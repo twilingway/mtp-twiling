@@ -11,7 +11,7 @@ import { MtpModel, activeMtpPeriods, lightweightMtp } from "../model/mtp.js";
 import { TIMEFRAMES } from "../model/history-codec.js";
 import type { Candle, ChartView, DrawingPoint } from "../model/types.js";
 import { logicalForTime, movingAverage, timeForLogical } from "./adapter.js";
-import { chartPriceFormat, positivePriceStep } from "./price-format.js";
+import { chartPriceFormat, lightweightPriceFormat } from "./price-format.js";
 import type { ChartAdapter, ChartOptions } from "./adapter.js";
 import { lineColor } from "../model/candle-palette.js";
 import { focusRange } from "./navigation.js";
@@ -99,7 +99,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     wickVisible: settings.wickVisible !== false,
     priceLineVisible: false,
     lastValueVisible: false,
-    priceFormat: { type: "price", ...priceFormat }
+    priceFormat: lightweightPriceFormat(priceFormat)
   });
   const volume = chart.addSeries(HistogramSeries, {
     priceFormat: { type: "volume" },
@@ -332,13 +332,15 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
         !instrumentUid ||
         metadata.uid !== instrumentUid ||
         live.source?.uid !== metadata.uid ||
-        live.source.owner !== metadata.owner ||
-        !positivePriceStep(metadata.step)
+        live.source.owner !== metadata.owner
       )
         return;
-      const next = chartPriceFormat({ symbol: row.symbol, step: metadata.step });
+      const next = chartPriceFormat(
+        { symbol: row.symbol, step: metadata.step, price: metadata.priceHint },
+        priceFormat
+      );
       if (next.minMove === priceFormat.minMove && next.precision === priceFormat.precision) return;
-      camera.programmatic(() => series.applyOptions({ priceFormat: { type: "price", ...next } }));
+      camera.programmatic(() => series.applyOptions({ priceFormat: lightweightPriceFormat(next) }));
       priceFormat = next;
     },
     ...lightweightNavigation(

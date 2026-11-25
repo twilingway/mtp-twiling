@@ -1,5 +1,6 @@
 import type { ChartAdapter } from "../../charts/adapter.js";
-import { positivePriceStep } from "../../charts/price-format.js";
+import { chartPriceFormat, positivePriceStep } from "../../charts/price-format.js";
+import type { ChartPriceFormat } from "../../charts/price-format.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { viewKey } from "./controller-bridge.js";
 import type { TerminalController } from "./controller.js";
@@ -14,7 +15,7 @@ export function watchChartPriceMetadata(
   if (!source || !adapter.updatePriceFormat) return () => {};
   const session = controller.sessionKey(),
     revision = controller.getSnapshot().chartRevision;
-  let appliedStep: number | undefined;
+  let applied: ChartPriceFormat | undefined;
   const update = () => {
     const state = controller.getSnapshot(),
       row = selectedMarketRow(state.rows, state.preferences);
@@ -32,13 +33,23 @@ export function watchChartPriceMetadata(
       adapter.source.uid !== source.uid ||
       adapter.source.viewKey !== source.viewKey ||
       viewKey(state.preferences) !== source.viewKey ||
-      row?.uid !== source.uid ||
-      !positivePriceStep(row.step) ||
-      row.step === appliedStep
+      row?.uid !== source.uid
     )
       return;
-    adapter.updatePriceFormat?.({ owner: source.owner, uid: source.uid, step: row.step });
-    appliedStep = row.step;
+    if (
+      !positivePriceStep(row.step) &&
+      !(typeof row.price === "number" && Number.isFinite(row.price))
+    )
+      return;
+    const next = chartPriceFormat(row, applied);
+    if (next.minMove === applied?.minMove && next.precision === applied.precision) return;
+    adapter.updatePriceFormat?.({
+      owner: source.owner,
+      uid: source.uid,
+      step: next.minMove,
+      priceHint: row.price
+    });
+    applied = next;
   };
   const unsubscribe = controller.subscribe(update);
   update();

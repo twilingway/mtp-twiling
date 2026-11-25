@@ -338,6 +338,25 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
 }
 
 for(const engine of ["lightweight","kline"]){
+ test(`${engine} unknown tick uses actual quote precision before metadata, expands without jitter, and yields to a real step`,()=>{
+  const f=harness(engine,{symbol:"TGKA",uid:"tgka",step:null,price:.004842});
+  f.adapter.source={owner:"A",uid:"tgka",viewKey:`TGKA:1d:${engine}:365`};
+  if(engine==="lightweight")assert.equal(f.priceFormats[0].formatter(.004842),"0.004842");
+  else assert.equal(f.priceFormats[0].precision,6);
+  f.adapter.setData(Array.from({length:1200},(_,i)=>({timestamp:Date.UTC(2022,0,1)+i*86400000,open:.0048,high:.0049,low:.0047,close:.004842,volume:1})),false);f.ready();
+  f.adapter.setView({camera:{barSpace:1.0550660792951543,rightOffsetBars:-444.16359109010153}});f.ready();
+  const before=f.camera();f.calls.length=0;
+  f.adapter.updatePriceFormat({owner:"A",uid:"tgka",step:null,priceHint:.004842001});f.ready();
+  if(engine==="lightweight")assert.equal(f.priceFormats.at(-1).formatter(.004842001),"0.004842001");
+  else assert.equal(f.priceFormats.at(-1).precision,9);
+  const expanded=f.priceFormats.length;
+  f.adapter.updatePriceFormat({owner:"A",uid:"tgka",step:null,priceHint:.0048});assert.equal(f.priceFormats.length,expanded);
+  f.adapter.updatePriceFormat({owner:"B",uid:"tgka",step:null,priceHint:.004842111});assert.equal(f.priceFormats.length,expanded);
+  f.adapter.updatePriceFormat({owner:"A",uid:"tgka",step:.000002});f.ready();assert.equal(f.priceFormats.at(-1).precision,6);
+  const resolved=f.priceFormats.length;
+  f.adapter.updatePriceFormat({owner:"A",uid:"tgka",step:null,priceHint:.004842111});assert.equal(f.priceFormats.length,resolved);
+  assert.deepEqual(f.camera(),before);assert.deepEqual(f.calls,[]);
+ });
  test(`${engine} late price metadata updates precision without data, camera, canvas or label replacement`,()=>{
   const f=harness(engine,{symbol:"VTBR",uid:"vtbr",step:null});
   f.adapter.source={owner:"A",uid:"vtbr",viewKey:`VTBR:1d:${engine}:365`};

@@ -11,8 +11,8 @@ import type { Coordinate, Indicator, IndicatorDrawParams, Point } from "klinecha
 import { MtpModel, activeMtpPeriods } from "../model/mtp.js";
 import { TIMEFRAMES } from "../model/history-codec.js";
 import type { Candle, ChartView, DrawingPoint } from "../model/types.js";
-import { logicalForTime, precision, timeForLogical } from "./adapter.js";
-import { positivePriceStep } from "./price-format.js";
+import { logicalForTime, timeForLogical } from "./adapter.js";
+import { chartPriceFormat } from "./price-format.js";
 import type { ChartAdapter, ChartOptions } from "./adapter.js";
 import { beginKlinePan, freezeKlinePriceScale, resetKlinePriceScale } from "./kline-price-scale.js";
 import { focusRange } from "./navigation.js";
@@ -34,7 +34,7 @@ import { UserCameraEvents } from "./camera-events.js";
 export function makeKline(options: ChartOptions): ChartAdapter {
   const camera = new UserCameraEvents(options);
   const instrumentUid = options.row.uid;
-  let pricePrecision = precision(options.row);
+  let priceFormat = chartPriceFormat(options.row);
   const { container, settings, timeframe, indicators } = options;
   let data: Candle[] = [],
     dataReady = false;
@@ -181,7 +181,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     layout: options.indicatorPaneLayout,
     onChange: options.onIndicatorLayout
   });
-  chart.setPriceVolumePrecision(pricePrecision, 0);
+  chart.setPriceVolumePrecision(priceFormat.precision, 0);
   const front = document.createElement("canvas");
   front.className = "foreground-canvas";
   container.parentElement?.append(front);
@@ -295,18 +295,21 @@ export function makeKline(options: ChartOptions): ChartAdapter {
         !instrumentUid ||
         metadata.uid !== instrumentUid ||
         live.source?.uid !== metadata.uid ||
-        live.source.owner !== metadata.owner ||
-        !positivePriceStep(metadata.step)
+        live.source.owner !== metadata.owner
       )
         return;
-      const next = precision({ ...options.row, step: metadata.step });
-      if (next === pricePrecision) return;
+      const next = chartPriceFormat(
+        { ...options.row, step: metadata.step, price: metadata.priceHint },
+        priceFormat
+      );
+      const changed = next.precision !== priceFormat.precision;
+      priceFormat = next;
+      if (!changed) return;
       camera.programmatic(() => {
-        chart.setPriceVolumePrecision(next, 0);
+        chart.setPriceVolumePrecision(next.precision, 0);
         // KLine 9.8 updates only its precision store; invalidate native labels via public API.
         chart.setStyles({});
       });
-      pricePrecision = next;
     },
     ...klineNavigation(
       chart,
