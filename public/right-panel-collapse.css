@@ -83,9 +83,6 @@
   .workspace .quote-row {
     height: 44px;
   }
-  .workspace .quote-row:not(.selected) .quote-remove {
-    display: none;
-  }
   .workspace .quote-row .quote-percent {
     max-width: none;
   }

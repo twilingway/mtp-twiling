@@ -115,7 +115,9 @@
   right: 2px;
   top: 50%;
   transform: translateY(-50%);
-  display: none;
+  display: grid;
+  opacity: 0;
+  pointer-events: none;
   place-items: center;
   width: 25px;
   height: 25px;
@@ -125,13 +127,21 @@
   background: #131722;
   color: #d1d4dc;
 }
-.quote-row:hover .quote-remove,
-.quote-row:focus-within .quote-remove {
-  display: grid;
+.quote-remove:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
 }
-.quote-row:hover .quote-percent,
-.quote-row:focus-within .quote-percent {
+.quote-row:has(.quote-remove:focus-visible) .quote-percent {
   opacity: 0;
+}
+@media (hover: hover) {
+  .quote-row:hover .quote-remove {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .quote-row:hover .quote-percent {
+    opacity: 0;
+  }
 }
 .watchlist-context-menu > button {
   display: flex;
@@ -160,17 +170,6 @@
 }
 .quote-row.drop-after > td {
   box-shadow: inset 0 -2px #2962ff;
-}
-@media (pointer: coarse) {
-  .quote-remove {
-    display: grid;
-    right: 1px;
-  }
-  .quote-percent {
-    display: inline-block;
-    max-width: calc(100% - 25px);
-    overflow: hidden;
-  }
 }
 @media (max-width: 800px) {
   .workspace {
