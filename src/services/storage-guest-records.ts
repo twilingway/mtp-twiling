@@ -1,5 +1,6 @@
 import { object } from "./types.js";
 import { db } from "./storage-db.js";
+import { isInertPublicDriveBootstrap } from "./storage-guest-drive-bootstrap.js";
 
 export const GUEST_SOURCE = "guest";
 export const GUEST_TARGET = "profile-v2:public";
@@ -120,6 +121,13 @@ export async function publicTargetOccupied(tx: IDBTransaction): Promise<boolean>
     `watchlist:${GUEST_TARGET}`,
     `market:${GUEST_TARGET}`
   ]);
+  if (keys.includes("drive-v2:public")) {
+    const [drive, device] = await Promise.all([
+      requestValue<unknown>(pref.get("drive-v2:public")),
+      requestValue<unknown>(pref.get("drive-device"))
+    ]);
+    if (isInertPublicDriveBootstrap(drive, device)) bootstrap.add("drive-v2:public");
+  }
   if (
     keys.some(
       (key) =>

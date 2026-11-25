@@ -85,3 +85,26 @@ Classifier отдельно исполняется в VM с другим Error c
 7. Задержать DB/Blob чтение и выполнить import/profile switch: нет старого download/late warning.
    Обычный выбор инструмента во время history await сохраняет установленный client. Abort до
    adoption commit не оставляет copies; abort после commit не выдавать за rollback.
+
+## Source fix browser blocker C19
+
+Отдельный пакет от `6edd57e3a1c2fa4bc011111db9bda305f1f86949` в ветке
+`fix/guest-drive-bootstrap-inert`. Сохранённый C19 repro подтвердил, что genuine .18 создаёт
+`drive-v2:public` даже без linked/head/digest/pending данных. Прежний classifier считал сам ключ
+занятостью.
+
+Новый pure checker допускает только exact data/plain envelope и пять полей bootstrap value:
+schemaVersion 1, automatic true, empty baseHeads, markerId/deviceId как валидные v4 UUID и точное
+совпадение отдельного exact drive-device. Любые extra/linked/pending/digest, иная shape, owner,
+UUID/mismatch остаются occupied. Два exact metadata record читаются внутри той же транзакции.
+Drive/source/device и существующие решения миграции не удаляются и не переписываются.
+
+`test/guest-drive-bootstrap.test.mjs`: 4/4, включая фактический production loadDriveRecord
+bootstrap, 28 вариантов occupied metadata, реальный public layout, прежний occupied decision и
+adversarial accessor/prototype/symbol shapes. Совместно guest/Drive coordinator/auth/storage-v2:
+**69/69**. `pnpm.cmd typecheck`, scoped ESLint/Prettier, `git diff --check`, strict OpenSpec
+**39/39** — успешно. Лог: ignored `artifacts/guest-drive-bootstrap-tests.tap` в fix worktree.
+Browser/build не запускались.
+
+Для повторной browser C проверки использовать сохранённый .18 baseline до ошибочного .19 decision.
+Уже существующий target-occupied marker намеренно не пересматривается: инвариант one-shot сохранён.

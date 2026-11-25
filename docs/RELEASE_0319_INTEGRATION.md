@@ -1,7 +1,8 @@
 # Версия 0.3.19: интеграционная проверка
 
 Изолированная ветка `feat/release-0319`, worktree `vps/artifacts/release-0319-worktree`. Она не
-меняет замороженную приёмку0.3.18 и опубликованную0.3.17.
+содержит следующую версию после опубликованной0.3.18. Публичный main остаётся `3a31c02` до
+завершения приёмки этого пакета.
 
 ## Состав
 
@@ -30,13 +31,30 @@ Drive allowlist расширен только `expansionLength`, `contractionLen
 
 ## Доказательства и пределы
 
-Общий `pnpm check`:672/672; build `aa46780921ea33f2`. Первый прогон нашёл устаревшую fixture
+Первый общий `pnpm check`:672/672; build `aa46780921ea33f2`. Первый прогон нашёл устаревшую fixture
 currency-search без обязательного preferences. Исправлена только fixture; production state не
 ослаблялся. Повторный полный прогон зелёный. Отдельные native/context/portability tests:20/20. Логи
 находятся в `vps/artifacts/release-0319-integration-check.log` и
 `vps/artifacts/release-0319-integration-spec.log`.
 
 Actual adapter fixtures подтверждают выходы29 общих формул в обоих движках, явный HV context,
-сохранение камеры/данных и bounded layout. Они не заменяют настоящую браузерную проверку.
-Независимая desktop/mobile QA0.3.19, реальный Google login/sync и публикация этой версии ещё не
-выполнены. Плотная легенда overlay на минимальной price pane остаётся отдельным UI замечанием.
+сохранение камеры/данных и bounded layout. Они не заменяют настоящую браузерную проверку. Первый
+браузерный прогон нашёл слишком большие SVG меню разделов и перехват кликов нижними панелями при
+плотной легенде. Оба дефекта исправлены в `be490a7`; отдельная повторная приёмка
+`vps/artifacts/release-0319-ui-fixes-qa/report.json` подтверждает компактное меню на desktop/mobile,
+прокрутку девяти overlay, попадание в настройки каждого, сохранение камеры и отсутствие новых
+запросов истории. Иконки меню дополнительно получили собственные размеры и stroke в `dc98e37`.
+
+Guest recovery `549f17b` включён как `53fc5b7`. Raw guest переносится атомарно только в доказанно
+пустое public-пространство; исходник остаётся. При занятом public доступны отдельный offline backup
+и явный импорт с предупреждением. Bank/vault/session записи не копируются. Последняя исходная
+проверка `6edd57e`:693/693 tests,39/39 strict specs, build `cae30ec3f52ee69b`, PR6 CI run16 PASS.
+Параметры ТА имеют читаемые подписи RU/EN; collapsed badge учитывает overlay ТА.
+
+Final browser QA в `vps/artifacts/guest-recovery-final-qa` подтвердила A raw17 и B occupied18:
+исходный guest byte-exact, текущий public сохраняется; offline export, явный import и возврат
+текущего backup работают. Для C genuine empty18 найден blocker: автоматически созданная инертная
+запись drive-v2:public считается пользовательским содержимым. До строгого исправления classifier и
+повторной приёмки из сохранённого .18 baseline публикация .19 запрещена. Исходный baseline и
+ошибочный C-run сохраняются; decision не удаляется ради теста. Native IndexedDB fault/race cases ещё
+проверяются. Реальный Google login/sync и публикация этой версии не выполнены.

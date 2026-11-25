@@ -23,6 +23,13 @@ portable данные и историю/coverage. Source SHALL сохранят�
 - **WHEN** public содержит любой layout, включая defaults, либо другие данные
 - **THEN** автоперенос не заменяет их и сохраняется решение конфликта
 
+#### Scenario: Инертный Drive bootstrap версии .18
+
+- **WHEN** public содержит только empty bootstrap и точный несвязанный drive-v2:public из пяти полей
+  с совпадающим UUID drive-device
+- **THEN** эти метаданные не блокируют guest adoption и не изменяются;
+  linked/head/digest/pending/extra либо неверные UUID остаются occupied
+
 ### Requirement: Безопасный повтор и отмена
 
 Приложение SHALL сохранять отдельное решение copied/occupied/source-empty и соблюдать
