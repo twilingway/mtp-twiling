@@ -123,3 +123,16 @@ test("calendar rendering avoids repeated Intl parts conversion and uses a UTC fa
     Intl.DateTimeFormat.prototype.formatToParts = original;
   }
 });
+
+test("2m, 10m and 30m non-aligned candles keep clock ticks in fractional-offset zones", () => {
+  for (const [timeframe, duration] of [["2m", 2], ["10m", 10], ["30m", 30]]) {
+    const data = bars("2026-03-03T00:00:00Z", 200, duration * 60000);
+    const selected = calendarAxisTicks(data, timeframe, {
+      from: 80, to: 180, width: 1000, coordinate: (index) => (index - 80) * 10,
+      display: calendarAxisDisplay(timeframe, { timeZone: "Asia/Kathmandu", locale: "en" })
+    });
+    assert.ok(selected.length >= 3, `${timeframe} must keep a visible time axis`);
+    assert.ok(selected.some((tick) => tick.text.includes(":")), `${timeframe} must show clock ticks`);
+    for (const tick of selected) assert.ok(data.some((bar) => bar.timestamp === tick.value));
+  }
+});

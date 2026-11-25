@@ -97,7 +97,7 @@ export function TimeframeMenu({
             reason
               ? t(reason)
               : item.kind === "derived"
-                ? `Агрегация из ${getInterval(item.source).label.toLocaleLowerCase("ru")}`
+                ? `${t("Агрегация из")} ${t(getInterval(item.source).label)}`
                 : t(item.label)
           }
           onClick={() => {

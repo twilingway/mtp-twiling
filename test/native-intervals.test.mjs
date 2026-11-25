@@ -468,8 +468,12 @@ test("Lightweight calendar grid draws only actual monthly/day boundaries, indepe
     starts.map((p) => p.x),
     [0.5, 144.5, 288.5]
   );
+  starts.length = 0;
+  const minuteBars = Array.from({ length: 91 }, (_, index) =>
+    bar(at("2024-01-01T00:00:00Z") + index * 60_000)
+  );
   assert.equal(
-    draw(context, data, "1m", {
+    draw(context, minuteBars, "1m", {
       from: 0,
       to: 90,
       width: 600,
@@ -477,6 +481,7 @@ test("Lightweight calendar grid draws only actual monthly/day boundaries, indepe
       color: "#ddd",
       coordinate: (index) => index * 6
     }),
-    0
+    7
   );
+  assert.deepEqual(starts.map((point) => point.x), [0.5, 90.5, 180.5, 270.5, 360.5, 450.5, 540.5]);
 });

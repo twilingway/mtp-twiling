@@ -1,4 +1,5 @@
 export const intervalMessages = {
+  "Агрегация из": "Aggregated from",
   "Показать названия индикаторов": "Show indicator names",
   "Свернуть названия индикаторов": "Collapse indicator names",
   "Не удалось сохранить список индикаторов.": "Could not save the indicator list.",

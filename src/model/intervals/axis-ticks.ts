@@ -82,6 +82,10 @@ export function calendarAxisTicks(
     const year = !before || date.year !== before.year;
     const month = year || date.month !== before?.month;
     const day = month || date.day !== before?.day;
+    const crossedMinuteBucket =
+      !before ||
+      Math.floor((date.hour * 60 + date.minute) / minuteStep) !==
+        Math.floor((before.hour * 60 + before.minute) / minuteStep);
     before = date;
     let text: string, priority: number;
     if (year) {
@@ -94,7 +98,8 @@ export function calendarAxisTicks(
       text = lightweightCalendarLabel(timestamp, timeframe, 2, detailed, options.display)!;
       priority = 2;
     } else if (minuteAxis) {
-      if ((date.hour * 60 + date.minute) % minuteStep !== 0) continue;
+      // A UTC-aligned 2m/10m bar may never land exactly on Nepal's local round hour.
+      if (!crossedMinuteBucket) continue;
       text = lightweightCalendarLabel(timestamp, timeframe, 3, true, options.display)!;
       priority = 1;
     } else if (detailed) {
