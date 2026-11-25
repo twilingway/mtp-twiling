@@ -59,6 +59,7 @@ export function attachVolumePaneLayout(
   };
   chart.subscribeAction(ActionType.OnPaneDrag, onDrag);
   return {
+    ratio: () => ratio,
     height,
     apply,
     dispose: () => {

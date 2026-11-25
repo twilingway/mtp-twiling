@@ -251,6 +251,7 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
       },
       removeIndicator() {},
       createIndicator() {},
+      overrideIndicator() {},
       getDataList: () => data,
       getVisibleRange() {
         const to = Math.round(data.length + offset + 0.5);

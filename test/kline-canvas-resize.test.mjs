@@ -136,6 +136,12 @@ async function fixture({ ratio = 1 } = {}) {
     settled,
     width: (value) => (width = value),
     draws: () => draws,
+    addCanvas(height) {
+      const canvas = new NativeCanvas({}, () => draws++);
+      canvases.push(canvas);
+      canvas.update(width, height);
+      return canvas;
+    },
     race() {
       // Queue an ordinary redraw first. The actual installed Canvas drops the
       // subsequent RO pixel-resize callback while this redraw is pending.
@@ -221,4 +227,26 @@ test("recovery restores the current responsive width and cancels all work on des
   cancel();
   retiring.settled();
   assert.deepEqual(retiring.styleWrites, []);
+});
+
+test("new technical panes join recovery and removed canvases release observers", async () => {
+  const f = await fixture(),
+    dispose = f.attach(),
+    recoveryObserver = f.observers.at(-1);
+  const added = f.addCanvas(200);
+  f.settled();
+  await Promise.resolve();
+  dispose.refresh();
+  added.update(85, 200);
+  added.update(85, 300);
+  f.emit();
+  f.tick();
+  assert.equal(added.getElement().height, 200);
+  f.settled();
+  assert.equal(added.getElement().height, 300);
+  const removed = f.canvases.splice(0, 1)[0].getElement();
+  dispose.refresh();
+  assert.ok(!recoveryObserver.targets.includes(removed));
+  dispose();
+  assert.equal(recoveryObserver.targets.length, 0);
 });
