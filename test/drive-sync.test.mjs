@@ -26,7 +26,10 @@ function load(relative) {
   return module.exports;
 }
 const { DRIVE_SCOPE, DRIVE_NAMESPACE } = load("services/drive/types.ts");
-const { DriveAuth } = load("services/drive/auth.ts");
+const { DriveAuth: RealDriveAuth } = load("services/drive/auth.ts");
+class DriveAuth extends RealDriveAuth {
+  constructor(loader, now) { super(loader, now, { load: async () => undefined, save: async () => {}, remove: async () => {} }); }
+}
 const { sanitizeDriveBackup, sha256, prepareDriveBackup, validateManifest, driveBackupDigest } =
   load("services/drive/backup.ts");
 const { DriveTransport } = load("services/drive/transport.ts");
@@ -241,15 +244,15 @@ test("GIS prepare never opens a popup; click synchronously requests only appdata
   const oauth = fakeOAuth();
   const auth = new DriveAuth(async () => oauth.sdk);
   try {
-    await assert.rejects(auth.connectFromUserGesture(), code("not-ready"));
+    await assert.rejects(auth.connectFromUserGesture("fixture-owner"), code("not-ready"));
     await auth.prepare();
     assert.equal(oauth.prompts.length, 0);
-    const pending = auth.connectFromUserGesture();
+    const pending = auth.connectFromUserGesture("fixture-owner");
     assert.equal(oauth.prompts.length, 1);
     assert.equal(oauth.configs[0].scope, DRIVE_SCOPE);
     assert.equal(oauth.configs[0].include_granted_scopes, false);
     assert.deepEqual(oauth.prompts[0], { prompt: "select_account" });
-    await assert.rejects(auth.connectFromUserGesture(), code("busy"));
+    await assert.rejects(auth.connectFromUserGesture("fixture-owner"), code("busy"));
     oauth.accept();
     const connected = await pending;
     assert.equal(connected.getAccessToken(), "fake-google-token");
@@ -271,13 +274,13 @@ test("Expiry requires a new click; stale callback/old HTTP binding cannot switch
   );
   try {
     await auth.prepare();
-    let pending = auth.connectFromUserGesture();
+    let pending = auth.connectFromUserGesture("fixture-owner");
     oauth.accept();
     const first = await pending;
     now += 3600000;
     assert.throws(() => first.getAccessToken(), code("auth-required"));
     assert.equal(oauth.prompts.length, 1);
-    pending = auth.connectFromUserGesture();
+    pending = auth.connectFromUserGesture("fixture-owner");
     oauth.accept(0, "old-account-token");
     oauth.accept(1, "second-account-token");
     const second = await pending;
@@ -296,13 +299,13 @@ test("GIS denial, popup cancellation and disconnect reject pending requests", as
   const oauth = fakeOAuth();
   const auth = new DriveAuth(async () => oauth.sdk);
   await auth.prepare();
-  let pending = auth.connectFromUserGesture();
+  let pending = auth.connectFromUserGesture("fixture-owner");
   oauth.configs[0].callback({ error: "access_denied" });
   await assert.rejects(pending, code("auth-required"));
-  pending = auth.connectFromUserGesture();
+  pending = auth.connectFromUserGesture("fixture-owner");
   oauth.configs[1].error_callback({ type: "popup_closed" });
   await assert.rejects(pending, code("auth-cancelled"));
-  pending = auth.connectFromUserGesture();
+  pending = auth.connectFromUserGesture("fixture-owner");
   const rejection = assert.rejects(pending, code("auth-cancelled"));
   await auth.disconnect();
   await rejection;
@@ -584,7 +587,7 @@ test("Insufficient scope and invalid token lifetime cannot authorize Drive", asy
     { access_token: "fake", expires_in: "NaN", scope: DRIVE_SCOPE },
     { access_token: "fake", expires_in: 2, scope: DRIVE_SCOPE }
   ]) {
-    const pending = auth.connectFromUserGesture();
+    const pending = auth.connectFromUserGesture("fixture-owner");
     oauth.configs.at(-1).callback(token);
     await assert.rejects(pending, code("auth-required"));
   }

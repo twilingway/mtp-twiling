@@ -25,6 +25,7 @@ export async function loadDriveRecord(owner: string): Promise<DriveRecord> {
         deviceId: record.deviceId,
         baseHeads: record.baseHeads.map((item: unknown) => String(item)),
         automatic: record.automatic !== false,
+        pendingChanges: record.pendingChanges === true,
         ...(typeof record.lastSyncedDigest === "string"
           ? { lastSyncedDigest: record.lastSyncedDigest }
           : {}),

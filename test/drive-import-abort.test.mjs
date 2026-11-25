@@ -244,7 +244,7 @@ for(const phase of ["owner","session","logout"]){
       profile:()=>profile,exportBackup:async()=>structuredClone(initial),
       importBackup:async(data,options)=>{importedSignal=options.signal;await transfers.import(data,options);}
     },{
-      auth:{prepare:async()=>{},connectFromUserGesture:()=>{authorized=true;return Promise.resolve({connectionId:crypto.randomUUID(),signal:a.signal,getAccessToken:()=>"fake",invalidate:()=>a.controller.abort()});},disconnect:async()=>{if(authorized)a.controller.abort();}},
+      auth:{prepare:async()=>{},restore:async()=>undefined,suspend:()=>{if(authorized)a.controller.abort();},connectFromUserGesture:()=>{authorized=true;return Promise.resolve({connectionId:crypto.randomUUID(),signal:a.signal,getAccessToken:()=>"fake",invalidate:()=>a.controller.abort()});},disconnect:async()=>{if(authorized)a.controller.abort();}},
       sync:()=>({inspect:async()=>({heads:[head],snapshots:[],conflict:false}),download:async()=>incoming,
         publish:async()=>assert.fail("must pull"),resolve:async()=>assert.fail("must pull")}),
       load:async()=>({schemaVersion:1,deviceId:crypto.randomUUID(),markerId:crypto.randomUUID(),baseHeads:[base],lastSyncedDigest:await driveBackupDigest(initial),automatic:false}),

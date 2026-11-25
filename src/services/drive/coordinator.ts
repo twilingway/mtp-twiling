@@ -3,29 +3,33 @@ import { DriveError } from "./types.js";
 import type { Backup } from "../../model/types.js";
 import type { DriveAuthorization, DriveInspection } from "./types.js";
 import { summarize } from "./coordinator-types.js";
+import { driveAvailable, driveFailure, prepareDriveIdentity } from "./coordinator-status.js";
 import type {
   DriveBridge,
   DriveDependencies,
   DriveRecord,
   DriveStatus
 } from "./coordinator-types.js";
-
 const same = (left: string[], right: string[]) =>
   [...left].sort().join() === [...right].sort().join();
 const cancelled = () => new DOMException("Синхронизация прервана", "AbortError");
-
-/** Owns a single bank profile/Google memory session; never owns market or history storage. */
 export class DriveCoordinator {
   private status: DriveStatus = {
     phase: "disconnected",
     prepared: false,
     preparing: false,
     connected: false,
-    automatic: true
+    automatic: true,
+    pendingChanges: false,
+    authorizationStored: false,
+    credentialSaveError: false
   };
   private readonly listeners = new Set<() => void>();
   private owner = "";
   private session: unknown;
+  private authenticated = false;
+  private restoredEpoch: number | undefined;
+  private resumeDue = false;
   private epoch = 0;
   private revision = 0;
   private authorization: DriveAuthorization | undefined;
@@ -35,7 +39,6 @@ export class DriveCoordinator {
   private applyingEpoch: number | undefined;
   private debounce: ReturnType<typeof setTimeout> | undefined;
   private preview: { heads: string[]; digest: string; revision: number } | undefined;
-
   constructor(
     private readonly bridge: DriveBridge,
     private readonly dependencies: DriveDependencies
@@ -52,28 +55,80 @@ export class DriveCoordinator {
   profileChanged(): void {
     const profile = this.bridge.profile();
     const changed = profile.owner !== this.owner || profile.session !== this.session;
-    if (!changed && profile.authenticated) return;
-    if (!changed && !this.status.connected && this.status.phase !== "connecting") return;
+    if (!changed && profile.authenticated === this.authenticated) {
+      if (this.resumeDue && !profile.blocked) {
+        this.resumeDue = false;
+        void this.sync();
+      }
+      return;
+    }
+    if (!profile.authenticated && this.authenticated) this.disconnect();
+    else this.suspend();
     this.owner = profile.owner;
     this.session = profile.session;
-    this.disconnect();
+    this.authenticated = profile.authenticated;
     this.record = undefined;
     this.status = {
       phase: "disconnected",
       prepared: this.status.prepared,
       preparing: false,
       connected: false,
-      automatic: true
+      automatic: true,
+      pendingChanges: false,
+      authorizationStored: false,
+      credentialSaveError: false
     };
     this.listeners.forEach((listener) => listener());
+    if (profile.authenticated) void this.restoreProfile(this.epoch);
+  }
+  private profileCurrent(epoch: number): boolean {
+    const profile = this.bridge.profile();
+    return (
+      epoch === this.epoch &&
+      profile.authenticated &&
+      profile.owner === this.owner &&
+      profile.session === this.session
+    );
+  }
+  private async restoreProfile(epoch: number): Promise<void> {
+    if (this.restoredEpoch === epoch) return;
+    this.restoredEpoch = epoch;
+    try {
+      const record = await this.dependencies.load(this.owner);
+      if (!this.profileCurrent(epoch)) return;
+      this.record = record;
+      this.update({
+        automatic: record.automatic,
+        pendingChanges: this.status.pendingChanges || record.pendingChanges === true,
+        lastSyncedAt: record.lastSyncedAt
+      });
+      const authorization = await this.dependencies.auth.restore(this.owner);
+      if (!this.profileCurrent(epoch)) {
+        authorization?.invalidate();
+        return;
+      }
+      if (authorization) await this.attach(authorization, epoch, true);
+      else this.update({ pauseReason: "auth-required" });
+    } catch {
+      /* A failed local restore never starts OAuth or blocks an explicit connection. */
+    }
+  }
+  resume(): void {
+    this.profileChanged();
+    if (this.bridge.profile().authenticated && !this.authorization)
+      void this.restoreProfile(this.epoch);
   }
   localChanged(): void {
     if (this.applyingEpoch !== this.epoch) {
       this.revision++;
+      this.update({ pendingChanges: true });
+      if (this.record) {
+        this.record = { ...this.record, pendingChanges: true };
+        void this.dependencies.save(this.owner, this.record).catch(() => {});
+      }
       this.schedule();
     }
   }
-  /** Invalidates an incoming snapshot before native geometry settles, without requesting upload. */
   localIntent(): void {
     if (this.applyingEpoch !== this.epoch) this.revision++;
   }
@@ -84,17 +139,8 @@ export class DriveCoordinator {
       void this.sync();
     }, 1500);
   }
-  async prepare(): Promise<void> {
-    if (this.status.prepared || this.status.preparing) return;
-    this.update({ preparing: true });
-    try {
-      await this.dependencies.auth.prepare();
-      this.update({ prepared: true });
-    } catch {
-      this.update({ phase: "error", error: "network" });
-    } finally {
-      this.update({ preparing: false });
-    }
+  prepare(): Promise<void> {
+    return prepareDriveIdentity(this.dependencies.auth, this.status, (patch) => this.update(patch));
   }
   /** The GIS call occurs synchronously, before the first await in the click path. */
   async connect(): Promise<void> {
@@ -109,48 +155,63 @@ export class DriveCoordinator {
     this.owner = profile.owner;
     this.session = profile.session;
     const epoch = ++this.epoch,
-      pending = this.dependencies.auth.connectFromUserGesture();
+      pending = this.dependencies.auth.connectFromUserGesture(profile.owner);
     this.update({ phase: "connecting", error: undefined, conflict: undefined });
     try {
       const authorization = await pending;
-      if (
-        epoch !== this.epoch ||
-        this.bridge.profile().owner !== this.owner ||
-        this.bridge.profile().session !== this.session ||
-        !this.bridge.profile().authenticated
-      ) {
+      if (!this.profileCurrent(epoch)) {
         authorization.invalidate();
         return;
       }
-      this.authorization = authorization;
-      authorization.signal.addEventListener(
-        "abort",
-        () => {
-          if (epoch !== this.epoch) return;
-          this.remote = undefined;
-          this.authorization = undefined;
-          this.preview = undefined;
-          clearTimeout(this.debounce);
-          this.update({ phase: "auth-required", connected: false, conflict: undefined });
-        },
-        { once: true }
-      );
-      const record = await this.dependencies.load(this.owner);
-      if (!this.current(epoch)) return;
-      this.record = record;
-      this.remote = this.dependencies.sync(authorization);
-      this.update({
-        phase: "idle",
-        connected: true,
-        automatic: record.automatic,
-        ...(record.lastSyncedAt ? { lastSyncedAt: record.lastSyncedAt } : {})
-      });
-      await this.sync();
+      await this.attach(authorization, epoch, false);
     } catch (error) {
       if (epoch === this.epoch) this.fail(error);
     }
   }
-  disconnect = (): void => {
+  private async attach(
+    authorization: DriveAuthorization,
+    epoch: number,
+    restored: boolean
+  ): Promise<void> {
+    this.authorization = authorization;
+    authorization.signal.addEventListener(
+      "abort",
+      () => {
+        if (epoch !== this.epoch) return;
+        this.remote = undefined;
+        this.authorization = undefined;
+        this.preview = undefined;
+        clearTimeout(this.debounce);
+        this.update({
+          phase: "auth-required",
+          connected: false,
+          conflict: undefined,
+          pauseReason: "auth-required",
+          error: "auth-required",
+          authorizationStored: false,
+          credentialSaveError: false
+        });
+      },
+      { once: true }
+    );
+    const record = this.record ?? (await this.dependencies.load(this.owner));
+    if (!this.current(epoch)) return;
+    this.record = record;
+    this.remote = this.dependencies.sync(authorization);
+    this.update({
+      phase: "idle",
+      connected: true,
+      automatic: record.automatic,
+      pendingChanges: this.status.pendingChanges || record.pendingChanges === true,
+      authorizationStored: authorization.stored === true,
+      credentialSaveError: authorization.persistenceError === true,
+      pauseReason: undefined,
+      ...(record.lastSyncedAt ? { lastSyncedAt: record.lastSyncedAt } : {})
+    });
+    this.resumeDue = record.automatic && this.bridge.profile().blocked;
+    if (!restored || record.automatic) await this.sync();
+  }
+  suspend = (): void => {
     this.epoch++;
     clearTimeout(this.debounce);
     this.authorization = undefined;
@@ -158,8 +219,24 @@ export class DriveCoordinator {
     this.preview = undefined;
     this.busy = false;
     this.applyingEpoch = undefined;
-    void this.dependencies.auth.disconnect().catch(() => {});
-    this.update({ phase: "disconnected", connected: false, conflict: undefined, error: undefined });
+    this.resumeDue = false;
+    this.dependencies.auth.suspend();
+    this.update({
+      phase: "disconnected",
+      connected: false,
+      conflict: undefined,
+      error: undefined,
+      authorizationStored: false,
+      credentialSaveError: false,
+      pauseReason: undefined
+    });
+  };
+  disconnect = (): void => {
+    this.suspend();
+    const epoch = this.epoch;
+    void this.dependencies.auth.disconnect().catch(() => {
+      if (epoch === this.epoch) this.update({ credentialSaveError: true });
+    });
   };
   private current(epoch: number): boolean {
     const profile = this.bridge.profile();
@@ -177,14 +254,7 @@ export class DriveCoordinator {
       throw cancelled();
   }
   private fail(error: unknown): void {
-    if (!this.status.connected && this.status.phase === "auth-required") return;
-    if (error instanceof DOMException && error.name === "AbortError") {
-      this.update({ phase: "idle", error: "local-changed" });
-      this.schedule();
-      return;
-    }
-    const code = error instanceof DriveError ? error.code : "network";
-    this.update({ phase: code === "auth-required" ? "auth-required" : "error", error: code });
+    driveFailure(this.status, error, this.update.bind(this), this.schedule.bind(this));
   }
   async setAutomatic(automatic: boolean): Promise<void> {
     this.update({ automatic });
@@ -195,14 +265,17 @@ export class DriveCoordinator {
     if (automatic) this.schedule();
     else clearTimeout(this.debounce);
   }
-  /** Bounded polling/focus caller; explicit user sync also works with automatic disabled. */
+  private available(): boolean {
+    return driveAvailable(this.authorization, this.dependencies, (patch) => this.update(patch));
+  }
   async sync(): Promise<void> {
     if (
       this.busy ||
       !this.remote ||
       !this.record ||
       !this.status.connected ||
-      this.bridge.profile().blocked
+      this.bridge.profile().blocked ||
+      !this.available()
     )
       return;
     clearTimeout(this.debounce);
@@ -211,7 +284,12 @@ export class DriveCoordinator {
       revision = this.revision;
     this.busy = true;
     this.preview = undefined;
-    this.update({ phase: "syncing", error: undefined, conflict: undefined });
+    this.update({
+      phase: "syncing",
+      error: undefined,
+      conflict: undefined,
+      pauseReason: undefined
+    });
     try {
       const backup = sanitizeDriveBackup(await this.bridge.exportBackup());
       this.check(epoch, revision);
@@ -249,8 +327,8 @@ export class DriveCoordinator {
           await this.conflict(result.inspection, backup, digest, epoch, revision);
           return;
         }
-        await this.accept([result.nodeId], digest, epoch);
-      } else await this.accept(inspection.heads, digest, epoch);
+        await this.accept([result.nodeId], digest, epoch, revision);
+      } else await this.accept(inspection.heads, digest, epoch, revision);
     } catch (error) {
       if (this.current(epoch)) {
         if (error instanceof DriveError && error.code === "conflict") {
@@ -290,7 +368,15 @@ export class DriveCoordinator {
     const preview = this.preview,
       remote = this.remote,
       record = this.record;
-    if (!preview || !remote || !record || this.busy || this.bridge.profile().blocked) return;
+    if (
+      !preview ||
+      !remote ||
+      !record ||
+      this.busy ||
+      this.bridge.profile().blocked ||
+      !this.available()
+    )
+      return;
     const epoch = this.epoch,
       revision = this.revision;
     this.busy = true;
@@ -333,7 +419,7 @@ export class DriveCoordinator {
           return;
         }
       }
-      if (nodeId === "local") await this.accept(heads, digest, epoch);
+      if (nodeId === "local") await this.accept(heads, digest, epoch, revision);
       else await this.apply(backup, heads, epoch, revision);
     } catch (error) {
       if (this.current(epoch)) {
@@ -374,24 +460,36 @@ export class DriveCoordinator {
     }
     const applied = await this.bridge.exportBackup();
     this.check(epoch, revision);
-    await this.accept(heads, await driveBackupDigest(applied), epoch);
+    await this.accept(heads, await driveBackupDigest(applied), epoch, revision);
   }
-  private async accept(heads: string[], digest: string, epoch: number): Promise<void> {
+  private async accept(
+    heads: string[],
+    digest: string,
+    epoch: number,
+    revision: number
+  ): Promise<void> {
     this.check(epoch);
     if (!this.record) throw cancelled();
     const record = {
       ...this.record,
       baseHeads: [...heads],
       lastSyncedDigest: digest,
+      pendingChanges: revision !== this.revision,
       lastSyncedAt: new Date().toISOString()
     };
     await this.dependencies.save(this.owner, record);
     this.check(epoch);
     this.record = record;
+    if (revision !== this.revision && !record.pendingChanges) {
+      this.record = { ...record, pendingChanges: true };
+      await this.dependencies.save(this.owner, this.record);
+      this.check(epoch);
+    }
     this.preview = undefined;
     this.update({
       phase: "idle",
       lastSyncedAt: record.lastSyncedAt,
+      pendingChanges: revision !== this.revision,
       conflict: undefined,
       error: undefined
     });

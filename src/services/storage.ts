@@ -1,6 +1,7 @@
 import { decodeCandles } from "../model/history-codec.js";
 import { assertImportCurrent, type BackupImportOptions } from "../model/backup-import.js";
 import { replacePortableRecords } from "./storage-portable.js";
+import { driveCredentialId } from "./drive/auth-credential-id.js";
 import { db, get, all, put, transaction, flush } from "./storage-db.js";
 export { flush } from "./storage-db.js";
 export {
@@ -149,7 +150,17 @@ export async function loadView(owner: string, key: string): Promise<ChartView | 
   if (!record) return undefined;
   return validatePart({ views: [{ key, value: record.value }] }).views?.[0]?.value;
 }
-async function deviceKey(): Promise<CryptoKey> {
+let deviceKeyPending: Promise<CryptoKey> | undefined;
+/** One non-extractable key shared by bank and Google credentials on this origin. */
+export function deviceKey(): Promise<CryptoKey> {
+  if (!deviceKeyPending)
+    deviceKeyPending = loadDeviceKey().catch((error: unknown) => {
+      deviceKeyPending = undefined;
+      throw error;
+    });
+  return deviceKeyPending;
+}
+async function loadDeviceKey(): Promise<CryptoKey> {
   const record = object(await get("vault", "device-key"));
   if (record) {
     if (!(record.key instanceof CryptoKey)) throw new Error("Повреждён ключ устройства.");
@@ -159,8 +170,18 @@ async function deviceKey(): Promise<CryptoKey> {
     "encrypt",
     "decrypt"
   ]);
-  await put("vault", { id: "device-key", key });
-  return key;
+  let selected = key;
+  await transaction(["vault"], (tx) => {
+    const store = tx.objectStore("vault"),
+      request = store.get("device-key");
+    request.onsuccess = () => {
+      const existing = object(request.result);
+      if (existing?.key instanceof CryptoKey) selected = existing.key;
+      else if (existing) tx.abort();
+      else store.add({ id: "device-key", key });
+    };
+  });
+  return selected;
 }
 interface Sealed {
   iv: string;
@@ -226,10 +247,11 @@ export async function restoreSession(): Promise<Session | null> {
     return null;
   }
 }
-export function clearSession(): Promise<void> {
+export function clearSession(owner?: string): Promise<void> {
   sessionStorage.removeItem("terminal-session");
   return transaction(["vault"], (tx) => {
     tx.objectStore("vault").delete("remembered");
+    if (owner) tx.objectStore("vault").delete(driveCredentialId(owner));
   });
 }
 export async function lastProfile(): Promise<{ owner: string; name: string } | undefined> {

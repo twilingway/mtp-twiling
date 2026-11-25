@@ -40,6 +40,7 @@ export function terminalDrive(controller: TerminalController): DriveCoordinator 
       },
       {
         auth: new DriveAuth(),
+        online: () => navigator.onLine,
         sync: (authorization) => new DriveSync(new DriveTransport(authorization)),
         load: loadDriveRecord,
         save: saveDriveRecord
@@ -87,7 +88,7 @@ export function startTerminalDrive(controller: TerminalController): () => void {
   });
   let previous = controller.getSnapshot(),
     signature = portableStateSignature(previous);
-  drive.profileChanged();
+  drive.resume();
   const unsubscribe = controller.subscribe(() => {
     const state = controller.getSnapshot();
     drive.profileChanged();
@@ -117,13 +118,17 @@ export function startTerminalDrive(controller: TerminalController): () => void {
   };
   const timer = setInterval(wake, 60000);
   window.addEventListener("focus", wake);
+  window.addEventListener("online", wake);
+  window.addEventListener("offline", wake);
   document.addEventListener("visibilitychange", wake);
   return () => {
     unsubscribe();
     unsubscribeCamera();
     clearInterval(timer);
     window.removeEventListener("focus", wake);
+    window.removeEventListener("online", wake);
+    window.removeEventListener("offline", wake);
     document.removeEventListener("visibilitychange", wake);
-    drive.disconnect();
+    drive.suspend();
   };
 }
