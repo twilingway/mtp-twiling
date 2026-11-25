@@ -13,6 +13,8 @@
   lint/typecheck/test/spec. Повторный exact-SHA CI gate перед активацией сохраняется.
 - Публичный deployment.json связывает SHA, semantic version, content buildId и контрольные суммы.
 - Health проверяет опубликованные файлы; ошибка возвращает предыдущий релиз.
+- Optional SHA pin ограничивает reviewed разовую попытку конкретным SHA и закрывает гонку смены main
+  между внешней проверкой оператора и запуском watcher.
 - Инструкция описывает отдельный Linux systemd watcher, nginx, HTTPS и существующее PWA-обновление.
 
 ## Capabilities
