@@ -36,7 +36,8 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
-      if (event.request.mode === "navigate")
+      // Only the app entry aliases the shell. Documents and assets keep their exact response.
+      if (event.request.mode === "navigate" && url.pathname === scope.pathname)
         return (await cache.match(new URL("index.html", scope).href)) || fetch(event.request);
       return (await cache.match(event.request, { ignoreSearch: true })) || fetch(event.request);
     })()
