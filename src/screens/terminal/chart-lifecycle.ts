@@ -37,7 +37,10 @@ export function useChartCanvas(
     uid = selectedMarketRow(state.rows, p)?.uid,
     renderKey = chartRenderConfigKey(p.chartSettings, p.indicators),
     renderConfig = useMemo(() => chartRenderConfigFromKey(renderKey), [renderKey]),
-    drawingsHidden = drawingToolbarSettings(p.chartSettings).drawingsHidden;
+    drawingsHidden = drawingToolbarSettings(p.chartSettings).drawingsHidden,
+    indicatorsHidden = drawingToolbarSettings(p.chartSettings).indicatorsHidden,
+    technicalInstances = p.technicalIndicators,
+    technicalLayout = p.technicalPaneLayout;
   useEffect(() => {
     const container = ref.current,
       owner = state.owner,
@@ -231,11 +234,22 @@ export function useChartCanvas(
     if (!adapter || adapter.retired || state.importingBackup || state.importRecoveryRequired)
       return;
     try {
-      adapter.updateTechnicalIndicators?.(technicalInputs(p), p.technicalPaneLayout ?? []);
+      const instances = technicalInstances ?? [];
+      adapter.updateTechnicalIndicators?.(
+        indicatorsHidden ? instances.map((item) => ({ ...item, visible: false })) : instances,
+        technicalLayout ?? []
+      );
     } catch (error: unknown) {
       controller.notify(error instanceof Error ? error.message : "Не удалось обновить индикатор.");
     }
-  }, [controller, p, state.importingBackup, state.importRecoveryRequired]);
+  }, [
+    controller,
+    technicalInstances,
+    technicalLayout,
+    indicatorsHidden,
+    state.importingBackup,
+    state.importRecoveryRequired
+  ]);
   useEffect(() => {
     adapterRef.current?.redrawDrawings();
   }, [
