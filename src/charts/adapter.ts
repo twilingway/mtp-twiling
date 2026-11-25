@@ -12,6 +12,8 @@ import type {
 export interface ChartAdapter {
   source?: { owner: string; viewKey: string; uid: string };
   persistView?: boolean;
+  /** Permanently excludes a superseded instance from capture and updates. */
+  retired?: boolean;
   setData(data: Candle[], fit: boolean): void;
   updateBar(bar: Candle): void;
   getView(): ChartView | null;

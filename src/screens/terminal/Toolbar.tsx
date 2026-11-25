@@ -15,10 +15,10 @@ export function Toolbar() {
   const [indicatorsOpen, setIndicatorsOpen] = useState(false);
   return (
     <header className="topbar">
-      <a className="brand" href="./" aria-label="mtp.twiling.ru">
-        <span className="brand-icon">∿</span>
+      <a className="brand" href="./" aria-label="MTP TWILING" title="MTP TWILING">
+        <img className="brand-icon" src="./icon.svg" width={25} height={25} alt="" />
         <span>
-          MTP <b>Twiling</b>
+          MTP <b>TWILING</b>
         </span>
       </a>
       <div className="divider" />

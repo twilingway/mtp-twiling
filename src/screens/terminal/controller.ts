@@ -23,7 +23,7 @@ import { TerminalSession } from "./controller-session.js";
 import { TerminalEditing } from "./controller-editing.js";
 import { TerminalDrawingTools } from "./controller-drawing-tools.js";
 import { TerminalPanel } from "./controller-panel.js";
-import { importTerminalBackup } from "./controller-import.js";
+import { TerminalBackups } from "./controller-backups.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { defaultPreferences } from "./controller-bridge.js";
 import type { ContextMenu, TerminalDialog, TerminalPreferences, TerminalState } from "./state.js";
@@ -64,6 +64,7 @@ export class TerminalController {
   readonly editing: TerminalEditing;
   readonly tools: TerminalDrawingTools;
   readonly panel: TerminalPanel;
+  private readonly backups: TerminalBackups;
   constructor() {
     const bridge = {
       getState: () => this.state,
@@ -89,6 +90,17 @@ export class TerminalController {
       },
       flush: () => this.flush()
     });
+    this.backups = new TerminalBackups({
+      ...bridge,
+      getClient: () => this.client,
+      saveView: this.saveView,
+      editing: this.editing,
+      session: this.session,
+      resetHistory: () => this.resetHistory(),
+      loadHistory: this.loadHistory,
+      flush: this.flush,
+      isAlive: () => !this.session.disposed
+    });
   }
   private get client(): TBankClient | null {
     return this.session.client;
@@ -101,6 +113,7 @@ export class TerminalController {
   };
   update = (patch: Partial<TerminalState>): void => {
     if (this.session.disposed) return;
+    if (patch.historyViewReady === false && this.chart) this.chart.persistView = false;
     const ownerChanged = patch.owner !== undefined && patch.owner !== this.state.owner;
     if (patch.preferences)
       patch = { ...patch, objectPanel: patch.preferences.rightPanelTab === "objects" };
@@ -115,6 +128,11 @@ export class TerminalController {
       this.editing.cancelGesture();
     if (ownerChanged)
       patch = {
+        importingBackup: false,
+        importRecoveryRequired: false,
+        backupBusy: false,
+        candles: [],
+        historyViewReady: true,
         mobilePanelOpen: false,
         objectPanel: false,
         drawings: [],
@@ -142,7 +160,14 @@ export class TerminalController {
       await storage.savePreferences(this.state.owner, this.state.preferences);
   }
   saveView = async (): Promise<void> => {
-    if (this.chart?.persistView === false) return;
+    if (
+      this.state.importRecoveryRequired ||
+      this.state.importingBackup ||
+      this.state.historyViewReady === false ||
+      this.chart?.retired ||
+      this.chart?.persistView === false
+    )
+      return;
     const source = this.chart?.source;
     if (
       source &&
@@ -239,6 +264,7 @@ export class TerminalController {
       next.instrumentUid !== previous.instrumentUid ||
       next.timeframe !== previous.timeframe ||
       next.rangeDays !== previous.rangeDays ||
+      next.engine !== previous.engine ||
       forceReload;
     if (reload) this.resetHistory();
     this.update({
@@ -294,7 +320,8 @@ export class TerminalController {
     };
     this.update({ preferences: { ...this.state.preferences, indicators, chartSettings } });
     await this.savePreferences();
-    if (key.startsWith("mtp") && indicators[key]) await this.loadHistory(true);
+    if (key !== "volume" && this.session.matches(client) && owner === this.state.owner)
+      await this.loadHistory(true);
   };
   setChartSettings = async (patch: ChartSettings): Promise<void> => {
     const owner = this.state.owner,
@@ -420,24 +447,10 @@ export class TerminalController {
   });
   clearHistory = (uid: string | null, timeframe: Timeframe | null): Promise<void> =>
     this.history.clear(uid, timeframe);
-  exportBackup = async (includeHistory: boolean): Promise<Backup> => {
-    const owner = this.state.owner;
-    await this.flush();
-    return storage.createBackup(owner, { includeHistory });
-  };
-  importBackup = (input: unknown): Promise<void> =>
-    importTerminalBackup(input, {
-      getState: this.getSnapshot,
-      getClient: () => this.client,
-      getChart: () => this.chart,
-      saveView: this.saveView,
-      editing: this.editing,
-      session: this.session,
-      resetHistory: () => this.resetHistory(),
-      update: this.update,
-      loadHistory: this.loadHistory,
-      notify: this.notify
-    });
+  exportBackup = (includeHistory: boolean): Promise<Backup> => this.backups.export(includeHistory);
+  importBackup = (input: unknown): Promise<void> => this.backups.import(input);
+  importBackupFile = (file: File): Promise<void> => this.backups.importFile(file);
+  recoverBackup = (): Promise<void> => this.backups.recover();
   saveImage = async (asset: ImageAsset): Promise<void> => {
     if (asset.owner !== this.state.owner || asset.symbol !== this.state.preferences.symbol) return;
     const previous = this.state.images.some((image) => image.id === asset.id);

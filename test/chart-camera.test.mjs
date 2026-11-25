@@ -229,6 +229,15 @@ function harness(engine) {
       removeIndicator() {},
       createIndicator() {},
       getDataList: () => data,
+      getVisibleRange() {
+        const to = Math.round(data.length + offset + 0.5);
+        return {
+          from: Math.max(0, Math.round(to - size.width / spacing) - 1),
+          to: Math.min(data.length, to),
+          realFrom: to - size.width / spacing,
+          realTo: to
+        };
+      },
       setBarSpace(value) {
         spacing = value;
         calls.push("spacing");
@@ -322,6 +331,10 @@ for (const engine of ["lightweight", "kline"])
     const before = adapter.getView();
     assert.equal(before.camera.barSpace, 11);
     assert.equal(before.camera.rightOffsetBars, -37);
+    if (engine === "kline") {
+      assert.equal(before.from, candles[290].timestamp / 1000);
+      assert.equal(before.to, candles[363].timestamp / 1000);
+    }
     const prepend = candles
       .slice(0, 30)
       .map((bar) => ({ ...bar, timestamp: bar.timestamp - 30 * 86400000 }));
@@ -383,9 +396,13 @@ test("history rejects out-of-order symbol results and a changed UID before publi
   const load = sources(
     {
       "services/storage.ts": { loadDrawings: async () => [], loadImages: async () => [] },
+      "services/chart-camera.ts": { loadChartView: async () => undefined },
       "model/mtp.ts": { activeMtpPeriods: () => [] },
-      "model/history-codec.ts": { TIMEFRAMES: { "1d": { ms: 86400000 } } },
-      "screens/terminal/controller-bridge.ts": { errorText: String, isAbort: () => false }
+      "screens/terminal/controller-bridge.ts": {
+        errorText: String,
+        isAbort: () => false,
+        viewKey: (p) => `${p.symbol}:${p.timeframe}:${p.engine}:${p.rangeDays}`
+      }
     },
     { AbortController, setTimeout, clearTimeout, navigator: { onLine: true } }
   );

@@ -344,7 +344,10 @@ export function makeKline(options: ChartOptions): ChartAdapter {
         bar = ownData[index],
         pixel = toPixel({ dataIndex: index }),
         lastPixel = toPixel({ dataIndex: data.length - 1 }),
-        barSpace = chart.getBarSpace();
+        barSpace = chart.getBarSpace(),
+        visible = chart.getVisibleRange(),
+        first = ownData[Math.max(0, Math.ceil(visible.from))],
+        last = ownData[Math.min(ownData.length - 1, Math.ceil(visible.to) - 1)];
       return {
         ...(size && lastPixel.x != null
           ? {
@@ -356,6 +359,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
           : {}),
         barSpace,
         offsetRight: chart.getOffsetRightDistance(),
+        ...(first && last ? { from: first.timestamp / 1000, to: last.timestamp / 1000 } : {}),
         ...(bar && pixel.x != null
           ? { anchor: { timestamp: bar.timestamp, xFraction: pixel.x / (size?.width ?? 500) } }
           : {})

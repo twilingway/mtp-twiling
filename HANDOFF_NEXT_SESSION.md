@@ -3,6 +3,74 @@
 Обновлено 25.11.2026. Это актуальный вход для нового чата; исторические статусы в CONTINUE.md читать
 после этого файла. Пользователь хочет короткие ответы по-русски и параллельную работу.
 
+## Актуальный этап 0.3.7 — читать первым
+
+Canonical HEAD ещё24bf6de, текущие изменения НЕоткатывать: build0.3.7/cb508bf9d82d2abf,
+`pnpm check`159/159 PASS, strict spec7/7 PASS. Независимое review восстановления истории PASS
+(`vps/artifacts/history-range-final-review.md`) и transfer persistence PASS
+(`vps/artifacts/transfer-race-final-review.md`,17 независимых import/queue/lifecycle тестов).
+
+- Ранее потерянный left2022 при importA восстановлен: загружаются весь saved window и фактические
+  warmup bars;18 новых history тестов. Legacy anchor использует фактическую ширину и backfill,
+  offline требует полное coverage до сохранённого right, MA20/EMA50 учтены; refresh отменяет старую
+  загрузку. `historyViewReady` не даёт записать промежуточный вид, KLine теперь пишет from/to
+  seconds.
+- Пользователь заменил бренд: только цветные кириллические **МТП**, без сетки/линий/TWILING внутри
+  SVG. М синяя, Т бирюзовая, П фиолетовая; font184,
+  SHA9cac2d2501e5ed246118f97dbaa0f2b13412754d6f947dea9e996d3f370b1cdf. Icon25/32/192/512+maskable
+  просмотрены в isolated worker; safezone0 pixelsoutside. Manifest application name MTP TWILING,
+  id/origin unchanged. Evidence `vps/artifacts/mtp-brand-visual`.
+- Тёмная палитра теперь#000000, нейтральные raised/input/borders; light/custom preserved. OHLC
+  вынесен в компонент: нейтральные labels, цветныеvalues/delta/% по previousClose, firstbar body
+  fallback без выдуманного delta. Точный TV zero-rule локальными bundles не доказан.
+- Actual QA0.3.6 (9e602bc98d441451) подтвердила fullhistory+МТП440 обоих движков и бренд, но нашла
+  P1 быстрый import→export / первыйrestore, перезаписывавшийA исходящимB. НЕвыдавать тот pass за
+  финальный: `vps/artifacts/history-brand-qa/report.json`. Исходный профиль после повторного
+  восстановления exact, браузер закрыт.
+- P1 исправлен в0.3.7: `TerminalBackups` очередь perowner, owner/client guards, файл резервирует
+  очередь ДОfile.text/JSON; global busy переживает закрытие accountdialog. `retired` sticky отдельно
+  от transient persistView; global importingBackup блокирует новые/remounted adapters. Commit
+  немедленно меняет revision; postcommit failure retire+recovery lock. `recoverBackup` повторяет
+  только restore profile, без повторной записи backup. Все saveView/helper/liveView/cleanup guards
+  согласованы. Prior recovery не сбрасывается неудачным новым commit.
+
+СЕЙЧАС fresh `/root/black_ohlc_transfer_qa` владеет профилем
+`D:\MySource\ReactJS\vps\artifacts\pwa-react-qa\profile` и проверяет EXACT0.3.7/cb508bf9d82d2abf. Не
+менять сборку/CSS, пока он не завершит. Evidence `vps/artifacts/black-ohlc-transfer-qa`. Проверка:
+black+OHLC оба движка/mobile, fullA+быстрыйexport, первыйrestore exact. После PASS обновить статусы
+ниже, сохранить canonical commit. Goal полный и активный, далеко не завершён.
+
+### Параллельные задачи, уже запущенные по новым указаниям пользователя
+
+- `/root/intervals_menu`: worktree `vps/artifacts/intervals-worktree`, branch feat/intervals-menu,
+  base24bf6de. Pure registry/menu/aggregation commit **a6486c27d08a4f8ede4ac236fb3d2b11e8369feb**,
+  15 тестов/scopedTS/lint/spec PASS, только newfiles, НЕинтегрирован. Union18:8 минутных,
+  4часовых,1d/1w/1M/3M/6M/12M. Теперь actor реально подключает13 native API+live/cache/validation/
+  Toolbar, переносит старый #range lookback отдельно. Persisted Timeframe=NativeIntervalId13;
+  45m/3h/3M/6M/12M честноdisabled до source/calendar glue. Полная цель18 остаётся в плане. 45m/3h
+  требуют явной торговой сессии. Native1M календарный, не30дней. Добавлена задача подписи шкалы:
+  day→months/hour→days, реальные boundary ticks, crosshair полнаядата. Работает ТОЛЬКО вworktree,
+  общий build там допустим, canonical/server не трогает. Ждать отдельный integration commit;
+  cherry-pick аккуратно разрешить общие файлы относительно новых root history/controller.
+- `/root/chart_types`: worktree `vps/artifacts/chart-types-worktree`, branch feat/chart-types,
+  base24bf6de. Пишет ТОЛЬКО новые model/chart-series/**, screens/terminal/chart-types/**,
+  public/chart-types.css, tests/OpenSpec. Registry21 TVtypes, commonnative
+  Candles/Bars/Line/Area/HA, дополнительные LWnative, остальные explicitdisabled. PureHA
+  batch/incremental/prepend без изменения реальных OHLCV, component callbacks и integration plans.
+  Коммита ещё не сообщал. Root подключит тип в ChartSettings/adapters/Toolbar после проверки. Нельзя
+  копировать целиком старые sharedfiles поверх текущих!
+
+Новые вопросы пользователя: `/` внеinput открывает общий каталог, полеwatchlist фильтрует только
+список. Цены вкаталоге требуют batch GetLastPrices для новых UID, ужеwatchlist можноизWS; это пока
+объяснение, не реализованная новая функция. Т-Технологии(T) корректно материнская компания Т-Банка,
+проверено по https://www.tbank.ru/invest/stocks/T/ .
+
+Foundation identity audit готов: `vps/artifacts/canonical-identity-contract-review.md`. ДляBybit/OKX
+нужны versioned InstrumentRef/rowId, Backup2+Driveprojection, unresolved legacy scopes безугадывания
+UID; это ещё НЕреализовано. Следовать очереди пользователя: menu/axis/charttypes/indicators, затем
+identity/providers/Drive/staticdeploy. Старые разделы ниже — историческое объяснение, не
+currentgate.
+
 ## Где продолжать
 
 - Открыть проект `D:\MySource\ReactJS\tradingview-personal` в новой сессии. Основная ветка

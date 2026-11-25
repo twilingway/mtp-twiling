@@ -23,6 +23,10 @@
       проверить same-source import apply once, stale callbacks и неизменность ревизии при
       failed/invalid import и toolbar actions.
 
+- [x] 1.8 Восстановить историю всего saved left window и фактический прогрев, legacy count backfill,
+      offline coverage и source/readiness guards; проверить history-view-range/load регрессии,
+      typecheck и scoped ESLint.
+
 ## 2. Интеграция
 
 - [ ] 2.1 Проверить горизонтальное перемещение, wheel zoom и ручную ценовую ось визуально в обоих
@@ -34,5 +38,8 @@
 QA0.3.5: KLine exportA/panB/importA визуально PASS без reload. LW поля камеры восстанавливаются, но
 loaded history после import короче исходной (слева пустота); P2 остаётся открытым. Evidence:
 `vps/artifacts/mobile-terminal-qa/report.json` и `camera-tradingview-import-A-settled.png`.
+
+Реализован отдельный history-view-range/load fix и readiness gate; закрытие P2 требует новой
+браузерной проверки исходного окна A целиком, включая левую часть свечей и прогрев.
 
 - После браузерного подтверждения синхронизировать спецификацию и архивировать изменение.

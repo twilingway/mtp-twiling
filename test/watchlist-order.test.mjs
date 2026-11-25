@@ -9,6 +9,7 @@ import ts from "typescript";
 const sourceRoot = fileURLToPath(new URL("../src/", import.meta.url));
 const modules = new Map();
 const preferenceWrites = [];
+let viewReads = 0;
 const storageBoundary = {
   savePreferences: async (owner, preferences) =>
     preferenceWrites.push({ owner, preferences: structuredClone(preferences) }),
@@ -22,7 +23,15 @@ function load(relative) {
   if (/services[\\/]chart-camera\.ts$/.test(filename))
     return new Proxy(
       {},
-      { get: () => () => assert.fail("reorder must not access chart/profile storage") }
+      {
+        get: (_target, key) =>
+          key === "loadChartView"
+            ? async () => {
+                viewReads++;
+                return undefined;
+              }
+            : () => assert.fail("reorder must not access chart/profile storage")
+      }
     );
   if (modules.has(filename)) return modules.get(filename).exports;
   const module = { exports: {} };
@@ -313,7 +322,9 @@ test("legacy duplicate-symbol selection is pinned before reorder; in-flight hist
   const loading = controller.loadHistory();
   await entered.promise;
   assert.equal(controller.getSnapshot().loading, true);
+  const readsBeforeReorder = viewReads;
   assert.equal(await controller.reorderWatchlist(move(f.client.rows, 1, 0), f.client.owner), true);
+  assert.equal(viewReads, readsBeforeReorder, "reorder must not reload the saved camera");
   const reordered = controller.getSnapshot();
   assert.equal(reordered.preferences.instrumentUid, "uid-one");
   assert.equal(reordered.preferences.engine, "kline");
@@ -324,7 +335,7 @@ test("legacy duplicate-symbol selection is pinned before reorder; in-flight hist
   result.resolve({ candles: bars, cached: true, requests: 0 });
   await loading;
   assert.equal(controller.getSnapshot().loading, false);
-  assert.equal(controller.getSnapshot().candles, bars);
+  assert.deepEqual(controller.getSnapshot().candles, bars);
   assert.equal(controller.chart, adapter);
 });
 
@@ -455,7 +466,7 @@ test("switching UIDs with the same symbol resets history and rejects late old ca
   await selecting;
   assert.equal(controller.getSnapshot().preferences.instrumentUid, "uid-two");
   assert.equal(controller.getSnapshot().loading, false);
-  assert.equal(controller.getSnapshot().candles, bars);
+  assert.deepEqual(controller.getSnapshot().candles, bars);
 });
 
 test("snapshot pinning retains selection across repeated live snapshots and explicit missing UID stays missing", () => {

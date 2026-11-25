@@ -57,7 +57,7 @@ test("theme-only light backup resolves to a white chart after merging profile de
   const settings = { ...defaultPreferences().chartSettings, ...migrateCandlePalette(imported) };
   assert.equal(terminalTheme(settings), "light");
   assert.equal(chartBackground(settings), "#ffffff");
-  assert.equal(chartBackground(defaultPreferences().chartSettings), "#131722");
+  assert.equal(chartBackground(defaultPreferences().chartSettings), "#000000");
 });
 
 test("standard background follows theme changes in either direction", () => {
@@ -73,7 +73,27 @@ test("standard background follows theme changes in either direction", () => {
     assert.equal(dark.theme, "dark");
     assert.equal(chartBackground(dark), THEME_PALETTES.dark.background);
   }
-  assert.equal(withTheme({ theme: "light", background: "#FFFFFF" }, "dark").background, "#131722");
+  assert.equal(withTheme({ theme: "light", background: "#FFFFFF" }, "dark").background, "#000000");
+});
+
+test("previous dark defaults resolve to pure black without mutating stored settings", () => {
+  for (const settings of [
+    {},
+    { background: "#131722" },
+    { theme: "dark", background: "#131722" },
+    { theme: "dark", background: "#000000" }
+  ]) {
+    const original = structuredClone(settings);
+    assert.equal(chartBackground(settings), "#000000");
+    assert.equal(chartPalette(settings).background, "#000000");
+    assert.equal(withTheme(settings, "dark").background, "#000000");
+    assert.deepEqual(settings, original);
+  }
+  assert.equal(chartBackground({ theme: "light", background: "#131722" }), "#131722");
+  for (const background of ["#121212", "#131723", "#345678", "#ffffff"]) {
+    assert.equal(chartBackground({ theme: "dark", background }), background);
+    assert.equal(chartPalette({ theme: "dark", background }).background, background);
+  }
 });
 
 test("theme changes preserve custom colors, indicators, drawing templates and toolbar state", () => {
@@ -145,9 +165,12 @@ test("chart text and scale labels remain readable on custom dark, light and midt
       "#345678"
     ]) {
       const palette = chartPalette({ theme, background });
-      assert.equal(palette.background, background);
+      assert.equal(
+        palette.background,
+        theme === "dark" && background === "#131722" ? "#000000" : background
+      );
       for (const color of [palette.text, palette.muted]) {
-        const values = [luminance(background), luminance(color)].sort((a, b) => a - b);
+        const values = [luminance(palette.background), luminance(color)].sort((a, b) => a - b);
         assert.ok((values[1] + 0.05) / (values[0] + 0.05) >= 4.5, `${color} on ${background}`);
       }
     }

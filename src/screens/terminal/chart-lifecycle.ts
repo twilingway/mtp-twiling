@@ -28,13 +28,14 @@ export function useChartCanvas(
       owner = state.owner,
       revision = state.chartRevision,
       key = `${p.symbol}:${p.timeframe}:${p.engine}:${p.rangeDays}`;
-    if (!container || !uid || !state.authenticated) return;
+    if (!container || !uid || !state.authenticated || state.importRecoveryRequired) return;
     let cancelled = false,
       owned: ChartAdapter | null = null;
     const matches = () => {
       const current = controller.getSnapshot();
       return (
         !cancelled &&
+        !current.importRecoveryRequired &&
         current.authenticated &&
         current.owner === owner &&
         current.chartRevision === revision &&
@@ -82,13 +83,16 @@ export function useChartCanvas(
       if (!matches()) return;
       owned = factory(options);
       owned.source = { owner, viewKey: key, uid };
+      owned.persistView =
+        !controller.getSnapshot().importingBackup &&
+        controller.getSnapshot().historyViewReady !== false;
       adapterRef.current = owned;
       controller.chart = owned;
       // Adapters retain this request until nonempty data has completed its initial fit.
       if (view) owned.setView(view);
       const candles = controller.getSnapshot().candles;
-      dataRef.current = candles;
-      if (candles.length) owned.setData([...candles], true);
+      dataRef.current = owned.persistView ? candles : [];
+      if (candles.length && owned.persistView) owned.setData([...candles], true);
     };
     void initialize().catch((error: unknown) => {
       if (matches())
@@ -96,6 +100,16 @@ export function useChartCanvas(
     });
     return () => {
       cancelled = true;
+      const current = controller.getSnapshot();
+      if (
+        owned &&
+        (current.importingBackup || current.historyViewReady === false) &&
+        current.owner === owner &&
+        (current.importingBackup ||
+          (viewKey(current.preferences) === key &&
+            selectedMarketRow(current.rows, current.preferences)?.uid === uid))
+      )
+        owned.persistView = false;
       void saveAdapterView(owned, owner, key).catch(() => {});
       owned?.destroy();
       if (controller.chart === owned) controller.chart = null;
@@ -110,6 +124,7 @@ export function useChartCanvas(
     state.owner,
     state.authenticated,
     state.chartRevision,
+    state.importRecoveryRequired,
     p.engine,
     p.symbol,
     p.timeframe,
@@ -120,6 +135,9 @@ export function useChartCanvas(
     const adapter = adapterRef.current,
       next = state.candles,
       previous = dataRef.current;
+    if (adapter?.retired || state.importRecoveryRequired) return;
+    if (adapter) adapter.persistView = !state.importingBackup && state.historyViewReady !== false;
+    if (state.importingBackup || state.historyViewReady === false) return;
     if (!adapter || !next.length || next === previous) return;
     const incremental =
       previous.length > 0 &&
@@ -135,7 +153,7 @@ export function useChartCanvas(
       if (view) adapter.setView(view);
     }
     dataRef.current = next;
-  }, [state.candles]);
+  }, [state.candles, state.historyViewReady, state.importingBackup, state.importRecoveryRequired]);
   useEffect(() => {
     adapterRef.current?.redrawDrawings();
   }, [state.drawings, state.preview, state.selectedObject, drawingsHidden]);

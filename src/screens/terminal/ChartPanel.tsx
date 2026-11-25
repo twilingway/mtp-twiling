@@ -11,6 +11,7 @@ import { ImageLayer } from "./ImageLayer.js";
 import { DrawingAxisLabels } from "./DrawingAxisLabels.js";
 import { CandleCountdown } from "./CandleCountdown.js";
 import { VisibilityIcon } from "./VisibilityIcon.js";
+import { OhlcLegend } from "./OhlcLegend.js";
 const Version = memo(function Version() {
   return (
     <span id="app-version" hidden>
@@ -78,18 +79,19 @@ export function ChartPanel() {
   const { controller, state } = useTerminal(),
     p = state.preferences,
     row = selectedMarketRow(state.rows, p),
-    bar = state.crosshairBar
-      ? (state.candles.find((bar) => bar.timestamp === state.crosshairBar?.timestamp) ??
-        state.crosshairBar)
-      : state.candles.at(-1),
-    digits = row ? precision(row) : 2;
+    barIndex = state.crosshairBar
+      ? state.candles.findIndex((bar) => bar.timestamp === state.crosshairBar?.timestamp)
+      : state.candles.length - 1,
+    bar = state.candles[barIndex] ?? state.crosshairBar ?? undefined,
+    digits = row ? precision(row) : 2,
+    busy = state.authenticated && (state.loading || state.importingBackup === true);
   return (
     <section
       id="chart-panel"
       className="chart-panel"
       aria-label="График инструмента"
-      aria-busy={state.authenticated && state.loading}
-      data-history-loading={(state.authenticated && state.loading) || undefined}
+      aria-busy={busy}
+      data-history-loading={busy || undefined}
     >
       <div className="chart-heading">
         <div className="instrument-title">
@@ -98,10 +100,12 @@ export function ChartPanel() {
           <span className="market-tag">MOEX</span>
           <span id="chart-period">{PERIOD_LABELS[p.timeframe]}</span>
         </div>
-        <div className="ohlc" id="ohlc">
-          ОТКР {number(bar?.open, digits)} МАКС {number(bar?.high, digits)} МИН{" "}
-          {number(bar?.low, digits)} ЗАКР {number(bar?.close, digits)}
-        </div>
+        <OhlcLegend
+          bar={bar}
+          previousClose={state.candles[barIndex - 1]?.close}
+          digits={digits}
+          settings={p.chartSettings}
+        />
         <div className="chart-price">
           <strong id="chart-price">{number(row?.price, digits)}</strong>
           <span id="chart-change" className={signClass(row?.change)}>
@@ -117,7 +121,8 @@ export function ChartPanel() {
         <ImageLayer />
         <DrawingAxisLabels />
         <CandleCountdown />
-        {(!state.authenticated || (!state.candles.length && !state.loading)) && (
+        {(!state.authenticated ||
+          ((!state.candles.length || state.historyViewReady === false) && !state.loading)) && (
           <div className="chart-message" id="chart-message">
             <span className="message-icon">⌃</span>
             <h2>
@@ -125,7 +130,9 @@ export function ChartPanel() {
                 ? "Ваш рынок. Ваш график."
                 : !state.rows.length
                   ? "Добавьте инструмент"
-                  : "История недоступна"}
+                  : state.historyViewReady === false
+                    ? "Не удалось восстановить окно графика"
+                    : "История недоступна"}
             </h2>
             <p>
               {!state.authenticated
@@ -149,6 +156,24 @@ export function ChartPanel() {
                 onClick={() => controller.setDialog("instruments")}
               >
                 Добавить инструмент
+              </button>
+            )}
+            {state.authenticated && state.rows.length > 0 && (
+              <button
+                className="primary-button"
+                onClick={() => {
+                  void (
+                    state.importRecoveryRequired
+                      ? controller.recoverBackup()
+                      : controller.loadHistory()
+                  ).catch((error: unknown) =>
+                    controller.notify(
+                      error instanceof Error ? error.message : "Не удалось восстановить график."
+                    )
+                  );
+                }}
+              >
+                {state.importRecoveryRequired ? "Повторить восстановление" : "Повторить загрузку"}
               </button>
             )}
           </div>

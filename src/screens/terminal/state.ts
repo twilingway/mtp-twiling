@@ -84,6 +84,11 @@ export interface ContextMenu {
   target: ContextTarget;
 }
 export interface TerminalState {
+  importingBackup?: boolean;
+  importRecoveryRequired?: boolean;
+  backupBusy?: boolean;
+  /** False while restoring a saved viewport whose data is not covered yet. */
+  historyViewReady?: boolean;
   mobilePanelOpen?: boolean;
   chartRevision: number;
   ready: boolean;

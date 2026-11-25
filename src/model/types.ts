@@ -219,6 +219,7 @@ export interface ChartCamera {
 }
 export interface ChartView {
   camera?: ChartCamera;
+  /** Visible candle boundaries in Unix seconds, shared by both chart engines. */
   from?: number;
   to?: number;
   barSpace?: number;

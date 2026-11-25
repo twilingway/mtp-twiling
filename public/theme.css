@@ -1,19 +1,19 @@
 html[data-theme="dark"] {
   color-scheme: dark;
-  --surface: #131722;
-  --surface-raised: #1e222d;
-  --surface-input: #171b26;
-  --surface-hover: #2a2e39;
-  --surface-selected: #1e2d4a;
-  --text: #d1d4dc;
-  --muted: #9598a1;
-  --line: #2a2e39;
-  --control-line: #434651;
+  --surface: #000000;
+  --surface-raised: #111111;
+  --surface-input: #181818;
+  --surface-hover: #222222;
+  --surface-selected: #222222;
+  --text: #d4d4d4;
+  --muted: #999999;
+  --line: #222222;
+  --control-line: #444444;
   --accent: #8aabff;
-  --accent-surface: #23314c;
+  --accent-surface: #222222;
   --danger: #f48a96;
   --shadow: #0008;
-  --backdrop: #060a12bd;
+  --backdrop: #000000bd;
 }
 
 html[data-theme="light"] {

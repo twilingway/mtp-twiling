@@ -1,5 +1,27 @@
 # Текущая очередь
 
+Актуально0.3.7/cb508bf9d82d2abf: общийcheck159/159 и независимые history/transfer reviews PASS.
+Логотип теперь только цветные МТП, тёмнаяпалитра#000000, OHLCцветной, импортполного окна и быстрый
+import/export защищены очередью/retired/barrier/recovery. Fresh visual gate идёт в
+`vps/artifacts/black-ohlc-transfer-qa`, не пересобирать стенд до завершения. Старые статусы0.3.5
+ниже исторические; authoritative подробности — начало HANDOFF_NEXT_SESSION.md.
+
+Новые запрошенные задачи, которые остаются до полного соответствия:
+
+1. Dropdownтаймфреймов как TV:13nativeTBank реально подключаются в isolatedfeat/intervals-menu;
+   pure18registry/menu commit a6486c27 ужеготов, но ещёНЕинтегрирован.5derived требуютsource/session
+   glue. Отдельно понятно разделить интервал свечи и lookback истории,
+   дневныеticksмесяцами/часовыеднями.
+2. Типы графика/индикаторы: purechart-types/menu/HA commit f5f1848f готов в отдельнойветке,14тестов,
+   НЕинтегрирован. Nativeadapters/crosshair/realprice/indicatorsemantics ещёподключить;
+   полныйкаталог индикаторов224 IDs покаreference, реальные6keys. Не объявлять22типа готовыми по
+   наличиюменю.
+3. Язык интерфейса Русский/English ссохранением. Выборвременнойзоны изпрокручиваемогосписка: Москва
+   default, UTC, устройствоиостальныеIANA. Толькоотображение, хранимыесвечи/drawings UTC неизменны;
+   сессии/агрегации остаютсявтаймзонебиржи. Согласоватьfooterclockсlookbackcontrol.
+4. Затем canonicalidentity/Backup2, Bybitprimary+OKXтолькоприотсутствиипары, DriveUI/OAuth
+   иstaticdeploy.
+
 Текущая сборка0.3.5 `8d7c16e44f955542`: общий check120/120 PASS; после последнего исправления React
 keys повторно strict build/scoped lint/format и120/120 тестов PASS. Исправлены лишний remount от
 toolbar settings, queued LW camera restore и KLine axis drift. Мобильный список поверх графика и

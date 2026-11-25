@@ -42,6 +42,7 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
     effects = [],
     destroyed = 0,
     saves = 0,
+    illegalSaves = 0,
     viewLoads = 0,
     savedView,
     nearStarts = 0,
@@ -143,8 +144,9 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
         viewLoads++;
         return savedView;
       },
-      saveAdapterView: async () => {
+      saveAdapterView: async (adapter) => {
         saves++;
+        if (state.historyViewReady === false && adapter?.persistView !== false) illegalSaves++;
       }
     },
     "model/drawing-model.ts": {
@@ -257,7 +259,12 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
   assert.equal(outgoing.getView(), pannedB);
   outgoing.persistView = false;
   savedView = importedA;
-  state = { ...state, chartRevision: state.chartRevision + 1, candles: [] };
+  state = {
+    ...state,
+    chartRevision: state.chartRevision + 1,
+    candles: [],
+    historyViewReady: false
+  };
   outgoing.options.onNearStart();
   outgoing.options.onCrosshair(candles[0]);
   outgoing.options.paint({}, 800, 500, () => null, "back");
@@ -274,6 +281,11 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
   assert.equal(viewLoads, beforeImportLoads + 1);
   state = { ...state, candles: [...candles] };
   await render();
+  assert.equal(controller.chart.persistView, false, "partial progress must not replace target A");
+  assert.notEqual(controller.chart.getView(), importedA, "A waits for restored window coverage");
+  state = { ...state, historyViewReady: true };
+  await render();
+  assert.equal(controller.chart.persistView, true);
   assert.equal(
     controller.chart.getView(),
     importedA,
@@ -289,4 +301,18 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
   assert.equal(state.chartRevision, 1);
   assert.equal(adapters.length, beforeImportAdapters + 1);
   assert.equal(controller.chart.getView(), importedA);
+  state = {
+    ...state,
+    historyViewReady: false,
+    preferences: {
+      ...state.preferences,
+      chartSettings: { ...state.preferences.chartSettings, scaleFontSize: 12 }
+    }
+  };
+  await render();
+  assert.equal(
+    illegalSaves,
+    0,
+    "native remount cleanup cannot save while saved history is pending"
+  );
 });

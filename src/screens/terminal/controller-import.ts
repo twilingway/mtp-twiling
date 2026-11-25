@@ -20,9 +20,65 @@ interface ImportBridge {
   notify: (message: string) => void;
 }
 
+function invalidateImportedView(
+  bridge: ImportBridge,
+  recoveryRequired: boolean,
+  historyHelp?: string
+): void {
+  bridge.resetHistory();
+  bridge.update({
+    candles: [],
+    loading: false,
+    historyViewReady: false,
+    importRecoveryRequired: recoveryRequired,
+    chartRevision: (bridge.getState().chartRevision ?? 0) + 1,
+    ...(historyHelp ? { historyHelp } : {})
+  });
+}
+
+/** Retry only the committed profile's restoration, without repeating any backup writes. */
+export async function restoreImportedProfile(bridge: ImportBridge): Promise<void> {
+  const { owner, name } = bridge.getState(),
+    client = bridge.getClient(),
+    valid = () => bridge.session.matches(client) && owner === bridge.getState().owner;
+  try {
+    await resetSharedChartCamera(owner);
+    if (!valid()) return;
+    await bridge.session.prepareProfile(owner, name, true, valid);
+    if (!valid()) return;
+    const watchlist = await storage.loadWatchlist(owner);
+    if (!valid()) return;
+    if (watchlist !== undefined && client) {
+      client.rows = watchlist;
+      const snapshot = await client.start();
+      if (!valid()) return;
+      bridge.session.applyBankState(snapshot);
+    }
+    // An adapter born under the transfer barrier may have read the old shared camera.
+    invalidateImportedView(bridge, false);
+    await bridge.loadHistory();
+  } catch (error) {
+    if (valid()) {
+      const chart = bridge.getChart();
+      if (chart) {
+        chart.retired = true;
+        chart.persistView = false;
+      }
+      bridge.editing.reset();
+      const detail = error instanceof Error ? error.message : String(error);
+      invalidateImportedView(
+        bridge,
+        true,
+        `Данные импорта записаны, но профиль не восстановлен: ${detail}. Повторите восстановление.`
+      );
+    }
+    throw error;
+  }
+}
+
 export async function importTerminalBackup(input: unknown, bridge: ImportBridge): Promise<void> {
   const data = validateBackup(input),
-    { owner, name } = bridge.getState(),
+    { owner } = bridge.getState(),
     client = bridge.getClient(),
     valid = () => bridge.session.matches(client) && owner === bridge.getState().owner;
   await bridge.editing.flush();
@@ -30,8 +86,12 @@ export async function importTerminalBackup(input: unknown, bridge: ImportBridge)
   await bridge.saveView();
   if (!valid()) return;
   const outgoing = bridge.getChart(),
-    previousPersistence = outgoing?.persistView;
-  if (outgoing) outgoing.persistView = false;
+    previousPersistence = outgoing?.persistView,
+    previousRetired = outgoing?.retired;
+  if (outgoing) {
+    outgoing.retired = true;
+    outgoing.persistView = false;
+  }
   let result: Awaited<ReturnType<typeof storage.importBackup>>;
   try {
     result = await storage.importBackup(owner, data);
@@ -39,29 +99,16 @@ export async function importTerminalBackup(input: unknown, bridge: ImportBridge)
     if (outgoing) {
       if (previousPersistence === undefined) delete outgoing.persistView;
       else outgoing.persistView = previousPersistence;
+      if (previousRetired === undefined) delete outgoing.retired;
+      else outgoing.retired = previousRetired;
     }
     throw error;
   }
-  await resetSharedChartCamera(owner);
   if (!valid()) return;
+  // Commit succeeded: invalidate all old/newborn canvas work before any next await.
   bridge.editing.reset();
-  bridge.resetHistory();
-  bridge.update({
-    candles: [],
-    loading: false,
-    chartRevision: (bridge.getState().chartRevision ?? 0) + 1
-  });
-  await bridge.session.prepareProfile(owner, name, true, valid);
-  if (!valid()) return;
-  const watchlist = await storage.loadWatchlist(owner);
-  if (!valid()) return;
-  if (watchlist !== undefined && client) {
-    client.rows = watchlist;
-    const snapshot = await client.start();
-    if (!valid()) return;
-    bridge.session.applyBankState(snapshot);
-  }
-  await bridge.loadHistory();
+  invalidateImportedView(bridge, false);
+  await restoreImportedProfile(bridge);
   if (valid())
     bridge.notify(`Импортировано: ${result.drawings} рисунков, ${result.images} изображений.`);
 }

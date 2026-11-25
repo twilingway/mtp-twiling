@@ -256,6 +256,7 @@ function terminalFixture({ restore = async () => null, candles, importBackup } =
     {
       "services/storage.ts": storage,
       "services/chart-camera.ts": {
+        loadChartView: async () => undefined,
         saveChartView: storage.saveView,
         resetSharedChartCamera: async () => {}
       },

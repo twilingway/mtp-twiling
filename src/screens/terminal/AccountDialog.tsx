@@ -172,7 +172,7 @@ function TransferSettings() {
         <button
           type="button"
           id="export-settings"
-          disabled={busy || !state.authenticated}
+          disabled={busy || state.backupBusy || !state.authenticated}
           onClick={() => {
             setBusy(true);
             void controller
@@ -198,7 +198,7 @@ function TransferSettings() {
         <button
           type="button"
           id="import-settings"
-          disabled={busy || !state.authenticated}
+          disabled={busy || state.backupBusy || !state.authenticated}
           onClick={() => input.current?.click()}
         >
           Импорт
@@ -219,10 +219,8 @@ function TransferSettings() {
             return;
           }
           setBusy(true);
-          void file
-            .text()
-            .then((text): unknown => JSON.parse(text))
-            .then((input) => controller.importBackup(input))
+          void controller
+            .importBackupFile(file)
             .catch((error: unknown) =>
               controller.notify(error instanceof Error ? error.message : "Импорт недоступен")
             )

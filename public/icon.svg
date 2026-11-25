@@ -1,18 +1,21 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#14171d" />
-  <rect x="48" y="48" width="416" height="416" rx="88" fill="#477aff" />
-  <path
-    d="M124 320h264M156 288V180m64 140V140m72 180V224m64 72V124"
-    stroke="#fff"
-    stroke-opacity=".28"
-    stroke-width="10"
-  />
-  <path
-    d="m126 310 74-80 65 42 120-132"
-    fill="none"
-    stroke="#fff"
-    stroke-width="28"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  />
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="512"
+  height="512"
+  viewBox="0 0 512 512"
+  role="img"
+  aria-labelledby="brand-title"
+>
+  <title id="brand-title">МТП</title>
+  <rect width="512" height="512" rx="80" fill="#fff" />
+  <g
+    font-family="Arial, Helvetica, sans-serif"
+    font-size="184"
+    font-weight="700"
+    text-anchor="middle"
+  >
+    <text x="126" y="256" dy=".35em" fill="#2962ff">М</text>
+    <text x="263" y="256" dy=".35em" fill="#008f83">Т</text>
+    <text x="388" y="256" dy=".35em" fill="#7151cb">П</text>
+  </g>
 </svg>

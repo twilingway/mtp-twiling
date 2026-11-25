@@ -14,13 +14,13 @@ export interface ChartPalette {
 
 export const THEME_PALETTES: Readonly<Record<TerminalTheme, Readonly<ChartPalette>>> = {
   dark: {
-    background: "#131722",
-    text: "#d1d4dc",
-    muted: "#9598a1",
-    grid: "#2a2e39",
-    border: "#2a2e39",
-    crosshair: "#647086",
-    labelBackground: "#363a45",
+    background: "#000000",
+    text: "#d4d4d4",
+    muted: "#999999",
+    grid: "#222222",
+    border: "#333333",
+    crosshair: "#666666",
+    labelBackground: "#333333",
     labelText: "#ffffff"
   },
   light: {
@@ -40,14 +40,19 @@ export function terminalTheme(settings: Pick<ChartSettings, "theme">): TerminalT
 }
 
 export function chartBackground(settings: Pick<ChartSettings, "theme" | "background">): string {
-  return settings.background ?? THEME_PALETTES[terminalTheme(settings)].background;
+  const theme = terminalTheme(settings);
+  // Recognize the exact previous dark default; other saved colors remain unchanged.
+  const legacyDefault = theme === "dark" && settings.background?.toLowerCase() === "#131722";
+  return !settings.background || legacyDefault
+    ? THEME_PALETTES[theme].background
+    : settings.background;
 }
 
 export function withTheme(settings: ChartSettings, theme: TerminalTheme): ChartSettings {
   const oldTheme = terminalTheme(settings),
     followsTheme =
       !settings.background ||
-      settings.background.toLowerCase() === THEME_PALETTES[oldTheme].background;
+      chartBackground(settings).toLowerCase() === THEME_PALETTES[oldTheme].background;
   return {
     ...settings,
     theme,

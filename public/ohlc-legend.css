@@ -1,0 +1,31 @@
+.chart-heading .ohlc-legend {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 3px 8px;
+  max-width: 100%;
+  color: var(--ohlc-label-color, var(--chart-muted, var(--muted)));
+}
+.ohlc-legend .ohlc-field {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  white-space: nowrap;
+}
+.ohlc-legend .ohlc-label,
+.ohlc-legend .ohlc-value[data-missing="true"] {
+  color: var(--ohlc-label-color, var(--chart-muted, var(--muted)));
+}
+.ohlc-legend .ohlc-value,
+.ohlc-legend .ohlc-change {
+  color: var(--ohlc-value-color, var(--chart-muted, var(--muted)));
+  font-variant-numeric: tabular-nums;
+}
+.ohlc-legend .ohlc-change {
+  white-space: nowrap;
+}
+@media (max-width: 800px) {
+  .chart-heading .ohlc-legend {
+    column-gap: 6px;
+  }
+}

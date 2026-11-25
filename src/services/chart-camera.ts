@@ -52,7 +52,7 @@ export async function saveAdapterView(
   owner: string,
   key: string
 ): Promise<void> {
-  if (!chart || chart.persistView === false || owner === "guest") return;
+  if (!chart || chart.retired || chart.persistView === false || owner === "guest") return;
   const view = chart.getView();
   if (view) await saveChartView(owner, key, view);
 }
