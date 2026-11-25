@@ -12,6 +12,7 @@ import { WatchlistMenu } from "./WatchlistMenu.js";
 import { matchesWatchlistFlag } from "../../model/watchlist-flags.js";
 import { WatchlistFlagFilter } from "./WatchlistFlagFilter.js";
 import { InstrumentIcon, QuoteRow } from "./WatchlistQuoteRow.js";
+import { InstrumentDetails } from "./InstrumentDetails.js";
 export { InstrumentIcon } from "./WatchlistQuoteRow.js";
 type SortKey = "symbol" | "price" | "change" | "changePercent";
 export function Watchlist() {
@@ -328,6 +329,7 @@ export function Watchlist() {
             )}
             {selected.note ? " · " + systemText(selected.note) : ""}
           </p>
+          <InstrumentDetails row={selected} />
         </section>
       )}
       <div className="private-note">

@@ -1,0 +1,108 @@
+.workspace .watchlist-panel .details:has(.instrument-details) {
+  display: block;
+  max-height: min(65%, 680px);
+  overflow-y: auto;
+  flex-shrink: 1;
+  scrollbar-color: var(--control-line) transparent;
+}
+.instrument-details {
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+  padding-top: 10px;
+  min-width: 0;
+  font-size: 12px;
+}
+.instrument-details summary {
+  cursor: pointer;
+  padding: 9px 2px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.instrument-details summary:focus-visible,
+.instrument-details button:focus-visible {
+  outline: 2px solid var(--accent, #397ddb);
+  outline-offset: 2px;
+}
+.instrument-details-section {
+  border-top: 1px solid var(--line);
+  padding-bottom: 5px;
+}
+.instrument-details-content {
+  min-width: 0;
+}
+.instrument-details p {
+  margin: 8px 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.instrument-details-caption,
+.instrument-details-source {
+  color: var(--muted);
+  font-size: 11px;
+}
+.instrument-details-source {
+  padding-top: 6px;
+}
+.instrument-details-facts {
+  margin: 5px 0;
+}
+.instrument-details-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+}
+.instrument-details-facts dt {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.instrument-details-facts dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  max-width: 58%;
+}
+.instrument-details-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow: auto;
+}
+.instrument-details-events li {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.instrument-details button {
+  font: inherit;
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px 9px;
+  margin: 5px 0;
+  background: transparent;
+  cursor: pointer;
+  max-width: 100%;
+  white-space: normal;
+}
+.instrument-details-seasonality {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.instrument-details-seasonality th,
+.instrument-details-seasonality td {
+  text-align: right;
+  padding: 6px 3px;
+  border-bottom: 1px solid var(--line);
+}
+.instrument-details-seasonality th:first-child {
+  text-align: left;
+}
