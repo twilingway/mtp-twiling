@@ -6,11 +6,12 @@
 ## Где продолжать
 
 - Открыть проект `D:\MySource\ReactJS\tradingview-personal` в новой сессии. Основная ветка
-  называется `master`, remote отсутствует. HEAD checkpoint
-  `9f75db7fc3224473abe2f487b57f0c085c5d50e0`.
-- Рабочее дерево содержит более новые изменения; не откатывать/не заменять их из HEAD или старого
-  `vps/artifacts/pwa-ts`. Версия 0.3.5, build `8d7c16e44f955542`, полный check120/120 PASS; после
-  последнего key fix повторно strict build/scoped lint/format и120/120 тестов PASS.
+  называется `master`, remote отсутствует. Checkpoint исходников `c7240d7`
+  (mobile/toolbar/theme/camera); исходный baseline `9f75db7fc3224473abe2f487b57f0c085c5d50e0`.
+  Текущий HEAD уточнять через Git.
+- Не откатывать/не заменять исходники старым `vps/artifacts/pwa-ts`. Версия 0.3.5, build
+  `8d7c16e44f955542`, полный check120/120 PASS; после последнего key fix повторно strict
+  build/scoped lint/format и120/120 тестов PASS.
 - Текущий сервер `http://127.0.0.1:5210/` уже запущен. Не создавать дубль и не завершать чужие
   процессы. Пользовательский Chrome/его графики сохранить. Визуал — свежий isolated-ui-review.
 - `.env`, `.secrets`, vault и браузерные профили не выводить/не добавлять в Git/не отправлять в
