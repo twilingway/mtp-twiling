@@ -11,6 +11,9 @@ export function IndicatorLegend() {
   const { controller, state } = useTerminal(),
     p = state.preferences;
   const keys = indicatorLegendKeys(p.chartSettings, p.indicators),
+    count =
+      keys.length +
+      (p.technicalIndicators ?? []).filter((item) => item.pane.kind === "overlay").length,
     collapsed = p.chartSettings.legendCollapsed === true;
   const blocked = !!(state.backupBusy || state.importingBackup || state.importRecoveryRequired);
   return (
@@ -65,7 +68,7 @@ export function IndicatorLegend() {
         aria-controls="indicator-legend-items"
         aria-label={
           collapsed
-            ? `${t("Показать названия индикаторов")} (${keys.length})`
+            ? `${t("Показать названия индикаторов")} (${count})`
             : t("Свернуть названия индикаторов")
         }
         title={t(collapsed ? "Показать названия индикаторов" : "Свернуть названия индикаторов")}
@@ -85,7 +88,7 @@ export function IndicatorLegend() {
             strokeWidth="1.5"
           />
         </svg>
-        {collapsed ? <span aria-hidden="true">{keys.length}</span> : null}
+        {collapsed ? <span aria-hidden="true">{count}</span> : null}
       </button>
     </div>
   );
