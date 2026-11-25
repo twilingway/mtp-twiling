@@ -10,10 +10,10 @@
   "scripts": {
     "dev": "pnpm build && node server.mjs",
     "start": "node server.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node scripts/prepare-version.mjs && tsc --noEmit",
     "build": "pnpm typecheck && node scripts/build.mjs",
     "test": "pnpm build && node --test test/*.test.mjs",
-    "lint": "eslint src --max-warnings 0",
+    "lint": "node scripts/prepare-version.mjs && eslint src --max-warnings 0",
     "format": "prettier --write src scripts server.mjs public/*.css public/*.html public/*.webmanifest public/*.svg *.json docs openspec",
     "format:check": "prettier --check src scripts server.mjs public/*.css public/*.html public/*.webmanifest public/*.svg *.json docs openspec",
     "check": "pnpm format:check && pnpm lint && pnpm test",

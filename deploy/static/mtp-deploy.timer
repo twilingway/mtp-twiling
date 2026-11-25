@@ -1,0 +1,11 @@
+[Unit]
+Description=Check MTP main for a verified static release
+
+[Timer]
+OnBootSec=60s
+OnUnitInactiveSec=60s
+AccuracySec=5s
+Unit=mtp-deploy.service
+
+[Install]
+WantedBy=timers.target

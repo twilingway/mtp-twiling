@@ -1,0 +1,23 @@
+[Unit]
+Description=MTP static release pull agent
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=mtp-deploy
+Group=mtp-deploy
+Environment=MTP_DEPLOY_ROOT=/srv/mtp
+Environment=MTP_DEPLOY_CONFIG=/etc/mtp-deploy/config.json
+Environment=PATH=/usr/local/bin:/usr/bin:/bin
+# Optional GH_TOKEN with fine-grained Contents/Actions read on this repo only.
+EnvironmentFile=-/etc/mtp-deploy/credentials
+ExecStart=/bin/bash /opt/mtp-deploy/controller/scripts/deploy-static.sh watch
+WorkingDirectory=/srv/mtp
+UMask=0022
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/mtp
+TimeoutStartSec=20min

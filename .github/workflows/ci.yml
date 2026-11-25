@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Require a release version for application changes
+        if: github.event_name == 'pull_request'
+        env:
+          RELEASE_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/deploy-version.mjs "$RELEASE_BASE_SHA"
+      - name: Check application
+        run: pnpm check
+      - name: Check deployment safeguards
+        run: node --test scripts/deploy.test.mjs
+      - name: Validate specifications
+        run: pnpm spec:validate
+
+# The VDS pulls the exact successful main SHA. No deployment credentials or
+# self-hosted runner are exposed to this workflow or to pull requests.
