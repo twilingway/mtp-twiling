@@ -155,6 +155,7 @@ function nativeFixture({ ratio = 0.3, volume = true } = {}) {
     priceHeight = 500,
     resize;
   const chart = {
+    getDom: () => null,
     setPaneOptions: (options) => {
       if (options.id === "volume_pane") {
         const total = priceHeight + volumeHeight;

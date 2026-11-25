@@ -223,6 +223,7 @@ function harness(engine) {
     )("charts/lightweight.ts").makeLightweight;
   } else {
     const chart = {
+      getDom: () => null,
       setPaneOptions(options) {
         assert.equal(options.id, "x_axis_pane");
         assert.equal(typeof options.axisOptions.name, "string");
