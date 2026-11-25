@@ -387,7 +387,8 @@ test("KLine 9 custom axis installs calendar tick selection and releases its data
     setPaneOptions: (options) => {
       installed = options;
     },
-    convertToPixel: (point) => ({ x: point.dataIndex * 6 })
+    convertToPixel: (point) => ({ x: point.dataIndex * 6 }),
+    getVisibleRange: () => ({ from: 0, to: 91, realFrom: 0, realTo: 90 })
   };
   let data = [];
   const dispose = attach(chart, () => data, "1d");
