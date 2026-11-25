@@ -15,16 +15,45 @@ import {
   pvt,
   momentumVolumeMetadata
 } from "./momentum-volume/index.js";
+import {
+  bollingerPercentB,
+  bollingerBandwidth,
+  historicalVolatility,
+  awesomeOscillator,
+  balanceOfPower,
+  cmo,
+  ultimateOscillator,
+  trix,
+  volatilityMomentumMetadata
+} from "./volatility-momentum/index.js";
 import type {
   NumericSeries,
   TechnicalBar,
   TechnicalIndicatorInstance,
   TechnicalIndicatorResult,
-  TechnicalHistoryRequirement
+  TechnicalHistoryRequirement,
+  TechnicalCalculationContext
 } from "./types.js";
 
 export function technicalIndicatorWarmup(instance: TechnicalIndicatorInstance): number {
   switch (instance.definitionId) {
+    case "bollinger-percent-b":
+    case "historical-volatility":
+    case "cmo":
+    case "trix":
+      return volatilityMomentumMetadata(instance.definitionId, { length: instance.params.length })
+        .warmupBars;
+    case "bollinger-bandwidth":
+      return volatilityMomentumMetadata(instance.definitionId, {
+        length: instance.params.length,
+        expansionLength: instance.params.expansionLength,
+        contractionLength: instance.params.contractionLength
+      }).warmupBars;
+    case "awesome-oscillator":
+    case "balance-of-power":
+      return volatilityMomentumMetadata(instance.definitionId).warmupBars;
+    case "ultimate-oscillator":
+      return volatilityMomentumMetadata(instance.definitionId, instance.params).warmupBars;
     case "momentum":
     case "roc":
     case "cci":
@@ -76,6 +105,23 @@ export function technicalIndicatorHistoryRequirement(
     convergence: "full-input-dependent"
   });
   switch (instance.definitionId) {
+    case "bollinger-percent-b":
+    case "historical-volatility":
+    case "cmo":
+    case "trix":
+      return volatilityMomentumMetadata(instance.definitionId, { length: instance.params.length })
+        .historyRequirement;
+    case "bollinger-bandwidth":
+      return volatilityMomentumMetadata(instance.definitionId, {
+        length: instance.params.length,
+        expansionLength: instance.params.expansionLength,
+        contractionLength: instance.params.contractionLength
+      }).historyRequirement;
+    case "awesome-oscillator":
+    case "balance-of-power":
+      return volatilityMomentumMetadata(instance.definitionId).historyRequirement;
+    case "ultimate-oscillator":
+      return volatilityMomentumMetadata(instance.definitionId, instance.params).historyRequirement;
     case "momentum":
     case "roc":
     case "cci":
@@ -123,7 +169,8 @@ export function rmaHistoryRequirement(length: number): TechnicalHistoryRequireme
 /** Pure full-history calculation; callers replace an old candle then recompute, without shared state. */
 export function calculateTechnicalIndicator(
   instance: unknown,
-  bars: readonly TechnicalBar[]
+  bars: readonly TechnicalBar[],
+  context?: TechnicalCalculationContext
 ): TechnicalIndicatorResult {
   if (!isTechnicalIndicatorInstance(instance)) {
     const id: unknown =
@@ -151,6 +198,37 @@ export function calculateTechnicalIndicator(
     );
     series = { k: calculated.k, d: calculated.d };
     present = bars.map((bar) => bar.high !== null && bar.low !== null && bar.close !== null);
+  } else if (instance.definitionId === "awesome-oscillator") {
+    series = { value: awesomeOscillator(bars) };
+    present = bars.map((bar) => bar.high !== null && bar.low !== null);
+  } else if (instance.definitionId === "balance-of-power") {
+    series = { value: balanceOfPower(bars) };
+    present = bars.map(
+      (bar) => bar.open !== null && bar.high !== null && bar.low !== null && bar.close !== null
+    );
+  } else if (instance.definitionId === "ultimate-oscillator") {
+    series = {
+      value: ultimateOscillator(
+        bars,
+        instance.params.fastLength,
+        instance.params.middleLength,
+        instance.params.slowLength
+      )
+    };
+    present = bars.map((bar) => bar.high !== null && bar.low !== null && bar.close !== null);
+  } else if (instance.definitionId === "historical-volatility") {
+    const factor = context?.historicalVolatilityPeriodsPerYear;
+    if (factor === undefined || !Number.isFinite(factor) || factor <= 0)
+      throw new RangeError(
+        "Historical Volatility requires explicit positive historicalVolatilityPeriodsPerYear context"
+      );
+    series = {
+      value: historicalVolatility(priceSource(bars, "close"), factor, instance.params.length)
+    };
+    present = bars.map((bar) => bar.close !== null && bar.close > 0);
+  } else if (instance.definitionId === "trix") {
+    series = { value: trix(priceSource(bars, "close"), instance.params.length) };
+    present = bars.map((bar) => bar.close !== null && bar.close > 0);
   } else if (instance.definitionId === "mfi") {
     series = { value: mfi(bars, instance.params.length) };
     present = bars.map(
@@ -168,6 +246,23 @@ export function calculateTechnicalIndicator(
     const source = priceSource(bars, instance.params.source);
     present = source.map((value) => value !== null);
     switch (instance.definitionId) {
+      case "bollinger-percent-b":
+        series = {
+          value: bollingerPercentB(source, instance.params.length, instance.params.multiplier)
+        };
+        break;
+      case "bollinger-bandwidth":
+        series = bollingerBandwidth(
+          source,
+          instance.params.length,
+          instance.params.multiplier,
+          instance.params.expansionLength,
+          instance.params.contractionLength
+        );
+        break;
+      case "cmo":
+        series = { value: cmo(source, instance.params.length) };
+        break;
       case "momentum":
         series = { value: momentum(source, instance.params.length) };
         break;

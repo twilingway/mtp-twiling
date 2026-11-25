@@ -5,6 +5,7 @@ import type {
 } from "./types.js";
 import { movingAveragePresets } from "./averages/metadata.js";
 import { momentumVolumePresets } from "./momentum-volume/metadata.js";
+import { volatilityIndicatorDefinitions } from "./volatility-definitions.js";
 
 const reference = (name: string) =>
   `https://www.tradingview.com/pine-script-reference/v6/#fun_ta.${name}`;
@@ -170,7 +171,8 @@ export const technicalIndicatorDefinitions: readonly TechnicalIndicatorDefinitio
       "https://www.tradingview.com/support/solutions/43000502332-stochastic-stoch/"
     ],
     [20, 80]
-  )
+  ),
+  ...volatilityIndicatorDefinitions
 ]);
 
 /** A real catalog limitation, not a claimed OHLCV implementation. No 224 fake calculators. */

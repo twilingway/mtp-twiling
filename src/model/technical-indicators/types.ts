@@ -23,7 +23,15 @@ export type TechnicalIndicatorId =
   | "mfi"
   | "obv"
   | "adl"
-  | "pvt";
+  | "pvt"
+  | "bollinger-percent-b"
+  | "bollinger-bandwidth"
+  | "historical-volatility"
+  | "awesome-oscillator"
+  | "balance-of-power"
+  | "cmo"
+  | "ultimate-oscillator"
+  | "trix";
 export type PriceSource = "open" | "high" | "low" | "close" | "hl2" | "hlc3" | "ohlc4" | "volume";
 export interface TechnicalBar {
   readonly timestamp: number;
@@ -34,6 +42,20 @@ export interface TechnicalBar {
   readonly volume: NumericValue;
 }
 export interface TechnicalParameters {
+  "bollinger-percent-b": { length: number; multiplier: number; source: PriceSource };
+  "bollinger-bandwidth": {
+    length: number;
+    multiplier: number;
+    source: PriceSource;
+    expansionLength: number;
+    contractionLength: number;
+  };
+  "historical-volatility": { length: number };
+  "awesome-oscillator": Record<string, never>;
+  "balance-of-power": Record<string, never>;
+  cmo: { length: number; source: PriceSource };
+  "ultimate-oscillator": { fastLength: number; middleLength: number; slowLength: number };
+  trix: { length: number };
   momentum: { length: number; source: PriceSource };
   roc: { length: number; source: PriceSource };
   cci: { length: number; source: PriceSource };
@@ -114,6 +136,10 @@ export interface TechnicalIndicatorResult {
   /** Minimum observations before every output can have a value; not convergence history. */
   warmupBars: number;
   historyRequirement: TechnicalHistoryRequirement;
+}
+/** Explicit current-timeframe context; never persisted in indicator instances or inferred from bars. */
+export interface TechnicalCalculationContext {
+  readonly historicalVolatilityPeriodsPerYear: number;
 }
 export type TechnicalHistoryRequirement =
   | {
