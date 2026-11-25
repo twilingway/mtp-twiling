@@ -26,6 +26,15 @@ import {
   trix,
   volatilityMomentumMetadata
 } from "./volatility-momentum/index.js";
+import {
+  aroon,
+  aroonOscillator,
+  dmi,
+  adx,
+  vortex,
+  choppinessIndex,
+  trendStrengthMetadata
+} from "./trend-strength/index.js";
 import type {
   NumericSeries,
   TechnicalBar,
@@ -35,8 +44,17 @@ import type {
   TechnicalCalculationContext
 } from "./types.js";
 
-export function technicalIndicatorWarmup(instance: TechnicalIndicatorInstance): number {
+export function technicalIndicatorWarmup(instance: TechnicalIndicatorInstance): number | null {
   switch (instance.definitionId) {
+    case "aroon":
+    case "aroon-oscillator":
+    case "vortex":
+    case "choppiness-index":
+      return trendStrengthMetadata(instance.definitionId, { length: instance.params.length })
+        .warmupBars;
+    case "dmi":
+    case "adx":
+      return trendStrengthMetadata(instance.definitionId, instance.params).warmupBars;
     case "bollinger-percent-b":
     case "historical-volatility":
     case "cmo":
@@ -105,6 +123,15 @@ export function technicalIndicatorHistoryRequirement(
     convergence: "full-input-dependent"
   });
   switch (instance.definitionId) {
+    case "aroon":
+    case "aroon-oscillator":
+    case "vortex":
+    case "choppiness-index":
+      return trendStrengthMetadata(instance.definitionId, { length: instance.params.length })
+        .historyRequirement;
+    case "dmi":
+    case "adx":
+      return trendStrengthMetadata(instance.definitionId, instance.params).historyRequirement;
     case "bollinger-percent-b":
     case "historical-volatility":
     case "cmo":
@@ -197,6 +224,25 @@ export function calculateTechnicalIndicator(
       instance.params.smoothD
     );
     series = { k: calculated.k, d: calculated.d };
+    present = bars.map((bar) => bar.high !== null && bar.low !== null && bar.close !== null);
+  } else if (instance.definitionId === "aroon") {
+    series = aroon(bars, instance.params.length);
+    // The reviewed math masks Up/Down independently; a shared HLC mask would lose valid values.
+    present = bars.map(() => true);
+  } else if (instance.definitionId === "aroon-oscillator") {
+    series = { value: aroonOscillator(bars, instance.params.length) };
+    present = bars.map((bar) => bar.high !== null && bar.low !== null);
+  } else if (instance.definitionId === "dmi") {
+    series = dmi(bars, instance.params.diLength, instance.params.adxSmoothing);
+    present = bars.map((bar) => bar.high !== null && bar.low !== null && bar.close !== null);
+  } else if (instance.definitionId === "adx") {
+    series = { value: adx(bars, instance.params.diLength, instance.params.adxSmoothing) };
+    present = bars.map((bar) => bar.high !== null && bar.low !== null && bar.close !== null);
+  } else if (instance.definitionId === "vortex") {
+    series = vortex(bars, instance.params.length);
+    present = bars.map((bar) => bar.high !== null && bar.low !== null && bar.close !== null);
+  } else if (instance.definitionId === "choppiness-index") {
+    series = { value: choppinessIndex(bars, instance.params.length) };
     present = bars.map((bar) => bar.high !== null && bar.low !== null && bar.close !== null);
   } else if (instance.definitionId === "awesome-oscillator") {
     series = { value: awesomeOscillator(bars) };
@@ -325,12 +371,14 @@ export function calculateTechnicalIndicator(
         break;
     }
   }
+  const warmupBars = technicalIndicatorWarmup(instance);
   return {
     instanceId: instance.id,
     definitionId: instance.definitionId,
     status: "computed",
     timestamps: bars.map((bar) => bar.timestamp),
-    warmupBars: technicalIndicatorWarmup(instance),
+    warmupBars,
+    ...(warmupBars === null ? { alwaysUndefined: true as const } : {}),
     historyRequirement: technicalIndicatorHistoryRequirement(instance),
     series: Object.fromEntries(
       Object.entries(series).map(([key, values]) => [

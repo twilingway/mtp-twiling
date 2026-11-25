@@ -31,7 +31,13 @@ export type TechnicalIndicatorId =
   | "balance-of-power"
   | "cmo"
   | "ultimate-oscillator"
-  | "trix";
+  | "trix"
+  | "aroon"
+  | "aroon-oscillator"
+  | "dmi"
+  | "adx"
+  | "vortex"
+  | "choppiness-index";
 export type PriceSource = "open" | "high" | "low" | "close" | "hl2" | "hlc3" | "ohlc4" | "volume";
 export interface TechnicalBar {
   readonly timestamp: number;
@@ -42,6 +48,12 @@ export interface TechnicalBar {
   readonly volume: NumericValue;
 }
 export interface TechnicalParameters {
+  aroon: { length: number };
+  "aroon-oscillator": { length: number };
+  dmi: { diLength: number; adxSmoothing: number };
+  adx: { diLength: number; adxSmoothing: number };
+  vortex: { length: number };
+  "choppiness-index": { length: number };
   "bollinger-percent-b": { length: number; multiplier: number; source: PriceSource };
   "bollinger-bandwidth": {
     length: number;
@@ -133,8 +145,10 @@ export interface TechnicalIndicatorResult {
   status: "computed";
   timestamps: readonly number[];
   series: Readonly<Record<string, NumericSeries>>;
-  /** Minimum observations before every output can have a value; not convergence history. */
-  warmupBars: number;
+  /** Minimum observations, not convergence history; null means no history can yield a finite output for these parameters. */
+  warmupBars: number | null;
+  /** Present only when the parameters make every output mathematically undefined. */
+  alwaysUndefined?: true;
   historyRequirement: TechnicalHistoryRequirement;
 }
 /** Explicit current-timeframe context; never persisted in indicator instances or inferred from bars. */
