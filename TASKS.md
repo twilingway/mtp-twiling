@@ -1,5 +1,13 @@
 # Текущая очередь
 
+САМОЕ НОВОЕ: .10/main1953608/build5219f27b5345f071 check222+spec11 PASS. Height ready+pending
+nativebrowserPASS, legend/favorites/mobileOHLC/PWA/RUEN/zones/minutegridPASS. Новый gateFAIL: KLine
+Yaxis0..10 послеFit/resize приценах78..119, freshkline_scale_regressionисследует (чистый
+сценарийпокаhealthy). SOURCEFROZEN/QAprofileownerэтотагент, нетrelease/push. FoundationVDS/TLSDONE,
+timerdisabled. DriveUI277tests+portablecontract32e09вownbranch, raceguardдофинала; Nav913dготов
+неintegrated;7colorflagsвownworktreeпочтиготовы; derivedcustomminute/45m/3hещёqueued. Подробности
+самыйверхHANDOFF_NEXT_SESSION.md.
+
 НОВЕЕ: browser gate0.3.9/f9d698d518582bc7 FAIL на VOL height persistence: настоящий divider95→215,
 prefs/IDB undefined, reload→95. Legend collapse/expand, favorites+keyboard/mobile, update0.3.8→0.3.9
 PASS. Тест был при empty2m history, поэтому fresh `kline_real_drag_fix` проверяет READY daily и

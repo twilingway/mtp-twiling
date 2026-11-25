@@ -5,6 +5,56 @@
 
 ## Актуальный этап — читать первым
 
+**САМЫЙ НОВЫЙ ЭТАП: main1953608,0.3.10/5219f27b5345f071, check222/222+spec11/11.** bc31abd снял
+только2 camera-only guards из onIndicatorLayout.valid; при loading/empty UIPane теперь пишется. .10
+fresh native browser PRIMARY PASS: READY GAZP VOL95→235/.2971, pending real request NVTK
+ready=false/persist=false/candles0 VOL235→275/.3477 сохраняются; TF/symbol/reload/ hideshow/resize
+PASS. PWA.9→.10 штатной кнопкой PASS, mobileOHLC nooverlap, RU/EN/IANA/minute Kathmandu2/10/30
+nonempty labels PASS.
+
+НО .10 gate FAIL дальше: после D→W(0)→M→D, zonesNY/MSK/themeblack, KLine#fit-chart иresize1441/1440
+старый reviewer видел Y labels0..10 при свечахGAZP78..119 (иVOL0..10). Артефакты
+`vps/artifacts/release-0310-qa/{report.json,calendar.js,kline-daily-grid.png,restoration.json}`.
+Причина НЕизвестна. Его browser закрыт, originals layout/drawings/images/watchlist/21views exact, 13
+новых QA viewkeys retained. Fresh `/root/kline_scale_regression` расследует actualnative в
+stable1953608/.10, profileownerОН. Собственный worktree `vps/artifacts/kline-scale-worktree`. **Root
+не менять source/CSS/build пока он не вернёт restore/close.** Чистый D/W/M/D у него пока здоровый,
+W777candles/nativeYAxis80..136/VOL3M..15M; НЕисправлять по догадке. Реальный directAPIprobe
+GAZP1year DAY338/WEEK53/MONTH13 с verifiedTLS: `vps/artifacts/weekly-source-probe.json`.
+
+Новые параллельные задачи user:
+
+- `/root/google_drive_ui`, worktree `vps/artifacts/drive-ui-worktree` отaf5dae5; core7f36691
+  cherry-only→2aa3a8f (dirty seeds старогоdrive-sync-worktree НЕпереносить). Guarded atomic portable
+  replace contract32e09eb (обычныйmanualimport остаётсяmerge), UI/coordinator+privacy+
+  narrowGoogleCSP/COOP в ownworktree; fullcheck277/spec12 прошёл до дополнительного canMutate
+  raceguard. Ещё НЕвлито/не realOAuth/two-device. Controller495..496, проситьhelpers<500. Incoming
+  только controller.importBackup queue/barriers; exclude bank/Googletokens/ownerhash/
+  history/livequotes. Export во времяобычногоsync не долженглушитьuseredits; portableapplyguard
+  нужен. GoogleOAuthProduction userзаранееавторизовалпослепубличнойhomepage/privacy.
+- Navcontrols готовыcommit913d12d6086e225bf3a4e713d8f888444583c8dc,5SVGbuttons bothnative
+  publicAPIs, independentfit()/newresetView, check228/spec12 ownPASS; НЕвлито/не visual.
+- Тотже `/root/chart_navigation_controls` now worktree `vps/artifacts/watchlist-flags-worktree`
+  от1953608:7colorpalettemarker+ПКМ+virtualcolorfilter/clearall, prefswatchlistFlags
+  keysuid:/legacy:, optionalwatchlistFlagFilter all|7colors, IDB/backup tests. Не row.color/logo,
+  неfill/blink. Почти fullcheck/commit, ещё НЕвлито. Driveworkerзнаетсхемуноне typedfield
+  доflagcommit.
+- User спросил4/6/7/8/9m и45m/3h: подтверждён officialproto fixed13native, клиентскаяагрегация
+  возможна1m/15m/1h; pureaggregate.ts есть, graph/history/stream НЕподключены, пунктыdisabled.
+  Необещатьихготовность. Задачаостаётсявочереди.
+
+CI FOUNDATION УЖЕ DONE: user/dirs/rootcontroller64a9, isolated pnpm10.34.5verifiedTLS+SHA512,
+systemdMemoryHigh240M/Max320M CPU50 Nice10 IOWeight10 Tasks64,
+timerDISABLED/inactive/serviceinactive. MTP TLSvalidдо2027-02-23,
+HTTPS404/no-storeexpected,current/repo/build/releasesЕЩЁНЕТ. Nginx-t/reload PASS,
+foreignstates/PIDs/pagehashes/nginxhashesunchanged. Evidence `vps/artifacts/cicd-foundation-`
+`result.md`/`report.json`; backup `/root/mtp-foundation-backup-20261125T162429Z`.
+Первыйcertbotstatus1безstderrнеобъяснён, ACMEGET200+однаretryуспешны. СледующийphaseТОЛЬКОпосле
+UIgate: finalsecret-audit, pushoriginmain, exactCIgreen, boundedfirstVDSbuild/provenance/public
+health, затемtimer. GitHubpublic+Issues ON, originattachedGCMhelpermanager, исходникиПОКАнеpush.
+
+Старые блоки ниже исторические. GoalACTIVE, полныйTradingViewparityдалеко,неcomplete.
+
 **НОВЕЕ: 0.3.9 browser gate FAIL — не выпускать.** `vps/artifacts/release-039-qa/report.json`:
 favorites topbuttons/live stars/reload/mobile/keyboard PASS, legend collapse+expand PASS, штатный
 PWA update PASS. Реальный KLine VOL divider95→215 НЕзаписывает indicatorPaneLayout; после смены
