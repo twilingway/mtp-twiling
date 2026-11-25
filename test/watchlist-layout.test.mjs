@@ -234,7 +234,8 @@ async function fixture(initialRows = [row("ONE"), row("TWO")]) {
     at: Date.now(),
     shares: [instrument("ONE"), instrument("TWO"), instrument("THREE")],
     futures: [],
-    indicatives: []
+    indicatives: [],
+    currencies: []
   });
   await storage.saveWatchlistSnapshot(owner, initialRows);
   const createClient = () => new TBankClient(token, "Unit test", storage);

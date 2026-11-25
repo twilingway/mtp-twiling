@@ -287,6 +287,9 @@ function isBackupMarketRow(value: unknown): value is BackupMarketRow {
       mark: string,
       ticker: string,
       figi: nullable(string),
+      classCode: string,
+      exchange: string,
+      realExchange: string,
       currency: string,
       step: nullable(finite),
       brand: nullable(
@@ -298,7 +301,7 @@ function isBackupMarketRow(value: unknown): value is BackupMarketRow {
             textColor: string
           })
       ),
-      type: member(["index", "future"]),
+      type: member(["index", "future", "currency"]),
       expirationDate: nullable(string),
       first1minCandleDate: string,
       first1dayCandleDate: string,

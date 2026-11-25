@@ -51,7 +51,7 @@ const backupShape: Shape = {
   watchlist: [
     {
       ...scalars(
-        "symbol name uid color mark ticker figi currency step type expirationDate first1minCandleDate first1dayCandleDate firstTradeDate"
+        "symbol name uid color mark ticker figi classCode exchange realExchange currency step type expirationDate first1minCandleDate first1dayCandleDate firstTradeDate"
       ),
       brand: scalars("logoName logoBaseColor textColor")
     }

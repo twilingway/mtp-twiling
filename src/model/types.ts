@@ -27,6 +27,8 @@ export interface InstrumentBrand {
   logoBaseColor?: string;
   textColor?: string;
 }
+export type InstrumentKind = "share" | "future" | "index" | "currency";
+export type InstrumentSearchKind = "all" | InstrumentKind;
 export interface CatalogInstrument {
   uid?: string;
   instrumentUid?: string;
@@ -34,6 +36,8 @@ export interface CatalogInstrument {
   ticker: string;
   name: string;
   classCode?: string;
+  exchange?: string;
+  realExchange?: string;
   currency?: string;
   brand?: InstrumentBrand | null;
   minPriceIncrement?: Quotation;
@@ -42,7 +46,8 @@ export interface CatalogInstrument {
   first1dayCandleDate?: string;
   firstTradeDate?: string;
   instrumentType?: string;
-  kind?: "share" | "future" | "index";
+  instrumentKind?: string;
+  kind?: InstrumentKind;
 }
 export type Instrument = CatalogInstrument;
 export interface Catalog {
@@ -50,6 +55,7 @@ export interface Catalog {
   shares: CatalogInstrument[];
   futures: CatalogInstrument[];
   indicatives: CatalogInstrument[];
+  currencies?: CatalogInstrument[];
 }
 export interface MarketRow {
   symbol: string;
@@ -59,10 +65,13 @@ export interface MarketRow {
   ticker: string;
   uid: string | null;
   figi: string | null;
+  classCode?: string;
+  exchange?: string;
+  realExchange?: string;
   currency: string;
   step: number | null;
   brand?: InstrumentBrand | null;
-  type?: "index" | "future" | undefined;
+  type?: "index" | "future" | "currency" | undefined;
   expirationDate?: string | null;
   first1minCandleDate?: string | undefined;
   first1dayCandleDate?: string | undefined;

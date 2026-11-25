@@ -381,7 +381,7 @@ export class TerminalController {
   scheduleOlderHistory = (): void => this.history.scheduleOlder();
   searchInstruments = async (
     query: string,
-    kind: "all" | "share" | "future" | "index",
+    kind: "all" | "share" | "future" | "index" | "currency",
     signal: AbortSignal
   ) => this.client?.searchInstruments(query, kind, signal) ?? [];
   addInstrument = async (

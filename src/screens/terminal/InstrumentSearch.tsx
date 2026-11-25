@@ -1,15 +1,16 @@
 import { t, systemText } from "../../i18n/messages.js";
 import { useEffect, useState } from "react";
-import type { CatalogInstrument, MarketRow } from "../../model/types.js";
+import type { CatalogInstrument, InstrumentSearchKind, MarketRow } from "../../model/types.js";
 import { useTerminal } from "./context.js";
 import { Modal } from "./Modal.js";
 import { intlLocale } from "../../i18n/preferences.js";
-type Kind = "all" | "share" | "future" | "index";
+type Kind = InstrumentSearchKind;
 const KINDS: { kind: Kind; label: string }[] = [
   { kind: "all", label: "Все" },
   { kind: "share", label: "Акции" },
   { kind: "future", label: "Фьючерсы" },
-  { kind: "index", label: "Индексы" }
+  { kind: "index", label: "Индексы" },
+  { kind: "currency", label: "Валюты" }
 ];
 interface SearchRequest {
   query: string;
@@ -41,16 +42,28 @@ function CatalogLogo({ item }: { item: CatalogInstrument }) {
 }
 function kindLabel(item: CatalogInstrument): string {
   const kind = item.kind ?? item.instrumentType;
-  return kind === "future"
-    ? t("Фьючерс")
-    : kind === "index"
-      ? t("Индекс")
-      : kind === "share"
-        ? t("Акция")
-        : t("Инструмент");
+  return kind === "currency"
+    ? t("Валюта")
+    : kind === "future"
+      ? t("Фьючерс")
+      : kind === "index"
+        ? t("Индекс")
+        : kind === "share"
+          ? t("Акция")
+          : t("Инструмент");
 }
 function metadata(item: CatalogInstrument): string {
-  const fields = [item.classCode, item.currency?.toUpperCase()].filter(Boolean);
+  const source =
+    item.exchange === "moex_close"
+      ? t("MOEX · данные закрытия")
+      : item.exchange === "dealer_fx_otc"
+        ? t("Дилер · внебиржевой")
+        : item.realExchange === "REAL_EXCHANGE_DEALER" || item.exchange?.startsWith("dealer")
+          ? t("Дилер")
+          : item.realExchange === "REAL_EXCHANGE_MOEX" || /^(moex|forts)/i.test(item.exchange ?? "")
+            ? "MOEX"
+            : null;
+  const fields = [item.classCode, source, item.currency?.toUpperCase()].filter(Boolean);
   if (item.expirationDate) {
     const expiration = new Date(item.expirationDate);
     if (Number.isFinite(expiration.getTime()))
@@ -66,6 +79,9 @@ function watchlistInstrument(row: MarketRow): CatalogInstrument {
     ticker: row.ticker,
     name: row.name,
     currency: row.currency,
+    ...(row.classCode ? { classCode: row.classCode } : {}),
+    ...(row.exchange ? { exchange: row.exchange } : {}),
+    ...(row.realExchange ? { realExchange: row.realExchange } : {}),
     ...(row.brand !== undefined ? { brand: row.brand } : {}),
     kind: row.type ?? "share",
     ...(row.uid ? { uid: row.uid } : {}),

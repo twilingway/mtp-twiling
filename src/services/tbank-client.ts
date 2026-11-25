@@ -1,4 +1,6 @@
 import { searchCatalog } from "./tbank-instruments.js";
+import { loadBankCatalog } from "./tbank-catalog.js";
+import { catalogInstrumentKind } from "../model/currency-search.js";
 import { MutationQueue } from "./mutation-queue.js";
 import { persistWatchlistMove, type WatchlistMove } from "./watchlist-order.js";
 import { quoteSnapshot } from "./quote-snapshot.js";
@@ -15,17 +17,11 @@ import type {
   Catalog,
   CatalogInstrument,
   HistoryRange,
+  InstrumentSearchKind,
   MarketRow,
   Timeframe
 } from "../model/types.js";
-import {
-  errorMessage,
-  list,
-  normaliseInstrument,
-  normaliseInstruments,
-  object,
-  text
-} from "./types.js";
+import { errorMessage, list, normaliseInstrument, object, text } from "./types.js";
 
 import { BankError, BankTransport } from "./tbank-transport.js";
 export { BankError } from "./tbank-transport.js";
@@ -136,30 +132,9 @@ export class TBankClient extends EventTarget {
       this.state = "connecting";
       this.notify();
     }
-    let catalog = await this.cache.loadCatalog();
-    if (!catalog || Date.now() - catalog.at > 86400000) {
-      const results = await Promise.allSettled([
-        this.request("InstrumentsService", "Shares", { instrumentStatus: "INSTRUMENT_STATUS_ALL" }),
-        this.request("InstrumentsService", "Futures", {
-          instrumentStatus: "INSTRUMENT_STATUS_BASE"
-        }),
-        this.request("InstrumentsService", "Indicatives")
-      ]);
-      const shares = results[0];
-      if (!shares || shares.status === "rejected")
-        throw shares?.reason ?? new BankError("Каталог банка недоступен.", "RESPONSE");
-      const instruments = (index: number) => {
-        const result = results[index];
-        return result?.status === "fulfilled" ? normaliseInstruments(result.value.instruments) : [];
-      };
-      catalog = {
-        at: Date.now(),
-        shares: instruments(0),
-        futures: instruments(1),
-        indicatives: instruments(2)
-      };
-      await this.cache.saveCatalog(catalog);
-    }
+    const catalog = await loadBankCatalog(this.cache, (service, method, body) =>
+      this.request(service, method, body)
+    );
     this.catalog = catalog;
     const watchlist = await this.cache.loadWatchlist(this.owner);
     this.rows =
@@ -171,21 +146,26 @@ export class TBankClient extends EventTarget {
       !this.rows.some((row) => row.uid === this.candleSubscription?.uid)
     )
       this.candleSubscription = null;
-    await this.cache.saveWatchlist(this.owner, this.rows);
     const catalogByUid = new Map(
-      [...catalog.shares, ...catalog.futures, ...catalog.indicatives].map((item) => [
-        item.uid ?? item.instrumentUid,
-        item
-      ])
+      [
+        ...catalog.shares,
+        ...catalog.futures,
+        ...catalog.indicatives,
+        ...(catalog.currencies ?? []).map((item) => ({ ...item, kind: "currency" as const }))
+      ].map((item) => [item.uid ?? item.instrumentUid, item])
     );
     for (const row of this.rows) {
       const item = row.uid ? catalogByUid.get(row.uid) : undefined;
       if (!item) continue;
+      if (item.kind === "currency") row.type = "currency";
+      for (const key of ["classCode", "exchange", "realExchange"] as const)
+        if (item[key] !== undefined) row[key] = item[key];
       if (item.brand !== undefined) row.brand = item.brand;
       row.first1minCandleDate = item.first1minCandleDate ?? row.first1minCandleDate;
       row.first1dayCandleDate = item.first1dayCandleDate ?? row.first1dayCandleDate;
       row.firstTradeDate = item.firstTradeDate ?? row.firstTradeDate;
     }
+    await this.cache.saveWatchlist(this.owner, this.rows);
     const ids = this.rows.flatMap((row) => (row.uid ? [row.uid] : []));
     if (!ids.length) {
       await this.cache.saveMarket(this.owner, { rows: this.rows, at: Date.now() });
@@ -223,7 +203,7 @@ export class TBankClient extends EventTarget {
   }
   async searchInstruments(
     query: string,
-    type: "all" | "share" | "future" | "index" = "all",
+    type: InstrumentSearchKind = "all",
     signal?: AbortSignal
   ): Promise<CatalogInstrument[]> {
     const catalog = this.catalog ?? (await this.cache.loadCatalog());
@@ -262,10 +242,19 @@ export class TBankClient extends EventTarget {
       ticker: full.ticker,
       uid: full.uid ?? full.instrumentUid ?? uid,
       figi: full.figi ?? null,
+      ...(full.classCode ? { classCode: full.classCode } : {}),
+      ...(full.exchange ? { exchange: full.exchange } : {}),
+      ...(full.realExchange ? { realExchange: full.realExchange } : {}),
       name: full.name,
       currency: full.currency || "rub",
       type:
-        instrument.kind === "future" ? "future" : instrument.kind === "index" ? "index" : undefined,
+        catalogInstrumentKind(full) === "currency"
+          ? "currency"
+          : instrument.kind === "future"
+            ? "future"
+            : instrument.kind === "index"
+              ? "index"
+              : undefined,
       color: instrument.kind === "future" ? "#31a8de" : "#5476bc",
       mark: full.name.slice(0, 1).toUpperCase(),
       step: quotation(full.minPriceIncrement),

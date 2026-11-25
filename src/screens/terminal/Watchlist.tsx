@@ -285,7 +285,9 @@ export function Watchlist() {
                   ? t("Фьючерс")
                   : selected.type === "index"
                     ? t("Индекс")
-                    : t("Акция")}
+                    : selected.type === "currency"
+                      ? t("Валюта")
+                      : t("Акция")}
               </span>
             </div>
             <p id="detail-name">{selected.name}</p>
