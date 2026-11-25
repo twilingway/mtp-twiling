@@ -3,6 +3,18 @@ import { assertTechnicalBars, priceSource } from "./data.js";
 import { getTechnicalIndicatorDefinition } from "./definitions.js";
 import { isTechnicalIndicatorInstance } from "./instances.js";
 import { assertLength, ema, sma } from "./primitives.js";
+import { wma, vwma, dema, tema, hma, smma, movingAverageMetadata } from "./averages/index.js";
+import {
+  momentum,
+  roc,
+  cci,
+  williamsR,
+  mfi,
+  obv,
+  accumulationDistribution,
+  pvt,
+  momentumVolumeMetadata
+} from "./momentum-volume/index.js";
 import type {
   NumericSeries,
   TechnicalBar,
@@ -13,6 +25,23 @@ import type {
 
 export function technicalIndicatorWarmup(instance: TechnicalIndicatorInstance): number {
   switch (instance.definitionId) {
+    case "momentum":
+    case "roc":
+    case "cci":
+    case "williams-r":
+    case "mfi":
+      return momentumVolumeMetadata(instance.definitionId, instance.params.length).warmupBars;
+    case "obv":
+    case "adl":
+    case "pvt":
+      return momentumVolumeMetadata(instance.definitionId).warmupBars;
+    case "wma":
+    case "vwma":
+    case "dema":
+    case "tema":
+    case "hma":
+    case "smma":
+      return movingAverageMetadata(instance.definitionId, instance.params.length).warmupBars;
     case "rsi":
       return instance.params.length + 1;
     case "sma":
@@ -47,6 +76,25 @@ export function technicalIndicatorHistoryRequirement(
     convergence: "full-input-dependent"
   });
   switch (instance.definitionId) {
+    case "momentum":
+    case "roc":
+    case "cci":
+    case "williams-r":
+    case "mfi":
+      return momentumVolumeMetadata(instance.definitionId, instance.params.length)
+        .historyRequirement;
+    case "obv":
+    case "adl":
+    case "pvt":
+      return momentumVolumeMetadata(instance.definitionId).historyRequirement;
+    case "wma":
+    case "vwma":
+    case "dema":
+    case "tema":
+    case "hma":
+    case "smma":
+      return movingAverageMetadata(instance.definitionId, instance.params.length)
+        .historyRequirement;
     case "sma":
     case "bollinger-bands":
       return finite(instance.params.length);
@@ -103,10 +151,63 @@ export function calculateTechnicalIndicator(
     );
     series = { k: calculated.k, d: calculated.d };
     present = bars.map((bar) => bar.high !== null && bar.low !== null && bar.close !== null);
+  } else if (instance.definitionId === "mfi") {
+    series = { value: mfi(bars, instance.params.length) };
+    present = bars.map(
+      (bar) => bar.high !== null && bar.low !== null && bar.close !== null && bar.volume !== null
+    );
+  } else if (instance.definitionId === "adl") {
+    series = { value: accumulationDistribution(bars) };
+    present = bars.map(
+      (bar) => bar.high !== null && bar.low !== null && bar.close !== null && bar.volume !== null
+    );
+  } else if (instance.definitionId === "obv" || instance.definitionId === "pvt") {
+    series = { value: instance.definitionId === "obv" ? obv(bars) : pvt(bars) };
+    present = bars.map((bar) => bar.close !== null && bar.volume !== null);
   } else {
     const source = priceSource(bars, instance.params.source);
     present = source.map((value) => value !== null);
     switch (instance.definitionId) {
+      case "momentum":
+        series = { value: momentum(source, instance.params.length) };
+        break;
+      case "roc":
+        series = { value: roc(source, instance.params.length) };
+        break;
+      case "cci":
+        series = { value: cci(source, instance.params.length) };
+        break;
+      case "williams-r":
+        series = { value: williamsR(bars, instance.params.length, source) };
+        present = bars.map(
+          (bar, index) => source[index] !== null && bar.high !== null && bar.low !== null
+        );
+        break;
+      case "wma":
+        series = { value: wma(source, instance.params.length) };
+        break;
+      case "vwma":
+        series = {
+          value: vwma(
+            source,
+            bars.map((bar) => bar.volume),
+            instance.params.length
+          )
+        };
+        present = bars.map((bar, index) => source[index] !== null && bar.volume !== null);
+        break;
+      case "dema":
+        series = { value: dema(source, instance.params.length) };
+        break;
+      case "tema":
+        series = { value: tema(source, instance.params.length) };
+        break;
+      case "hma":
+        series = { value: hma(source, instance.params.length) };
+        break;
+      case "smma":
+        series = { value: smma(source, instance.params.length) };
+        break;
       case "sma":
         series = { value: sma(source, instance.params.length) };
         break;

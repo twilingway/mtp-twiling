@@ -1,3 +1,4 @@
+import { marketAvailable } from "./market-readiness.js";
 import { useEffect, useMemo, useRef } from "react";
 import type { RefObject } from "react";
 import type { Candle, Drawing } from "../../model/types.js";
@@ -13,6 +14,15 @@ import type { TerminalState } from "./state.js";
 import { persistIndicatorPaneLayout } from "./indicator-preferences.js";
 import { cameraCallbacks } from "./controller-camera-sync.js";
 import { watchChartPriceMetadata } from "./chart-price-metadata.js";
+import { persistTechnicalPaneLayout } from "./technical-indicator-actions.js";
+import type { TerminalPreferences } from "./state.js";
+
+function technicalInputs(preferences: TerminalPreferences) {
+  const instances = preferences.technicalIndicators ?? [];
+  return drawingToolbarSettings(preferences.chartSettings).indicatorsHidden
+    ? instances.map((item) => ({ ...item, visible: false }))
+    : instances;
+}
 
 export function useChartCanvas(
   ref: RefObject<HTMLDivElement | null>,
@@ -22,17 +32,21 @@ export function useChartCanvas(
     dataRef = useRef<Candle[]>([]),
     adapterRef = useRef<ChartAdapter | null>(null);
   const p = state.preferences,
+    available = marketAvailable(state),
     session = controller.sessionKey(),
     uid = selectedMarketRow(state.rows, p)?.uid,
     renderKey = chartRenderConfigKey(p.chartSettings, p.indicators),
     renderConfig = useMemo(() => chartRenderConfigFromKey(renderKey), [renderKey]),
-    drawingsHidden = drawingToolbarSettings(p.chartSettings).drawingsHidden;
+    drawingsHidden = drawingToolbarSettings(p.chartSettings).drawingsHidden,
+    indicatorsHidden = drawingToolbarSettings(p.chartSettings).indicatorsHidden,
+    technicalInstances = p.technicalIndicators,
+    technicalLayout = p.technicalPaneLayout;
   useEffect(() => {
     const container = ref.current,
       owner = state.owner,
       revision = state.chartRevision,
       key = `${p.symbol}:${p.timeframe}:${p.engine}:${p.rangeDays}`;
-    if (!container || !uid || !state.authenticated || state.importRecoveryRequired) return;
+    if (!container || !uid || !available || state.importRecoveryRequired) return;
     let cancelled = false,
       layoutWrite = 0,
       stopPriceMetadata = () => {},
@@ -42,7 +56,7 @@ export function useChartCanvas(
       return (
         !cancelled &&
         !current.importRecoveryRequired &&
-        current.authenticated &&
+        marketAvailable(current) &&
         controller.sessionKey() === session &&
         current.owner === owner &&
         current.chartRevision === revision &&
@@ -65,6 +79,23 @@ export function useChartCanvas(
         indicators: renderConfig.indicators,
         settings: renderConfig.settings,
         indicatorPaneLayout: snapshot.preferences.indicatorPaneLayout,
+        technicalIndicators: technicalInputs(snapshot.preferences),
+        technicalPaneLayout: snapshot.preferences.technicalPaneLayout ?? [],
+        onTechnicalPaneLayout: (layout) => {
+          const valid = () =>
+            matches() &&
+            owned !== null &&
+            controller.chart === owned &&
+            !owned.retired &&
+            !controller.getSnapshot().backupBusy &&
+            !controller.getSnapshot().importingBackup;
+          void persistTechnicalPaneLayout(controller, layout, valid).catch((error: unknown) => {
+            if (valid())
+              controller.notify(
+                error instanceof Error ? error.message : "Не удалось сохранить панель индикатора."
+              );
+          });
+        },
         onIndicatorLayout: (layout) => {
           const write = ++layoutWrite;
           const valid = () => {
@@ -122,6 +153,11 @@ export function useChartCanvas(
         controller.getSnapshot().historyViewReady !== false;
       adapterRef.current = owned;
       controller.chart = owned;
+      const currentPreferences = controller.getSnapshot().preferences;
+      owned.updateTechnicalIndicators?.(
+        technicalInputs(currentPreferences),
+        currentPreferences.technicalPaneLayout ?? []
+      );
       stopPriceMetadata = watchChartPriceMetadata(controller, owned, matches);
       // Adapters retain this request until nonempty data has completed its initial fit.
       if (view) owned.setView(view);
@@ -159,7 +195,7 @@ export function useChartCanvas(
     visibleDrawings,
     uid,
     state.owner,
-    state.authenticated,
+    available,
     state.chartRevision,
     state.importRecoveryRequired,
     p.engine,
@@ -194,6 +230,33 @@ export function useChartCanvas(
     dataRef.current = next;
   }, [state.candles, state.historyViewReady, state.importingBackup, state.importRecoveryRequired]);
   useEffect(() => {
+    const adapter = adapterRef.current;
+    if (!adapter || adapter.retired || state.importingBackup || state.importRecoveryRequired)
+      return;
+    try {
+      const instances = technicalInstances ?? [];
+      adapter.updateTechnicalIndicators?.(
+        indicatorsHidden ? instances.map((item) => ({ ...item, visible: false })) : instances,
+        technicalLayout ?? []
+      );
+    } catch (error: unknown) {
+      controller.notify(error instanceof Error ? error.message : "Не удалось обновить индикатор.");
+    }
+  }, [
+    controller,
+    technicalInstances,
+    technicalLayout,
+    indicatorsHidden,
+    state.importingBackup,
+    state.importRecoveryRequired
+  ]);
+  useEffect(() => {
     adapterRef.current?.redrawDrawings();
-  }, [state.drawings, state.preview, state.selectedObject, drawingsHidden]);
+  }, [
+    state.drawings,
+    state.drawingSettingsPreview,
+    state.preview,
+    state.selectedObject,
+    drawingsHidden
+  ]);
 }

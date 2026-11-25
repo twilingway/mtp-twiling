@@ -1,10 +1,10 @@
-import * as storage from "../../services/storage.js";
+import * as storage from "../../services/storage-v2.js";
 import { setDisplayPreferences } from "../../i18n/preferences.js";
-import type { TBankClient } from "../../services/tbank-client.js";
+import type { MarketClient } from "../../services/market-client.js";
 import type { BackupImportOptions } from "../../model/backup-import.js";
 import type { BackupExportOptions } from "../../model/backup-export.js";
 import { moveWatchlistRow, type WatchlistMove } from "../../services/watchlist-order.js";
-import { loadCandleCalendar } from "../../services/tbank-calendar.js";
+import { marketCalendar } from "../../services/market-calendar.js";
 import { toggleIndicatorFlags } from "../../model/indicator-flags.js";
 import { historyDepthTransition, saveControllerView } from "./controller-camera.js";
 import type { TradingCalendarDay } from "../../model/candle-clock.js";
@@ -18,12 +18,14 @@ import type {
   DrawingTool,
   ImageAsset,
   IndicatorKey,
+  InstrumentSearchKind,
   Timeframe
 } from "../../model/types.js";
 import type { ChartAdapter } from "../../charts/adapter.js";
 import { TerminalHistory } from "./controller-history.js";
 import { TerminalSession } from "./controller-session.js";
 import { TerminalEditing } from "./controller-editing.js";
+import { createDrawingPreview, drawingPreviewState } from "./drawing-settings-preview.js";
 import { TerminalDrawingTools } from "./controller-drawing-tools.js";
 import { TerminalPanel } from "./controller-panel.js";
 import { TerminalBackups } from "./controller-backups.js";
@@ -31,6 +33,9 @@ import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { defaultPreferences, terminalHistoryLabel } from "./controller-bridge.js";
 import { nativeTimeframe } from "../../model/intervals/native-timeframes.js";
 import { importWritable } from "./controller-transfer-guard.js";
+import { openLegacyIndicatorSettings } from "./indicator-preferences.js";
+import { marketAvailable } from "./market-readiness.js";
+import { nativeInterval } from "../../services/providers/bybit/market.js";
 import type { ContextMenu, TerminalDialog, TerminalPreferences, TerminalState } from "./state.js";
 
 export class TerminalController {
@@ -40,6 +45,7 @@ export class TerminalController {
     owner: "guest",
     name: "",
     authenticated: false,
+    marketReady: false,
     status: "offline",
     error: null,
     rows: resolveWatchlist([], [], []),
@@ -49,7 +55,7 @@ export class TerminalController {
     drawings: [],
     images: [],
     loading: false,
-    historyHelp: "Подключите личный API-ключ",
+    historyHelp: "Выберите инструмент Bybit или подключите Т‑Банк",
     activeTool: null,
     preview: null,
     selectedObject: null,
@@ -67,6 +73,7 @@ export class TerminalController {
   private readonly session: TerminalSession;
   private selectionEpoch = 0;
   readonly editing: TerminalEditing;
+  readonly drawingSettings: ReturnType<typeof createDrawingPreview>;
   readonly tools: TerminalDrawingTools;
   readonly panel: TerminalPanel;
   private readonly backups: TerminalBackups;
@@ -79,6 +86,7 @@ export class TerminalController {
       notify: (message: string) => this.notify(message)
     };
     this.editing = new TerminalEditing(bridge);
+    this.drawingSettings = createDrawingPreview(bridge, this.editing, () => !this.session.disposed);
     this.tools = new TerminalDrawingTools(this);
     this.panel = new TerminalPanel(this);
     this.history = new TerminalHistory({
@@ -108,7 +116,7 @@ export class TerminalController {
       isAlive: () => !this.session.disposed
     });
   }
-  private get client(): TBankClient | null {
+  private get client(): MarketClient | null {
     return this.session.client;
   }
   getSnapshot = (): TerminalState => this.state;
@@ -149,7 +157,7 @@ export class TerminalController {
         activeTool: null,
         ...patch
       };
-    this.state = { ...this.state, ...patch };
+    this.state = drawingPreviewState({ ...this.state, ...patch });
     if (patch.preferences) setDisplayPreferences(patch.preferences);
     this.listeners.forEach((listener) => listener());
   };
@@ -175,20 +183,20 @@ export class TerminalController {
   }
   start = (): Promise<void> => this.session.start();
   dispose = (): void => {
+    this.drawingSettings.cancel();
     this.editing.reset();
     this.session.dispose();
     if (this.toastTimer) clearTimeout(this.toastTimer);
   };
   login = async (token: string, name: string, remember: boolean): Promise<void> => {
-    this.update({ authenticated: false });
     await this.editing.flush();
     await this.session.login(token, name, remember);
   };
   logout = (): Promise<void> => {
-    this.update({ authenticated: false });
     return this.session.logout();
   };
-  setDialog = (dialog: TerminalDialog): void => this.update({ dialog, contextMenu: null });
+  setDialog = (dialog: TerminalDialog): void => this.drawingSettings.setDialog(dialog);
+  mergePublicProfile = (): Promise<void> => this.session.mergePublicProfile();
   setContext = (contextMenu: ContextMenu | null): void => this.update({ contextMenu });
   selectObject = (id: string | null): void => this.update({ selectedObject: id });
   focusObject = (id: string): void => {
@@ -212,6 +220,7 @@ export class TerminalController {
   };
   setPreview = (preview: TerminalState["preview"]): void => this.update({ preview });
   undoDrawings = (): Promise<void> => {
+    this.drawingSettings.cancel();
     if (this.state.activeTool && this.state.preview) {
       this.setTool(null);
       return Promise.resolve();
@@ -249,6 +258,9 @@ export class TerminalController {
         };
       if ("symbol" in patch && !("instrumentUid" in patch)) delete merged.instrumentUid;
       const next = routing ? pinSelectedInstrument(this.state.rows, merged) : merged;
+      const selected = selectedMarketRow(this.state.rows, next);
+      if (selected?.providerRef) next.providerRef = selected.providerRef;
+      else delete next.providerRef;
       const reload =
         next.symbol !== previous.symbol ||
         next.instrumentUid !== previous.instrumentUid ||
@@ -287,7 +299,7 @@ export class TerminalController {
       await this.savePreferences();
       if (
         reload &&
-        this.state.authenticated &&
+        marketAvailable(this.state) &&
         epoch === this.selectionEpoch &&
         this.session.matches(client) &&
         owner === this.state.owner
@@ -299,6 +311,8 @@ export class TerminalController {
   };
   setTimeframe = async (timeframe: Timeframe): Promise<void> => {
     nativeTimeframe(timeframe);
+    if (selectedMarketRow(this.state.rows, this.state.preferences)?.providerRef)
+      nativeInterval(timeframe);
     await this.setPreferences({ timeframe });
   };
   toggleIndicator = async (key: IndicatorKey): Promise<void> => {
@@ -367,25 +381,21 @@ export class TerminalController {
   ): Promise<TradingCalendarDay[]> => {
     const client = this.client,
       owner = this.state.owner;
-    if (!client || signal.aborted || this.session.disposed) return [];
-    try {
-      const days = await loadCandleCalendar(client, uid, barTimestamp, timeframe, now, signal);
-      return !signal.aborted && owner === this.state.owner && this.session.matches(client)
-        ? days
-        : [];
-    } catch {
-      // Optional calendar metadata must not produce recurring network-error toasts.
-      return [];
-    }
+    return marketCalendar(
+      client,
+      uid,
+      barTimestamp,
+      timeframe,
+      now,
+      signal,
+      () => !this.session.disposed && owner === this.state.owner && this.session.matches(client)
+    );
   };
   scheduleOlderHistory = (): void => this.history.scheduleOlder();
-  searchInstruments = async (
-    query: string,
-    kind: "all" | "share" | "future" | "index" | "currency",
-    signal: AbortSignal
-  ) => this.client?.searchInstruments(query, kind, signal) ?? [];
+  searchInstruments = async (query: string, kind: InstrumentSearchKind, signal: AbortSignal) =>
+    this.client?.searchInstruments(query, kind, signal) ?? [];
   addInstrument = async (
-    instrument: Parameters<TBankClient["addInstrument"]>[0]
+    instrument: Parameters<MarketClient["addInstrument"]>[0]
   ): Promise<void> => {
     const client = this.client;
     if (!client || !importWritable(this.state)) return;
@@ -482,12 +492,7 @@ export class TerminalController {
       createdAt: Date.now()
     });
   };
-  editIndicator = (key: IndicatorKey): void =>
-    this.update({
-      editingIndicator: key,
-      dialog: key === "volume" ? "chart-settings" : "indicator-settings",
-      contextMenu: null
-    });
+  editIndicator = (key: IndicatorKey): void => openLegacyIndicatorSettings(this, key);
   setCrosshair = (crosshairBar: Candle | null): void => {
     if (this.state.crosshairBar?.timestamp !== crosshairBar?.timestamp)
       this.update({ crosshairBar });

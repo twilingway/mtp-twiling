@@ -1,7 +1,29 @@
+import type { CumulativeHistoryRequirement } from "./momentum-volume/metadata.js";
+
 export type NumericValue = number | null;
 export type NumericSeries = readonly NumericValue[];
 export type TechnicalIndicatorId =
-  "sma" | "ema" | "rsi" | "macd" | "bollinger-bands" | "atr" | "stochastic";
+  | "sma"
+  | "ema"
+  | "rsi"
+  | "macd"
+  | "bollinger-bands"
+  | "atr"
+  | "stochastic"
+  | "wma"
+  | "vwma"
+  | "dema"
+  | "tema"
+  | "hma"
+  | "smma"
+  | "momentum"
+  | "roc"
+  | "cci"
+  | "williams-r"
+  | "mfi"
+  | "obv"
+  | "adl"
+  | "pvt";
 export type PriceSource = "open" | "high" | "low" | "close" | "hl2" | "hlc3" | "ohlc4" | "volume";
 export interface TechnicalBar {
   readonly timestamp: number;
@@ -12,6 +34,20 @@ export interface TechnicalBar {
   readonly volume: NumericValue;
 }
 export interface TechnicalParameters {
+  momentum: { length: number; source: PriceSource };
+  roc: { length: number; source: PriceSource };
+  cci: { length: number; source: PriceSource };
+  "williams-r": { length: number; source: PriceSource };
+  mfi: { length: number };
+  obv: Record<string, never>;
+  adl: Record<string, never>;
+  pvt: Record<string, never>;
+  wma: { length: number; source: PriceSource };
+  vwma: { length: number; source: PriceSource };
+  dema: { length: number; source: PriceSource };
+  tema: { length: number; source: PriceSource };
+  hma: { length: number; source: PriceSource };
+  smma: { length: number; source: PriceSource };
   sma: { length: number; source: PriceSource };
   ema: { length: number; source: PriceSource };
   rsi: { length: number; source: PriceSource };
@@ -24,6 +60,8 @@ export interface OutputStyle {
   color: string;
   width: number;
   visible: boolean;
+  opacity?: number;
+  lineStyle?: "solid" | "dashed" | "dotted";
 }
 export type IndicatorPane = { kind: "overlay" } | { kind: "pane"; id: string };
 export type TechnicalIndicatorInstance = {
@@ -95,4 +133,6 @@ export type TechnicalHistoryRequirement =
         | "first-value-ema-chain"
         | "true-range-wilder";
       convergence: "full-input-dependent";
-    };
+    }
+  /** Reviewed accumulation policy; never substitute an EMA/recursive seed. */
+  | CumulativeHistoryRequirement;

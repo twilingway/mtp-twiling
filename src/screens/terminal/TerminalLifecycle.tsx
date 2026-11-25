@@ -85,7 +85,7 @@ export function TerminalLifecycle() {
       }
       if (e.key === "/") {
         e.preventDefault();
-        controller.setDialog(controller.getSnapshot().authenticated ? "instruments" : "account");
+        controller.setDialog(controller.getSnapshot().ready ? "instruments" : "account");
       }
       if (e.key === "Escape") {
         controller.editing.cancelGesture();

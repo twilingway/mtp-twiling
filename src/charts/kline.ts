@@ -1,13 +1,5 @@
-import {
-  ActionType,
-  DomPosition,
-  IndicatorSeries,
-  TooltipShowRule,
-  dispose,
-  init,
-  registerIndicator
-} from "klinecharts";
-import type { Coordinate, Indicator, IndicatorDrawParams, Point } from "klinecharts";
+import { ActionType, DomPosition, TooltipShowRule, dispose, init } from "klinecharts";
+import type { Coordinate, Point } from "klinecharts";
 import { MtpModel, activeMtpPeriods } from "../model/mtp.js";
 import { TIMEFRAMES } from "../model/history-codec.js";
 import type { Candle, ChartView, DrawingPoint } from "../model/types.js";
@@ -30,6 +22,15 @@ import { attachVolumePaneLayout } from "./kline-pane-layout.js";
 import { attachKlineCanvasResize } from "./kline-canvas-resize.js";
 import { klineNavigation } from "./kline-navigation.js";
 import { UserCameraEvents } from "./camera-events.js";
+import {
+  registerKlineDrawingIndicators,
+  bindKlineDrawingIndicators,
+  redrawKlineDrawingIndicator,
+  disposeKlineDrawingContext
+} from "./kline-drawing-indicators.js";
+import type { KlineDrawingContext } from "./kline-drawing-indicators.js";
+import { klineTechnical } from "./kline-technical.js";
+import { preserveKlineCamera } from "./kline-preserve-camera.js";
 
 export function makeKline(options: ChartOptions): ChartAdapter {
   const camera = new UserCameraEvents(options);
@@ -48,54 +49,14 @@ export function makeKline(options: ChartOptions): ChartAdapter {
   const model = new MtpModel();
   if (settings.indicatorOptions) model.styles = settings.indicatorOptions;
   model.styleKey = indicators.mtpAll ? "mtpAll" : undefined;
-  registerIndicator({
-    name: "MTP_PERSONAL",
-    shortName: "",
-    series: IndicatorSeries.Price,
-    zLevel: -1,
-    figures: [
-      { key: "mtpLow", title: "", type: "line" },
-      { key: "mtpHigh", title: "", type: "line" }
-    ],
-    calc: () => model.bounds,
-    draw: ({ ctx, visibleRange, xAxis, yAxis }) => {
-      model.draw(
-        ctx,
-        visibleRange.from,
-        visibleRange.to,
-        (index) => xAxis.convertToPixel(index),
-        (price) => (price == null ? null : yAxis.convertToPixel(price))
-      );
-      return true;
-    }
-  });
-  const drawObjects = ({
-    ctx,
-    bounding,
-    xAxis,
-    yAxis
-  }: Pick<IndicatorDrawParams<Indicator>, "ctx" | "bounding" | "xAxis" | "yAxis">) => {
-    options.paint(
-      ctx,
-      bounding.width,
-      bounding.height,
-      (point) => ({
-        x: xAxis.convertToPixel(logicalForTime(data, point.timestamp, TIMEFRAMES[timeframe].ms)),
-        y: yAxis.convertToPixel(point.value)
-      }),
-      "back"
-    );
-    return true;
+  registerKlineDrawingIndicators();
+  const drawingContext: KlineDrawingContext = {
+    model,
+    getData: () => data,
+    timeframe,
+    paint: options.paint,
+    disposed: false
   };
-  registerIndicator({
-    name: "DRAWINGS_PERSONAL",
-    shortName: "",
-    series: IndicatorSeries.Price,
-    zLevel: -2,
-    figures: [],
-    calc: () => [],
-    draw: drawObjects
-  });
   const chart = init(container, {
     locale: intlLocale(options.locale),
     timezone: resolveTimeZone(options.timeZone),
@@ -232,6 +193,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     }
     chart.resize();
     volumeLayout.apply();
+    technical?.apply();
     flushView();
     paintFront();
   });
@@ -286,6 +248,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     options.onCrosshair(data[index] ?? null);
   });
   initializeKlineIndicators(chart, options, volumeLayout.height());
+  bindKlineDrawingIndicators(chart, drawingContext);
   volumeLayout.apply();
   const detachCanvasResize = attachKlineCanvasResize(chart, () => axisWidth);
   const adapter: ChartAdapter = {
@@ -317,9 +280,11 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       () => dataReady
     ),
     setData(next, fit) {
+      if (live.retired) return;
       dataReady = false;
-      data = next;
+      data = [...next];
       model.reset(data, activeMtpPeriods(indicators));
+      technical?.setData(data);
       chart.applyNewData(data);
       if (fit) {
         const count = data.filter(
@@ -333,11 +298,20 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       paintFront();
     },
     updateBar(bar) {
+      if (live.retired) return;
       const index = data.findIndex((item) => item.timestamp === bar.timestamp);
+      const historical = bar.timestamp < (data.at(-1)?.timestamp ?? bar.timestamp);
       if (index >= 0) data[index] = bar;
-      else data.push(bar);
-      model.update(data);
-      chart.updateData(bar);
+      else {
+        data.push(bar);
+        if (historical) data.sort((a, b) => a.timestamp - b.timestamp);
+      }
+      if (historical) model.reset(data, activeMtpPeriods(indicators));
+      else model.update(data);
+      technical?.setData(data);
+      if (historical) {
+        camera.programmatic(() => preserveKlineCamera(chart, () => chart.applyNewData(data)));
+      } else chart.updateData(bar);
     },
     getView() {
       if (!dataReady || !data.length) return null;
@@ -374,6 +348,14 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       flushView();
     },
     pointToPixel,
+    technicalPaneMetrics: () => technical?.metrics() ?? [],
+    timeAxisTop: () => technical?.timeAxisTop() ?? container.clientHeight - 28,
+    updateTechnicalIndicators(instances, layout) {
+      if (live.retired) return;
+      camera.programmatic(() =>
+        preserveKlineCamera(chart, () => technical?.update(instances, layout))
+      );
+    },
     beginPan: (start) => beginKlinePan(chart, start),
     focusPoints(points) {
       const size = chart.getSize("candle_pane", DomPosition.Main);
@@ -390,6 +372,8 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       }
     },
     pixelToPoint(x, y) {
+      const size = chart.getSize("candle_pane", DomPosition.Main);
+      if (!size || x < 0 || x > size.width || y < 0 || y > size.height) return null;
       const point = fromPixel({ x, y });
       if (point.dataIndex == null || point.value == null) return null;
       const timestamp = timeForLogical(data, point.dataIndex, TIMEFRAMES[timeframe].ms);
@@ -408,13 +392,12 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       chart.scrollToRealTime();
     },
     redrawDrawings() {
-      chart.overrideIndicator(
-        { name: "DRAWINGS_PERSONAL", draw: (args) => drawObjects(args) },
-        "candle_pane"
-      );
+      redrawKlineDrawingIndicator(chart, drawingContext);
       paintFront();
     },
     destroy() {
+      technical?.dispose();
+      disposeKlineDrawingContext(drawingContext);
       detachCanvasResize();
       volumeLayout.dispose();
       detachCalendarXAxis();
@@ -424,5 +407,15 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     }
   };
   const live = camera.wrap(adapter);
+  const technical = klineTechnical(
+    chart,
+    options,
+    () => !live.retired,
+    volumeLayout.ratio,
+    volumeLayout.apply,
+    detachCanvasResize.refresh,
+    paintFront
+  );
+  technical.update(options.technicalIndicators ?? [], options.technicalPaneLayout);
   return live;
 }

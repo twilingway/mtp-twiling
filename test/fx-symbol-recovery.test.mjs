@@ -12,6 +12,7 @@ function sources(overrides = {}) {
   function load(relative) {
     const file = path.resolve(root, relative).replace(/\.js$/, ".ts");
     const key = path.relative(root, file).replaceAll(path.sep, "/");
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (modules.has(file)) return modules.get(file).exports;
     const module = { exports: {} };
@@ -97,7 +98,7 @@ function terminalFixture(t) {
   const { TerminalController } = localLoad("screens/terminal/controller.ts");
   const { startTerminalDrive } = localLoad("screens/terminal/controller-drive.ts");
   const controller = new TerminalController();
-  const client = { async addInstrument() { return fx; }, snapshot: () => ({ rows: [fx], authenticated: true, status: "online" }),
+  const client = { async addInstrument() { return fx; }, snapshot: () => ({ rows: [fx], authenticated: true, marketReady: true, status: "online" }),
     async candles(symbol, timeframe, range, options) { candles.push({ symbol, timeframe, uid: options.uid }); return { candles: [{ timestamp: range.to, open: 1, high: 1, low: 1, close: 1, volume: 1 }], requests: 1 }; },
     async close() {} };
   controller.session.client = client;

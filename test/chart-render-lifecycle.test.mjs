@@ -9,11 +9,12 @@ import ts from "typescript";
 const root = fileURLToPath(new URL("../src/", import.meta.url));
 function sourceModules(overrides) {
   const modules = new Map(),
-    context = vm.createContext({ console, Map, Date, Math, Promise });
+    context = vm.createContext({ console, Map, Date, Math, Promise, structuredClone });
   function load(relative) {
     if (Object.hasOwn(overrides, relative)) return overrides[relative];
     const file = path.resolve(root, relative).replace(/\.js$/, ".ts"),
       key = path.relative(root, file).replaceAll(path.sep, "/");
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (modules.has(file)) return modules.get(file).exports;
     const module = { exports: {} };
@@ -39,7 +40,8 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
     listeners = new Set(), metadata = [],
     adapters = [],
     paints = [],
-    layoutWrites = [];
+    layoutWrites = [],
+    technicalUpdates = [];
   let cursor = 0,
     effects = [],
     destroyed = 0,
@@ -131,6 +133,7 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
         }
       },
       updateBar() {},
+      updateTechnicalIndicators: (instances, layout) => technicalUpdates.push({ instances, layout }),
       updatePriceFormat(value) { metadata.push(value); },
       setView(view) {
         if (hasData) currentView = view;
@@ -207,12 +210,22 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
   listeners.forEach(listener=>listener());await render();
   assert.equal(metadata.at(-1).step,.000002);assert.equal(controller.chart,original);
   assert.equal(original.getView(),viewBefore);assert.equal(viewLoads,loadsBefore);assert.equal(adapters.length,1);
+  const technicalBeforeVolume = technicalUpdates.length;
   original.options.onIndicatorLayout({ volume: { heightRatio: 0.33 } });
   await new Promise(setImmediate);
   await render();
   assert.equal(layoutWrites.length, 1);
   assert.equal(state.preferences.indicatorPaneLayout.volume.heightRatio, 0.33);
   assert.equal(controller.chart, original, "pane layout cannot remount the native chart");
+  assert.equal(technicalUpdates.length, technicalBeforeVolume,
+    "legacy volume persistence must not cancel an active technical separator gesture");
+  const instance = load("model/technical-indicators/instances.ts")
+    .createTechnicalIndicatorInstance("rsi", "strength");
+  state = { ...state, preferences: { ...state.preferences, technicalIndicators: [instance] } };
+  await render();
+  assert.equal(technicalUpdates.length, technicalBeforeVolume + 1,
+    "an actual TA input change must still reach the adapter");
+  assert.equal(technicalUpdates.at(-1).instances[0].id, "strength");
   for (const flag of ["backupBusy", "importingBackup", "importRecoveryRequired"]) {
     const previous = state[flag];
     state = { ...state, [flag]: true };

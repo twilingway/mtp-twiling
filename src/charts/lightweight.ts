@@ -1,19 +1,11 @@
-import {
-  CandlestickSeries,
-  ColorType,
-  CrosshairMode,
-  HistogramSeries,
-  LineSeries,
-  createChart
-} from "lightweight-charts";
+import { CandlestickSeries, ColorType, CrosshairMode, createChart } from "lightweight-charts";
 import type { IPriceLine, ISeriesPrimitive, Logical, Time, UTCTimestamp } from "lightweight-charts";
 import { MtpModel, activeMtpPeriods, lightweightMtp } from "../model/mtp.js";
 import { TIMEFRAMES } from "../model/history-codec.js";
 import type { Candle, ChartView, DrawingPoint } from "../model/types.js";
-import { logicalForTime, movingAverage, timeForLogical } from "./adapter.js";
+import { logicalForTime, timeForLogical } from "./adapter.js";
 import { chartPriceFormat, lightweightPriceFormat } from "./price-format.js";
 import type { ChartAdapter, ChartOptions } from "./adapter.js";
-import { lineColor } from "../model/candle-palette.js";
 import { focusRange } from "./navigation.js";
 import { PendingChartView } from "./view-camera.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
@@ -25,6 +17,9 @@ import { intlLocale } from "../i18n/preferences.js";
 import { calendarAxisDisplay } from "../i18n/calendar-axis.js";
 import { lightweightNavigation } from "./lightweight-navigation.js";
 import { UserCameraEvents } from "./camera-events.js";
+import { lightweightLegacy } from "./lightweight-legacy.js";
+import { lightweightTechnical } from "./lightweight-technical.js";
+import { preserveLightweightCamera } from "./lightweight-preserve-camera.js";
 
 export function makeLightweight(options: ChartOptions): ChartAdapter {
   const camera = new UserCameraEvents(options);
@@ -101,33 +96,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     lastValueVisible: false,
     priceFormat: lightweightPriceFormat(priceFormat)
   });
-  const volume = chart.addSeries(HistogramSeries, {
-    priceFormat: { type: "volume" },
-    priceScaleId: "volume",
-    lastValueVisible: false,
-    priceLineVisible: false
-  });
-  volume
-    .priceScale()
-    .applyOptions({ scaleMargins: { top: 0.83, bottom: 0 }, borderVisible: false });
-  const sma = chart.addSeries(LineSeries, {
-    color: lineColor(
-      settings.indicatorOptions?.ma?.color ?? "#ddad56",
-      settings.indicatorOptions?.ma?.opacity
-    ),
-    lineWidth: (settings.indicatorOptions?.ma?.width ?? 1) as 1 | 2 | 3 | 4,
-    priceLineVisible: false,
-    lastValueVisible: false
-  });
-  const ema = chart.addSeries(LineSeries, {
-    color: lineColor(
-      settings.indicatorOptions?.ema?.color ?? "#7b8fff",
-      settings.indicatorOptions?.ema?.opacity
-    ),
-    lineWidth: (settings.indicatorOptions?.ema?.width ?? 1) as 1 | 2 | 3 | 4,
-    priceLineVisible: false,
-    lastValueVisible: false
-  });
+  const legacy = lightweightLegacy(chart, options);
   series.setSeriesOrder(3);
   const model = new MtpModel();
   if (settings.indicatorOptions) model.styles = settings.indicatorOptions;
@@ -278,18 +247,6 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     if (lastPriceLabel) lastPriceLabel.applyOptions(label);
     else lastPriceLabel = series.createPriceLine(label);
   }
-  function averages() {
-    sma.setData(
-      indicators.ma
-        ? movingAverage(data, 20).map((p) => ({ ...p, time: p.time as UTCTimestamp }))
-        : []
-    );
-    ema.setData(
-      indicators.ema
-        ? movingAverage(data, 50, true).map((p) => ({ ...p, time: p.time as UTCTimestamp }))
-        : []
-    );
-  }
   function restoreView() {
     if (settingData) return;
     const view = pendingView.take(data.length > 0 && chart.timeScale().width() > 0);
@@ -350,21 +307,14 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       () => !settingData && !viewStaged && restoreFrame === null && settleFrame === null
     ),
     setData(next, fit) {
+      if (live.retired) return;
       settingData = true;
-      data = next;
+      data = [...next];
       model.reset(data, activeMtpPeriods(indicators));
       series.setData(data.map((bar) => ({ ...bar, time: time(bar) })));
       updateLastPriceLabel();
-      volume.setData(
-        indicators.volume
-          ? data.map((bar) => ({
-              time: time(bar),
-              value: bar.volume,
-              color: bar.close >= bar.open ? "#08998144" : "#f2364544"
-            }))
-          : []
-      );
-      averages();
+      legacy.setData(data);
+      technical.setData(data);
       mtp.update();
       updateDrawings();
       if (fit && data.length) {
@@ -378,19 +328,23 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       scheduleViewRestore();
     },
     updateBar(bar) {
+      if (live.retired) return;
       const index = data.findIndex((item) => item.timestamp === bar.timestamp);
+      const historical = bar.timestamp < (data.at(-1)?.timestamp ?? bar.timestamp);
       if (index >= 0) data[index] = bar;
-      else data.push(bar);
-      model.update(data);
-      series.update({ ...bar, time: time(bar) });
+      else {
+        data.push(bar);
+        if (historical) data.sort((a, b) => a.timestamp - b.timestamp);
+      }
+      if (historical) model.reset(data, activeMtpPeriods(indicators));
+      else model.update(data);
+      if (historical && index < 0)
+        series.setData(data.map((item) => ({ ...item, time: time(item) })));
+      else series.update({ ...bar, time: time(bar) }, historical);
       updateLastPriceLabel();
-      if (indicators.volume)
-        volume.update({
-          time: time(bar),
-          value: bar.volume,
-          color: bar.close >= bar.open ? "#08998144" : "#f2364544"
-        });
-      averages();
+      if (historical && index < 0) legacy.setData(data);
+      else legacy.update(data, bar, historical);
+      technical.setData(data);
       mtp.update();
     },
     getView() {
@@ -418,6 +372,14 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       scheduleViewRestore();
     },
     pointToPixel,
+    technicalPaneMetrics: () => technical.metrics(),
+    timeAxisTop: () => technical.timeAxisTop(),
+    updateTechnicalIndicators: (instances, layout) => {
+      if (!live.retired)
+        camera.programmatic(() =>
+          preserveLightweightCamera(chart, series, () => technical.update(instances, layout))
+        );
+    },
     focusPoints(points) {
       const timeScale = chart.timeScale(),
         visible = timeScale.getVisibleLogicalRange(),
@@ -448,13 +410,18 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       scale.setVisibleRange(range);
     },
     pixelToPoint(x, y) {
+      const price = technical.metrics()[0];
+      if (!price || x < 0 || x > price.width || y < 0 || y > price.height) return null;
       const index = chart.timeScale().coordinateToLogical(x),
         value = series.coordinateToPrice(y);
       if (index == null || value == null) return null;
       const timestamp = timeForLogical(data, index, TIMEFRAMES[timeframe].ms);
       return timestamp == null ? null : { timestamp, value };
     },
-    plotSize: () => ({ width: chart.timeScale().width(), height: container.clientHeight - 28 }),
+    plotSize: () => ({
+      width: chart.timeScale().width(),
+      height: technical.metrics()[0]?.height ?? container.clientHeight - 28
+    }),
     fit() {
       series.priceScale().applyOptions({ autoScale: true });
       chart.timeScale().fitContent();
@@ -464,9 +431,12 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       if (restoreFrame !== null) cancelAnimationFrame(restoreFrame);
       if (settleFrame !== null) cancelAnimationFrame(settleFrame);
       mtp.destroy();
+      technical.dispose();
       chart.remove();
     }
   };
   const live = camera.wrap(adapter);
+  const technical = lightweightTechnical(chart, options, () => !live.retired);
+  technical.update(options.technicalIndicators ?? [], options.technicalPaneLayout);
   return live;
 }

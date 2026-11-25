@@ -17,6 +17,7 @@ function sources(overrides = {}) {
     let file = path.resolve(root, relative).replace(/\.js$/, ".ts");
     if (!file.endsWith(".tsx") && !existsSync(file) && existsSync(file + "x")) file += "x";
     const key = path.relative(root, file).replaceAll(path.sep, "/");
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (modules.has(file)) return modules.get(file).exports;
     const module = { exports: {} }; modules.set(file, module);

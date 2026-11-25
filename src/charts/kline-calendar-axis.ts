@@ -11,32 +11,40 @@ export function attachCalendarXAxis(
   timeframe: Timeframe,
   display?: CalendarAxisDisplay
 ): () => void {
-  const source = {
-    getData,
-    coordinate: (index: number) => {
-      const point = chart.convertToPixel({ dataIndex: index }, { paneId: "candle_pane" });
-      return !Array.isArray(point) && typeof point.x === "number" ? point.x : NaN;
-    }
-  };
+  const source = { chart: chart as Chart | null, getData, timeframe, display };
   const name = "personal-calendar-boundaries";
-  registerXAxis({
-    name,
-    createTicks: ({ bounding, defaultTicks }) => {
-      const range = chart.getVisibleRange();
-      return (
-        calendarAxisTicks(source.getData(), timeframe, {
-          from: range.realFrom,
-          to: range.realTo,
-          width: bounding.width,
-          coordinate: source.coordinate,
-          ...(display ? { display } : {})
-        }) ?? defaultTicks
-      );
-    }
-  });
+  registerXAxis({ name, createTicks: calendarTicks(new WeakRef(source)) });
   chart.setPaneOptions({ id: "x_axis_pane", axisOptions: { name } });
   return () => {
+    source.chart = null;
     source.getData = () => [];
-    source.coordinate = () => NaN;
+  };
+}
+/** v9 axis callbacks have no extendData argument. A weak context keeps old callbacks owner-isolated. */
+function calendarTicks(
+  weak: WeakRef<{
+    chart: Chart | null;
+    getData: () => readonly Candle[];
+    timeframe: Timeframe;
+    display: CalendarAxisDisplay | undefined;
+  }>
+): Parameters<typeof registerXAxis>[0]["createTicks"] {
+  return ({ bounding, defaultTicks }) => {
+    const source = weak.deref(),
+      chart = source?.chart;
+    if (!source || !chart) return defaultTicks;
+    const range = chart.getVisibleRange();
+    return (
+      calendarAxisTicks(source.getData(), source.timeframe, {
+        from: range.realFrom,
+        to: range.realTo,
+        width: bounding.width,
+        coordinate: (index) => {
+          const point = chart.convertToPixel({ dataIndex: index }, { paneId: "candle_pane" });
+          return !Array.isArray(point) && typeof point.x === "number" ? point.x : NaN;
+        },
+        ...(source.display ? { display: source.display } : {})
+      }) ?? defaultTicks
+    );
   };
 }

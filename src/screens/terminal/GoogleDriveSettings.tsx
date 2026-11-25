@@ -1,7 +1,11 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { t } from "../../i18n/messages.js";
 import { intlLocale } from "../../i18n/preferences.js";
-import type { DriveStatus, DriveSummary } from "../../services/drive/coordinator-types.js";
+import type {
+  DriveStatus,
+  DriveSummary,
+  DriveChoice
+} from "../../services/drive/coordinator-types.js";
 import { terminalDrive } from "./controller-drive.js";
 import { useTerminal } from "./context.js";
 
@@ -46,6 +50,7 @@ function Summary({ summary }: { summary: DriveSummary }) {
 }
 export function GoogleDriveSettings() {
   const { controller, state } = useTerminal(),
+    [legacyChoices, setLegacyChoices] = useState<DriveChoice[] | null>(null),
     drive = terminalDrive(controller),
     status = useSyncExternalStore(drive.subscribe, drive.getSnapshot, drive.getSnapshot),
     busy =
@@ -56,6 +61,7 @@ export function GoogleDriveSettings() {
   useEffect(() => {
     void drive.prepare();
   }, [drive]);
+  useEffect(() => setLegacyChoices(null), [state.owner]);
   return (
     <section className="transfer-settings drive-settings" id="google-drive-settings">
       <h3>{t("Личный Google Диск")}</h3>
@@ -89,13 +95,13 @@ export function GoogleDriveSettings() {
           </time>
         </small>
       </div>
-      {!state.authenticated && <p>{t("Сначала подключите личный ключ Т‑Банка")}</p>}
+      {!state.marketReady && <p>{t("Дождитесь открытия локального профиля")}</p>}
       {!status.connected ? (
         <button
           id="google-drive-connect"
           className="primary-button"
           type="button"
-          disabled={!state.authenticated || busy || !status.prepared}
+          disabled={!state.marketReady || busy || !status.prepared || state.profileTransition}
           onClick={() => {
             void drive.connect();
           }}
@@ -139,7 +145,7 @@ export function GoogleDriveSettings() {
           id="google-drive-automatic"
           type="checkbox"
           checked={status.automatic}
-          disabled={busy || !state.authenticated}
+          disabled={busy || !state.marketReady || state.profileTransition}
           onChange={(event) => {
             void drive
               .setAutomatic(event.target.checked)
@@ -167,6 +173,71 @@ export function GoogleDriveSettings() {
               : errors[status.error]
           )}
         </p>
+      )}
+      {status.legacyAvailable && (
+        <div className="drive-conflict" id="google-drive-legacy">
+          <h4>{t("На Google Диске найден формат 1")}</h4>
+          <p>
+            {t(
+              "Формат 2 синхронизируется отдельно. Обновите приложение на других устройствах. Старый поток не изменяется; перенос выбранного снимка заменит локальные настройки этого профиля только после вашего выбора."
+            )}
+          </p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              void drive.legacy
+                .inspect()
+                .then(setLegacyChoices)
+                .catch((error: unknown) =>
+                  controller.notify(
+                    error instanceof Error ? error.message : "Legacy import unavailable"
+                  )
+                );
+            }}
+          >
+            {t("Посмотреть старые снимки")}
+          </button>
+          {legacyChoices && (
+            <>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => {
+                  void drive.legacy
+                    .choose("local")
+                    .catch((error: unknown) =>
+                      controller.notify(
+                        error instanceof Error ? error.message : "Legacy import unavailable"
+                      )
+                    );
+                }}
+              >
+                {t("Оставить данные устройства и начать формат 2")}
+              </button>
+              {legacyChoices.map((remote) => (
+                <div key={remote.nodeId}>
+                  <Summary summary={remote} />
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      void drive.legacy
+                        .choose(remote.nodeId)
+                        .catch((error: unknown) =>
+                          controller.notify(
+                            error instanceof Error ? error.message : "Legacy import unavailable"
+                          )
+                        );
+                    }}
+                  >
+                    {t("Перенести этот снимок в формат 2")}
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
       )}
       {status.conflict && (
         <div id="google-drive-conflict" className="drive-conflict">

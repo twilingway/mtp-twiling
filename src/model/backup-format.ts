@@ -1,11 +1,15 @@
 import { TOOL_NAMES } from "./drawing-model.js";
 import { isInstrumentSymbol, isInstrumentViewKey } from "./instrument-symbol.js";
+import { validBackupProviders, validLayoutProvider, validRowProvider } from "./backup-provider.js";
+import { isProviderRef, isMarketAssetClass } from "./market-provider.js";
 import { isLocale, isTimeZone } from "../i18n/preferences.js";
 import { isDrawingToolbarSettings } from "./drawing-toolbar.js";
 import { isNativeIntervalId } from "./intervals/registry.js";
 import { isIntervalFavorites } from "./intervals/favorites.js";
 import { isIndicatorPaneLayout } from "./indicator-layout.js";
 import { isWatchlistFlags, isWatchlistFlagFilter } from "./watchlist-flags.js";
+import { isTechnicalIndicatorInstanceList } from "./technical-indicators/instances.js";
+import { isTechnicalPaneLayout } from "./technical-indicator-layout.js";
 import type {
   Backup,
   BackupDrawing,
@@ -227,7 +231,11 @@ export function isChartSettings(value: unknown): value is ChartSettings {
 export function isProfilePreferences(value: unknown): value is ProfilePreferences {
   return (
     isRecord(value) &&
+    validLayoutProvider(value) &&
     fields(value, {
+      technicalIndicators: isTechnicalIndicatorInstanceList,
+      technicalPaneLayout: isTechnicalPaneLayout,
+      providerRef: isProviderRef,
       watchlistFlags: isWatchlistFlags,
       watchlistFlagFilter: isWatchlistFlagFilter,
       locale: isLocale,
@@ -278,11 +286,23 @@ export function isChartView(value: unknown): value is ChartView {
 function isBackupMarketRow(value: unknown): value is BackupMarketRow {
   return (
     isRecord(value) &&
-    (value.uid === null || (string(value.uid) && value.uid.length <= 100)) &&
+    validRowProvider(value) &&
+    (value.uid === null || (string(value.uid) && value.uid.length <= 200)) &&
     isInstrumentSymbol(value.symbol) &&
     string(value.name) &&
     value.name.length <= 300 &&
     fields(value, {
+      providerRef: isProviderRef,
+      assetClass: isMarketAssetClass,
+      nativePriceStep: (value) => finite(value) && value > 0,
+      productKind: member(["spot", "perpetual", "future"]),
+      baseCoin: string,
+      quoteCoin: string,
+      settleCoin: string,
+      marketRegion: string,
+      underlyingTicker: string,
+      symbolType: string,
+      comparisonBasis: member(["exchange-day", "rolling-24h"]),
       color: string,
       mark: string,
       ticker: string,
@@ -301,7 +321,7 @@ function isBackupMarketRow(value: unknown): value is BackupMarketRow {
             textColor: string
           })
       ),
-      type: member(["index", "future", "currency"]),
+      type: member(["index", "future", "currency", "crypto", "tokenized-stock"]),
       expirationDate: nullable(string),
       first1minCandleDate: string,
       first1dayCandleDate: string,
@@ -345,7 +365,8 @@ function isBackup(value: unknown): value is Backup {
   return (
     isRecord(value) &&
     value.application === "personal-terminal" &&
-    value.schemaVersion === 1 &&
+    (value.schemaVersion === 1 || value.schemaVersion === 2) &&
+    validBackupProviders(value) &&
     list(
       (document) =>
         isRecord(document) &&
@@ -366,7 +387,11 @@ function isBackup(value: unknown): value is Backup {
   );
 }
 export function validateBackup(input: unknown): Backup {
-  if (!isRecord(input) || input.application !== "personal-terminal" || input.schemaVersion !== 1)
+  if (
+    !isRecord(input) ||
+    input.application !== "personal-terminal" ||
+    (input.schemaVersion !== 1 && input.schemaVersion !== 2)
+  )
     throw new Error("Это не поддерживаемый файл настроек терминала.");
   plain(input);
   if (!isBackup(input)) throw new Error("Некорректная структура или настройки файла.");

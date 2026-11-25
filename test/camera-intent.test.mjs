@@ -15,6 +15,7 @@ function sources(overrides = {}) {
   function load(relative) {
     const file = path.resolve(root, relative).replace(/\.js$/, ".ts"),
       key = path.relative(root, file).replaceAll(path.sep, "/");
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (modules.has(file)) return modules.get(file).exports;
     const module = { exports: {} };
@@ -316,7 +317,7 @@ function fixture() {
   controller.notify = (message) => notices.push(message);
   controller.update({
     owner: "A",
-    authenticated: true,
+    authenticated: true, marketReady: true,
     ready: true,
     rows: [{ symbol: "SBER", uid: "one", name: "Test" }],
     preferences: { ...controller.getSnapshot().preferences, ...local.layout },

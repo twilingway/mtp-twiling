@@ -1,16 +1,16 @@
-import * as storage from "../../services/storage.js";
+import * as storage from "../../services/storage-v2.js";
 import { resetSharedChartCamera } from "../../services/chart-camera.js";
 import { validateBackup } from "../../model/backup-format.js";
 import { assertImportCurrent, type BackupImportOptions } from "../../model/backup-import.js";
 import type { ChartAdapter } from "../../charts/adapter.js";
-import type { TBankClient } from "../../services/tbank-client.js";
+import type { MarketClient } from "../../services/market-client.js";
 import type { TerminalState } from "./state.js";
 import type { TerminalEditing } from "./controller-editing.js";
 import type { TerminalSession } from "./controller-session.js";
 
 interface ImportBridge {
   getState: () => TerminalState;
-  getClient: () => TBankClient | null;
+  getClient: () => MarketClient | null;
   getChart: () => ChartAdapter | null;
   saveView: () => Promise<void>;
   editing: Pick<TerminalEditing, "flush" | "reset">;
@@ -50,6 +50,8 @@ export async function restoreImportedProfile(
       assertImportCurrent(guard);
       return true;
     };
+  const previousCachePaused = client?.cachePaused ?? false;
+  if (client) client.cachePaused = true;
   try {
     await resetSharedChartCamera(owner);
     if (!valid()) return;
@@ -82,6 +84,8 @@ export async function restoreImportedProfile(
       );
     }
     throw error;
+  } finally {
+    if (client) client.cachePaused = previousCachePaused;
   }
 }
 
@@ -102,39 +106,45 @@ export async function importTerminalBackup(
   assertImportCurrent(options.valid);
   const outgoing = bridge.getChart(),
     previousPersistence = outgoing?.persistView,
-    previousRetired = outgoing?.retired;
-  if (outgoing) {
-    outgoing.retired = true;
-    outgoing.persistView = false;
-  }
-  let result: Awaited<ReturnType<typeof storage.importBackup>>;
+    previousRetired = outgoing?.retired,
+    previousCachePaused = client?.cachePaused ?? false;
+  if (client) client.cachePaused = true;
   try {
-    result = await storage.importBackup(owner, data, {
-      ...options,
-      valid: () => valid() && (options.valid?.() ?? true)
-    });
-  } catch (error) {
     if (outgoing) {
-      if (previousPersistence === undefined) delete outgoing.persistView;
-      else outgoing.persistView = previousPersistence;
-      if (previousRetired === undefined) delete outgoing.retired;
-      else outgoing.retired = previousRetired;
+      outgoing.retired = true;
+      outgoing.persistView = false;
     }
-    throw error;
-  }
-  if (!valid()) return;
-  try {
-    assertImportCurrent(options.valid);
-  } catch (error) {
+    let result: Awaited<ReturnType<typeof storage.importBackup>>;
+    try {
+      result = await storage.importBackup(owner, data, {
+        ...options,
+        valid: () => valid() && (options.valid?.() ?? true)
+      });
+    } catch (error) {
+      if (outgoing) {
+        if (previousPersistence === undefined) delete outgoing.persistView;
+        else outgoing.persistView = previousPersistence;
+        if (previousRetired === undefined) delete outgoing.retired;
+        else outgoing.retired = previousRetired;
+      }
+      throw error;
+    }
+    if (!valid()) return;
+    try {
+      assertImportCurrent(options.valid);
+    } catch (error) {
+      bridge.editing.reset();
+      invalidateImportedView(bridge, true);
+      throw error;
+    }
+    options.onCommitted?.();
+    // Commit succeeded: invalidate all old/newborn canvas work before any next await.
     bridge.editing.reset();
-    invalidateImportedView(bridge, true);
-    throw error;
+    invalidateImportedView(bridge, false);
+    await restoreImportedProfile(bridge, options.valid);
+    if (valid())
+      bridge.notify(`Импортировано: ${result.drawings} рисунков, ${result.images} изображений.`);
+  } finally {
+    if (client) client.cachePaused = previousCachePaused;
   }
-  options.onCommitted?.();
-  // Commit succeeded: invalidate all old/newborn canvas work before any next await.
-  bridge.editing.reset();
-  invalidateImportedView(bridge, false);
-  await restoreImportedProfile(bridge, options.valid);
-  if (valid())
-    bridge.notify(`Импортировано: ${result.drawings} рисунков, ${result.images} изображений.`);
 }

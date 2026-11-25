@@ -14,6 +14,8 @@ function sources(overrides = {}) {
   function load(name) {
     const file = path.resolve(root, name).replace(/\.js$/, ".ts"),
       relative = path.relative(root, file).replaceAll(path.sep, "/");
+    if (relative === "services/storage-v2.ts") return load("services/storage.ts");
+    if (relative === "services/storage-v2-migration.ts") return { physicalOwner: owner => owner, prepareProfileV2: async () => {} };
     if (Object.hasOwn(overrides, relative)) return overrides[relative];
     if (cache.has(file)) return cache.get(file).exports;
     const module = { exports: {} };
@@ -58,7 +60,7 @@ async function fixture({ engine = "tradingview", records } = {}) {
       color: "#123456", mark: symbol[0], currency: "rub", step: 1, price: 11, previousClose: 10,
       first1dayCandleDate: new Date(today - 5000 * DAY).toISOString() }));
   storage.loadImages = async () => [];
-  const client = { owner: "owner", authenticated: true,
+  const client = { owner: "owner", authenticated: true, marketReady: true,
     candles: async (symbol, timeframe, range, options) => {
       requests.push({ symbol, timeframe, range, uid: options.uid });
       return { candles: bars.filter((bar) => bar.timestamp >= range.from && bar.timestamp <= range.to), requests: 0, cached: true };
@@ -66,7 +68,7 @@ async function fixture({ engine = "tradingview", records } = {}) {
   };
   controller.session.client = client;
   const saved = records ? await storage.loadPreferences("owner") : {};
-  controller.update({ owner: "owner", authenticated: true, ready: true, historyViewReady: true, rows,
+  controller.update({ owner: "owner", authenticated: true, marketReady: true, ready: true, historyViewReady: true, rows,
     candles: [...bars], preferences: { ...controller.getSnapshot().preferences,
       engine, symbol: "SBER", instrumentUid: "uid-SBER", ...saved } });
   const key = () => { const p = controller.getSnapshot().preferences; return `${p.symbol}:${p.timeframe}:${p.engine}:${p.rangeDays}`; };

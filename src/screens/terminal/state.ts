@@ -15,8 +15,12 @@ import type {
 import { NATIVE_PERIOD_LABELS } from "../../model/intervals/native-timeframes.js";
 import type { IntervalId } from "../../model/intervals/registry.js";
 import type { DisplayPreferences } from "../../i18n/preferences.js";
+import type { TechnicalIndicatorInstance } from "../../model/technical-indicators/types.js";
+import type { TechnicalPaneLayout } from "../../model/technical-indicator-layout.js";
 import type { WatchlistFlags, WatchlistFlagFilter } from "../../model/watchlist-flags.js";
+import type { MarketProviderRef } from "../../model/market-provider.js";
 import { formatClock, formatNumber } from "../../i18n/format.js";
+import type { DrawingSettingsPreview } from "./drawing-settings-preview.js";
 export const DEFAULT_INDICATORS: IndicatorFlags = {
   ma: false,
   ema: false,
@@ -54,6 +58,9 @@ export const INDICATOR_NAMES: Record<IndicatorKey, string> = {
 };
 export const PERIOD_LABELS: Record<Timeframe, string> = NATIVE_PERIOD_LABELS;
 export interface TerminalPreferences extends DisplayPreferences {
+  technicalIndicators?: TechnicalIndicatorInstance[];
+  technicalPaneLayout?: TechnicalPaneLayout;
+  providerRef?: MarketProviderRef | undefined;
   watchlistFlags?: WatchlistFlags;
   watchlistFlagFilter?: WatchlistFlagFilter;
   indicatorPaneLayout?: IndicatorPaneLayout;
@@ -79,6 +86,7 @@ export type TerminalDialog =
   | "chart-settings"
   | "drawing-settings"
   | "indicator-library"
+  | "technical-settings"
   | "indicator-settings";
 export type ContextTarget =
   | { kind: "drawing"; id: string }
@@ -91,6 +99,11 @@ export interface ContextMenu {
   target: ContextTarget;
 }
 export interface TerminalState {
+  editingTechnicalIndicator?: string;
+  drawingSettingsPreview?: DrawingSettingsPreview | null;
+  marketReady?: boolean;
+  profileTransition?: boolean;
+  pendingPublicSource?: string | null;
   importingBackup?: boolean;
   importRecoveryRequired?: boolean;
   backupBusy?: boolean;

@@ -19,6 +19,7 @@ import { TerminalLifecycle, UpdateBanner } from "./screens/terminal/TerminalLife
 import { ThemeEffect } from "./screens/terminal/ThemeEffect.js";
 import { LocaleEffect } from "./screens/terminal/LocaleEffect.js";
 import { TerminalIndicatorLibrary } from "./screens/terminal/TerminalIndicatorLibrary.js";
+import { TechnicalIndicatorSettings } from "./screens/terminal/TechnicalIndicatorSettings.js";
 function Terminal() {
   const { state } = useTerminal();
   return (
@@ -40,6 +41,10 @@ function Terminal() {
       {state.dialog === "chart-settings" && <ChartSettingsDialog />}
       {state.dialog === "indicator-settings" && <IndicatorSettingsDialog />}
       {state.dialog === "indicator-library" && <TerminalIndicatorLibrary />}
+      {state.dialog === "technical-settings" &&
+        state.preferences.technicalIndicators
+          ?.filter((item) => item.id === state.editingTechnicalIndicator)
+          .map((instance) => <TechnicalIndicatorSettings key={instance.id} instance={instance} />)}
       <DrawingSettingsDialog />
       <DeleteObjectDialog />
       <ContextMenu />

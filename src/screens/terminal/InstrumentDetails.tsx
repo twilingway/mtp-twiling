@@ -22,7 +22,7 @@ import { detailText as l } from "./InstrumentDetailsText.js";
 import { useTerminal } from "./context.js";
 
 const readHistory: HistoryReader = async (...args) =>
-  (await import("../../services/storage-history.js")).loadHistory(...args);
+  (await import("../../services/storage-v2.js")).loadHistory(...args);
 
 export function InstrumentDetails({ row }: { row: MarketRow }) {
   const { state, controller } = useTerminal();
@@ -44,7 +44,14 @@ export function InstrumentDetails({ row }: { row: MarketRow }) {
     >
       <summary>{l("Компания и статистика", "Company and statistics")}</summary>
       {open &&
-        (!state.authenticated || !client ? (
+        (row.providerRef ? (
+          <p>
+            {l(
+              "Данные Bybit: цена контракта или токена, без корпоративных показателей T-Invest.",
+              "Bybit contract/token prices; T-Invest company data does not apply."
+            )}
+          </p>
+        ) : !state.authenticated || !client ? (
           <p>{l("Подключите личный ключ T-Invest.", "Connect your personal T-Invest key.")}</p>
         ) : !row.uid ? (
           <p>{l("UID инструмента недоступен.", "Instrument UID is unavailable.")}</p>

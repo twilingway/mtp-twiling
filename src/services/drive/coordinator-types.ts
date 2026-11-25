@@ -23,6 +23,7 @@ export interface DriveConflict {
   remotes: DriveChoice[];
 }
 export interface DriveStatus {
+  legacyAvailable?: boolean;
   phase:
     "disconnected" | "connecting" | "idle" | "syncing" | "conflict" | "auth-required" | "error";
   prepared: boolean;
@@ -43,6 +44,7 @@ export interface DriveBridge {
   importBackup(backup: Backup, options: BackupImportOptions): Promise<void>;
 }
 export interface DriveDependencies {
+  legacySync?(authorization: DriveAuthorization): Pick<DriveSync, "inspect" | "download">;
   auth: Pick<
     DriveAuth,
     "prepare" | "connectFromUserGesture" | "disconnect" | "restore" | "suspend"

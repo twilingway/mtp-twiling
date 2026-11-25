@@ -21,7 +21,7 @@ const helperSource = ts.transpileModule(
   { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }
 ).outputText;
 
-async function fixture({ ratio = 1 } = {}) {
+async function fixture({ ratio = 1, heights = [420, 371] } = {}) {
   const frames = new Map(),
     observers = [],
     styleWrites = [],
@@ -56,16 +56,31 @@ async function fixture({ ratio = 1 } = {}) {
     }
   }
   const canvasDom = () => {
+    let backingWidth = 0,
+      backingHeight = 0;
     const context = { clearRect() {}, scale() {} };
     return {
-      width: 0,
-      height: 0,
+      ink: false,
+      get width() {
+        return backingWidth;
+      },
+      set width(value) {
+        backingWidth = value;
+        this.ink = false;
+      },
+      get height() {
+        return backingHeight;
+      },
+      set height(value) {
+        backingHeight = value;
+        this.ink = false;
+      },
       style: {},
       get clientWidth() {
-        return parseFloat(this.style.width) || 0;
+        return Math.round(parseFloat(this.style.width) || 0);
       },
       get clientHeight() {
-        return parseFloat(this.style.height) || 0;
+        return Math.round(parseFloat(this.style.height) || 0);
       },
       getContext: () => context
     };
@@ -84,8 +99,11 @@ async function fixture({ ratio = 1 } = {}) {
   });
   new vm.Script(nativeCanvas + helperSource).runInContext(context);
   const NativeCanvas = vm.runInContext("Canvas", context);
-  for (const height of [420, 371]) {
-    const canvas = new NativeCanvas({}, () => draws++);
+  for (const height of heights) {
+    const canvas = new NativeCanvas({}, () => {
+      draws++;
+      canvas.getElement().ink = true;
+    });
     canvases.push(canvas);
     canvas.update(width, height);
   }
@@ -136,6 +154,15 @@ async function fixture({ ratio = 1 } = {}) {
     settled,
     width: (value) => (width = value),
     draws: () => draws,
+    addCanvas(height) {
+      const canvas = new NativeCanvas({}, () => {
+        draws++;
+        canvas.getElement().ink = true;
+      });
+      canvases.push(canvas);
+      canvas.update(width, height);
+      return canvas;
+    },
     race() {
       // Queue an ordinary redraw first. The actual installed Canvas drops the
       // subsequent RO pixel-resize callback while this redraw is pending.
@@ -146,6 +173,24 @@ async function fixture({ ratio = 1 } = {}) {
     }
   };
 }
+
+test("installed KLine Canvas cannot repaint unchanged fractional pane bounds despite healthy buffers", async () => {
+  const f = await fixture({ heights: [598.5672, 33.4328] });
+  f.emit();
+  f.settled();
+  assert.deepEqual(
+    f.canvases.map((canvas) => canvas.getElement().height),
+    [599, 33]
+  );
+  const count = f.draws();
+  for (const [index, canvas] of f.canvases.entries()) canvas.update(85, [598.5672, 33.4328][index]);
+  f.emit();
+  f.settled();
+  assert.equal(f.draws(), count, "same CSS size emits no RO and native fractional comparison skips paint");
+  for (const [index, canvas] of f.canvases.entries()) canvas.update(85, [599, 33][index]);
+  f.settled();
+  assert.equal(f.draws(), count + 2, "whole pixel native bounds redraw without resize or camera changes");
+});
 
 test("installed KLine Canvas loses pixel resize during pending redraw; public recovery fixes both panes", async () => {
   const f = await fixture();
@@ -221,4 +266,50 @@ test("recovery restores the current responsive width and cancels all work on des
   cancel();
   retiring.settled();
   assert.deepEqual(retiring.styleWrites, []);
+});
+
+test("new technical panes join recovery and removed canvases release observers", async () => {
+  const f = await fixture(),
+    dispose = f.attach(),
+    recoveryObserver = f.observers.at(-1);
+  const added = f.addCanvas(200);
+  f.settled();
+  await Promise.resolve();
+  dispose.refresh();
+  added.update(85, 200);
+  added.update(85, 300);
+  f.emit();
+  f.tick();
+  assert.equal(added.getElement().height, 200);
+  f.settled();
+  assert.equal(added.getElement().height, 300);
+  const removed = f.canvases.splice(0, 1)[0].getElement();
+  dispose.refresh();
+  assert.ok(!recoveryObserver.targets.includes(removed));
+  dispose();
+  assert.equal(recoveryObserver.targets.length, 0);
+});
+
+test("installed Canvas recovery repaints after every backingstore reset on initial, TA and viewport resize", async () => {
+  const f = await fixture(),
+    dispose = f.attach();
+  f.emit();
+  f.settled();
+  assert.ok(f.canvases.every((canvas) => canvas.getElement().ink));
+  f.race();
+  f.settled();
+  assert.ok(f.canvases.every((canvas) => canvas.getElement().ink));
+  const lower = f.addCanvas(80);
+  f.settled();
+  await Promise.resolve();
+  dispose.refresh();
+  for (const height of [160, 30, 240]) {
+    lower.update(85, lower.getElement().clientHeight);
+    lower.update(85, height);
+    f.emit();
+    f.settled();
+    assert.equal(lower.getElement().height, height);
+    assert.ok(lower.getElement().ink, "native listener must run after buffer clears");
+  }
+  dispose();
 });

@@ -1,0 +1,79 @@
+.drawing-line-controls {
+  display: grid;
+  grid-template-columns: 34px 64px minmax(85px, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.drawing-line-controls .drawing-opacity {
+  grid-column: 1 / -1;
+}
+.drawing-opacity {
+  display: grid;
+  grid-template-columns: minmax(100px, auto) minmax(60px, 1fr) 42px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+  margin: 6px 0;
+  font-size: 12px;
+}
+.drawing-opacity-track {
+  display: flex;
+  min-width: 0;
+  height: 20px;
+  border: 1px solid #787b86;
+  border-radius: 4px;
+  background: repeating-conic-gradient(#b8bac0 0% 25%, #53565e 0% 50%) 0 0 / 8px 8px;
+}
+#drawing-settings .drawing-opacity input[type="range"] {
+  appearance: none;
+  display: block;
+  height: 18px;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: linear-gradient(to right, transparent, var(--opacity-color));
+  cursor: pointer;
+}
+#drawing-settings .drawing-opacity input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 9px;
+  height: 24px;
+  border: 2px solid #e5e7ec;
+  border-radius: 3px;
+  background: #282b33;
+  box-shadow: 0 0 2px #000;
+}
+#drawing-settings .drawing-opacity input[type="range"]::-moz-range-thumb {
+  width: 7px;
+  height: 20px;
+  border: 2px solid #e5e7ec;
+  border-radius: 3px;
+  background: #282b33;
+}
+#drawing-settings .drawing-opacity input[type="range"]:focus-visible {
+  outline: 2px solid #a3a8b1;
+  outline-offset: 3px;
+}
+.drawing-opacity output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 520px) {
+  #drawing-settings .setting-row:has(.drawing-line-controls) {
+    flex-wrap: wrap;
+  }
+  .drawing-line-controls {
+    flex-basis: 100%;
+  }
+  .drawing-opacity {
+    grid-template-columns: minmax(85px, auto) minmax(50px, 1fr) 38px;
+    gap: 5px;
+  }
+}

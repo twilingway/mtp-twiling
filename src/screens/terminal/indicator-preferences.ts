@@ -1,6 +1,18 @@
 import type { TerminalController } from "./controller.js";
 import type { IndicatorPaneLayout } from "../../model/types.js";
 import { isIndicatorPaneLayout } from "../../model/indicator-layout.js";
+import type { IndicatorKey } from "../../model/types.js";
+
+export function openLegacyIndicatorSettings(
+  controller: Pick<TerminalController, "update">,
+  key: IndicatorKey
+): void {
+  controller.update({
+    editingIndicator: key,
+    dialog: key === "volume" ? "chart-settings" : "indicator-settings",
+    contextMenu: null
+  });
+}
 
 type Controller = Pick<TerminalController, "getSnapshot" | "setPreferences">;
 export async function persistIndicatorPaneLayout(

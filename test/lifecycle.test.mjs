@@ -40,6 +40,7 @@ function sourceModules(globals = {}, overrides = {}) {
   function load(relative) {
     const filename = path.resolve(sourceRoot, relative).replace(/\.js$/, ".ts");
     const key = path.relative(sourceRoot, filename).replaceAll(path.sep, "/");
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (modules.has(filename)) return modules.get(filename).exports;
     assert.ok(!key.startsWith("../") && !path.isAbsolute(key), "source imports stay in src");
@@ -108,7 +109,9 @@ test("portable mutation barrier blocks edits/recovery but allows exports and log
   assert.equal(controller.getSnapshot().preferences.locale, "en");
   controller.update({ importingBackup: true }); const logout = controller.logout();
   assert.equal(controller.getSnapshot().authenticated, false, "logout signals Google abort synchronously");
-  await logout; assert.equal(reloads, 1); assert.equal(clients[0].closed, true);
+  await logout; assert.equal(reloads, 0); assert.equal(clients[0].closed, true);
+  assert.equal(controller.getSnapshot().owner, "public");
+  assert.equal(controller.getSnapshot().marketReady, true);
 });
 
 test("settings handlers recheck import ownership after awaiting saveView", async t => {
@@ -311,6 +314,10 @@ function terminalFixture({ restore = async () => null, candles, importBackup, on
   const clients = [],
     savedSessions = [];
   const storage = {
+    PUBLIC_OWNER: "public",
+    prepareProfileV2: async () => {},
+    copyPublicProfile: async () => ({ conflict: false, count: 0 }),
+    loadWatchlist: async () => undefined,
     migrateLegacy: async () => {},
     lastProfile: async () => undefined,
     restoreSession: restore,
@@ -329,18 +336,19 @@ function terminalFixture({ restore = async () => null, candles, importBackup, on
     importBackup: (...args) => importBackup(...args)
   };
   class BankBoundary extends EventTarget {
-    constructor(_token, name) {
+    constructor(token, name) {
       super();
       this.name = name;
-      this.owner = `owner-${name}`;
-      this.rows = [sampleRow(name)];
-      this.authenticated = true;
+      this.owner = token ? `owner-${name}` : "public";
+      this.rows = token ? [sampleRow(name)] : [];
+      this.authenticated = Boolean(token);
       this.closed = false;
-      clients.push(this);
+      if (token) clients.push(this);
     }
     snapshot() {
       return {
         authenticated: this.authenticated,
+        marketReady: true,
         rows: this.rows,
         status: "connected",
         error: null,
@@ -353,6 +361,7 @@ function terminalFixture({ restore = async () => null, candles, importBackup, on
     async start() {
       return this.snapshot();
     }
+    async prepareOwner() { return this.owner; }
     candles(symbol, timeframe, range, options) {
       return candles
         ? candles(symbol, timeframe, range, options)
@@ -387,7 +396,8 @@ function terminalFixture({ restore = async () => null, candles, importBackup, on
         saveChartView: storage.saveView,
         resetSharedChartCamera: async () => {}
       },
-      "services/tbank-client.ts": { TBankClient: BankBoundary }
+      "services/tbank-client.ts": { TBankClient: BankBoundary },
+      "services/market-client.ts": { MarketClient: BankBoundary }
     }
   );
   const { TerminalController } = modules.load("screens/terminal/controller.ts");

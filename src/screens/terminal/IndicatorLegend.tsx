@@ -5,6 +5,7 @@ import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { indicatorLegendKeys } from "../../model/indicator-legend.js";
 import { persistLegendCollapsed } from "./indicator-preferences.js";
 import { t } from "../../i18n/messages.js";
+import { TechnicalPriceLegend } from "./TechnicalIndicatorPanels.js";
 
 export function IndicatorLegend() {
   const { controller, state } = useTerminal(),
@@ -20,6 +21,7 @@ export function IndicatorLegend() {
       hidden={p.chartSettings.showLegend === false}
     >
       <div id="indicator-legend-items" className="indicator-legend-list" hidden={collapsed}>
+        <TechnicalPriceLegend />
         {keys.map((key) => (
           <div
             key={key}

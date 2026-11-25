@@ -14,6 +14,7 @@ function sources(overrides = {}, globals = {}) {
     let filename = path.resolve(root, relative).replace(/\.js$/, ".ts");
     if (!existsSync(filename) && filename.endsWith(".ts")) filename = filename + "x";
     const key = path.relative(root, filename).replaceAll(path.sep, "/");
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (cells.has(key)) return cells.get(key).exports;
     const module = { exports: {} };
@@ -149,7 +150,9 @@ function nativeFixture({ ratio = 0.3, volume = true } = {}) {
   const created = [],
     removed = [],
     actions = new Map(),
-    changes = [];
+    changes = [],
+    frames = new Map();
+  let frameId = 0;
   let data = [],
     volumeHeight = 0,
     priceHeight = 500,
@@ -232,6 +235,8 @@ function nativeFixture({ ratio = 0.3, volume = true } = {}) {
       }
     },
     {
+      requestAnimationFrame: (callback) => { frames.set(++frameId, callback); return frameId; },
+      cancelAnimationFrame: (id) => frames.delete(id),
       ResizeObserver: class {
         constructor(callback) {
           resize = callback;
@@ -268,6 +273,7 @@ function nativeFixture({ ratio = 0.3, volume = true } = {}) {
     removed,
     actions,
     changes,
+    frames,
     volume: () => volumeHeight,
     resize: () => resize(),
     drag: (height) => {
@@ -312,6 +318,7 @@ test("production KLine adapter creates VOL once and keeps real dragged height ac
   shown.adapter.destroy();
   hidden.adapter.destroy();
   f.adapter.destroy();
+  assert.equal(f.frames.size, 0, "dispose cancels the pending native settlement");
 });
 test("legend collapse exposes an accessible compact count without toggling indicators and follows the dynamic price heading", async () => {
   const jsx = (type, props) => ({ type, props });
@@ -326,7 +333,7 @@ test("legend collapse exposes an accessible compact count without toggling indic
   let state = {
     owner: "owner",
     chartRevision: 0,
-    authenticated: true,
+    authenticated: true, marketReady: true,
     loading: false,
     candles: [],
     rows: [{ symbol: "SBER", uid: "uid", step: 0.01 }],

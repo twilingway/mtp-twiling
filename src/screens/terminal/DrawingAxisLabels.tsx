@@ -5,6 +5,7 @@ import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { useTerminal } from "./context.js";
 import { drawingVisibleOnInterval } from "../../model/intervals/drawing-visibility.js";
 import { chartDateFormat } from "../../i18n/format.js";
+import { drawingRenderList } from "./drawing-settings-preview.js";
 
 interface AxisLabel {
   timestamp: number;
@@ -15,7 +16,8 @@ interface AxisLabel {
 export function DrawingAxisLabels() {
   const { controller, state } = useTerminal();
   const [labels, setLabels] = useState<AxisLabel[]>([]);
-  const selected = state.preview ?? state.drawings.find((item) => item.id === state.selectedObject);
+  const selected =
+    state.preview ?? drawingRenderList(state).find((item) => item.id === state.selectedObject);
   const points =
     drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden ||
     selected?.visible === false ||

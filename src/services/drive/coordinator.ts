@@ -1,9 +1,12 @@
 import { driveBackupDigest, sanitizeDriveBackup } from "./backup.js";
-import { DriveError } from "./types.js";
+import { DriveError, type DriveAuthorization, type DriveInspection } from "./types.js";
 import type { Backup } from "../../model/types.js";
-import type { DriveAuthorization, DriveInspection } from "./types.js";
-import { summarize } from "./coordinator-types.js";
+import { prepareDriveConflict } from "./conflict.js";
 import { driveAvailable, driveFailure, prepareDriveIdentity } from "./coordinator-status.js";
+import { LegacyDriveMigration } from "./legacy.js";
+import { acceptDriveRecord } from "./accept.js";
+import { restoreDriveProfile } from "./restore.js";
+import { applyDriveBackup } from "./apply.js";
 import type {
   DriveBridge,
   DriveDependencies,
@@ -14,6 +17,7 @@ const same = (left: string[], right: string[]) =>
   [...left].sort().join() === [...right].sort().join();
 const cancelled = () => new DOMException("Синхронизация прервана", "AbortError");
 export class DriveCoordinator {
+  readonly legacy: LegacyDriveMigration;
   private status: DriveStatus = {
     phase: "disconnected",
     prepared: false,
@@ -42,7 +46,33 @@ export class DriveCoordinator {
   constructor(
     private readonly bridge: DriveBridge,
     private readonly dependencies: DriveDependencies
-  ) {}
+  ) {
+    this.legacy = new LegacyDriveMigration(bridge, {
+      capture: () =>
+        this.authorization && this.remote && this.current(this.epoch)
+          ? {
+              epoch: this.epoch,
+              revision: this.revision,
+              authorization: this.authorization,
+              remote: this.remote
+            }
+          : undefined,
+      valid: (context) => this.current(context.epoch) && context.revision === this.revision,
+      reader: (authorization) => dependencies.legacySync?.(authorization),
+      busy: () => this.busy,
+      setBusy: (value) => {
+        this.busy = value;
+        this.update({
+          phase: value ? "syncing" : this.status.legacyAvailable ? "conflict" : "idle"
+        });
+      },
+      applying: (context) => {
+        this.applyingEpoch = context?.epoch;
+      },
+      update: (patch) => this.update(patch),
+      dirty: () => this.localChanged()
+    });
+  }
   getSnapshot = (): DriveStatus => this.status;
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -94,19 +124,21 @@ export class DriveCoordinator {
     if (this.restoredEpoch === epoch) return;
     this.restoredEpoch = epoch;
     try {
-      const record = await this.dependencies.load(this.owner);
-      if (!this.profileCurrent(epoch)) return;
-      this.record = record;
-      this.update({
-        automatic: record.automatic,
-        pendingChanges: this.status.pendingChanges || record.pendingChanges === true,
-        lastSyncedAt: record.lastSyncedAt
-      });
-      const authorization = await this.dependencies.auth.restore(this.owner);
-      if (!this.profileCurrent(epoch)) {
-        authorization?.invalidate();
-        return;
-      }
+      const restored = await restoreDriveProfile(
+        this.dependencies,
+        this.owner,
+        () => this.profileCurrent(epoch),
+        (record) => {
+          this.record = record;
+          this.update({
+            automatic: record.automatic,
+            pendingChanges: this.status.pendingChanges || record.pendingChanges === true,
+            lastSyncedAt: record.lastSyncedAt
+          });
+        }
+      );
+      if (!restored) return;
+      const { authorization } = restored;
       if (authorization) await this.attach(authorization, epoch, true);
       else this.update({ pauseReason: "auth-required" });
     } catch {
@@ -212,6 +244,7 @@ export class DriveCoordinator {
     if (!restored || record.automatic) await this.sync();
   }
   suspend = (): void => {
+    this.legacy.reset();
     this.epoch++;
     clearTimeout(this.debounce);
     this.authorization = undefined;
@@ -228,7 +261,8 @@ export class DriveCoordinator {
       error: undefined,
       authorizationStored: false,
       credentialSaveError: false,
-      pauseReason: undefined
+      pauseReason: undefined,
+      legacyAvailable: false
     });
   };
   disconnect = (): void => {
@@ -239,15 +273,7 @@ export class DriveCoordinator {
     });
   };
   private current(epoch: number): boolean {
-    const profile = this.bridge.profile();
-    return (
-      epoch === this.epoch &&
-      !!this.authorization &&
-      !this.authorization.signal.aborted &&
-      profile.owner === this.owner &&
-      profile.session === this.session &&
-      profile.authenticated
-    );
+    return this.profileCurrent(epoch) && !!this.authorization && !this.authorization.signal.aborted;
   }
   private check(epoch: number, revision?: number): void {
     if (!this.current(epoch) || (revision !== undefined && revision !== this.revision))
@@ -271,6 +297,7 @@ export class DriveCoordinator {
   async sync(): Promise<void> {
     if (
       this.busy ||
+      this.status.legacyAvailable ||
       !this.remote ||
       !this.record ||
       !this.status.connected ||
@@ -296,6 +323,7 @@ export class DriveCoordinator {
       const digest = await driveBackupDigest(backup),
         inspection = await remote.inspect();
       this.check(epoch, revision);
+      if (await this.legacy.detect(inspection)) return;
       if (
         inspection.conflict ||
         (inspection.heads.length &&
@@ -350,19 +378,16 @@ export class DriveCoordinator {
     epoch: number,
     revision: number
   ): Promise<void> {
-    if (inspection.heads.length > 8)
-      throw new DriveError("limit", "Слишком много конфликтующих снимков");
-    const remotes = [];
-    for (const nodeId of inspection.heads) {
-      const incoming = await this.remote!.download(nodeId);
-      this.check(epoch, revision);
-      const date = inspection.snapshots.find((item) => item.manifest.nodeId === nodeId)?.manifest
-        .createdAt;
-      remotes.push({ ...summarize(incoming, date), nodeId });
-    }
-    this.check(epoch, revision);
-    this.preview = { heads: inspection.heads, digest, revision };
-    this.update({ phase: "conflict", conflict: { local: summarize(backup), remotes } });
+    const next = await prepareDriveConflict(
+      this.remote!,
+      inspection,
+      backup,
+      digest,
+      revision,
+      () => this.check(epoch, revision)
+    );
+    this.preview = next.preview;
+    this.update({ phase: "conflict", conflict: next.conflict });
   }
   async choose(nodeId: string): Promise<void> {
     const preview = this.preview,
@@ -440,27 +465,17 @@ export class DriveCoordinator {
     epoch: number,
     revision: number
   ): Promise<void> {
-    this.check(epoch, revision);
-    if (!backup.layout || !backup.watchlist || !backup.views)
-      throw new DriveError("remote-invalid", "Неполный снимок настроек Google Диска");
     const signal = this.authorization?.signal;
     if (!signal) throw cancelled();
-    try {
-      await this.bridge.importBackup(backup, {
-        replacePortable: true,
-        signal,
-        valid: () => this.current(epoch) && revision === this.revision,
-        onCommitted: () => {
-          this.applyingEpoch = epoch;
-        }
-      });
-      this.check(epoch, revision);
-    } finally {
-      if (this.applyingEpoch === epoch) this.applyingEpoch = undefined;
-    }
-    const applied = await this.bridge.exportBackup();
-    this.check(epoch, revision);
-    await this.accept(heads, await driveBackupDigest(applied), epoch, revision);
+    const digest = await applyDriveBackup(backup, this.bridge, signal, {
+      check: () => this.check(epoch, revision),
+      current: () => this.current(epoch) && revision === this.revision,
+      applying: (active) => {
+        if (active) this.applyingEpoch = epoch;
+        else if (this.applyingEpoch === epoch) this.applyingEpoch = undefined;
+      }
+    });
+    await this.accept(heads, digest, epoch, revision);
   }
   private async accept(
     heads: string[],
@@ -468,27 +483,19 @@ export class DriveCoordinator {
     epoch: number,
     revision: number
   ): Promise<void> {
-    this.check(epoch);
     if (!this.record) throw cancelled();
-    const record = {
-      ...this.record,
-      baseHeads: [...heads],
-      lastSyncedDigest: digest,
-      pendingChanges: revision !== this.revision,
-      lastSyncedAt: new Date().toISOString()
-    };
-    await this.dependencies.save(this.owner, record);
-    this.check(epoch);
-    this.record = record;
-    if (revision !== this.revision && !record.pendingChanges) {
-      this.record = { ...record, pendingChanges: true };
-      await this.dependencies.save(this.owner, this.record);
-      this.check(epoch);
-    }
+    const lastSyncedAt = await acceptDriveRecord(this.record, heads, digest, revision, {
+      check: () => this.check(epoch),
+      revision: () => this.revision,
+      save: (record) => this.dependencies.save(this.owner, record),
+      assign: (record) => {
+        this.record = record;
+      }
+    });
     this.preview = undefined;
     this.update({
       phase: "idle",
-      lastSyncedAt: record.lastSyncedAt,
+      lastSyncedAt,
       pendingChanges: revision !== this.revision,
       conflict: undefined,
       error: undefined

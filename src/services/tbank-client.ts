@@ -7,6 +7,8 @@ import { quoteSnapshot } from "./quote-snapshot.js";
 import { QuoteDayBases, MISSING_DAY_BASE } from "./quote-day-bases.js";
 import { profileKey } from "./profile-key.js";
 import { selectedMarketRow } from "../model/selected-instrument.js";
+import { isBankIdentity } from "../model/market-provider.js";
+import { assertBankRequest } from "./market-bank-cache.js";
 import { lastPriceSubscription } from "./market-subscriptions.js";
 import { resolveWatchlist, quotation, normaliseCandles } from "../model/market-model.js";
 import { TIMEFRAMES, splitRanges, subtractRanges, mergeCandles } from "../model/history-codec.js";
@@ -222,6 +224,8 @@ export class TBankClient extends EventTarget {
     return this.mutations.run(() => this.addInstrumentNow(instrument));
   }
   private async addInstrumentNow(instrument: CatalogInstrument): Promise<MarketRow> {
+    if (!isBankIdentity(instrument))
+      throw new BankError("Источник инструмента не является Т‑Банком.", 400);
     if (this.rows.length >= 300)
       throw new BankError("В одном списке поддерживается до 300 инструментов.", 400);
     const uid = instrument.uid ?? instrument.instrumentUid;
@@ -355,6 +359,7 @@ export class TBankClient extends EventTarget {
       );
   }
   private send(data: object): void {
+    assertBankRequest(data);
     this.transport.send(data);
   }
   private sendCandleSubscription(action: string): void {
@@ -369,12 +374,17 @@ export class TBankClient extends EventTarget {
     });
   }
   subscribeCandles(uid: string, timeframe: Timeframe): void {
+    assertBankRequest({ uid });
     nativeTimeframe(timeframe);
     if (this.candleSubscription?.uid === uid && this.candleSubscription.timeframe === timeframe)
       return;
     this.sendCandleSubscription("SUBSCRIPTION_ACTION_UNSUBSCRIBE");
     this.candleSubscription = { uid, timeframe };
     this.sendCandleSubscription("SUBSCRIPTION_ACTION_SUBSCRIBE");
+  }
+  unsubscribeCandles(): void {
+    this.sendCandleSubscription("SUBSCRIPTION_ACTION_UNSUBSCRIBE");
+    this.candleSubscription = null;
   }
   private queueLiveBar(sub: Subscription, bar: Candle): void {
     if (this.cachePaused) return;
@@ -411,7 +421,8 @@ export class TBankClient extends EventTarget {
     nativeTimeframe(timeframe);
     range = historyRequestWindow(range, timeframe);
     const row = selectedMarketRow(this.rows, { symbol, instrumentUid: uid });
-    if (!row?.uid) throw new BankError("Инструмент недоступен у банка.", 404);
+    if (!row?.uid || !isBankIdentity(row))
+      throw new BankError("Инструмент недоступен у банка.", 404);
     const config = TIMEFRAMES[timeframe];
     if (!config) throw new BankError("Неизвестный таймфрейм.", 400);
     const cached = await this.cache.loadHistory(

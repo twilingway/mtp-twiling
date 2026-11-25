@@ -16,6 +16,8 @@ function sourceModules(overrides = {}) {
     const candidate = path.resolve(root, name).replace(/\.js$/, ".ts"),
       file = existsSync(candidate) ? candidate : candidate + "x",
       relative = path.relative(root, file).replaceAll(path.sep, "/");
+    if (relative === "services/storage-v2.ts") return load("services/storage.ts");
+    if (relative === "services/storage-v2-migration.ts") return { physicalOwner: owner => owner, prepareProfileV2: async () => {} };
     if (Object.hasOwn(overrides, relative)) return overrides[relative];
     if (cache.has(file)) return cache.get(file).exports;
     const module = { exports: {} };
@@ -118,7 +120,7 @@ function controllerFixture() {
     { TerminalController } = module("screens/terminal/controller.js"),
     { persistWatchlistFlagChange } = module("screens/terminal/watchlist-flag-preferences.js"),
     controller = new TerminalController(), rows = [row("ONE"), row("TWO")];
-  controller.update({ owner: "profile-A", authenticated: true, ready: true, rows,
+  controller.update({ owner: "profile-A", authenticated: true, marketReady: true, ready: true, rows,
     preferences: { ...controller.getSnapshot().preferences, symbol: "ONE", instrumentUid: "uid-ONE" } });
   let reloads = 0, views = 0;
   controller.loadHistory = async () => { reloads++; };

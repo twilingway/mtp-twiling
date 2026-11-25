@@ -13,11 +13,13 @@ import { useChartCanvas } from "./chart-lifecycle.js";
 import { useTerminal } from "./context.js";
 import type { TerminalState } from "./state.js";
 import { drawingVisibleOnInterval } from "../../model/intervals/drawing-visibility.js";
+import { technicalIndicatorGroups } from "../../model/technical-indicator-layout.js";
 import { useCameraInput } from "./camera-input.js";
+import { drawingRenderList } from "./drawing-settings-preview.js";
 
 export function visibleDrawings(state: TerminalState): Drawing[] {
   if (drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden) return [];
-  return state.drawings.filter((drawing) =>
+  return drawingRenderList(state).filter((drawing) =>
     drawingVisibleOnInterval(drawing.visibility, state.preferences.timeframe)
   );
 }
@@ -65,6 +67,11 @@ export function ChartGestures({ children }: { children: ReactNode }) {
     pointer = useRef<HTMLSpanElement>(null),
     drag = useRef<Drag | null>(null),
     pan = useRef<NativePan | null>(null);
+  const lowerCount = technicalIndicatorGroups(state.preferences.technicalIndicators ?? []).filter(
+    (item) => item.pane.kind === "pane"
+  ).length;
+  const legacyVolume = state.preferences.engine === "kline" && state.preferences.indicators.volume;
+  const minimumHeight = lowerCount ? 160 + 28 + 31 * (lowerCount + (legacyVolume ? 1 : 0)) : 0;
   const cameraInput = useCameraInput(controller);
   useEffect(() => {
     const finish = (event: PointerEvent) => {
@@ -158,7 +165,8 @@ export function ChartGestures({ children }: { children: ReactNode }) {
   function down(event: ReactPointerEvent<HTMLDivElement>) {
     if (
       event.button !== 0 ||
-      (event.target instanceof Element && event.target.closest("[data-image-id],.indicator-legend"))
+      (event.target instanceof Element &&
+        event.target.closest("[data-image-id],.indicator-legend,.technical-pane-legends"))
     )
       return;
     const chart = controller.chart;
@@ -349,6 +357,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
   return (
     <div
       className={`chart-body ${state.activeTool ? "drawing-active" : ""}`}
+      style={{ minHeight: minimumHeight }}
       onPointerDownCapture={(event) => {
         if (cameraInput.down(event) !== false) down(event);
       }}
@@ -379,7 +388,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
         if (cameraInput.action(event) === false) return;
         if (
           event.target instanceof Element &&
-          event.target.closest("[data-image-id],.indicator-legend")
+          event.target.closest("[data-image-id],.indicator-legend,.technical-pane-legends")
         )
           return;
         const hit = find(pixel(event));
@@ -393,7 +402,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
       onContextMenuCapture={(event) => {
         if (
           event.target instanceof Element &&
-          event.target.closest("[data-image-id],.indicator-legend")
+          event.target.closest("[data-image-id],.indicator-legend,.technical-pane-legends")
         )
           return;
         event.preventDefault();

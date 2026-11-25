@@ -4,8 +4,10 @@ export const accountMessages = {
   "Инструменты не найдены": "No instruments found",
   "Выбрать все интервалы инструмента": "Select all intervals for this instrument",
   "Добро пожаловать в MTP TWILING": "Welcome to MTP TWILING",
-  "Личный терминал для графиков, индикаторов и разметки. Начните со своего ключа Т‑Банка.":
-    "A personal workspace for charts, indicators and drawings. Start with your own T-Bank key.",
+  "Личный терминал для графиков, индикаторов и разметки. Криптовалюты Bybit доступны без ключа. Для российских инструментов подключите свой ключ Т‑Банка.":
+    "A personal workspace for charts, indicators and drawings. Bybit crypto works without a key. Connect your own T-Bank key for Russian instruments.",
+  "Чтобы открыть Bybit, продолжите без подключения банка и найдите монету через поиск инструментов.":
+    "To open Bybit, continue without connecting a bank and find a coin in instrument search.",
   "Подключите рыночные данные": "Connect market data",
   "Выпустите личный API-токен Т‑Инвестиций с правами только для чтения и вставьте его в настройках аккаунта. Приложение не совершает сделки.":
     "Create a personal read-only T-Invest API token and enter it in account settings. This app does not place trades.",

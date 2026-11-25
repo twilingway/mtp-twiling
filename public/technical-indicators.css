@@ -1,0 +1,131 @@
+.chart-scroll-host {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+  overscroll-behavior-y: contain;
+}
+.chart-scroll-host > .chart-body {
+  height: 100%;
+  width: 100%;
+}
+.chart-panel[data-history-loading="true"] > .chart-scroll-host {
+  opacity: 0.35;
+}
+.technical-pane-legends {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+.technical-pane-legend {
+  position: absolute;
+  left: 8px;
+  overflow: auto;
+  pointer-events: auto;
+}
+.technical-indicator-rows {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 22px;
+}
+.technical-indicator-row {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+  min-height: 22px;
+  background: color-mix(in srgb, var(--chart-background, #000) 65%, transparent);
+}
+.technical-indicator-row[draggable="true"] {
+  cursor: grab;
+}
+.technical-indicator-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+  color: inherit;
+}
+.technical-row-actions,
+.technical-pane-actions {
+  display: inline-flex;
+  align-items: center;
+}
+.technical-row-actions {
+  visibility: hidden;
+}
+.technical-indicator-row:hover .technical-row-actions,
+.technical-indicator-row:focus-within .technical-row-actions {
+  visibility: visible;
+}
+.technical-indicator-rows button {
+  padding: 2px 4px;
+  min-height: 22px;
+  min-width: 22px;
+  border: 0;
+  background: transparent;
+  border-radius: 3px;
+  color: inherit;
+  font: inherit;
+}
+.technical-indicator-rows button:hover {
+  background: var(--hover, #333);
+}
+.technical-indicator-rows svg {
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+}
+.technical-pane-actions {
+  float: right;
+}
+#technical-indicator-settings {
+  width: min(600px, calc(100vw - 24px));
+}
+.technical-settings {
+  max-height: 75vh;
+  overflow: auto;
+}
+.technical-settings fieldset {
+  border: 0;
+  margin: 12px 0;
+  padding: 8px 0;
+}
+.technical-settings label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0;
+}
+.technical-settings :is(input[type="number"], select) {
+  width: min(220px, 55%);
+}
+.technical-output-style {
+  border-top: 1px solid var(--border);
+  padding: 8px 0;
+}
+.technical-opacity input {
+  flex: 1;
+  min-width: 40px;
+}
+.technical-opacity output {
+  min-width: 40px;
+  text-align: right;
+}
+.technical-opacity input[type="range"] {
+  background: repeating-conic-gradient(#888 0 25%, #444 0 50%) 0/8px 8px;
+}
+.technical-settings footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@media (pointer: coarse) {
+  .technical-row-actions {
+    visibility: visible;
+  }
+}

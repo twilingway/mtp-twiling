@@ -28,6 +28,7 @@ function sources(overrides = {}) {
   function load(relative) {
     const filename = path.resolve(sourceRoot, relative).replace(/\.js$/, ".ts");
     const key = path.relative(sourceRoot, filename).replaceAll(path.sep, "/");
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (key === "services/storage-db.ts")
       return new Proxy({}, { get: () => () => assert.fail("unexpected direct IndexedDB access") });
@@ -433,8 +434,8 @@ test("controller discards stale owner/client/aborted results and optional errors
   const { load } = sources({ "services/storage.ts": {}, "services/tbank-calendar.ts": calendar });
   const { TerminalController } = load("screens/terminal/controller.ts");
   const controller = new TerminalController(),
-    first = {},
-    second = {};
+    first = { bankClient: {} },
+    second = { bankClient: {} };
   controller.session.client = first;
   controller.update({ owner: "alice" });
   const valid = controller.loadCandleCalendar(...loadArgs, new AbortController().signal);

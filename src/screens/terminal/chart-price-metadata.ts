@@ -1,3 +1,4 @@
+import { marketAvailable } from "./market-readiness.js";
 import type { ChartAdapter } from "../../charts/adapter.js";
 import { chartPriceFormat, positivePriceStep } from "../../charts/price-format.js";
 import type { ChartPriceFormat } from "../../charts/price-format.js";
@@ -23,7 +24,7 @@ export function watchChartPriceMetadata(
       !alive() ||
       controller.chart !== adapter ||
       adapter.retired ||
-      !state.authenticated ||
+      !marketAvailable(state) ||
       state.importingBackup ||
       state.importRecoveryRequired ||
       state.owner !== source.owner ||

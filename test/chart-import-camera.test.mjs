@@ -13,6 +13,7 @@ function sources(overrides) {
   function load(relative) {
     const file = path.resolve(root, relative).replace(/\.js$/, ".ts"),
       key = path.relative(root, file).replaceAll(path.sep, "/");
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (modules.has(file)) return modules.get(file).exports;
     const module = { exports: {} };
@@ -161,10 +162,10 @@ test("backup camera survives outgoing cleanup while only the importing owner's s
   const restored = await f.camera.loadChartView(f.owner, f.key);
   assert.equal(restored.camera.barSpace, 15);
   assert.equal(restored.anchor.timestamp, 1700000000000);
-  assert.equal(f.db.has("chart-camera:owner:kline:1d"), false);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline:1d"), false);
   assert.equal(f.db.has("layout:owner"), true);
   assert.equal(f.db.has(`view:${f.owner}:${f.key}`), true);
-  assert.equal(f.db.has("chart-camera:owner:child:kline:1d"), true);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:child:kline:1d"), true);
   const other = await f.camera.loadChartView("owner:child", "RTSI:1d:kline:365");
   assert.equal(other.camera.barSpace, 21);
 });
@@ -179,7 +180,7 @@ test("failed import restores outgoing persistence and retains the shared camera"
   assert.equal(f.events.filter((event) => event === "view.save").length, 2);
   assert.equal(f.events.includes("history.reset"), false);
   assert.equal(f.events.includes("editing.reset"), false);
-  assert.equal(f.db.has("chart-camera:owner:kline:1d"), true);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline:1d"), true);
 });
 
 test("invalid backup does not flush, retire the adapter, or reset history", async () => {
@@ -191,7 +192,7 @@ test("invalid backup does not flush, retire the adapter, or reset history", asyn
   assert.equal(f.outgoing.persistView, undefined);
   assert.equal(f.outgoing.retired, undefined);
   assert.equal(f.state.chartRevision, 0);
-  assert.equal(f.db.has("chart-camera:owner:kline:1d"), true);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline:1d"), true);
 });
 
 test("successful import remains retired when late lifecycle/data work re-enables persistView", async () => {
@@ -209,7 +210,7 @@ test("successful import remains retired when late lifecycle/data work re-enables
   const imported = await f.camera.loadChartView(f.owner, f.key);
   assert.equal(imported.camera.barSpace, f.incoming.camera.barSpace);
   assert.equal(imported.camera.rightOffsetBars, f.incoming.camera.rightOffsetBars);
-  assert.equal(f.db.has("chart-camera:owner:kline:1d"), false);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline:1d"), false);
 });
 
 test("failed import restores both original optional flags exactly", async () => {
@@ -275,7 +276,7 @@ test("shared-reset failure after commit invalidates immediately, retires newborn
   assert.equal(f.state.historyViewReady, true);
   assert.equal(newborn.retired, true);
   assert.equal(f.outgoing.retired, true);
-  assert.equal(f.db.has("chart-camera:owner:kline:1d"), false);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline:1d"), false);
   const restored = await f.camera.loadChartView(f.owner, f.key);
   assert.equal(restored.camera.barSpace, f.incoming.camera.barSpace);
   assert.equal(restored.camera.rightOffsetBars, f.incoming.camera.rightOffsetBars);

@@ -54,11 +54,13 @@ export const QuoteRow = memo(function QuoteRow({
   const digits = precision(row);
   const { state } = useTerminal();
   const changeTitle = t(
-    row.previousClose == null
-      ? "Предыдущее закрытие недоступно"
-      : row.type === "future"
-        ? "К предыдущему закрытию Т-Банка"
-        : "К предыдущему дневному закрытию"
+    row.comparisonBasis === "rolling-24h"
+      ? "Изменение за последние 24 часа · Bybit"
+      : row.previousClose == null
+        ? "Предыдущее закрытие недоступно"
+        : row.type === "future"
+          ? "К предыдущему закрытию Т-Банка"
+          : "К предыдущему дневному закрытию"
   );
   return (
     <tr
@@ -110,7 +112,7 @@ export const QuoteRow = memo(function QuoteRow({
             onOpen={onFlag}
           />
           <InstrumentIcon key={row.brand?.logoName ?? row.symbol} row={row} />
-          <b>{row.symbol}</b>
+          <b>{row.ticker}</b>
         </span>
       </td>
       <td className={direction}>{number(row.price, digits)}</td>

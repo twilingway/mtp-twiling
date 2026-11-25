@@ -1,4 +1,4 @@
-import * as storage from "../../services/storage.js";
+import * as storage from "../../services/storage-v2.js";
 import { loadChartView } from "../../services/chart-camera.js";
 import { activeMtpPeriods } from "../../model/mtp.js";
 import { mergeCandles, TIMEFRAMES } from "../../model/history-codec.js";
@@ -14,7 +14,7 @@ import {
   planHistoryViewRange
 } from "../../model/history-view-range.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
-import type { TBankClient } from "../../services/tbank-client.js";
+import type { MarketClient } from "../../services/market-client.js";
 import { errorText, isAbort, viewKey } from "./controller-bridge.js";
 import type { HistoryBridge } from "./controller-bridge.js";
 
@@ -48,7 +48,7 @@ export class TerminalHistory {
     this.startReached = false;
     this.olderBusy = false;
   }
-  private current(id: number, client: TBankClient, owner: string): boolean {
+  private current(id: number, client: MarketClient, owner: string): boolean {
     const state = this.bridge.getState(),
       source = this.source;
     return (

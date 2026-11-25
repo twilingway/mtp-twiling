@@ -33,14 +33,22 @@ function pane(value: unknown): value is IndicatorPane {
 function style(value: unknown): value is OutputStyle {
   return (
     record(value) &&
-    exact(value, ["color", "width", "visible"]) &&
+    exact(value, ["color", "width", "visible", "opacity", "lineStyle"]) &&
     typeof value.color === "string" &&
     /^#[0-9a-f]{6}$/i.test(value.color) &&
     typeof value.width === "number" &&
     Number.isInteger(value.width) &&
     value.width >= 1 &&
     value.width <= 4 &&
-    typeof value.visible === "boolean"
+    typeof value.visible === "boolean" &&
+    (value.opacity === undefined ||
+      (typeof value.opacity === "number" &&
+        Number.isFinite(value.opacity) &&
+        value.opacity >= 0 &&
+        value.opacity <= 1)) &&
+    (value.lineStyle === undefined ||
+      (typeof value.lineStyle === "string" &&
+        ["solid", "dashed", "dotted"].includes(value.lineStyle)))
   );
 }
 export function isTechnicalIndicatorInstance(value: unknown): value is TechnicalIndicatorInstance {

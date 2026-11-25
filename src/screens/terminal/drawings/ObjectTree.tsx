@@ -7,6 +7,7 @@ import { INDICATOR_NAMES, PERIOD_LABELS } from "../state.js";
 import { TOOL_NAMES } from "../../../model/drawing-model.js";
 import { useTerminal } from "../context.js";
 import { VisibilityIcon, LockIcon, DeleteIcon } from "../VisibilityIcon.js";
+import { TechnicalObjectTree } from "../TechnicalIndicatorPanels.js";
 
 export function ObjectTree() {
   const { controller, state } = useTerminal();
@@ -145,6 +146,7 @@ export function ObjectTree() {
               </button>
             </div>
           ))}
+        <TechnicalObjectTree />
         {[...state.drawings].reverse().map((drawing) => (
           <div
             key={drawing.id}

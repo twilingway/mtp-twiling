@@ -1,4 +1,4 @@
-import * as storage from "../../services/storage.js";
+import * as storage from "../../services/storage-v2.js";
 import {
   DrawingUndoHistory,
   copyDrawing,

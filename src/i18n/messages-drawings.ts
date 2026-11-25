@@ -69,6 +69,12 @@ export const drawingMessages = {
   "Использовать один цвет": "Use one colour",
   "Общий цвет уровней": "Shared level colour",
   "Непрозрачность фона": "Background opacity",
+  "Непрозрачность линии": "Line opacity",
+  "Непрозрачность линии тренда": "Trend line opacity",
+  "Толщина линии": "Line width",
+  "Толщина линии тренда": "Trend line width",
+  "Контекст рисунка изменился. Откройте настройки снова.":
+    "The drawing context changed. Reopen settings.",
   Переворот: "Reverse",
   Цены: "Prices",
   Уровни: "Levels",

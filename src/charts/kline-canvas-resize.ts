@@ -4,10 +4,10 @@ import type { Chart } from "klinecharts";
 export function attachKlineCanvasResize(
   chart: Pick<Chart, "getDom" | "setStyles">,
   axisWidth: () => number
-): () => void {
+): (() => void) & { refresh: () => void } {
   const root = chart.getDom();
-  if (!root) return () => {};
-  const canvases = [...root.querySelectorAll("canvas")];
+  if (!root) return Object.assign(() => {}, { refresh() {} });
+  const canvases = new Set<HTMLCanvasElement>();
   let frame = 0,
     disposed = false,
     repairing = false;
@@ -20,7 +20,7 @@ export function attachKlineCanvasResize(
     frame = 0;
     if (disposed) return;
     const ratio = window.devicePixelRatio || 1;
-    const stale = canvases.some(
+    const stale = [...canvases].some(
       (canvas) =>
         canvas.clientWidth > 0 &&
         canvas.clientHeight > 0 &&
@@ -42,10 +42,28 @@ export function attachKlineCanvasResize(
   const observer = new ResizeObserver(() => {
     if (!disposed && !repairing && !frame) afterPaint(check);
   });
-  for (const canvas of canvases) observer.observe(canvas);
-  return () => {
-    disposed = true;
-    observer.disconnect();
-    cancelAnimationFrame(frame);
+  const refresh = () => {
+    if (disposed) return;
+    const current = new Set(root.querySelectorAll("canvas"));
+    for (const canvas of canvases)
+      if (!current.has(canvas)) {
+        observer.unobserve(canvas);
+        canvases.delete(canvas);
+      }
+    for (const canvas of current)
+      if (!canvases.has(canvas)) {
+        canvases.add(canvas);
+        observer.observe(canvas);
+      }
   };
+  refresh();
+  return Object.assign(
+    () => {
+      disposed = true;
+      observer.disconnect();
+      canvases.clear();
+      cancelAnimationFrame(frame);
+    },
+    { refresh }
+  );
 }

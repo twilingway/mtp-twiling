@@ -11,6 +11,7 @@ function sources(overrides = {}) {
   const modules = new Map();
   function load(relative) {
     const file = path.resolve(root, relative).replace(/\.js$/, ".ts"), key = path.relative(root, file).replaceAll(path.sep, "/");
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (modules.has(file)) return modules.get(file).exports;
     const module = { exports: {} }; modules.set(file, module);
@@ -27,7 +28,7 @@ class Store {
   async list(kind) { await this.hooks.list?.(kind); return this.files.filter(file => file.appProperties.mtpKind === kind).map(file => structuredClone(file)); }
   async read(file, max) { await this.hooks.read?.(file); const body = this.bodies.get(file.id); assert.ok(body.size <= max); return body; }
   async create(kind, key, hash, body) {
-    const file = { id: crypto.randomUUID(), name: kind, size: body.size, appProperties: { mtpNamespace: "mtp-drive-v1", mtpKind: kind, mtpKey: key, mtpHash: hash } };
+    const file = { id: crypto.randomUUID(), name: kind, size: body.size, appProperties: { mtpNamespace: "mtp-drive-v2", mtpKind: kind, mtpKey: key, mtpHash: hash } };
     await this.hooks.create?.(kind); this.files.push(file); this.bodies.set(file.id, body); return structuredClone(file);
   }
   count() { return this.files.filter(file => file.appProperties.mtpKind === "snapshot").length; }

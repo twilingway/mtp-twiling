@@ -2,7 +2,8 @@ import type { ChartView, ChartCamera } from "../model/types.js";
 import type { ChartAdapter } from "../charts/adapter.js";
 import { chooseChartView, isChartCamera, parseChartViewKey } from "../charts/view-camera.js";
 import { all, get, put, transaction } from "./storage-db.js";
-import { loadView, saveView } from "./storage.js";
+import { loadView, saveView } from "./storage-v2.js";
+import { physicalOwner, prepareProfileV2 } from "./storage-v2-migration.js";
 
 interface SharedView {
   symbol: string;
@@ -10,7 +11,7 @@ interface SharedView {
 }
 const memory = new Map<string, SharedView & { owner: string }>();
 function scope(owner: string, source: { engine: string; timeframe: string }): string {
-  return `chart-camera:${owner}:${source.engine}:${source.timeframe}`;
+  return `chart-camera:${physicalOwner(owner)}:${source.engine}:${source.timeframe}`;
 }
 export async function saveChartView(owner: string, key: string, view: ChartView): Promise<void> {
   const source = parseChartViewKey(key);
@@ -21,7 +22,7 @@ export async function saveChartView(owner: string, key: string, view: ChartView)
   if (shared) memory.set(id, { ...shared, owner });
   await Promise.all([
     saveView(owner, key, view),
-    ...(shared ? [put("preferences", { id, owner, value: shared })] : [])
+    ...(shared ? [put("preferences", { id, owner: physicalOwner(owner), value: shared })] : [])
   ]);
 }
 /** Keep the legacy depth key; a later import transaction wins in IDB transaction order. */
@@ -32,12 +33,13 @@ export async function copyDepthChartView(
   valid: () => boolean
 ): Promise<boolean> {
   if (!parseChartViewKey(key) || owner === "guest" || !valid()) return false;
+  await prepareProfileV2(owner, valid);
   let written = false;
   await transaction(["preferences"], (tx) => {
     if (!valid()) return;
     tx.objectStore("preferences").put({
-      id: `view:${owner}:${key}`,
-      owner,
+      id: `view:${physicalOwner(owner)}:${key}`,
+      owner: physicalOwner(owner),
       viewKey: key,
       value: view
     });
@@ -84,7 +86,7 @@ export async function resetSharedChartCamera(owner: string): Promise<void> {
   const ids = records.flatMap((record) => {
     if (!record || typeof record !== "object" || !("id" in record) || !("owner" in record))
       return [];
-    return record.owner === owner &&
+    return record.owner === physicalOwner(owner) &&
       typeof record.id === "string" &&
       record.id.startsWith("chart-camera:")
       ? [record.id]

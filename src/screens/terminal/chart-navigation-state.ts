@@ -1,3 +1,4 @@
+import { marketAvailable } from "./market-readiness.js";
 import type { ChartAdapter } from "../../charts/adapter.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { viewKey } from "./controller-bridge.js";
@@ -13,7 +14,7 @@ export function chartNavigationReady(
     source &&
     !chart.retired &&
     chart.persistView !== false &&
-    state.authenticated &&
+    marketAvailable(state) &&
     state.candles.length &&
     !state.loading &&
     !state.importingBackup &&

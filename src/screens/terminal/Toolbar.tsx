@@ -1,3 +1,4 @@
+import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { t } from "../../i18n/messages.js";
 import { memo } from "react";
 import type { ChartEngine } from "../../model/types.js";
@@ -20,7 +21,8 @@ const InstallButton = memo(function InstallButton() {
 });
 export function Toolbar() {
   const { controller, state } = useTerminal(),
-    p = state.preferences;
+    p = state.preferences,
+    row = selectedMarketRow(state.rows, p);
   return (
     <header className="topbar">
       <a className="brand" href="./" aria-label="MTP TWILING" title="MTP TWILING">
@@ -33,17 +35,25 @@ export function Toolbar() {
       <button
         className="symbol-button"
         id="symbol-button"
-        onClick={() => controller.setDialog(state.authenticated ? "instruments" : "account")}
+        onClick={() => controller.setDialog(state.ready ? "instruments" : "account")}
         title={t("Найти инструмент")}
       >
         <span className="tiny-search">⌕</span>
-        <b id="top-symbol">{p.symbol || t("Инструмент")}</b>
+        <b id="top-symbol">{row?.ticker || t("Инструмент")}</b>
       </button>
       <nav className="timeframes" aria-label={t("Таймфрейм")}>
         <TimeframeMenu
           value={p.timeframe}
           favorites={p.favoriteIntervals ?? DEFAULT_INTERVAL_FAVORITES}
-          availability={DERIVED_INTERVAL_UNAVAILABLE}
+          availability={{
+            ...DERIVED_INTERVAL_UNAVAILABLE,
+            ...(row?.providerRef
+              ? {
+                  "2m": "Bybit: интервал пока не поддерживается",
+                  "10m": "Bybit: интервал пока не поддерживается"
+                }
+              : {})
+          }}
           onSelect={(id) => {
             if (isNativeIntervalId(id)) void controller.setTimeframe(id);
           }}
@@ -85,10 +95,12 @@ export function Toolbar() {
         <i
           className={`account-connection ${state.status}`}
           aria-label={
-            state.status === "connected" ? t("Т-Банк подключён") : t("Т-Банк не подключён")
+            state.authenticated && state.status === "connected"
+              ? t("Т-Банк подключён")
+              : t("Т-Банк не подключён")
           }
         />
-        <span id="account-name">{state.name || t("Подключить API")}</span>
+        <span id="account-name">{state.name || t("Аккаунт и источники")}</span>
       </button>
     </header>
   );

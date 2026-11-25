@@ -37,7 +37,7 @@ import type { MarketCache } from "./types.js";
 function validatePart(part: Record<string, unknown>) {
   return validateBackup({
     application: "personal-terminal",
-    schemaVersion: 1,
+    schemaVersion: 2,
     drawings: [],
     images: [],
     ...part
@@ -312,7 +312,7 @@ export async function createBackup(
     : [];
   return {
     application: "personal-terminal" as const,
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
     exportedAt: new Date().toISOString(),
     layout: await loadPreferences(owner),
     watchlist: (await loadWatchlist(owner)) ?? [],
