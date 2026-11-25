@@ -3,6 +3,7 @@ import { memo, useState } from "react";
 import type { ChartEngine, IndicatorKey } from "../../model/types.js";
 import { useTerminal } from "./context.js";
 import { INDICATOR_NAMES } from "./state.js";
+import { MtpIndicatorGroup } from "./MtpIndicatorGroup.js";
 import { TimeframeMenu } from "./intervals/TimeframeMenu.js";
 import { isNativeIntervalId } from "../../model/intervals/registry.js";
 import { DERIVED_INTERVAL_UNAVAILABLE } from "../../model/intervals/native-timeframes.js";
@@ -71,19 +72,27 @@ export function Toolbar() {
         {indicatorsOpen && (
           <div className="popover" id="indicators-panel">
             <strong>{t("Индикаторы")}</strong>
-            {(Object.entries(INDICATOR_NAMES) as [IndicatorKey, string][]).map(([key, name]) => (
-              <label key={key}>
-                <input
-                  type="checkbox"
-                  id={`indicator-${key}`}
-                  checked={!!p.indicators[key]}
-                  onChange={() => {
-                    void controller.toggleIndicator(key);
-                  }}
-                />
-                {t(name)}
-              </label>
-            ))}
+            <MtpIndicatorGroup
+              flags={p.indicators}
+              onToggle={(key) => {
+                void controller.toggleIndicator(key);
+              }}
+            />
+            {(Object.entries(INDICATOR_NAMES) as [IndicatorKey, string][])
+              .filter(([key]) => !key.startsWith("mtp"))
+              .map(([key, name]) => (
+                <label key={key}>
+                  <input
+                    type="checkbox"
+                    id={`indicator-${key}`}
+                    checked={!!p.indicators[key]}
+                    onChange={() => {
+                      void controller.toggleIndicator(key);
+                    }}
+                  />
+                  {t(name)}
+                </label>
+              ))}
           </div>
         )}
       </div>

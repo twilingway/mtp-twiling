@@ -45,10 +45,10 @@ export const DEFAULT_CHART_SETTINGS: ChartSettings = {
 };
 export const INDICATOR_NAMES: Record<IndicatorKey, string> = {
   volume: "Объём",
-  mtpAll: "MTP 4–640",
-  mtp640: "MTP160+440+640",
-  mtp440: "MTP160+440",
-  mtp160: "MTP160",
+  mtpAll: "MTP 0–640",
+  mtp640: "MTP 440–640",
+  mtp440: "MTP 160–440",
+  mtp160: "MTP 0–160",
   ma: "SMA 20",
   ema: "EMA 50"
 };

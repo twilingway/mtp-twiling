@@ -69,8 +69,18 @@ test("combined toggle does not resurrect old groups, and separate toggle exits c
   const combined = toggleIndicatorFlags({ ...off, mtp160: true, mtp440: true }, "mtpAll");
   assert.deepEqual(combined, { ...off, mtpAll: true });
   assert.deepEqual(toggleIndicatorFlags(combined, "mtpAll"), { ...off, mtpAll: false });
-  assert.deepEqual(toggleIndicatorFlags(combined, "mtp640"), { ...off, mtp640: true, mtpAll: false });
+  assert.deepEqual(toggleIndicatorFlags(combined, "mtp640"), { ...off, mtp160: true, mtp440: true, mtpAll: false });
   assert.equal(toggleIndicatorFlags(combined, "volume").mtpAll, true);
+});
+
+test("MTP master checkbox shows partial ranges and clears all individually selected ranges", async () => {
+  const { toggleIndicatorFlags, mtpSelection } = await pureModule("indicator-flags");
+  assert.deepEqual(mtpSelection({ ...off, mtp160: true }), { all: false, partial: true });
+  const allParts = { ...off, mtp160: true, mtp440: true, mtp640: true };
+  assert.deepEqual(mtpSelection(allParts), { all: true, partial: false });
+  assert.deepEqual(toggleIndicatorFlags(allParts, "mtpAll"), { ...off, mtpAll: false });
+  assert.deepEqual(mtpSelection(toggleIndicatorFlags(allParts, "mtp440")), { all: false, partial: true });
+  assert.deepEqual(mtpSelection({ ...off, mtpAll: true }), { all: true, partial: false });
 });
 
 test("combined legend shows one MTP entry and backup roundtrip accepts optional new data", async () => {
