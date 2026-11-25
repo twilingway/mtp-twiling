@@ -1,0 +1,465 @@
+import * as storage from "../../services/storage.js";
+import type { TBankClient } from "../../services/tbank-client.js";
+import { moveWatchlistRow, type WatchlistMove } from "../../services/watchlist-order.js";
+import { loadCandleCalendar } from "../../services/tbank-calendar.js";
+import { saveChartView } from "../../services/chart-camera.js";
+import type { TradingCalendarDay } from "../../model/candle-clock.js";
+import { resolveWatchlist } from "../../model/market-model.js";
+import { pinSelectedInstrument, selectedMarketRow } from "../../model/selected-instrument.js";
+import type {
+  Backup,
+  Candle,
+  ChartSettings,
+  Drawing,
+  DrawingTool,
+  ImageAsset,
+  IndicatorKey,
+  Timeframe
+} from "../../model/types.js";
+import type { ChartAdapter } from "../../charts/adapter.js";
+import { PERIOD_LABELS } from "./state.js";
+import { TerminalHistory } from "./controller-history.js";
+import { TerminalSession } from "./controller-session.js";
+import { TerminalEditing } from "./controller-editing.js";
+import { defaultPreferences } from "./controller-bridge.js";
+import type { ContextMenu, TerminalDialog, TerminalPreferences, TerminalState } from "./state.js";
+
+export class TerminalController {
+  private state: TerminalState = {
+    ready: false,
+    owner: "guest",
+    name: "",
+    authenticated: false,
+    status: "offline",
+    error: null,
+    rows: resolveWatchlist([], [], []),
+    pricesDirection: new Map(),
+    preferences: defaultPreferences(),
+    candles: [],
+    drawings: [],
+    images: [],
+    loading: false,
+    historyHelp: "Подключите личный API-ключ",
+    activeTool: null,
+    preview: null,
+    selectedObject: null,
+    dialog: null,
+    contextMenu: null,
+    objectPanel: false,
+    toast: "",
+    editingIndicator: "mtp160",
+    crosshairBar: null
+  };
+  private readonly listeners = new Set<() => void>();
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
+  chart: ChartAdapter | null = null;
+  private readonly history: TerminalHistory;
+  private readonly session: TerminalSession;
+  private selectionEpoch = 0;
+  readonly editing: TerminalEditing;
+  constructor() {
+    const bridge = {
+      getState: () => this.state,
+      getChart: () => this.chart,
+      update: (patch: Partial<TerminalState>) => this.update(patch),
+      notify: (message: string) => this.notify(message)
+    };
+    this.editing = new TerminalEditing(bridge);
+    this.history = new TerminalHistory({
+      ...bridge,
+      getClient: () => this.session.client,
+      isAlive: () => !this.session.disposed
+    });
+    this.session = new TerminalSession({
+      ...bridge,
+      resetHistory: () => this.history.reset(),
+      loadHistory: (refresh?: boolean) => this.history.load(refresh),
+      isClearingHistory: () => this.history.clearing,
+      mutateCandles: (candles: Candle[]) => {
+        this.state = { ...this.state, candles };
+      },
+      flush: () => this.flush()
+    });
+  }
+  private get client(): TBankClient | null {
+    return this.session.client;
+  }
+  getSnapshot = (): TerminalState => this.state;
+  marketNow = (): number => this.client?.serverNow?.() ?? Date.now();
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+  update = (patch: Partial<TerminalState>): void => {
+    if (this.session.disposed) return;
+    const ownerChanged = patch.owner !== undefined && patch.owner !== this.state.owner;
+    if (ownerChanged || (patch.authenticated === false && this.state.authenticated))
+      this.editing.reset();
+    else if (
+      patch.preferences &&
+      (patch.preferences.symbol !== this.state.preferences.symbol ||
+        patch.preferences.instrumentUid !== this.state.preferences.instrumentUid ||
+        patch.preferences.timeframe !== this.state.preferences.timeframe)
+    )
+      this.editing.cancelGesture();
+    if (ownerChanged)
+      patch = {
+        drawings: [],
+        images: [],
+        selectedObject: null,
+        preview: null,
+        activeTool: null,
+        ...patch
+      };
+    this.state = { ...this.state, ...patch };
+    this.listeners.forEach((listener) => listener());
+  };
+  notify = (message: string): void => {
+    if (this.session.disposed) return;
+    this.update({ toast: message });
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => this.update({ toast: "" }), 5000);
+  };
+  private get viewKey(): string {
+    const p = this.state.preferences;
+    return `${p.symbol}:${p.timeframe}:${p.engine}:${p.rangeDays}`;
+  }
+  private async savePreferences(): Promise<void> {
+    if (this.state.owner !== "guest")
+      await storage.savePreferences(this.state.owner, this.state.preferences);
+  }
+  saveView = async (): Promise<void> => {
+    const source = this.chart?.source;
+    if (
+      source &&
+      (source.owner !== this.state.owner ||
+        source.viewKey !== this.viewKey ||
+        source.uid !== selectedMarketRow(this.state.rows, this.state.preferences)?.uid)
+    )
+      return;
+    const view = this.chart?.getView();
+    if (view && this.state.owner !== "guest")
+      await saveChartView(this.state.owner, this.viewKey, view);
+  };
+  flush = async (): Promise<void> => {
+    const client = this.client;
+    await this.editing.flush();
+    await this.saveView();
+    await client?.flush();
+    await storage.flush();
+  };
+  private resetHistory(): void {
+    this.history.reset();
+  }
+  start = (): Promise<void> => this.session.start();
+  dispose = (): void => {
+    this.editing.reset();
+    this.session.dispose();
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+  };
+  login = async (token: string, name: string, remember: boolean): Promise<void> => {
+    await this.editing.flush();
+    this.editing.reset();
+    await this.session.login(token, name, remember);
+  };
+  logout = (): Promise<void> => {
+    this.editing.reset();
+    return this.session.logout();
+  };
+  setDialog = (dialog: TerminalDialog): void => this.update({ dialog, contextMenu: null });
+  setContext = (contextMenu: ContextMenu | null): void => this.update({ contextMenu });
+  selectObject = (id: string | null): void => this.update({ selectedObject: id });
+  focusObject = (id: string): void => {
+    const drawing = this.state.drawings.find((item) => item.id === id);
+    const image = this.state.images.find((item) => item.id === id);
+    this.selectObject(id);
+    const points = drawing?.points ?? (image ? [image.point] : []);
+    if (points.length) this.chart?.focusPoints?.(points);
+  };
+  toggleObjects = (): void =>
+    this.update({ objectPanel: !this.state.objectPanel, contextMenu: null });
+  setTool = (tool: DrawingTool | null): void => {
+    this.editing.cancelGesture();
+    this.update({ activeTool: tool, preview: null, selectedObject: null, contextMenu: null });
+  };
+  setPreview = (preview: TerminalState["preview"]): void => this.update({ preview });
+  undoDrawings = (): Promise<void> => {
+    if (this.state.activeTool && this.state.preview) {
+      this.setTool(null);
+      return Promise.resolve();
+    }
+    return this.editing.undo();
+  };
+  setPreferences = async (
+    patch: Partial<TerminalPreferences>,
+    forceReload = false
+  ): Promise<void> => {
+    const routing =
+      forceReload ||
+      ["symbol", "instrumentUid", "timeframe", "rangeDays", "engine"].some((key) => key in patch);
+    const epoch = routing ? ++this.selectionEpoch : this.selectionEpoch;
+    const owner = this.state.owner,
+      client = this.client;
+    await this.saveView();
+    await this.editing.flush();
+    if (
+      !this.session.matches(client) ||
+      owner !== this.state.owner ||
+      (routing && epoch !== this.selectionEpoch)
+    )
+      return;
+    const previous = this.state.preferences,
+      merged = {
+        ...previous,
+        ...patch
+      };
+    if ("symbol" in patch && !("instrumentUid" in patch)) delete merged.instrumentUid;
+    const next = routing ? pinSelectedInstrument(this.state.rows, merged) : merged;
+    const reload =
+      next.symbol !== previous.symbol ||
+      next.instrumentUid !== previous.instrumentUid ||
+      next.timeframe !== previous.timeframe ||
+      next.rangeDays !== previous.rangeDays ||
+      forceReload;
+    if (reload) this.resetHistory();
+    this.update({
+      preferences: next,
+      crosshairBar: null,
+      ...(reload
+        ? {
+            candles: [],
+            loading: false,
+            drawings: [],
+            images: [],
+            selectedObject: null,
+            activeTool: null,
+            preview: null
+          }
+        : {})
+    });
+    await this.savePreferences();
+    if (
+      reload &&
+      this.state.authenticated &&
+      epoch === this.selectionEpoch &&
+      this.session.matches(client) &&
+      owner === this.state.owner
+    )
+      await this.loadHistory();
+  };
+  setTimeframe = async (timeframe: Timeframe): Promise<void> => {
+    const days: Record<Timeframe, number> = {
+      "1m": 1,
+      "5m": 5,
+      "15m": 30,
+      "30m": 30,
+      "1h": 90,
+      "1d": 365,
+      "1w": 1825
+    };
+    await this.setPreferences({ timeframe, rangeDays: days[timeframe] });
+  };
+  toggleIndicator = async (key: IndicatorKey): Promise<void> => {
+    const owner = this.state.owner,
+      client = this.client;
+    await this.saveView();
+    if (!this.session.matches(client) || owner !== this.state.owner) return;
+    const indicators = {
+      ...this.state.preferences.indicators,
+      [key]: !this.state.preferences.indicators[key]
+    };
+    this.update({ preferences: { ...this.state.preferences, indicators } });
+    await this.savePreferences();
+    if (key.startsWith("mtp") && indicators[key]) await this.loadHistory(true);
+  };
+  setChartSettings = async (patch: ChartSettings): Promise<void> => {
+    const owner = this.state.owner,
+      client = this.client;
+    await this.saveView();
+    if (!this.session.matches(client) || owner !== this.state.owner) return;
+    this.update({
+      preferences: {
+        ...this.state.preferences,
+        chartSettings: { ...this.state.preferences.chartSettings, ...patch }
+      }
+    });
+    await this.savePreferences();
+  };
+  setDrawings = async (drawings: Drawing[]): Promise<void> => {
+    await this.editing.change({ drawings });
+  };
+  updateDrawing = async (drawing: Drawing): Promise<void> =>
+    this.setDrawings(this.state.drawings.map((item) => (item.id === drawing.id ? drawing : item)));
+  addDrawing = async (drawing: Drawing): Promise<void> => {
+    const owner = this.state.owner,
+      symbol = this.state.preferences.symbol,
+      uid = selectedMarketRow(this.state.rows, this.state.preferences)?.uid;
+    await this.setDrawings([...this.state.drawings, drawing]);
+    if (
+      owner === this.state.owner &&
+      symbol === this.state.preferences.symbol &&
+      uid === selectedMarketRow(this.state.rows, this.state.preferences)?.uid
+    )
+      this.update({ selectedObject: drawing.id, activeTool: null, preview: null });
+  };
+  loadHistory = (refresh = false): Promise<void> => this.history.load(refresh);
+  loadCandleCalendar = async (
+    uid: string,
+    barTimestamp: number,
+    timeframe: Timeframe,
+    now: number,
+    signal: AbortSignal
+  ): Promise<TradingCalendarDay[]> => {
+    const client = this.client,
+      owner = this.state.owner;
+    if (!client || signal.aborted || this.session.disposed) return [];
+    try {
+      const days = await loadCandleCalendar(client, uid, barTimestamp, timeframe, now, signal);
+      return !signal.aborted && owner === this.state.owner && this.session.matches(client)
+        ? days
+        : [];
+    } catch {
+      // Optional calendar metadata must not produce recurring network-error toasts.
+      return [];
+    }
+  };
+  scheduleOlderHistory = (): void => this.history.scheduleOlder();
+  searchInstruments = async (
+    query: string,
+    kind: "all" | "share" | "future" | "index",
+    signal: AbortSignal
+  ) => this.client?.searchInstruments(query, kind, signal) ?? [];
+  addInstrument = async (
+    instrument: Parameters<TBankClient["addInstrument"]>[0]
+  ): Promise<void> => {
+    const client = this.client;
+    if (!client) return;
+    const row = await client.addInstrument(instrument);
+    if (!this.session.matches(client)) return;
+    this.session.applyBankState(client.snapshot());
+    this.update({ dialog: null });
+    await this.setPreferences({ symbol: row.symbol, instrumentUid: row.uid });
+  };
+  removeInstrument = async (
+    reference: Pick<TerminalState["rows"][number], "uid" | "symbol">
+  ): Promise<void> => {
+    const client = this.client,
+      owner = this.state.owner;
+    if (!client) return;
+    await this.flush();
+    if (!this.session.matches(client) || owner !== this.state.owner) return;
+    const selected = selectedMarketRow(this.state.rows, this.state.preferences);
+    await client.removeInstrument(reference);
+    if (!this.session.matches(client) || owner !== this.state.owner) return;
+    this.session.applyBankState(client.snapshot());
+    const removedSelected =
+      selected &&
+      !selectedMarketRow(this.state.rows, { symbol: selected.symbol, instrumentUid: selected.uid });
+    if (
+      removedSelected &&
+      this.state.preferences.symbol === selected.symbol &&
+      (this.state.preferences.instrumentUid === undefined ||
+        this.state.preferences.instrumentUid === selected.uid)
+    ) {
+      const next = this.state.rows.find((item) => item.uid) ?? this.state.rows[0];
+      await this.setPreferences(
+        { symbol: next?.symbol ?? "", instrumentUid: next?.uid ?? null },
+        true
+      );
+    }
+  };
+  reorderWatchlist = async (move: WatchlistMove, expectedOwner: string): Promise<boolean> => {
+    const client = this.client;
+    if (!client || this.state.owner !== expectedOwner || !this.session.matches(client))
+      return false;
+    if (!moveWatchlistRow(this.state.rows, move)) return false;
+    const preferences = pinSelectedInstrument(this.state.rows, this.state.preferences);
+    if (preferences !== this.state.preferences) this.update({ preferences });
+    await this.savePreferences();
+    if (!this.session.matches(client) || this.state.owner !== expectedOwner) return false;
+    const changed = await client.reorderWatchlist(move);
+    if (!this.session.matches(client) || this.state.owner !== expectedOwner) return false;
+    if (changed) this.session.applyBankState(client.snapshot());
+    return changed;
+  };
+  getStorageStats = async () => ({
+    candles: await storage.historyStats(this.state.owner),
+    browser: await storage.usage()
+  });
+  clearHistory = (uid: string | null, timeframe: Timeframe | null): Promise<void> =>
+    this.history.clear(uid, timeframe);
+  exportBackup = async (includeHistory: boolean): Promise<Backup> => {
+    const owner = this.state.owner;
+    await this.flush();
+    return storage.createBackup(owner, { includeHistory });
+  };
+  importBackup = async (input: unknown): Promise<void> => {
+    const { owner, name } = this.state,
+      client = this.client;
+    const valid = () => this.session.matches(client) && owner === this.state.owner;
+    this.editing.reset();
+    await this.editing.flush();
+    const result = await storage.importBackup(owner, input);
+    if (!valid()) return;
+    this.resetHistory();
+    this.update({ candles: [], loading: false });
+    await this.session.prepareProfile(owner, name, true, valid);
+    if (!valid()) return;
+    const watchlist = await storage.loadWatchlist(owner);
+    if (!valid()) return;
+    if (watchlist !== undefined && client) {
+      client.rows = watchlist;
+      const snapshot = await client.start();
+      if (!valid()) return;
+      this.session.applyBankState(snapshot);
+    }
+    await this.loadHistory();
+    if (valid())
+      this.notify(`Импортировано: ${result.drawings} рисунков, ${result.images} изображений.`);
+  };
+  saveImage = async (asset: ImageAsset): Promise<void> => {
+    if (asset.owner !== this.state.owner || asset.symbol !== this.state.preferences.symbol) return;
+    const previous = this.state.images.some((image) => image.id === asset.id);
+    await this.editing.change({
+      images: previous
+        ? this.state.images.map((image) => (image.id === asset.id ? asset : image))
+        : [...this.state.images, asset]
+    });
+  };
+  deleteImage = async (id: string): Promise<void> => {
+    await this.editing.change({ images: this.state.images.filter((image) => image.id !== id) });
+  };
+  attachImage = async (file: File): Promise<void> => {
+    if (
+      !this.chart ||
+      !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type) ||
+      file.size > 20 * 1024 * 1024
+    )
+      throw new Error("Выберите PNG/JPEG/WebP/GIF до 20 МБ.");
+    const size = this.chart.plotSize(),
+      point = this.chart.pixelToPoint(size.width * 0.55, size.height * 0.25);
+    if (!point) throw new Error("Не удалось определить координаты изображения.");
+    await this.saveImage({
+      id: crypto.randomUUID(),
+      owner: this.state.owner,
+      symbol: this.state.preferences.symbol,
+      name: file.name,
+      blob: file,
+      point,
+      width: Math.min(220, size.width * 0.55),
+      createdAt: Date.now()
+    });
+  };
+  editIndicator = (key: IndicatorKey): void =>
+    this.update({
+      editingIndicator: key,
+      dialog: key === "volume" ? "chart-settings" : "indicator-settings",
+      contextMenu: null
+    });
+  setCrosshair = (crosshairBar: Candle | null): void => {
+    if (this.state.crosshairBar?.timestamp !== crosshairBar?.timestamp)
+      this.update({ crosshairBar });
+  };
+  historyLabel = (): string =>
+    `${this.state.preferences.symbol} · ${PERIOD_LABELS[this.state.preferences.timeframe]}`;
+}

@@ -1,0 +1,155 @@
+.foreground-canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+.chart-body[data-object-cursor] #chart,
+.chart-body[data-object-cursor] #chart * {
+  cursor: var(--drawing-cursor) !important;
+}
+.chart-body[data-chart-pan] #chart,
+.chart-body[data-chart-pan] #chart * {
+  cursor: grabbing !important;
+}
+.drawing-axis-labels {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  overflow: hidden;
+  pointer-events: none;
+}
+.drawing-axis-label {
+  position: absolute;
+  bottom: 0;
+  transform: translateX(-50%);
+  padding: 5px 7px;
+  background: #2962ff;
+  color: #fff;
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.candle-countdown {
+  position: absolute;
+  right: 0;
+  z-index: 7;
+  pointer-events: none;
+  color: #fff;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 17px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.fib-levels {
+  gap: 8px 22px;
+}
+.settings-tabs button {
+  color: #b2b5be;
+}
+.settings-tabs button.active {
+  color: #e0e3eb;
+}
+#drawing-settings [data-settings-page="style"] > .checkbox-label {
+  margin: 18px 0;
+}
+#drawing-settings input[type="checkbox"] {
+  accent-color: #e0e3eb;
+}
+#drawing-settings .colour-popover input[type="range"] {
+  padding: 0;
+}
+#drawing-settings [data-settings-page="visibility"] {
+  min-height: 270px;
+}
+.image-annotation.locked {
+  cursor: default;
+}
+.image-annotation.locked .image-resize {
+  display: none;
+}
+@media (max-width: 480px) {
+  .fib-levels {
+    gap: 8px 12px;
+  }
+  .fib-level {
+    gap: 5px;
+  }
+  .fib-level .colour-swatch {
+    width: 29px;
+    height: 30px;
+  }
+  .fib-level input[type="checkbox"] {
+    width: 15px;
+    height: 15px;
+  }
+  .setting-row {
+    font-size: 12px;
+    gap: 7px;
+  }
+  .coordinate-row {
+    grid-template-columns: 1.3fr 1fr 1fr;
+    gap: 6px;
+    font-size: 12px;
+  }
+  .visibility-row {
+    grid-template-columns: 1.6fr 1fr 10px 1fr;
+    gap: 7px;
+  }
+  .settings-tabs button {
+    font-size: 13px;
+  }
+  .colour-popover {
+    width: 245px;
+  }
+  #drawing-settings footer {
+    gap: 7px;
+  }
+}
+
+.context-submenu {
+  position: relative;
+}
+.chart-context-menu.submenu-left .context-submenu > div {
+  left: auto;
+  right: 100%;
+}
+.context-submenu > button > span {
+  margin-left: auto;
+}
+.context-submenu > div {
+  display: none;
+  position: absolute;
+  left: 100%;
+  top: 0;
+  min-width: 225px;
+  padding: 6px 0;
+  background: #1e222d;
+  border: 1px solid #363a45;
+  border-radius: 6px;
+  box-shadow: 0 8px 30px #0009;
+}
+.context-submenu:hover > div,
+.context-submenu:focus-within > div,
+.context-submenu.expanded > div {
+  display: block;
+}
+.chart-context-menu {
+  min-width: 250px;
+}
+@media (max-width: 650px) {
+  .context-submenu > div {
+    position: static;
+    margin: 0 8px 5px;
+    background: #181c26;
+    box-shadow: none;
+    border-color: #434651;
+  }
+  .context-submenu > div > button {
+    font-size: 12px;
+    padding: 8px 12px;
+  }
+}

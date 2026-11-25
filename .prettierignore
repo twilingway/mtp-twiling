@@ -1,0 +1,14 @@
+node_modules/
+artifacts/
+.agents/
+.claude/
+.codex/
+reference/
+public/*.js
+public/assets/
+public/vendor/
+public/version.json
+src/generated/
+pnpm-lock.yaml
+.build-manifest.json
+.release-assets.json

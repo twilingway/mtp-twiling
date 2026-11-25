@@ -1,0 +1,17 @@
+node_modules/
+.secrets/
+.env
+.env.*
+!.env.example
+artifacts/
+*.log
+public/vendor/
+
+# Compiled frontend and local build metadata
+public/*.js
+public/assets/
+public/licenses/
+public/version.json
+src/generated/
+.build-manifest.json
+.release-assets.json

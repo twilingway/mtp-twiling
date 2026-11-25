@@ -1,0 +1,43 @@
+{
+  "name": "mtp-twiling",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "description": "Личный PWA-терминал с прямым T‑Invest API и локальными сохранениями",
+  "engines": {
+    "node": ">=22.21.0"
+  },
+  "scripts": {
+    "dev": "pnpm build && node server.mjs",
+    "start": "node server.mjs",
+    "typecheck": "tsc --noEmit",
+    "build": "pnpm typecheck && node scripts/build.mjs",
+    "test": "pnpm build && node --test test/*.test.mjs",
+    "lint": "eslint src --max-warnings 0",
+    "format": "prettier --write src scripts server.mjs public/*.css public/*.html public/*.webmanifest public/*.svg *.json docs openspec",
+    "format:check": "prettier --check src scripts server.mjs public/*.css public/*.html public/*.webmanifest public/*.svg *.json docs openspec",
+    "check": "pnpm format:check && pnpm lint && pnpm test",
+    "spec": "node scripts/spec.mjs",
+    "spec:validate": "node scripts/spec.mjs validate --all --strict"
+  },
+  "dependencies": {
+    "klinecharts": "9.8.12",
+    "lightweight-charts": "5.0.9",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@fission-ai/openspec": "2.2.0",
+    "@types/node": "26.6.10",
+    "@types/react": "19.3.2",
+    "@types/react-dom": "19.3.0",
+    "esbuild": "0.28.2",
+    "eslint": "10.15.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "prettier": "3.10.1",
+    "typescript": "6.0.2",
+    "typescript-eslint": "8.74.0"
+  },
+  "packageManager": "pnpm@10.34.5"
+}

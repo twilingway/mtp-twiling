@@ -1,0 +1,50 @@
+import { useState } from "react";
+import { TerminalContext, useTerminal } from "./screens/terminal/context.js";
+import { TerminalController } from "./screens/terminal/controller.js";
+import { Toolbar } from "./screens/terminal/Toolbar.js";
+import { RightPanel } from "./screens/terminal/RightPanel.js";
+import { ChartPanel } from "./screens/terminal/ChartPanel.js";
+import { DrawingToolbar } from "./screens/terminal/DrawingToolbar.js";
+import { AccountDialog } from "./screens/terminal/AccountDialog.js";
+import { InstrumentSearch } from "./screens/terminal/InstrumentSearch.js";
+import {
+  ChartSettingsDialog,
+  IndicatorSettingsDialog
+} from "./screens/terminal/ChartSettingsDialog.js";
+import { DrawingSettingsDialog } from "./screens/terminal/drawings/DrawingSettingsDialog.js";
+import { ContextMenu } from "./screens/terminal/drawings/ContextMenu.js";
+import { TerminalLifecycle, UpdateBanner } from "./screens/terminal/TerminalLifecycle.js";
+function Terminal() {
+  const { state } = useTerminal();
+  return (
+    <>
+      <Toolbar />
+      <main className="workspace">
+        <DrawingToolbar />
+        <ChartPanel />
+        <RightPanel />
+      </main>
+      {state.dialog === "account" && <AccountDialog />}
+      {state.dialog === "instruments" && <InstrumentSearch />}
+      {state.dialog === "chart-settings" && <ChartSettingsDialog />}
+      {state.dialog === "indicator-settings" && <IndicatorSettingsDialog />}
+      <DrawingSettingsDialog />
+      <ContextMenu />
+      {state.toast && (
+        <div id="toast" role="status">
+          {state.toast}
+        </div>
+      )}
+      <UpdateBanner />
+      <TerminalLifecycle />
+    </>
+  );
+}
+export function App() {
+  const [controller] = useState(() => new TerminalController());
+  return (
+    <TerminalContext value={controller}>
+      <Terminal />
+    </TerminalContext>
+  );
+}
