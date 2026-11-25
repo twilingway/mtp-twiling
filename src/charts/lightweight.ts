@@ -10,7 +10,8 @@ import type { IPriceLine, ISeriesPrimitive, Logical, Time, UTCTimestamp } from "
 import { MtpModel, activeMtpPeriods, lightweightMtp } from "../model/mtp.js";
 import { TIMEFRAMES } from "../model/history-codec.js";
 import type { Candle, ChartView, DrawingPoint } from "../model/types.js";
-import { logicalForTime, movingAverage, precision, timeForLogical } from "./adapter.js";
+import { logicalForTime, movingAverage, timeForLogical } from "./adapter.js";
+import { chartPriceFormat, positivePriceStep } from "./price-format.js";
 import type { ChartAdapter, ChartOptions } from "./adapter.js";
 import { lineColor } from "../model/candle-palette.js";
 import { focusRange } from "./navigation.js";
@@ -28,6 +29,8 @@ import { UserCameraEvents } from "./camera-events.js";
 export function makeLightweight(options: ChartOptions): ChartAdapter {
   const camera = new UserCameraEvents(options);
   const { container, row, settings, indicators, timeframe } = options;
+  const instrumentUid = row.uid;
+  let priceFormat = chartPriceFormat(row);
   let data: Candle[] = [],
     updateDrawings = () => {},
     settingData = false,
@@ -96,7 +99,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     wickVisible: settings.wickVisible !== false,
     priceLineVisible: false,
     lastValueVisible: false,
-    priceFormat: { type: "price", precision: precision(row), minMove: row.step ?? 0.01 }
+    priceFormat: { type: "price", ...priceFormat }
   });
   const volume = chart.addSeries(HistogramSeries, {
     priceFormat: { type: "volume" },
@@ -323,6 +326,21 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
   }
   chart.timeScale().subscribeSizeChange(scheduleViewRestore);
   const adapter: ChartAdapter = {
+    updatePriceFormat(metadata) {
+      if (
+        live.retired ||
+        !instrumentUid ||
+        metadata.uid !== instrumentUid ||
+        live.source?.uid !== metadata.uid ||
+        live.source.owner !== metadata.owner ||
+        !positivePriceStep(metadata.step)
+      )
+        return;
+      const next = chartPriceFormat({ symbol: row.symbol, step: metadata.step });
+      if (next.minMove === priceFormat.minMove && next.precision === priceFormat.precision) return;
+      camera.programmatic(() => series.applyOptions({ priceFormat: { type: "price", ...next } }));
+      priceFormat = next;
+    },
     ...lightweightNavigation(
       chart,
       series,
@@ -447,5 +465,6 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       chart.remove();
     }
   };
-  return camera.wrap(adapter);
+  const live = camera.wrap(adapter);
+  return live;
 }

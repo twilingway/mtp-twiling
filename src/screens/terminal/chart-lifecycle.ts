@@ -12,6 +12,7 @@ import { chartRenderConfigFromKey, chartRenderConfigKey } from "../../charts/ren
 import type { TerminalState } from "./state.js";
 import { persistIndicatorPaneLayout } from "./indicator-preferences.js";
 import { cameraCallbacks } from "./controller-camera-sync.js";
+import { watchChartPriceMetadata } from "./chart-price-metadata.js";
 
 export function useChartCanvas(
   ref: RefObject<HTMLDivElement | null>,
@@ -21,6 +22,7 @@ export function useChartCanvas(
     dataRef = useRef<Candle[]>([]),
     adapterRef = useRef<ChartAdapter | null>(null);
   const p = state.preferences,
+    session = controller.sessionKey(),
     uid = selectedMarketRow(state.rows, p)?.uid,
     renderKey = chartRenderConfigKey(p.chartSettings, p.indicators),
     renderConfig = useMemo(() => chartRenderConfigFromKey(renderKey), [renderKey]),
@@ -33,6 +35,7 @@ export function useChartCanvas(
     if (!container || !uid || !state.authenticated || state.importRecoveryRequired) return;
     let cancelled = false,
       layoutWrite = 0,
+      stopPriceMetadata = () => {},
       owned: ChartAdapter | null = null;
     const matches = () => {
       const current = controller.getSnapshot();
@@ -40,6 +43,7 @@ export function useChartCanvas(
         !cancelled &&
         !current.importRecoveryRequired &&
         current.authenticated &&
+        controller.sessionKey() === session &&
         current.owner === owner &&
         current.chartRevision === revision &&
         viewKey(current.preferences) === key &&
@@ -118,6 +122,7 @@ export function useChartCanvas(
         controller.getSnapshot().historyViewReady !== false;
       adapterRef.current = owned;
       controller.chart = owned;
+      stopPriceMetadata = watchChartPriceMetadata(controller, owned, matches);
       // Adapters retain this request until nonempty data has completed its initial fit.
       if (view) owned.setView(view);
       const candles = controller.getSnapshot().candles;
@@ -130,6 +135,7 @@ export function useChartCanvas(
     });
     return () => {
       cancelled = true;
+      stopPriceMetadata();
       const current = controller.getSnapshot();
       if (
         owned &&
@@ -148,6 +154,7 @@ export function useChartCanvas(
     };
   }, [
     controller,
+    session,
     ref,
     visibleDrawings,
     uid,
