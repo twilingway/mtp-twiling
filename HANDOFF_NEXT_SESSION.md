@@ -5,6 +5,38 @@
 
 ## Актуальный этап — читать первым
 
+### Обновление после 0.3.15 — 26.11.2026
+
+- Main `c2d476b86f0016e62132cb09f73253db3d5631b5`, PR1 merged. Exact push CI `45689854414` success.
+  Локально уже работает 0.3.15/build `652005923294e034`; check447/447, OpenSpec25/25. История SBER,
+  подключение банка, VTBR3decimals и штатный PWA update подтверждены визуально в обычном Chrome.
+  Vault/рисунки/изображения сохранены. Пользователь параллельно пользуется этой вкладкой: не гонять
+  её UI. Google/edit-key/Escape живьём пока не проверены.
+- `release/0.3.16` в `vps/artifacts/release-0316-worktree` объединяет образцы линий, SVG стрелки
+  (`e7054c3`), измеренную типографику списка (`e35a8d3`) и вертикальный разделитель статистики
+  (`d37cb3d`). CSS drawing-controls и watchlist-details-resize подключены координатором. Общий check
+  и свежая визуальная проверка этой версии ещё нужны; canonical runtime не обновлять до них.
+- В отдельном `future-calendar-axis-worktree` готовится ось будущих дат до +9 календарных месяцев,
+  без фальшивых свечей/продолжения индикаторов. Существующие пределы pan сохраняются. Отдельно
+  `watchlist_details_vertical_resize` делает Currencies catalog + поиск USDRUB_TOM aliases.
+- Живой API: Currencies29 есть; FindInstrument("USDRUB_TOM") пуст, но "USD000UTSTOM" возвращает CETS
+  currency. Есть также дилерский USD000UTSTOM/CNGDOTC с другим UID, USDRUB/EES_CETS, USDFIXME/CETS,
+  USDRUBF и срочные Si/UM. Аудит: `vps/artifacts/usdrub-tickers-audit/`.
+- Прежнее объяснение только остановкой торгов USD в 2024 неполно: официальный MOEX s3933
+  подтверждает беспоставочный USDRUB_TOM с рублёвыми расчётами в CETS/CNGD с 16.02.2026.
+- Bybit anonymous V5 реально даёт stock perpetuals AAPLUSDT/NVDAUSDT, ETF SPYUSDT и отдельный spot
+  xStocks AAPLXUSDT/NVDAXUSDT/TSLAXUSDT. Не обычные акции. Crypto выделять отдельно от
+  stock/ETF/forex/commodity/xstocks/mstocks. CORS с mtp.twiling.ru и kline проверены HTTP200.
+  Отчёт/контракт: `vps/artifacts/bybit-equity-crypto-audit/report.md`. Реализация провайдера ещё не
+  начата: нужны source-qualified identity, flags, backup/Drive, history, WS и interval mapping.
+- Первый VDS release ещё не выполнен. Подготовлен и скопирован в `/tmp/mtp-reviewed-release-0315.py`
+  скрипт `root-apply-0315.py`, закреплённый за c2d476b/.15. SHA256
+  `6db3097d62317984716a98c15ca10302e63510c18e16a5522a5c114b092800a3`. Он не запускался на момент
+  записи; сначала независимый review, затем одна bounded попытка с fresh memory>=304MiB,
+  cgroup192/240MiB, timer disabled. Не применять старый root-apply.py .14.
+
+Не считать Google Production, две независимые sync-копии, криптопровайдер или .16 опубликованными.
+
 ### Срочное исправление 0.3.15 — 25.11.2026
 
 Кандидат находится в `vps/artifacts/csp-cache-release-worktree`, ветка `fix/csp-cache-release`.
