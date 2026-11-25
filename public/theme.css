@@ -74,7 +74,7 @@ html[data-theme]
     .chart-heading .chart-price,
     .legend-row
   ) {
-  background: var(--chart-background, var(--surface));
+  background: color-mix(in srgb, var(--chart-background, var(--surface)) 45%, transparent);
 }
 
 html[data-theme] :is(.chart-heading .instrument-title, .chart-heading .ohlc) {
@@ -383,6 +383,6 @@ html[data-theme] .colour-palette button:hover {
 }
 
 html[data-theme] .legend-row button:hover:not(:disabled) {
-  background: var(--chart-background, var(--surface));
+  background: color-mix(in srgb, var(--chart-background, var(--surface)) 65%, transparent);
   color: var(--chart-text, var(--text));
 }

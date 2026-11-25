@@ -178,8 +178,11 @@ export interface MtpDrawTarget {
 export interface MtpPrimitive {
   attached(params: { requestUpdate: () => void }): void;
   paneViews(): {
-    zOrder: () => "bottom";
-    renderer: () => { draw(target: MtpDrawTarget): void };
+    zOrder: () => "normal";
+    renderer: () => {
+      draw(target: MtpDrawTarget): void;
+      drawBackground(target: MtpDrawTarget): void;
+    };
   }[];
   autoscaleInfo(
     from: number,
@@ -207,9 +210,11 @@ export function lightweightMtp(chart: MtpChart, series: MtpSeries, model: MtpMod
     paneViews() {
       return [
         {
-          zOrder: () => "bottom",
+          // Normal backgrounds run after the grid and before every series foreground.
+          zOrder: () => "normal",
           renderer: () => ({
-            draw(target) {
+            draw() {},
+            drawBackground(target) {
               const range = chart.timeScale().getVisibleLogicalRange();
               if (!range) return;
               target.useBitmapCoordinateSpace(
