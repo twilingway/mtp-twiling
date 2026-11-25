@@ -53,3 +53,29 @@ SSR/component/event проверки подтверждают отдельные
 - Build и свежая изолированная desktop/mobile визуальная проверка светлой/тёмной темы, реального
   drag, long-press/контекстного меню, размеров и отсутствия горизонтального overflow.
 - После визуальной проверки — закрытие task 3.2 и дальнейшие разрешённые release-действия.
+
+## Повторный аудит асинхронных границ
+
+После интеграции source пакета координатор запросил проверку canonical reorder, удаления выбранной
+строки и точных дублей UID/symbol. Новые тесты до исправления воспроизвели два сбоя:
+
+- Ожидающий `saveView` fallback после удаления перезаписывал завершённый import на том же
+  owner/client старым выбором `TWO` вместо импортированного `THREE` и сохранял этот layout.
+- Canonical reorder после owner → другой owner → исходный owner продолжал изменение клиента.
+
+В `controller-watchlist.ts` вынесены оба действия с захваченным owner/client/chartRevision и sticky
+отменой по переходу профиля/импорту. Fallback передаёт `valid` callback в generic setPreferences и
+проверяет прежний selection/ledger. Layout canonical reorder сохраняется с явным захваченным owner;
+поздний snapshot не публикуется в сменившийся профиль. Уже начавшийся commit хранилища этим guard не
+отменяется.
+
+`test/watchlist-sections-boundaries.test.mjs`: 4/4, включая обе красные до исправления регрессии,
+границы до client mutation/после неё и реальный MarketClient с удалением первого exact duplicate.
+Число реальных строк уменьшается 3 → 2 → 1, refs уникальны, пустые headers остаются. Переиндексация
+точных UID/symbol occurrence сохраняет ограничение идентичности, описанное в design.
+
+После исправления общий source suite той же командой выше: **87/87**. Повторно прошли
+`pnpm.cmd typecheck`, полный source ESLint, scoped Prettier, `git diff --check`, strict spec
+**36/36**. Лог запуска: ignored `artifacts/sections-boundary-source-tests.tap` в worktree
+исполнителя. Build, серверы, браузер и интеграционный worktree координатора не затрагивались; это
+source audit, не browser QA.

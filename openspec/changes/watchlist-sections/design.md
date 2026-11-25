@@ -49,6 +49,14 @@ Non-Goals: новая версия приложения, публикация, �
 
 ## Risks / Trade-offs
 
+Проверка границ после source integration выявила старый обход sticky cancellation в canonical
+reorder и fallback после удаления выбранной строки. Оба действия вынесены в
+`controller-watchlist.ts` с захваченным owner/client/revision и подпиской на
+import/profileTransition. Отложенный fallback дополнительно передаёт valid callback в
+setPreferences: завершённый import или новый ledger не перезаписывается прежним выбором. Canonical
+row storage/API путь сохранён; guard не отменяет уже начавшийся storage commit, но запрещает
+последующую публикацию в чужой профиль.
+
 Точные дубли UID+symbol не имеют собственного постоянного ID; после удаления одного такого дубля
 сохраняется порядок вхождений. Штатный setPreferences сохраняет вид графика, но section patch не
 меняет маршрут, историю или камеру. Визуальная проверка выполняется координатором в отдельном свежем
