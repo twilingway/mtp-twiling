@@ -54,9 +54,21 @@ SHA.
 #### Scenario: Проверенный SHA собирается на VDS
 
 - **WHEN** hosted push CI текущего main SHA успешно завершил все обязательные проверки
-- **THEN** VDS устанавливает зависимости по frozen lockfile и самостоятельно строит статические
+- **THEN** VDS устанавливает зависимости по frozen lockfile без lifecycle scripts с child/network
+  concurrency1 и tarball workers1 только для pnpm child, затем самостоятельно строит статические
   файлы
-- **AND** version, buildId и hashes payload совпадают с полной сборкой тех же исходников
+- **AND** version, buildId и hashes payload совпадают с полной сборкой тех же исходников и
+  зависимостей в одинаковом Linux-окружении
+
+#### Scenario: Native optional dependency отсутствует
+
+- **WHEN** pinned native esbuild не установлен или не запускается после установки без scripts
+- **THEN** builder завершается ошибкой без активации, увеличения memory budget и запуска postinstall
+
+#### Scenario: Ограничение установщика изолировано
+
+- **WHEN** контроллер задаёт tarball workers1 для установки
+- **THEN** builder сохраняет исходные PNPM_MAX_WORKERS и NODE_OPTIONS, а cgroup budget не меняется
 
 #### Scenario: CI изменился после сборки
 

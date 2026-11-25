@@ -141,18 +141,47 @@ Watcher раз в минуту читает origin/main; новый цикл Git
 глобально, даже если SHA меняется каждую минуту. Публикует только latest successful push run
 `.github/workflows/ci.yml` для exact main SHA. Пропущенный, pending, cancelled или failed CI ничего
 не публикует. При смене main во время сборки активация откладывается. Сервер выполняет frozen
-install с child/network concurrency1 и `node scripts/build.mjs` в чистом archive-каталоге. Полные
-`pnpm check`, deploy-тесты и `spec:validate` остаются обязательными в hosted CI точного SHA; VDS не
-повторяет lint/typecheck/tests/spec. Builder сам готовит version metadata и использует тот же
-esbuild, что `pnpm build`; tsc имеет noEmit. Публикуется только manifest allowlist из public.
-Secrets и исходники в release не попадают. Повторная сборка SHA обязана совпасть с имеющимся
-immutable payload.
+install с `--ignore-scripts --child-concurrency=1 --network-concurrency=1`, scoped
+`PNPM_MAX_WORKERS=1` только для pnpm child и `node scripts/build.mjs` в чистом archive-каталоге.
+Tarball worker pool pnpm10.34.5 независим от child/network concurrency; без этого env его размер
+зависит от available CPUs. NODE_OPTIONS и другие Node-процессы контроллер не меняет. Pinned esbuild
+использует native optional package без postinstall; optional dependencies не отключать.
+Отсутствующий binary останавливает builder. Полные `pnpm check`, deploy-тесты и `spec:validate`
+остаются обязательными в hosted CI точного SHA; VDS не повторяет lint/typecheck/tests/spec. Builder
+сам готовит version metadata и использует тот же esbuild, что `pnpm build`; tsc имеет noEmit.
+Публикуется только manifest allowlist из public. Secrets и исходники в release не попадают.
+Повторная сборка SHA обязана совпасть с имеющимся immutable payload.
+
+Linux-проверка 26.11.2026 на исходном `28525cf`/0.3.16: WSL Ubuntu x64, Node22.22.1, pnpm10.34.5,
+esbuild0.28.2. Два независимых пустых stores: обычный frozen install с фактически выполненным
+esbuild postinstall + `pnpm build`, и frozen install с `--ignore-scripts` + прямой builder. Оба cold
+builds и оба повторных direct builds совпали по version/buildId `b783575aa314c53d` и SHA-256 всех63
+allowlist файлов. Native `@esbuild/linux-x64`0.28.2 запускался в обоих вариантах. Сверка с Windows
+имеет другие имена двух vendor chunks при одинаковых байтах этих chunks и изменённые ссылки в
+app-entry/service-worker. Поэтому hashes сравниваются в одинаковом Linux-окружении; это не
+доказательство совпадения путей assets между ОС. При изменении зависимостей эту проверку
+normal/ignored cold/repeat необходимо повторить.
+
+Локальный aggregate cgroup test также выполнен с настоящим Node deploy-controller, cold pnpm
+install, native builder, allowlist packaging и переключением local current. Git/CI/public health в
+этом fixture изолированы: git возвращает точный подготовленный archive, GitHub gate задан успешным,
+health читает настоящие release bytes с диска. Cgroup192/240MiB/Swap0, CPU50%, Nice10 и IOWeight10
+не менялись между контролями. Один `--ignore-scripts` дал timeout180s; heap96/4 без ограничения
+tarball workers также дал timeout. Workers1 без heap override прошёл cold run за38.110s и повтор на
+точном финальном controller за37.439s; финальный aggregate memory.peak203272192B (193.86MiB),
+memory.events max0/oom0/oom_kill0, high621. Metadata и все63 hashes совпали с полной Linux-сборкой.
+Это измеренный локальный cgroup, включая resident controller, а не замер VDS: реальные fetch, сеть,
+GitHub, systemd/VDS kernel и публичный health проверяются отдельно. Production NODE_OPTIONS перед
+recovery нужно проверить, не менять автоматически.
 
 ## Проверка релиза
 
-Перед первым запуском повторно измерить MemAvailable и свободный диск. Пик frozen install и builder
-на VDS не измерен; уменьшенный параллелизм не доказывает достаточность памяти. Предложенный отдельно
-для review профиль MemoryHigh192M/MemoryMax240M/MemorySwapMax0 оставляет минимум64MiB резерва при
+Перед новой попыткой повторно измерить MemAvailable и свободный диск. Первая ограниченная
+VDS-попытка с lifecycle scripts закончилась timeout на esbuild postinstall. Пик установки без
+scripts и builder на VDS не измерен; локальные RSS и уменьшенный параллелизм не доказывают
+достаточность памяти. Повторный запуск требует отдельного recovery-плана по фактическому состоянию;
+first-release apply не повторяют поверх непустых repo/state. Предложенный отдельно для review
+профиль MemoryHigh192M/MemoryMax240M/MemorySwapMax0 оставляет минимум64MiB резерва при
 MemAvailable>=304MiB. Он не применяется автоматически этим изменением: существующий unit сохраняет
 240M/320M. Оператор проверяет фактические cgroup properties перед единственной попыткой и фиксирует
 MemoryPeak/Result/OOM; при OOM/timeout не повышает лимит автоматически и не включает timer. Предел

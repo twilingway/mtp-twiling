@@ -25,6 +25,21 @@
 
 ## Workflow follow-up
 
+- [x] Проверить локально Linux normal postinstall + полный build и ignore-scripts + прямой builder
+      на независимых холодных stores, затем повторные сборки: metadata и hashes63 assets должны
+      совпадать; native pinned esbuild запускается без postinstall. Обновить controller contract,
+      выполнить check/spec и Linux deploy-тесты; реальный VDS retry требует отдельного
+      recovery-плана.
+- [x] Измерить ограниченный local cgroup192/240/0 с настоящим Node-controller, cold pnpm install,
+      builder и packaging; проверить workers1 отдельно от heap flags, затем cold repeat финального
+      кода. Зафиксировать точный scope offline GitHub/public fixtures и отличие от live VDS proof.
+
+  Проверено 26.11.2026: normal/ignored cold/repeat Linux63/63 hashes совпали; native esbuild0.28.2
+  работает без postinstall, missing binary даёт exit1 без release manifest. Workers1+ignore-scripts
+  прошёл cold local aggregate cgroup дважды; финальный controller37.439s, memory.peak203272192B,
+  max/oom/oom_kill0. PNPM_MAX_WORKERS меняется только у pnpm child, NODE_OPTIONS не меняется. Полный
+  check479/479, Linux deploy27/27, strict spec29/29.
+
 - [x] Проверить optional SHA pin: malformed, expected A/current green B без query/build/activation,
       успешный pinned A и смену main перед активацией; прогнать deploy/check/spec на изолированной
       ветке и подтвердить неизменный PWA buildId.
