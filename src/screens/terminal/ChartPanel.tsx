@@ -1,6 +1,6 @@
 import { marketAvailable } from "./market-readiness.js";
 import { t, systemText } from "../../i18n/messages.js";
-import { memo } from "react";
+import { memo, useState } from "react";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { precision } from "../../charts/adapter.js";
 import { useTerminal } from "./context.js";
@@ -15,6 +15,7 @@ import { OhlcLegend } from "./OhlcLegend.js";
 import { ChartRangeControl } from "./intervals/ChartRangeControl.js";
 import { ChartNavigation } from "./ChartNavigation.js";
 import { TechnicalIndicatorPanels } from "./TechnicalIndicatorPanels.js";
+import { useTechnicalPaneMetrics } from "./use-technical-pane-metrics.js";
 const Version = memo(function Version() {
   return (
     <span id="app-version" hidden>
@@ -23,7 +24,11 @@ const Version = memo(function Version() {
   );
 });
 export function ChartPanel() {
+  const [scrollTop, setScrollTop] = useState(0);
   const { controller, state } = useTerminal(),
+    metrics = useTechnicalPaneMetrics(controller),
+    price = metrics.find((metric) => metric.key === "price"),
+    headingHeight = price ? Math.max(0, price.height - scrollTop - 2) : undefined,
     available = marketAvailable(state),
     p = state.preferences,
     row = selectedMarketRow(state.rows, p),
@@ -41,7 +46,10 @@ export function ChartPanel() {
       aria-busy={busy}
       data-history-loading={busy || undefined}
     >
-      <div className="chart-heading">
+      <div
+        className="chart-heading"
+        style={{ maxHeight: headingHeight, visibility: headingHeight === 0 ? "hidden" : undefined }}
+      >
         <div className="instrument-title">
           {row && <InstrumentIcon key={row.uid ?? row.symbol} row={row} id="chart-icon" />}
           <h1 id="instrument-name">{row?.name ?? (p.symbol || t("Выберите инструмент"))}</h1>
@@ -83,13 +91,16 @@ export function ChartPanel() {
         </div>
         <IndicatorLegend />
       </div>
-      <div className="chart-scroll-host">
+      <div
+        className="chart-scroll-host"
+        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+      >
         <ChartGestures>
           <ChartCanvas />
           <ImageLayer />
           <DrawingAxisLabels />
           <CandleCountdown />
-          <TechnicalIndicatorPanels />
+          <TechnicalIndicatorPanels metrics={metrics} />
           {(!available ||
             ((!state.candles.length || state.historyViewReady === false) && !state.loading)) && (
             <div className="chart-message" id="chart-message">

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef } from "react";
 import { useTerminal } from "./context.js";
 import { technicalIndicatorDefinitions } from "../../model/technical-indicators/definitions.js";
 import { technicalIndicatorGroups } from "../../model/technical-indicator-layout.js";
@@ -240,37 +240,8 @@ export function TechnicalObjectTree() {
   );
 }
 
-export function TechnicalIndicatorPanels() {
-  const { controller, state } = useTerminal();
-  const [metrics, setMetrics] = useState<readonly TechnicalPaneMetric[]>([]);
-  useEffect(() => {
-    let frame = 0,
-      last = 0;
-    const tick = (now: number) => {
-      if (now - last > 60) {
-        const next = controller.chart?.technicalPaneMetrics?.() ?? [];
-        setMetrics((previous) =>
-          previous.length === next.length &&
-          previous.every((item, index) => {
-            const value = next[index];
-            return (
-              value &&
-              item.key === value.key &&
-              item.top === value.top &&
-              item.height === value.height &&
-              item.width === value.width
-            );
-          })
-            ? previous
-            : next
-        );
-        last = now;
-      }
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(frame);
-  }, [controller]);
+export function TechnicalIndicatorPanels({ metrics }: { metrics: readonly TechnicalPaneMetric[] }) {
+  const { state } = useTerminal();
   const groups = technicalIndicatorGroups(
     state.preferences.technicalIndicators ?? [],
     state.preferences.technicalPaneLayout

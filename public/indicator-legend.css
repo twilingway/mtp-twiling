@@ -1,4 +1,14 @@
 /* Keep the legend after the actual wrapping OHLC/price height, including on mobile. */
+.chart-heading {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.chart-heading > .instrument-title,
+.chart-heading > .ohlc-legend,
+.chart-heading > .chart-price {
+  flex-shrink: 0;
+}
 .chart-heading .indicator-legend {
   position: static;
   top: auto;
@@ -7,6 +17,16 @@
   max-width: 100%;
   margin-top: 6px;
   pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 0 1 auto;
+}
+.indicator-legend-list {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 .chart-heading .indicator-legend[hidden],
 .indicator-legend-list[hidden] {
@@ -26,6 +46,8 @@
   background: color-mix(in srgb, var(--chart-background, var(--surface, #131722)) 45%, transparent);
   pointer-events: auto;
   font-size: 12px;
+  flex-shrink: 0;
+  align-self: flex-start;
 }
 .indicator-legend .legend-collapse:hover:not(:disabled) {
   background: var(--surface-hover, #2a2e39);

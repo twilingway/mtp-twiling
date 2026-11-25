@@ -5,7 +5,7 @@ import { DeleteIcon } from "./VisibilityIcon.js";
 
 export function SectionIcon({ action }: { action: "add" | "collapse" | "expand" | "up" | "down" }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <path
         d={
           {
@@ -120,7 +120,7 @@ export function WatchlistSectionMenu({
       {section && (
         <>
           <button role="menuitem" disabled={disabled} onClick={() => run(onRename)}>
-            <svg viewBox="0 0 24 24" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="m4 16 12-12 4 4L8 20H4v-4ZM13 7l4 4" />
             </svg>
             <span>{sectionText("rename")}</span>

@@ -7,6 +7,37 @@ login отложить. Ответы коротко по-русски. Реал�
 
 ## Опубликовано
 
+### Новейший статус — важнее исторических строк ниже
+
+- PR5 merged, main `3a31c02aa86bd4fe3494b6fefe50fa35aeb81c71`: публичная и локальная0.3.18,
+  build `62b7c12c8b73f573`. Main push CI45715266056/run14 PASS;622 tests/spec35.
+- Настоящий автоматический timer deploy: UTC22:46:30,12.811s wall,192.4MiB peak, лимиты192/240/Swap0
+  сохранены, соседние hashes/PIDs/health прежние. Root руками deploy/service start не запускал.
+- Все66 публичных файлов подтверждены. Два engine chunks имеют другие сгенерированные имена, но
+  их payload побайтно совпал с Windows. Для app-entry/SW доказаны ровно две замены этих имён.
+  Evidence `vps/artifacts/deploy-release-readiness/auto-release-0318-native-proof.json` и alias proof.
+- Bybit CSP include обновлён отдельно; backup
+  `/root/mtp-nginx-include-backup-20261125T223553Z-6d33e1d0e979`. Timer остаётся включён.
+- Local canonical чисто FF до main3a31 и собран. Старый собственный PID11464 был проверен и
+  остановлен через session39079 ради нового server CSP. Новый server5210 — managed session1404;
+  версия и реальные Bybit REST/WS origins в headers проверены. Другие процессы не трогать.
+- Независимый public .17→.18 PWA report `vps/artifacts/public-0318-pwa-qa/report.json`: scopedPASS,
+  26 captures/22 viewed, оба engines/реальный Bybit/RSI/Line/375/documents online-offline. Google
+  OAuth и реальный bank key не использовались. Старый guest layout byte-exact сохранён, но новый
+  public owner его не показывает — recovery исправляется в следующем пакете. NOTICE charset minor.
+- Следующий source пакет0.3.19: ветка `feat/release-0319`, worktree `vps/artifacts/release-0319-worktree`,
+  frozen initial `de0f42d`,672 tests/spec38,29 computed TA + разделы. Initial visualFAIL содержит
+  giant section SVG и перекрытие overlay settings нижними панелями. Root правит оба; новые visual
+  gates обязательны. .19 не публиковалась.
+- Guest recovery worker работает отдельно от de0 в `vps/artifacts/guest-public-recovery-worktree`:
+  exact raw guest→public только в пустой target атомарно, source всегда сохраняется; при occupied
+  только явный offline export старых данных. Vault/session/bank owners исключены. Контракт root
+  согласовал; source implementation/tests ещё в работе.
+- Math-only .20 trend-strength продолжен отдельным worker после временного освобождения слота.
+  Все127 алгоритмов по-прежнему не реализованы. Реальный Google sync/login/два устройства pending.
+
+Ниже сохранён исторический ход0.3.17→0.3.18; его pending пункты не отменяют эту сводку.
+
 - Public repo: https://github.com/twilingway/mtp-twiling, Issues включены.
 - PR3 и PR4 merged. Main `b721744af1b58b9d06b0dfefc420461feaf5bb30`.
 - Локальный canonical и публичный https://mtp.twiling.ru — версия 0.3.17, build `1b49aca5787d1ec4`.
