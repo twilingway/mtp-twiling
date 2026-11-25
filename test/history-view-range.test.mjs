@@ -4,17 +4,22 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
 
-const module = { exports: {} },
-  code = ts.transpileModule(
-    readFileSync(new URL("../src/model/history-view-range.ts", import.meta.url), "utf8"),
-    {
-      compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
-    }
-  ).outputText;
-new vm.Script(`(function(module,exports){${code}\n})`).runInNewContext({ Date })(
-  module,
-  module.exports
-);
+const modules = new Map(),
+  context = vm.createContext({ Date });
+function load(url) {
+  if (modules.has(url.href)) return modules.get(url.href);
+  const module = { exports: {} };
+  modules.set(url.href, module.exports);
+  const code = ts.transpileModule(readFileSync(url, "utf8"), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS }
+  }).outputText;
+  new vm.Script(`(function(require,module,exports){${code}\n})`).runInContext(context)(
+    (specifier) => load(new URL(specifier.replace(/\.js$/, ".ts"), url)),
+    module,
+    module.exports
+  );
+  return module.exports;
+}
 const {
   planHistoryViewRange,
   historyViewCoverage,
@@ -22,8 +27,9 @@ const {
   historyFirstDate,
   historyRangeCovered,
   historyViewCachedWindow,
+  historyViewBackfillFrom,
   HISTORY_FALLBACK_FIRST
-} = module.exports;
+} = load(new URL("../src/model/history-view-range.ts", import.meta.url));
 const DAY = 86400000,
   until = Date.parse("2026-11-25T14:00:00Z"),
   options = {
@@ -173,4 +179,72 @@ test("offline proof keeps the saved right edge even when cached candles end earl
     view: { barSpace: 8, anchor: { timestamp: left, xFraction: 0.5 } }
   });
   assert.equal(historyViewCachedWindow(legacy, candles).to, until);
+});
+test("monthly saved left plans real calendar warmup and aligns listing metadata to its native month", () => {
+  const left = Date.parse("2024-03-31T00:00:00Z");
+  const view = Object.freeze({ from: left / 1000, to: Date.parse("2025-06-20T00:00:00Z") / 1000 });
+  const plan = planHistoryViewRange({ ...options, intervalMs: null, period: 2, view });
+  // Four calendar months before March 31 is November 30, then the existing 14-day buffer.
+  assert.equal(plan.from, Date.parse("2023-11-01T00:00:00Z"));
+  assert.equal(plan.intervalMs, null);
+  assert.equal(plan.requiredBars, 2);
+  assert.equal(plan.target, left);
+  assert.equal(plan.visibleTo, Date.parse("2025-06-20T00:00:00Z"));
+  const first = historyFirstDate(
+    { first1minCandleDate: "2010-01-01", first1dayCandleDate: "2024-02-09T12:00:00Z" },
+    "1M"
+  );
+  assert.equal(first, Date.parse("2024-02-01T00:00:00Z"));
+  assert.equal(
+    planHistoryViewRange({ ...options, intervalMs: null, period: 440, first, view }).from,
+    first
+  );
+});
+test("monthly backfill doubles calendar month counts, including leap February, not elapsed milliseconds", () => {
+  const plan = planHistoryViewRange({ ...options, intervalMs: null, period: 0 });
+  const from = Date.parse("2024-03-01T00:00:00Z");
+  const one = historyViewBackfillFrom(plan, from, 1);
+  const doubled = historyViewBackfillFrom(plan, from, 1, 2);
+  assert.equal(one, Date.parse("2024-01-01T00:00:00Z"));
+  assert.equal(doubled, Date.parse("2023-11-01T00:00:00Z"));
+  assert.notEqual(from - doubled, 2 * (from - one));
+  assert.equal(historyViewBackfillFrom(plan, one, 0), Date.parse("2023-12-01T00:00:00Z"));
+});
+test("monthly camera warmup counts actual bars and retains saved right-edge cache proof", () => {
+  const plan = planHistoryViewRange({
+    ...options,
+    rangeDays: 1,
+    intervalMs: null,
+    period: 3,
+    width: 120,
+    view: { camera: { barSpace: 10, rightOffsetBars: 0 } }
+  });
+  assert.equal(plan.requiredBars, 15);
+  assert.equal(plan.from, Date.parse("2024-10-01T00:00:00Z"));
+  const candles = Array.from({ length: 16 }, (_, index) => bar(Date.UTC(2025, index, 1)));
+  assert.equal(historyViewCoverage(plan, candles, plan.from).complete, true);
+  assert.equal(
+    historyViewCoverage(
+      plan,
+      candles.filter((_, index) => index !== 4),
+      plan.from
+    ).complete,
+    false
+  );
+  const saved = planHistoryViewRange({
+    ...options,
+    intervalMs: null,
+    period: 2,
+    view: { from: Date.parse("2025-06-01") / 1000, to: Date.parse("2026-02-20") / 1000 }
+  });
+  const needed = historyViewCachedWindow(saved, candles);
+  assert.equal(needed.to, Date.parse("2026-02-20"));
+  assert.equal(
+    historyRangeCovered(
+      [{ from: needed.from, to: Date.parse("2026-02-01") }],
+      needed.from,
+      needed.to
+    ),
+    false
+  );
 });

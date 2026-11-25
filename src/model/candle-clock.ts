@@ -1,4 +1,5 @@
 import type { Timeframe } from "./types.js";
+import { shiftUtcMonths, utcMonthStart } from "./intervals/calendar.js";
 
 export interface TradingCalendarInterval {
   start: number;
@@ -19,10 +20,15 @@ export interface CandleCalendarPeriod {
 const minute = 60_000;
 const intradayMinutes: Partial<Record<Timeframe, number>> = {
   "1m": 1,
+  "2m": 2,
+  "3m": 3,
   "5m": 5,
+  "10m": 10,
   "15m": 15,
   "30m": 30,
-  "1h": 60
+  "1h": 60,
+  "2h": 120,
+  "4h": 240
 };
 export function candleDuration(timeframe: Timeframe): number | null {
   const minutes = intradayMinutes[timeframe];
@@ -43,6 +49,10 @@ export function candleCalendarPeriod(
   timeframe: Timeframe
 ): CandleCalendarPeriod {
   let start = utcDate(timestamp);
+  if (timeframe === "1M") {
+    start = utcMonthStart(timestamp);
+    return { start, end: shiftUtcMonths(start, 1) };
+  }
   if (timeframe === "1w") start = shiftUtcDate(start, -((new Date(start).getUTCDay() + 6) % 7));
   return { start, end: shiftUtcDate(start, timeframe === "1w" ? 7 : 1) };
 }

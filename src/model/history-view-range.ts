@@ -1,4 +1,5 @@
 import type { Candle, ChartView, HistoryRange, MarketRow, Timeframe } from "./types.js";
+import { shiftUtcMonths, utcMonthStart } from "./intervals/calendar.js";
 
 const DAY = 86400000;
 export const HISTORY_FALLBACK_FIRST = Date.UTC(1990, 0, 1);
@@ -10,7 +11,7 @@ export interface HistoryViewPlan {
   mode: "none" | "left" | "anchor" | "camera";
   target: number;
   requiredBars: number;
-  intervalMs: number;
+  intervalMs: number | null;
   visibleTo: number;
 }
 function finite(value: unknown): value is number {
@@ -20,29 +21,52 @@ export function historyViewNeedsWidth(view: ChartView | undefined): boolean {
   return !!view && !finite(view.from) && !!(view.anchor || view.camera || view.barSpace);
 }
 export function historyFirstDate(row: MarketRow, timeframe: Timeframe): number | null {
-  const daily = timeframe === "1d" || timeframe === "1w";
+  const daily = timeframe === "1d" || timeframe === "1w" || timeframe === "1M";
   for (const value of [
     daily ? row.first1dayCandleDate : row.first1minCandleDate,
     row.firstTradeDate
   ]) {
     const timestamp = value ? Date.parse(value) : NaN;
-    if (Number.isFinite(timestamp)) return daily ? Math.floor(timestamp / DAY) * DAY : timestamp;
+    if (Number.isFinite(timestamp))
+      return timeframe === "1M"
+        ? utcMonthStart(timestamp)
+        : daily
+          ? Math.floor(timestamp / DAY) * DAY
+          : timestamp;
   }
   return null;
+}
+function estimatedBarsFrom(
+  anchor: number,
+  intervalMs: number | null,
+  bars: number,
+  paddingDays: number
+): number {
+  return intervalMs === null
+    ? shiftUtcMonths(anchor, -Math.ceil(bars * 1.65)) - paddingDays * DAY
+    : anchor - (Math.ceil(((bars * intervalMs) / DAY) * 1.65) + paddingDays) * DAY;
+}
+function alignHistoryStart(timestamp: number, intervalMs: number | null): number {
+  return intervalMs === null ? utcMonthStart(timestamp) : Math.floor(timestamp / DAY) * DAY;
 }
 export function planHistoryViewRange(options: {
   until: number;
   rangeDays: number;
-  intervalMs: number;
+  intervalMs: number | null;
   period: number;
   first: number | null;
   view?: ChartView | undefined;
   width?: number | undefined;
 }): HistoryViewPlan {
   const { until, rangeDays, intervalMs, period, first, view } = options,
-    warmupDays = Math.ceil(((period * intervalMs) / DAY) * 1.65) + (period ? 14 : 0),
-    earliest = Math.min(until, first ?? HISTORY_FALLBACK_FIRST);
-  let from = Math.floor((until - (rangeDays + warmupDays) * DAY) / DAY) * DAY,
+    paddingDays = period ? 14 : 0,
+    earliest = Math.min(
+      until,
+      intervalMs === null
+        ? utcMonthStart(first ?? HISTORY_FALLBACK_FIRST)
+        : (first ?? HISTORY_FALLBACK_FIRST)
+    );
+  let from = estimatedBarsFrom(until - rangeDays * DAY, intervalMs, period, paddingDays),
     mode: HistoryViewPlan["mode"] = "none",
     target = until,
     requiredBars = 0;
@@ -50,7 +74,7 @@ export function planHistoryViewRange(options: {
     mode = "left";
     target = Math.min(until, view.from * 1000);
     requiredBars = period;
-    from = Math.min(from, target - warmupDays * DAY);
+    from = Math.min(from, estimatedBarsFrom(target, intervalMs, period, paddingDays));
   } else if (view && historyViewNeedsWidth(view)) {
     const width = options.width,
       spacing = view.camera?.barSpace ?? view.barSpace;
@@ -67,11 +91,10 @@ export function planHistoryViewRange(options: {
     }
     if (!Number.isFinite(requiredBars))
       throw new Error("Масштаб сохранённого окна не поддерживается.");
-    const estimatedDays = Math.ceil(((requiredBars * intervalMs) / DAY) * 1.65) + 14;
-    from = Math.min(from, target - estimatedDays * DAY);
+    from = Math.min(from, estimatedBarsFrom(target, intervalMs, requiredBars, 14));
   }
   return {
-    from: Math.max(earliest, Math.floor(from / DAY) * DAY),
+    from: Math.max(earliest, alignHistoryStart(from, intervalMs)),
     to: until,
     earliest,
     knownFirst: first !== null,
@@ -104,7 +127,24 @@ export function historyViewCoverage(
   return { complete: visibleLeftPresent && (missingBars === 0 || firstReached), missingBars };
 }
 export function historyViewBackfillStep(plan: HistoryViewPlan, missingBars: number): number {
-  return Math.max(DAY, Math.ceil(((missingBars * plan.intervalMs) / DAY) * 1.65) * DAY);
+  return plan.from - historyViewBackfillFrom(plan, plan.from, missingBars);
+}
+/** Recompute each calendar step from its current cursor; elapsed milliseconds must not be doubled. */
+export function historyViewBackfillFrom(
+  plan: HistoryViewPlan,
+  from: number,
+  missingBars: number,
+  multiplier = 1
+): number {
+  if (plan.intervalMs === null)
+    return shiftUtcMonths(
+      utcMonthStart(from),
+      -Math.max(1, Math.ceil(missingBars * 1.65)) * multiplier
+    );
+  return (
+    from -
+    Math.max(DAY, Math.ceil(((missingBars * plan.intervalMs) / DAY) * 1.65) * DAY) * multiplier
+  );
 }
 
 export function historyViewCachedWindow(

@@ -26,6 +26,7 @@ import { TerminalPanel } from "./controller-panel.js";
 import { TerminalBackups } from "./controller-backups.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { defaultPreferences } from "./controller-bridge.js";
+import { nativeTimeframe } from "../../model/intervals/native-timeframes.js";
 import type { ContextMenu, TerminalDialog, TerminalPreferences, TerminalState } from "./state.js";
 
 export class TerminalController {
@@ -293,16 +294,8 @@ export class TerminalController {
       await this.loadHistory();
   };
   setTimeframe = async (timeframe: Timeframe): Promise<void> => {
-    const days: Record<Timeframe, number> = {
-      "1m": 1,
-      "5m": 5,
-      "15m": 30,
-      "30m": 30,
-      "1h": 90,
-      "1d": 365,
-      "1w": 1825
-    };
-    await this.setPreferences({ timeframe, rangeDays: days[timeframe] });
+    nativeTimeframe(timeframe);
+    await this.setPreferences({ timeframe });
   };
   toggleIndicator = async (key: IndicatorKey): Promise<void> => {
     const owner = this.state.owner,

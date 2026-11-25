@@ -17,6 +17,8 @@ import { focusRange } from "./navigation.js";
 import { PendingChartView } from "./view-camera.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { chartPalette } from "../model/theme.js";
+import { hasCalendarAxis, lightweightCalendarLabel } from "../model/intervals/axis-ticks.js";
+import { paintCalendarGrid } from "./lightweight-calendar-grid.js";
 
 export function makeLightweight(options: ChartOptions): ChartAdapter {
   const { container, row, settings, indicators, timeframe } = options;
@@ -27,6 +29,16 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     restoreFrame: number | null = null,
     settleFrame: number | null = null;
   const pendingView = new PendingChartView();
+  let detailedTimeAxis = false;
+  const formatTick = (time: Time, type: number): string | null => {
+    const timestamp =
+      typeof time === "number"
+        ? time * 1000
+        : typeof time === "string"
+          ? Date.parse(time)
+          : Date.UTC(time.year, time.month - 1, time.day);
+    return lightweightCalendarLabel(timestamp, timeframe, type, detailedTimeAxis);
+  };
   const palette = chartPalette(settings);
   const chart = createChart(container, {
     autoSize: true,
@@ -38,13 +50,17 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       attributionLogo: false
     },
     grid: {
-      vertLines: { color: palette.grid, visible: settings.grid !== false },
+      vertLines: {
+        color: palette.grid,
+        visible: settings.grid !== false && !hasCalendarAxis(timeframe)
+      },
       horzLines: { color: palette.grid, visible: settings.grid !== false }
     },
     rightPriceScale: { borderColor: palette.border, scaleMargins: { top: 0.08, bottom: 0.22 } },
     timeScale: {
       borderColor: palette.border,
-      timeVisible: !["1d", "1w"].includes(timeframe),
+      timeVisible: !["1d", "1w", "1M"].includes(timeframe),
+      tickMarkFormatter: formatTick,
       rightOffset: 8
     },
     crosshair: {
@@ -134,6 +150,23 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
               const { context, horizontalPixelRatio: x, verticalPixelRatio: y, bitmapSize } = scope;
               context.save();
               context.scale(x, y);
+              const range = chart.timeScale().getVisibleLogicalRange();
+              if (
+                layer === "back" &&
+                settings.grid !== false &&
+                range &&
+                hasCalendarAxis(timeframe)
+              )
+                paintCalendarGrid(context, data, timeframe, {
+                  from: range.from,
+                  to: range.to,
+                  width: bitmapSize.width / x,
+                  height: bitmapSize.height / y,
+                  coordinate: (index) =>
+                    chart.timeScale().logicalToCoordinate(index as Logical) ?? NaN,
+                  color: palette.grid,
+                  pixelRatio: x
+                });
               options.paint(
                 context,
                 bitmapSize.width / x,
@@ -149,6 +182,11 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
   };
   series.attachPrimitive(primitive);
   chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
+    const detailed = chart.timeScale().options().barSpacing >= 24;
+    if (detailed !== detailedTimeAxis) {
+      detailedTimeAxis = detailed;
+      chart.applyOptions({ timeScale: { tickMarkFormatter: formatTick } });
+    }
     if (range && range.from < 80) options.onNearStart();
   });
   chart.subscribeCrosshairMove((event) => {

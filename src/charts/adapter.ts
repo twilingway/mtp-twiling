@@ -8,6 +8,7 @@ import type {
   PixelPoint,
   Timeframe
 } from "../model/types.js";
+import { monthPosition, shiftUtcMonths } from "../model/intervals/calendar.js";
 
 export interface ChartAdapter {
   source?: { owner: string; viewKey: string; uid: string };
@@ -45,13 +46,20 @@ export interface ChartOptions {
   onNearStart: () => void;
   onCrosshair: (bar: Candle | null) => void;
 }
-export function logicalForTime(data: Candle[], timestamp: number, intervalMs: number): number {
+export function logicalForTime(
+  data: Candle[],
+  timestamp: number,
+  intervalMs: number | null
+): number {
   const first = data[0],
     last = data.at(-1);
   if (!first || !last) return 0;
-  if (timestamp < first.timestamp) return (timestamp - first.timestamp) / intervalMs;
-  if (timestamp > last.timestamp)
-    return data.length - 1 + (timestamp - last.timestamp) / intervalMs;
+  const distance = (anchor: number) =>
+    intervalMs === null
+      ? monthPosition(timestamp) - monthPosition(anchor)
+      : (timestamp - anchor) / intervalMs;
+  if (timestamp < first.timestamp) return distance(first.timestamp);
+  if (timestamp > last.timestamp) return data.length - 1 + distance(last.timestamp);
   let lo = 0,
     hi = data.length - 1;
   while (lo < hi) {
@@ -64,15 +72,21 @@ export function logicalForTime(data: Candle[], timestamp: number, intervalMs: nu
     after = data[lo]!;
   return lo - 1 + (timestamp - before.timestamp) / (after.timestamp - before.timestamp);
 }
-export function timeForLogical(data: Candle[], index: number, intervalMs: number): number | null {
+export function timeForLogical(
+  data: Candle[],
+  index: number,
+  intervalMs: number | null
+): number | null {
   const first = data[0],
     last = data.at(-1);
   if (!first || !last) return null;
   const i = Math.round(index);
+  const offset = (timestamp: number, count: number) =>
+    intervalMs === null ? shiftUtcMonths(timestamp, count) : timestamp + count * intervalMs;
   return i < 0
-    ? first.timestamp + i * intervalMs
+    ? offset(first.timestamp, i)
     : i >= data.length
-      ? last.timestamp + (i - data.length + 1) * intervalMs
+      ? offset(last.timestamp, i - data.length + 1)
       : data[i]!.timestamp;
 }
 export function movingAverage(

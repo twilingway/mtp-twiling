@@ -28,7 +28,9 @@ function fixture({
   viewPromise,
   coverage = [],
   chartMissing = false,
-  fastTimeout = false
+  fastTimeout = false,
+  timeframe = "1d",
+  rangeDays = 365
 } = {}) {
   const calls = [],
     patches = [],
@@ -67,9 +69,9 @@ function fixture({
     preferences: {
       symbol: "SBER",
       instrumentUid: "uid",
-      timeframe: "1d",
+      timeframe,
       engine: "tradingview",
-      rangeDays: 365,
+      rangeDays,
       indicators: {}
     },
     rows: [{ symbol: "SBER", uid: "uid", first1dayCandleDate: first }],
@@ -79,7 +81,11 @@ function fixture({
   let chart = chartMissing
     ? null
     : {
-        source: { owner: "owner", viewKey: "SBER:1d:tradingview:365", uid: "uid" },
+        source: {
+          owner: "owner",
+          viewKey: `SBER:${timeframe}:tradingview:${rangeDays}`,
+          uid: "uid"
+        },
         plotSize: () => ({ width: 800, height: 500 }),
         getView: () => null
       };
@@ -422,4 +428,70 @@ test("refresh supersedes a pending smaller-period load and uses the stored targe
   await old;
   assert.equal(f.state().candles, accepted);
   assert.equal(f.state().historyViewReady, true);
+});
+test("native monthly restore preserves saved left, calendar warmup and readiness until the final source result", async () => {
+  const left = Date.parse("2024-03-01"),
+    pending = deferred();
+  const bars = Array.from({ length: 38 }, (_, index) => bar(Date.UTC(2023, 9 + index, 1)));
+  const f = fixture({
+    timeframe: "1M",
+    period: 3,
+    view: { from: left / 1000, to: Date.parse("2025-06-20") / 1000 },
+    provider: ({ options }) => {
+      options.onProgress({ cached: true, candles: [bars.at(-1)], completed: 0, total: 1 });
+      return pending.promise;
+    }
+  });
+  const loading = f.history.load();
+  await tick();
+  assert.equal(f.calls[0].timeframe, "1M");
+  assert.equal(f.calls[0].range.from, Date.parse("2023-09-01"));
+  assert.equal(f.calls[0].options.uid, "uid");
+  assert.equal(f.state().historyViewReady, false);
+  assert.equal(
+    f.patches.some((patch) => "candles" in patch),
+    false
+  );
+  pending.resolve({ candles: bars, cached: true, requests: 0 });
+  await loading;
+  assert.equal(f.state().historyViewReady, true);
+  assert.equal(f.state().loading, false);
+  assert.ok(f.state().candles.filter((item) => item.timestamp < left).length >= 3);
+});
+test("monthly restore backfills sparse history with calendar cursors and keeps offline coverage guards", async () => {
+  const left = Date.parse("2024-03-01"),
+    old = [4, 5, 6].map((month) => bar(Date.UTC(2023, month, 1)));
+  const f = fixture({
+    timeframe: "1M",
+    period: 3,
+    view: { from: left / 1000 },
+    provider: ({ call, range }) => ({
+      cached: true,
+      requests: 0,
+      candles:
+        call === 1
+          ? [bar(Date.parse("2026-11-01"))]
+          : old.filter((item) => item.timestamp >= range.from && item.timestamp <= range.to)
+    })
+  });
+  await f.history.load();
+  assert.equal(f.calls.length, 2);
+  assert.equal(f.calls[0].range.from, Date.parse("2023-09-01"));
+  assert.equal(f.calls[1].range.from, Date.parse("2023-04-01"));
+  assert.equal(f.state().historyViewReady, true);
+  const right = Date.parse("2025-06-20"),
+    bars = Array.from({ length: 22 }, (_, index) => bar(Date.UTC(2023, 9 + index, 1)));
+  for (const coveredTo of [Date.parse("2025-06-01"), right]) {
+    const offline = fixture({
+      timeframe: "1M",
+      period: 3,
+      offline: true,
+      bars,
+      view: { from: left / 1000, to: right / 1000 },
+      coverage: [{ from: Date.parse("2023-09-01"), to: coveredTo }]
+    });
+    await offline.history.load();
+    assert.equal(offline.state().historyViewReady, coveredTo === right);
+    assert.equal(offline.calls.length, 1);
+  }
 });

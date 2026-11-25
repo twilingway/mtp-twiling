@@ -21,6 +21,7 @@ import { PendingChartView, signedRightOffset } from "./view-camera.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { stablePriceAxisWidth } from "./price-axis-layout.js";
 import { chartPalette } from "../model/theme.js";
+import { attachCalendarXAxis } from "./kline-calendar-axis.js";
 
 export function makeKline(options: ChartOptions): ChartAdapter {
   const { container, settings, timeframe, indicators } = options;
@@ -155,6 +156,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     }
   });
   if (!chart) throw new Error("Не удалось создать KLineChart.");
+  const detachCalendarXAxis = attachCalendarXAxis(chart, () => data, timeframe);
   chart.setPriceVolumePrecision(precision(options.row), 0);
   const front = document.createElement("canvas");
   front.className = "foreground-canvas";
@@ -411,6 +413,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       paintFront();
     },
     destroy() {
+      detachCalendarXAxis();
       resize.disconnect();
       front.remove();
       dispose(container);

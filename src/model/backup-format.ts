@@ -1,5 +1,7 @@
 import { TOOL_NAMES } from "./drawing-model.js";
 import { isDrawingToolbarSettings } from "./drawing-toolbar.js";
+import { isNativeIntervalId } from "./intervals/registry.js";
+import { isIntervalFavorites } from "./intervals/favorites.js";
 import type {
   Backup,
   BackupDrawing,
@@ -68,7 +70,7 @@ function plain(value: unknown, depth = 0): void {
     }
 }
 export function isTimeframe(value: unknown): value is Timeframe {
-  return member(["1m", "5m", "15m", "30m", "1h", "1d", "1w"])(value);
+  return isNativeIntervalId(value);
 }
 export function isDrawingPoint(value: unknown): value is DrawingPoint {
   return isRecord(value) && finite(value.timestamp) && value.timestamp >= 0 && finite(value.value);
@@ -226,6 +228,7 @@ export function isProfilePreferences(value: unknown): value is ProfilePreference
       symbol: string,
       instrumentUid: nullable((value) => string(value) && value.length > 0 && value.length <= 200),
       timeframe: isTimeframe,
+      favoriteIntervals: isIntervalFavorites,
       engine: member(["kline", "tradingview"]),
       rangeDays: numberBetween(1, 3650),
       sidebarWidth: numberBetween(240, 720),

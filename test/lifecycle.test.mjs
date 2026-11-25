@@ -92,6 +92,26 @@ const sampleRow = (name) => ({
   availability: "pending"
 });
 
+test("native timeframe changes preserve history lookback, instrument UID and favorites", async (t) => {
+  const { controller, modules } = terminalFixture();
+  t.after(() => controller.dispose());
+  await controller.start();
+  await controller.login(`t.${"b".repeat(40)}`, "B", false);
+  await controller.setPreferences({ rangeDays: 180, favoriteIntervals: ["1m", "1M"] });
+  const uid = controller.getSnapshot().preferences.instrumentUid;
+  const ids = modules.load("model/intervals/native-timeframes.ts").NATIVE_TIMEFRAMES;
+  for (const timeframe of ids) {
+    await controller.setTimeframe(timeframe);
+    const state = controller.getSnapshot();
+    assert.equal(state.preferences.timeframe, timeframe);
+    assert.equal(state.preferences.rangeDays, 180);
+    assert.equal(state.preferences.instrumentUid, uid);
+    assert.deepEqual([...state.preferences.favoriteIntervals], ["1m", "1M"]);
+  }
+  await assert.rejects(controller.setTimeframe("3M"), { name: "RangeError" });
+  assert.equal(controller.getSnapshot().preferences.timeframe, "1M");
+});
+
 test("latest asynchronous symbol selection wins and concurrent sidebar width does not cancel it", async (t) => {
   const { controller } = terminalFixture();
   t.after(() => controller.dispose());

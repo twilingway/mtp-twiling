@@ -7,6 +7,8 @@ import { selectedMarketRow } from "../model/selected-instrument.js";
 import { lastPriceSubscription } from "./market-subscriptions.js";
 import { resolveWatchlist, quotation, dayChange, normaliseCandles } from "../model/market-model.js";
 import { TIMEFRAMES, splitRanges, subtractRanges, mergeCandles } from "../model/history-codec.js";
+import { historyRequestWindow, shiftTimeframe } from "../model/intervals/calendar.js";
+import { nativeTimeframe } from "../model/intervals/native-timeframes.js";
 import type {
   Candle,
   Catalog,
@@ -347,7 +349,8 @@ export class TBankClient extends EventTarget {
       if (bar && uid && interval) {
         this.emit<CandleEvent>("candle", { uid, interval, bar });
         const sub = this.candleSubscription;
-        if (sub && uid === sub.uid) this.queueLiveBar(sub, bar);
+        if (sub && uid === sub.uid && interval === TIMEFRAMES[sub.timeframe].stream)
+          this.queueLiveBar(sub, bar);
       }
     }
     const candles = object(data.subscribeCandlesResponse);
@@ -377,6 +380,7 @@ export class TBankClient extends EventTarget {
     });
   }
   subscribeCandles(uid: string, timeframe: Timeframe): void {
+    nativeTimeframe(timeframe);
     if (this.candleSubscription?.uid === uid && this.candleSubscription.timeframe === timeframe)
       return;
     this.sendCandleSubscription("SUBSCRIPTION_ACTION_UNSUBSCRIBE");
@@ -415,6 +419,8 @@ export class TBankClient extends EventTarget {
     range: HistoryRange,
     { signal, onProgress, uid }: CandleOptions = {}
   ): Promise<CandleResult> {
+    nativeTimeframe(timeframe);
+    range = historyRequestWindow(range, timeframe);
     const row = selectedMarketRow(this.rows, { symbol, instrumentUid: uid });
     if (!row?.uid) throw new BankError("Инструмент недоступен у банка.", 404);
     const config = TIMEFRAMES[timeframe];
@@ -437,12 +443,12 @@ export class TBankClient extends EventTarget {
         requests: 0
       };
     const coverage = await this.cache.loadCoverage(this.owner, row.uid, timeframe);
-    const closedTo = Math.min(range.to, Date.now() - 2 * config.ms);
+    const closedTo = Math.min(range.to, shiftTimeframe(Date.now(), timeframe, -2));
     const gaps = subtractRanges(range.from, Math.max(range.from, closedTo), coverage);
     const recent = coverage.find(
       (covered) =>
         covered.from <= closedTo &&
-        covered.to >= range.to - config.ms &&
+        covered.to >= shiftTimeframe(range.to, timeframe, -1) &&
         Date.now() - (covered.fetchedAt ?? 0) < 15000
     );
     if (closedTo < range.to && !recent)

@@ -122,14 +122,7 @@ export function resolveWatchlist(
   });
 }
 
-export const TIMEFRAMES = {
-  "1m": { interval: "CANDLE_INTERVAL_1_MIN", days: 1 },
-  "5m": { interval: "CANDLE_INTERVAL_5_MIN", days: 1 },
-  "15m": { interval: "CANDLE_INTERVAL_15_MIN", days: 1 },
-  "1h": { interval: "CANDLE_INTERVAL_HOUR", days: 7 },
-  "1d": { interval: "CANDLE_INTERVAL_DAY", days: 365 },
-  "1w": { interval: "CANDLE_INTERVAL_WEEK", days: 730 }
-};
+export { NATIVE_TIMEFRAME_CONFIG as TIMEFRAMES } from "./intervals/native-timeframes.js";
 
 export function normaliseCandles(candles: unknown): Candle[] {
   const byTime = new Map<number, Candle>();

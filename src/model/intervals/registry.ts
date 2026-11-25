@@ -142,3 +142,6 @@ export function getInterval(id: IntervalId): IntervalDefinition {
   if (!result) throw new RangeError(`Unknown candle interval: ${id}`);
   return result;
 }
+export function isNativeIntervalId(value: unknown): value is NativeIntervalId {
+  return isIntervalId(value) && getInterval(value).kind === "native";
+}

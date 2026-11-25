@@ -1,4 +1,5 @@
 import type * as Storage from "./storage.js";
+import { isNativeIntervalId } from "../model/intervals/registry.js";
 import type {
   Candle,
   Catalog,
@@ -29,7 +30,7 @@ export function errorMessage(value: unknown): string {
   return value instanceof Error ? value.message : "Неизвестная ошибка.";
 }
 export function isTimeframe(value: unknown): value is HistoryRecord["timeframe"] {
-  return typeof value === "string" && ["1m", "5m", "15m", "30m", "1h", "1d", "1w"].includes(value);
+  return isNativeIntervalId(value);
 }
 function normaliseQuotation(value: unknown): Quotation | undefined {
   const raw = object(value);

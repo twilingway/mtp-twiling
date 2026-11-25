@@ -11,6 +11,8 @@ import type {
   MarketRow,
   Timeframe
 } from "../../model/types.js";
+import { NATIVE_PERIOD_LABELS } from "../../model/intervals/native-timeframes.js";
+import type { IntervalId } from "../../model/intervals/registry.js";
 export const DEFAULT_INDICATORS: IndicatorFlags = {
   ma: false,
   ema: false,
@@ -44,16 +46,9 @@ export const INDICATOR_NAMES: Record<IndicatorKey, string> = {
   ma: "SMA 20",
   ema: "EMA 50"
 };
-export const PERIOD_LABELS: Record<Timeframe, string> = {
-  "1m": "1м",
-  "5m": "5м",
-  "15m": "15м",
-  "30m": "30м",
-  "1h": "1ч",
-  "1d": "1Д",
-  "1w": "1Н"
-};
+export const PERIOD_LABELS: Record<Timeframe, string> = NATIVE_PERIOD_LABELS;
 export interface TerminalPreferences {
+  favoriteIntervals?: IntervalId[];
   rightPanelCollapsed?: boolean;
   rightPanelTab?: "watchlist" | "objects";
   sidebarWidth?: number;

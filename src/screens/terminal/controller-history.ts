@@ -2,11 +2,12 @@ import * as storage from "../../services/storage.js";
 import { loadChartView } from "../../services/chart-camera.js";
 import { activeMtpPeriods } from "../../model/mtp.js";
 import { mergeCandles, TIMEFRAMES } from "../../model/history-codec.js";
+import { olderHistoryStart } from "../../model/intervals/calendar.js";
 import type { Candle, ChartEngine, Timeframe } from "../../model/types.js";
 import {
   historyFirstDate,
   historyRangeCovered,
-  historyViewBackfillStep,
+  historyViewBackfillFrom,
   historyViewCachedWindow,
   historyViewCoverage,
   historyViewNeedsWidth,
@@ -205,7 +206,7 @@ export class TerminalHistory {
       let coverage = historyViewCoverage(plan, available, from),
         requests = result.requests,
         emptySpan = available.length ? 0 : until - from,
-        step = historyViewBackfillStep(plan, coverage.missingBars),
+        backfillMultiplier = 1,
         incomplete = "";
       while (!coverage.complete) {
         if (!navigator.onLine) {
@@ -220,7 +221,10 @@ export class TerminalHistory {
           incomplete = "Источник не дал свечей за год: сохранённое окно ещё не восстановлено.";
           break;
         }
-        const nextFrom = Math.max(plan.earliest, from - step),
+        const nextFrom = Math.max(
+            plan.earliest,
+            historyViewBackfillFrom(plan, from, coverage.missingBars, backfillMultiplier)
+          ),
           previousFrom = from;
         this.bridge.update({ historyHelp: "Восстанавливаем левый край сохранённого окна…" });
         const older = await client.candles(
@@ -237,10 +241,10 @@ export class TerminalHistory {
         coverage = historyViewCoverage(plan, available, from);
         if (earlier.length) {
           emptySpan = 0;
-          step = historyViewBackfillStep(plan, coverage.missingBars);
+          backfillMultiplier = 1;
         } else {
           emptySpan += previousFrom - from;
-          step *= 2;
+          backfillMultiplier *= 2;
         }
       }
       if (restoring && coverage.complete && !navigator.onLine) {
@@ -315,22 +319,16 @@ export class TerminalHistory {
       owner = state.owner,
       p = state.preferences;
     const until = Math.min(this.cursor ?? first.timestamp, first.timestamp);
-    const days: Record<Timeframe, number> = {
-      "1m": 3,
-      "5m": 14,
-      "15m": 30,
-      "30m": 60,
-      "1h": 120,
-      "1d": 730,
-      "1w": 1460
-    };
+
     const parsed = Date.parse(
-      (["1d", "1w"].includes(p.timeframe) ? row.first1dayCandleDate : row.first1minCandleDate) ??
+      (["1d", "1w", "1M"].includes(p.timeframe)
+        ? row.first1dayCandleDate
+        : row.first1minCandleDate) ??
         row.firstTradeDate ??
         "1990-01-01"
     );
     const earliest = Number.isFinite(parsed) ? parsed : Date.parse("1990-01-01");
-    const from = Math.max(earliest, until - days[p.timeframe] * 86400000);
+    const from = Math.max(earliest, olderHistoryStart(until, p.timeframe));
     if (from >= until) {
       this.startReached = true;
       return;

@@ -12,6 +12,30 @@
   display: inline-flex;
   flex-shrink: 0;
 }
+.chart-range-control {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  min-height: 30px;
+  border-top: 1px solid var(--line, #2a2e39);
+  background: var(--surface, #131722);
+  color: var(--text, #d1d4dc);
+  font-size: 12px;
+}
+.chart-range-control select {
+  min-height: 25px;
+  max-width: 130px;
+  padding: 2px 7px;
+  border: 1px solid var(--control-line, #434651);
+  border-radius: 4px;
+  color: inherit;
+  background: var(--surface-input, #171b26);
+}
+.chart-range-note {
+  color: var(--muted, #9598a1);
+}
 .interval-menu-trigger {
   display: inline-flex;
   align-items: center;

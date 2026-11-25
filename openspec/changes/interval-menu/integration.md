@@ -1,6 +1,8 @@
 # Подключение меню интервалов
 
-Модули готовы к подключению из Toolbar; общие файлы здесь намеренно не изменены.
+В изолированном worktree подключены 13 нативных интервалов в Toolbar, историю, поток, кеш и backup.
+Меню содержит все 18 строк; пять производных явно недоступны до следующего этапа. Это не полная
+поддержка 18 интервалов. Сервер и канонический checkout не затронуты.
 
 ## Контракт
 
@@ -115,23 +117,115 @@ SubscriptionInterval. Их нет в согласованном IntervalId. Ти
   `isComplete` требует полного набора, закрытого периода по `asOf` и отсутствия исходного
   `isComplete:false`. Сохранять этот флаг, если его предоставляет источник.
 
+## Интегрированный промежуточный этап
+
+- `Timeframe = NativeIntervalId` содержит 13 идентификаторов. Оба валидатора history/backup
+  принимают именно их. `favoriteIntervals?: IntervalId[]` — только представление меню; пять
+  производных можно отметить звездой, но нельзя выбрать как текущий источник.
+- `NATIVE_TIMEFRAME_CONFIG` — единственный mapping, реэкспортированный из history-codec и
+  market-model. Для 1M `ms=null`, `chunkDays=null`; запросы разбиваются по 119 календарным месяцам,
+  чтобы при включительных границах не превысить 120 свечей/10 лет. Остальные chunkDays остаются
+  консервативными и укладываются в проверенные ограничения.
+- `TimeframeMenu` стоит в Toolbar; `ChartRangeControl` — ниже графика. Lookback явно подписан днями,
+  а не календарными месяцами. `setTimeframe` сохраняет rangeDays, UID и избранное.
+- Запоздавшие сообщения старого интервала того же UID больше не попадают в live-кеш новой серии: в
+  receive проверяются одновременно UID и `TIMEFRAMES[sub.timeframe].stream`.
+- Старые правила видимости рисунков не содержат месяцы. 1M не наследует правило weeks; данные
+  рисунков и их schema не мигрируются. Настройки/координаты и глобальная камера не меняются.
+
+## Согласование с контроллером на 2ab4dc3
+
+Интеграционная ветка основана на root `2ab4dc3`. Его `history-view-range.ts` адаптирован к
+`intervalMs:number|null`: null означает календарный месяц UTC. Сохранены coverage/readiness,
+приоритет saved-left, actual warmup bars, offline proof правого края, engine/UID/cancellation,
+retired-camera и import recovery guards. Контроллер истории не заменён старой версией.
+
+`planHistoryViewRange` использует календарный shift от target для месячного warmup и выравнивает
+from/earliest к началу месяца. `historyFirstDate` использует first1dayCandleDate для 1M и возвращает
+начало соответствующего месяца. `historyViewBackfillFrom(plan,cursor,missingBars,multiplier)` каждый
+раз пересчитывает границу от текущего cursor; при пустой истории удваивается количество календарных
+месяцев, а не ранее вычисленный интервал миллисекунд. Числовые интервалы сохраняют прежний расчёт
+дней. `historyViewBackfillStep` оставлен для совместимости; controller использует новую границу from
+и не удваивает его результат.
+
+Все вспомогательные функции ниже остаются доступны, timestamps — ms:
+
+```ts
+import {
+  shiftUtcMonths,
+  utcMonthStart,
+  shiftTimeframe,
+  historyRequestWindow,
+  historyWindowStart,
+  olderHistoryStart
+} from "./intervals/calendar.js";
+
+// Ровно N календарных месяцев назад с корректным clamp дня (31 января -> 29 февраля).
+const warmupFrom = shiftUtcMonths(utcMonthStart(until), -N);
+// Или N интервалов любого нативного вида, без вычисления monthMs.
+const sourceWarmupFrom = shiftTimeframe(until, timeframe, -N);
+// Готовая прежняя эвристика lookback + ceil(warmupBars*1.65) интервалов + 14 дней.
+const from = historyWindowStart(until, rangeDays, timeframe, warmupBars);
+// Готовая граница backfill: для 1M это 120 реальных месяцев.
+const olderFrom = olderHistoryStart(cursor, timeframe);
+// Нативный monthly GetCandles требует достаточно широкого окна.
+const request = historyRequestWindow({ from, to: until }, timeframe);
+```
+
+`historyRequestWindow` для 1M выравнивает from по началу месяца UTC; если span ещё меньше месяца,
+захватывает предыдущий месяц. Пустые окна не расширяет. `historyWindowStart` уже возвращает эту
+выровненную границу; добавочный вызов нормализации ей не нужен. Отдельно сохранить root clamp по
+доступности инструмента: для 1M использовать first1dayCandleDate, как для 1d/1w.
+
+Readiness-модель не подставляет 30 дней вместо `intervalMs:null`. Кеш/stream client использует
+`shiftTimeframe` для recent coverage и не умножает null. Контроллер приложения содержит 491 непустую
+строку, контроллер истории — 381; оба укладываются в ограничение 500.
+
+Проекция `charts/adapter.ts` принимает прежний `intervalMs:number` и дополнительно null для
+календарного месяца. Все имеющиеся вызовы из LW/KLine и диалога координат получают его из config;
+интерполяция внутри реальных данных сохранена, за пределами используются календарные месяцы.
+
+## Шкала времени
+
+- LW5.0.9: `timeScale.tickMarkFormatter`, штатные TickMarkType Year/Month/DayOfMonth/Time. Мелкие
+  подписи при обычном масштабе скрыты; границы месяца/года и дня выбирает сама библиотека. При
+  barSpacing >=24 показываются подробные даты/часы. Для 1M timeVisible=false. Форматтер перекрестия
+  не переопределён.
+- В LW пустая подпись не удаляет штатный grid mark. Поэтому нативные вертикальные линии для
+  календарных/часовых интервалов выключены; `paintCalendarGrid` в bottom primitive рисует реальные
+  линии на выбранных calendarAxisTicks. Горизонтальная сетка сохранена. Передний слой не рисует
+  сетку повторно. Для минутных интервалов остаётся нативная сетка. Это проверено отдельными тестами
+  координат рисования и binding production-примитива; одного label hiding недостаточно.
+- KLine9.8.12: [публичный custom-axis API](https://v9.klinecharts.com/en-US/guide/custom-axis),
+  `registerXAxis/createTicks` и `setPaneOptions({id:"x_axis_pane",axisOptions:{name}})`.
+  `calendarAxisTicks` выбирает первые реальные свечи при смене UTC-месяца/дня и расставляет деления
+  с приоритетом календарных границ и проверкой расстояния. Имена месяцев не дублируются на каждом
+  дневном баре. CustomApi.formatDate, tooltip и crosshair не изменены.
+- Реальные calendar boundary ticks и binding KLine API проверены детерминированно. Видимый canvas
+  после общей интеграции ещё требует browser/visual QA; это не заявляется как проверенное визуально.
+
 ## Оставшаяся интеграция
 
-1. Общий Timeframe должен ссылаться на IntervalId; расширить TIMEFRAMES, все проверки profile/backup
-   и mapping истории/потока. Для отрисовки календарные интервалы не подменять 30/90/180/365 днями.
-2. Поставить меню на место текущей кнопки интервала. Выбор диапазона истории оставить отдельным
-   элементом в согласованной нижней панели.
-3. Добавить per-owner избранное с безопасным значением по умолчанию для старых профилей.
-4. Подключить реальный исходный fetch и live-пересчёт. Пока source/calendar не готов, передавать
-   понятную причину через availability.
-5. Общие проверки и изолированная визуальная проверка светлой/тёмной/чёрной темы, мобильного меню,
-   Escape, стрелок, Home/End, звёзд и клика снаружи выполняются после подключения.
+1. Перенести два итоговых коммита интеграционной ветки в canonical; новые изменения root после
+   2ab4dc3 в MTP/прозрачности объединяет владелец canonical. Календарный grid находится в нижнем
+   LW-примитиве перед options.paint, соответствующую вставку сохранить при конфликтах слоёв.
+2. Подключить исходный fetch и live-пересчёт пяти производных, затем разрешить их в persisted
+   Timeframe/backup/cache. До этого причины `DERIVED_INTERVAL_UNAVAILABLE` остаются обязательными.
+3. Выполнить общие проверки canonical и изолированную визуальную проверку светлой/тёмной/чёрной
+   темы, мобильного меню, Escape, стрелок, Home/End, звёзд, клика снаружи и реальных делений шкалы.
 
 ## Выполненные локальные проверки
 
 - `node test/intervals.test.mjs`: 15 поведенческих тестов агрегации и registry.
-- Scoped TypeScript program только для четырёх новых TS/TSX-файлов: без ошибок.
-- `pnpm exec eslint src/model/intervals src/screens/terminal/intervals --max-warnings 0`.
-- Scoped Prettier и `pnpm spec validate interval-menu --strict`.
-- Полный canonical build, сервер и браузер этим worktree не запускались. Обычный `node --test` в
-  sandbox получил spawn EPERM; прямой запуск тестового файла запускает те же node:test сценарии.
+- `node test/native-intervals.test.mjs`: 12 тестов реальных production-модулей с заменённой
+  сетью/хранилищем на границе; каждый из 13 interval enum, source/live/cache, offline, stale-stream,
+  backup/binary roundtrip, month/leap/countdown/projection и actual boundary ticks.
+- `node test/lifecycle.test.mjs`: сохранение UID/lookback/favorites при всех 13 переключениях.
+- Saved-left/calendar warmup/backfill: 9 тестов history-view-range, 14 history-view-load; production
+  binding LW grid проверяет реальные линии в bottom primitive.
+- Полный `pnpm check` на базе 2ab4dc3: TypeScript, ESLint, Prettier, build и все **193 теста PASS**.
+  Build 0.3.7 / `81bf21e070f820e9`, 41 assets. `pnpm spec:validate`: все 8 пунктов PASS. Sandbox
+  spawn EPERM устранён разрешённым запуском. Root import/readiness/camera проверки сохранены и
+  проходят вместе с новыми месячными сценариями.
+- Canonical build, сервер, браузер и настоящая сессия банка не запускались. Фактическая поддержка
+  enum проверена по официальному proto, сетевые сценарии — детерминированные проверки границ.

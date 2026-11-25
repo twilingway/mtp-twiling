@@ -1,28 +1,13 @@
 import { useEffect, useState } from "react";
-import type { DrawingPoint, DrawingVisibility, Timeframe } from "../../model/types.js";
+import type { DrawingPoint } from "../../model/types.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { useTerminal } from "./context.js";
+import { drawingVisibleOnInterval } from "../../model/intervals/drawing-visibility.js";
 
 interface AxisLabel {
   timestamp: number;
   x: number;
   width: number;
-}
-
-function visibleOnTimeframe(
-  visibility: DrawingVisibility | undefined,
-  timeframe: Timeframe
-): boolean {
-  const group = timeframe.endsWith("m")
-    ? "minutes"
-    : timeframe.endsWith("h")
-      ? "hours"
-      : timeframe.endsWith("d")
-        ? "days"
-        : "weeks";
-  const rule = visibility?.[group];
-  const count = Number.parseInt(timeframe);
-  return !rule || (rule.enabled && count >= rule.from && count <= rule.to);
 }
 
 export function DrawingAxisLabels() {
@@ -32,7 +17,7 @@ export function DrawingAxisLabels() {
   const points =
     drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden ||
     selected?.visible === false ||
-    !visibleOnTimeframe(selected?.visibility, state.preferences.timeframe)
+    !drawingVisibleOnInterval(selected?.visibility, state.preferences.timeframe)
       ? undefined
       : selected?.points;
   useEffect(() => {

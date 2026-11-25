@@ -96,7 +96,9 @@ function harness(engine) {
     offset = 8;
   const actions = new Map(),
     calls = [],
+    primitives = [],
     frames = new Map();
+  let constructedOptions;
   let frameId = 0,
     drawScheduled = false,
     nativeOperations = [],
@@ -195,7 +197,9 @@ function harness(engine) {
             }
           },
           setSeriesOrder() {},
-          attachPrimitive() {},
+          attachPrimitive(primitive) {
+            primitives.push(primitive);
+          },
           priceScale: () => ({ applyOptions() {} })
         };
       }
@@ -203,7 +207,8 @@ function harness(engine) {
     factory = sources(
       {
         "lightweight-charts": {
-          createChart: () => {
+          createChart: (_container, options) => {
+            constructedOptions = options;
             queueNative(() => {});
             return chart;
           },
@@ -218,6 +223,10 @@ function harness(engine) {
     )("charts/lightweight.ts").makeLightweight;
   } else {
     const chart = {
+      setPaneOptions(options) {
+        assert.equal(options.id, "x_axis_pane");
+        assert.equal(typeof options.axisOptions.name, "string");
+      },
       setPriceVolumePrecision() {},
       getSize: () => size,
       resize() {},
@@ -275,6 +284,7 @@ function harness(engine) {
         klinecharts: {
           init: () => chart,
           registerIndicator() {},
+          registerXAxis() {},
           ActionType: { OnDataReady: "ready" },
           DomPosition: { Main: "main" },
           IndicatorSeries: { Price: "price" },
@@ -305,9 +315,53 @@ function harness(engine) {
       assert.equal(frames.size, 0, "restoration frames must settle");
     },
     calls,
+    chartOptions: () => constructedOptions,
+    primitives,
     camera: () => ({ spacing, offset })
   };
 }
+
+test("Lightweight binds actual calendar grid to the bottom primitive and disables native daily grid marks", () => {
+  const f = harness("lightweight");
+  const bars = Array.from({ length: 91 }, (_, index) => ({
+    timestamp: Date.UTC(2024, 0, 1) + index * 86400000,
+    open: 10,
+    high: 12,
+    low: 9,
+    close: 11,
+    volume: 1
+  }));
+  f.adapter.setData(bars, false);
+  f.ready();
+  assert.equal(f.chartOptions().grid.vertLines.visible, false);
+  assert.equal(f.chartOptions().grid.horzLines.visible, true);
+  const starts = [];
+  const context = {
+    save() {},
+    restore() {},
+    scale() {},
+    beginPath() {},
+    setLineDash() {},
+    stroke() {},
+    moveTo: (x, y) => starts.push({ x, y }),
+    lineTo() {}
+  };
+  const target = {
+    useBitmapCoordinateSpace: (draw) =>
+      draw({
+        context,
+        horizontalPixelRatio: 1,
+        verticalPixelRatio: 1,
+        bitmapSize: { width: 800, height: 500 }
+      })
+  };
+  const views = f.primitives[0].paneViews();
+  assert.equal(views[0].zOrder(), "bottom");
+  views[0].renderer().draw(target);
+  assert.equal(starts.length, 3);
+  views[1].renderer().draw(target);
+  assert.equal(starts.length, 3, "front drawing layer cannot duplicate calendar grid lines");
+});
 
 for (const engine of ["lightweight", "kline"])
   test(`${engine}: empty-chart restore waits until data and survives initial fit`, () => {

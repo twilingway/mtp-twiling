@@ -1,4 +1,6 @@
 import type { Candle, HistoryRange, Timeframe } from "./types.js";
+import { NATIVE_TIMEFRAME_CONFIG } from "./intervals/native-timeframes.js";
+import { historyRequestWindow, shiftUtcMonths } from "./intervals/calendar.js";
 export const HISTORY_FORMAT = "ohlcv-f64-v1";
 export const STRIDE = 6;
 export function encodeCandles(candles: readonly Candle[]): ArrayBuffer {
@@ -63,73 +65,17 @@ export function subtractRanges(
   if (cursor < to) gaps.push({ from: cursor, to });
   return gaps;
 }
-export const TIMEFRAMES: Record<
-  Timeframe,
-  {
-    interval: string;
-    stream: string;
-    ms: number;
-    chunkDays: number;
-    limit: number;
-  }
-> = {
-  "1m": {
-    interval: "CANDLE_INTERVAL_1_MIN",
-    stream: "SUBSCRIPTION_INTERVAL_ONE_MINUTE",
-    ms: 60000,
-    chunkDays: 1,
-    limit: 2400
-  },
-  "5m": {
-    interval: "CANDLE_INTERVAL_5_MIN",
-    stream: "SUBSCRIPTION_INTERVAL_FIVE_MINUTES",
-    ms: 300000,
-    chunkDays: 7,
-    limit: 2400
-  },
-  "15m": {
-    interval: "CANDLE_INTERVAL_15_MIN",
-    stream: "SUBSCRIPTION_INTERVAL_FIFTEEN_MINUTES",
-    ms: 900000,
-    chunkDays: 21,
-    limit: 2400
-  },
-  "30m": {
-    interval: "CANDLE_INTERVAL_30_MIN",
-    stream: "SUBSCRIPTION_INTERVAL_30_MIN",
-    ms: 1800000,
-    chunkDays: 21,
-    limit: 1200
-  },
-  "1h": {
-    interval: "CANDLE_INTERVAL_HOUR",
-    stream: "SUBSCRIPTION_INTERVAL_ONE_HOUR",
-    ms: 3600000,
-    chunkDays: 60,
-    limit: 2400
-  },
-  "1d": {
-    interval: "CANDLE_INTERVAL_DAY",
-    stream: "SUBSCRIPTION_INTERVAL_ONE_DAY",
-    ms: 86400000,
-    chunkDays: 1825,
-    limit: 2400
-  },
-  "1w": {
-    interval: "CANDLE_INTERVAL_WEEK",
-    stream: "SUBSCRIPTION_INTERVAL_WEEK",
-    ms: 604800000,
-    chunkDays: 1460,
-    limit: 300
-  }
-};
+export const TIMEFRAMES = NATIVE_TIMEFRAME_CONFIG;
 export function splitRanges(ranges: readonly HistoryRange[], timeframe: Timeframe): HistoryRange[] {
   const config = TIMEFRAMES[timeframe];
   if (!config) throw new Error("Неизвестный таймфрейм.");
   const pieces: HistoryRange[] = [];
-  for (const range of ranges) {
+  for (const input of ranges) {
+    const range = historyRequestWindow(input, timeframe);
     for (let from = range.from; from < range.to;) {
-      const to = Math.min(range.to, from + config.chunkDays * 86400000);
+      const next =
+        config.chunkDays === null ? shiftUtcMonths(from, 119) : from + config.chunkDays * 86400000;
+      const to = Math.min(range.to, next);
       pieces.push({ from, to });
       from = to;
     }

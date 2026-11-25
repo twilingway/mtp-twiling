@@ -11,22 +11,13 @@ import { isPanMovement } from "../../charts/navigation.js";
 import { useChartCanvas } from "./chart-lifecycle.js";
 import { useTerminal } from "./context.js";
 import type { TerminalState } from "./state.js";
+import { drawingVisibleOnInterval } from "../../model/intervals/drawing-visibility.js";
 
 export function visibleDrawings(state: TerminalState): Drawing[] {
   if (drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden) return [];
-  const tf = state.preferences.timeframe,
-    n = Number.parseInt(tf),
-    group = tf.endsWith("m")
-      ? "minutes"
-      : tf.endsWith("h")
-        ? "hours"
-        : tf.endsWith("d")
-          ? "days"
-          : "weeks";
-  return state.drawings.filter((d) => {
-    const rule = d.visibility?.[group];
-    return !rule || (rule.enabled && n >= rule.from && n <= rule.to);
-  });
+  return state.drawings.filter((drawing) =>
+    drawingVisibleOnInterval(drawing.visibility, state.preferences.timeframe)
+  );
 }
 export function ChartCanvas() {
   const { state } = useTerminal(),

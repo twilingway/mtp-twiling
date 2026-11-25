@@ -1,7 +1,14 @@
 import { memo, useState } from "react";
-import type { ChartEngine, IndicatorKey, Timeframe } from "../../model/types.js";
+import type { ChartEngine, IndicatorKey } from "../../model/types.js";
 import { useTerminal } from "./context.js";
-import { INDICATOR_NAMES, PERIOD_LABELS } from "./state.js";
+import { INDICATOR_NAMES } from "./state.js";
+import { TimeframeMenu } from "./intervals/TimeframeMenu.js";
+import { isNativeIntervalId } from "../../model/intervals/registry.js";
+import { DERIVED_INTERVAL_UNAVAILABLE } from "../../model/intervals/native-timeframes.js";
+import {
+  DEFAULT_INTERVAL_FAVORITES,
+  toggleIntervalFavorite
+} from "../../model/intervals/favorites.js";
 const InstallButton = memo(function InstallButton() {
   return (
     <button id="install-app" className="install-button" hidden>
@@ -32,40 +39,22 @@ export function Toolbar() {
         <b id="top-symbol">{p.symbol || "Инструмент"}</b>
       </button>
       <nav className="timeframes" aria-label="Таймфрейм">
-        {(Object.keys(PERIOD_LABELS) as Timeframe[]).map((tf) => (
-          <button
-            key={tf}
-            data-timeframe={tf}
-            className={tf === p.timeframe ? "active" : ""}
-            onClick={() => {
-              void controller.setTimeframe(tf);
-            }}
-          >
-            {PERIOD_LABELS[tf]}
-          </button>
-        ))}
-        <select
-          id="range"
-          aria-label="Период истории"
-          value={p.rangeDays}
-          onChange={(e) => {
-            void controller.setPreferences({ rangeDays: Number(e.target.value) });
+        <TimeframeMenu
+          value={p.timeframe}
+          favorites={p.favoriteIntervals ?? DEFAULT_INTERVAL_FAVORITES}
+          availability={DERIVED_INTERVAL_UNAVAILABLE}
+          onSelect={(id) => {
+            if (isNativeIntervalId(id)) void controller.setTimeframe(id);
           }}
-        >
-          {[
-            [1, "1Д"],
-            [5, "5Д"],
-            [30, "1М"],
-            [90, "3М"],
-            [180, "6М"],
-            [365, "1Г"],
-            [1825, "5Л"]
-          ].map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+          onToggleFavorite={(id) => {
+            void controller.setPreferences({
+              favoriteIntervals: toggleIntervalFavorite(
+                p.favoriteIntervals ?? DEFAULT_INTERVAL_FAVORITES,
+                id
+              )
+            });
+          }}
+        />
       </nav>
       <div className="divider" />
       <div className="indicator-control">
