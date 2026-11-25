@@ -138,6 +138,48 @@
   border: 1px solid var(--control-line);
   border-radius: 7px;
 }
+.history-instrument-search {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+}
+.history-instrument-search input {
+  width: 100%;
+  min-width: 0;
+}
+.storage-instrument-list {
+  max-height: min(420px, 45dvh);
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.storage-instrument {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.storage-instrument summary {
+  cursor: pointer;
+  padding: 8px 4px;
+  overflow-wrap: anywhere;
+}
+.storage-instrument-name {
+  display: inline-grid;
+  gap: 3px;
+  max-width: 100%;
+  vertical-align: middle;
+}
+.storage-instrument-name small,
+.storage-instrument-totals {
+  color: var(--muted);
+  font-size: 12px;
+}
+.storage-instrument-totals {
+  display: block;
+  margin: 5px 0 0 20px;
+}
+.storage-instrument > button {
+  margin: 4px 7px 8px;
+  white-space: normal;
+}
 .history-delete-scope label {
   display: block;
   margin: 12px 0 5px;

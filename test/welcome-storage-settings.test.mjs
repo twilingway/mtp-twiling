@@ -43,7 +43,7 @@ test("actual welcome/account components render English, official links and compa
   const render = component => renderToStaticMarkup(React.createElement(TerminalContext, { value: controller }, React.createElement(component)));
   const welcome = render(WelcomeGate);
   for (const link of ["https://developer.tbank.ru/invest/intro/intro/token", "https://www.tbank.ru/invest/settings/", "https://github.com/twilingway/mtp-twiling", "./privacy.html"]) assert.ok(welcome.includes(link));
-  assert.ok(welcome.includes("IndexedDB")); assert.ok(welcome.includes("personal Google Drive")); assert.ok(welcome.includes("welcome-do-not-show"));
+  assert.ok(welcome.includes("The installed app stores data on your device.")); assert.ok(welcome.includes("only on this device")); assert.ok(welcome.includes("personal Google Drive")); assert.ok(welcome.includes("welcome-do-not-show"));
   assert.equal(/[А-Яа-яЁё]/u.test(welcome), false);
   state = { ...state, dialog: "account" }; const account = render(AccountDialog);
   assert.ok(account.includes('id="account-section-drive" hidden=""'));

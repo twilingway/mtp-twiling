@@ -4,6 +4,7 @@ import { t } from "../../i18n/messages.js";
 import { intlLocale } from "../../i18n/preferences.js";
 import { useTerminal } from "./context.js";
 import { PERIOD_LABELS, number } from "./state.js";
+import { StorageHistoryList } from "./StorageHistoryList.js";
 
 function bytes(value: number): string {
   const unit = value >= 1024 * 1024 ? 1024 * 1024 : 1024;
@@ -121,44 +122,14 @@ export function StoragePanel() {
       >
         {t("Обновить объём")}
       </button>
-      <div className="storage-table-scroll">
-        <table className="storage-history-table">
-          <caption>{t("История по инструментам и интервалам")}</caption>
-          <thead>
-            <tr>
-              <th>{t("Инструмент")}</th>
-              <th>{t("Интервал")}</th>
-              <th>{t("Свечей")}</th>
-              <th>{t("Объём")}</th>
-              <th>{t("Выбор")}</th>
-            </tr>
-          </thead>
-          <tbody id="history-storage-details">
-            {groups.map((group) => (
-              <tr key={`${group.uid}:${group.timeframe}`}>
-                <td title={group.uid}>{label(group.uid)}</td>
-                <td>{t(PERIOD_LABELS[group.timeframe])}</td>
-                <td>{number(group.bars, 0)}</td>
-                <td>{bytes(group.bytes)}</td>
-                <td>
-                  <button
-                    type="button"
-                    disabled={blocked}
-                    onClick={() => model.select(group.uid, group.timeframe)}
-                  >
-                    {t("Выбрать")}
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {history && !groups.length && (
-              <tr>
-                <td colSpan={5}>{t("Сохранённых свечей нет")}</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <StorageHistoryList
+        key={state.owner}
+        groups={groups}
+        rows={state.rows}
+        blocked={blocked}
+        bytes={bytes}
+        onSelect={(uid, timeframe) => model.select(uid, timeframe)}
+      />
       <fieldset className="history-delete-scope" disabled={blocked}>
         <legend>{t("Что очистить")}</legend>
         <label htmlFor="clear-history-instrument">{t("Инструмент")}</label>

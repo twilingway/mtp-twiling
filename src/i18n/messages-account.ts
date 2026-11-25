@@ -1,4 +1,8 @@
 export const accountMessages = {
+  "Поиск инструмента в хранилище": "Search stored instruments",
+  "Тикер или название инструмента": "Ticker or instrument name",
+  "Инструменты не найдены": "No instruments found",
+  "Выбрать все интервалы инструмента": "Select all intervals for this instrument",
   "Добро пожаловать в MTP TWILING": "Welcome to MTP TWILING",
   "Личный терминал для графиков, индикаторов и разметки. Начните со своего ключа Т‑Банка.":
     "A personal workspace for charts, indicators and drawings. Start with your own T-Bank key.",
@@ -13,8 +17,8 @@ export const accountMessages = {
   "Сервер приложения раздаёт оболочку и обновления. Ключ банка, котировки и локальные сохранения находятся в браузере устройства; запросы к Т‑Банку идут напрямую. Если включить Drive, выбранные переносимые данные хранятся на вашем личном Google Диске.":
     "The app server delivers the app shell and updates. Your bank key, quotes and local saves stay in your device's browser; T-Bank requests go directly to the bank. If you enable Drive, selected portable data is stored in your personal Google Drive.",
   "Открытый код на GitHub": "Source code on GitHub",
-  "На Android и iOS установленное PWA также хранит данные в IndexedDB. Очистка данных сайта или приложения удалит локальные сохранения. Сохраняйте резервную копию важных данных.":
-    "The installed PWA on Android and iOS also stores data in IndexedDB. Clearing site or app data deletes local saves. Keep a backup of important data.",
+  "Установленное приложение хранит данные на вашем устройстве. Очистка данных сайта или приложения удалит сохранения только на этом устройстве. Настройки и разметку можно восстановить с личного Google Диска, если синхронизация была включена.":
+    "The installed app stores data on your device. Clearing site or app data deletes saves only on this device. Settings and drawings can be restored from your personal Google Drive if sync was enabled.",
   "Больше не показывать на этом устройстве": "Don't show again on this device",
   "Не удалось прочитать настройку приветствия. Можно продолжить без её сохранения.":
     "Could not read the welcome preference. You can continue without saving it.",
