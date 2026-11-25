@@ -18,15 +18,18 @@ import {
   technicalPaneKey
 } from "../../model/technical-indicator-layout.js";
 
-const labels: Readonly<Record<string, string>> = {
-  length: "Период",
-  source: "Источник",
-  multiplier: "Множитель",
-  fastLength: "Быстрый период",
-  slowLength: "Медленный период",
-  signalLength: "Сигнальный период",
-  smoothK: "Сглаживание K",
-  smoothD: "Сглаживание D"
+const labels: Readonly<Record<string, readonly [string, string]>> = {
+  length: ["Период", "Length"],
+  source: ["Источник", "Source"],
+  multiplier: ["Множитель", "Multiplier"],
+  fastLength: ["Быстрый период", "Fast length"],
+  slowLength: ["Медленный период", "Slow length"],
+  middleLength: ["Средний период", "Middle length"],
+  signalLength: ["Сигнальный период", "Signal length"],
+  smoothK: ["Сглаживание K", "K smoothing"],
+  smoothD: ["Сглаживание D", "D smoothing"],
+  expansionLength: ["Период максимального расширения", "Highest expansion length"],
+  contractionLength: ["Период минимального сжатия", "Lowest contraction length"]
 };
 
 export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIndicatorInstance }) {
@@ -124,7 +127,7 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
           <legend>{text("Параметры", "Inputs")}</legend>
           {definition.parameters.map((parameter) => (
             <label key={parameter.key}>
-              <span>{english ? parameter.key : (labels[parameter.key] ?? parameter.key)}</span>
+              <span>{labels[parameter.key]?.[english ? 1 : 0] ?? parameter.key}</span>
               {parameter.type === "source" ? (
                 <select
                   value={parameters[parameter.key]}
