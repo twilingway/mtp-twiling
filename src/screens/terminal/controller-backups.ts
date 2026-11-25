@@ -1,4 +1,5 @@
 import * as storage from "../../services/storage.js";
+import { assertImportCurrent, type BackupImportOptions } from "../../model/backup-import.js";
 import { importTerminalBackup, restoreImportedProfile } from "./controller-import.js";
 
 type Bridge = Parameters<typeof importTerminalBackup>[1] & {
@@ -48,22 +49,30 @@ export class TerminalBackups {
       await this.bridge.flush();
       return storage.createBackup(owner, { includeHistory });
     });
-  private importNow = (input: unknown): Promise<void> =>
-    importTerminalBackup(input, {
-      ...this.bridge,
-      saveView: async () => {
-        const { owner } = this.bridge.getState(),
-          client = this.bridge.getClient();
-        await this.bridge.saveView();
-        if (
-          this.bridge.isAlive() &&
-          this.bridge.getState().owner === owner &&
-          this.bridge.getClient() === client
-        )
-          this.bridge.update({ importingBackup: true });
-      }
+  private importNow = (input: unknown, options: BackupImportOptions = {}): Promise<void> =>
+    importTerminalBackup(
+      input,
+      {
+        ...this.bridge,
+        saveView: async () => {
+          const { owner } = this.bridge.getState(),
+            client = this.bridge.getClient();
+          await this.bridge.saveView();
+          if (
+            this.bridge.isAlive() &&
+            this.bridge.getState().owner === owner &&
+            this.bridge.getClient() === client
+          )
+            this.bridge.update({ importingBackup: true });
+        }
+      },
+      options
+    );
+  import = (input: unknown, options: BackupImportOptions = {}): Promise<void> =>
+    this.enqueue(() => {
+      assertImportCurrent(options.valid);
+      return this.importNow(input, options);
     });
-  import = (input: unknown): Promise<void> => this.enqueue(() => this.importNow(input));
   importFile = (file: Pick<File, "size" | "text">): Promise<void> =>
     this.enqueue(async () => {
       if (file.size > 256 * 1024 * 1024) throw new Error("Для импорта допустим файл до 256 МБ.");

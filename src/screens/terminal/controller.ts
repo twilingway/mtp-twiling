@@ -1,6 +1,7 @@
 import * as storage from "../../services/storage.js";
 import { setDisplayPreferences } from "../../i18n/preferences.js";
 import type { TBankClient } from "../../services/tbank-client.js";
+import type { BackupImportOptions } from "../../model/backup-import.js";
 import { moveWatchlistRow, type WatchlistMove } from "../../services/watchlist-order.js";
 import { loadCandleCalendar } from "../../services/tbank-calendar.js";
 import { saveChartView } from "../../services/chart-camera.js";
@@ -444,7 +445,8 @@ export class TerminalController {
   clearHistory = (uid: string | null, timeframe: Timeframe | null): Promise<void> =>
     this.history.clear(uid, timeframe);
   exportBackup = (includeHistory: boolean): Promise<Backup> => this.backups.export(includeHistory);
-  importBackup = (input: unknown): Promise<void> => this.backups.import(input);
+  importBackup = (input: unknown, options?: BackupImportOptions): Promise<void> =>
+    this.backups.import(input, options);
   importBackupFile = (file: File): Promise<void> => this.backups.importFile(file);
   recoverBackup = (): Promise<void> => this.backups.recover();
   saveImage = async (asset: ImageAsset): Promise<void> => {

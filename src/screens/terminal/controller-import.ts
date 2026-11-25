@@ -1,6 +1,7 @@
 import * as storage from "../../services/storage.js";
 import { resetSharedChartCamera } from "../../services/chart-camera.js";
 import { validateBackup } from "../../model/backup-format.js";
+import { assertImportCurrent, type BackupImportOptions } from "../../model/backup-import.js";
 import type { ChartAdapter } from "../../charts/adapter.js";
 import type { TBankClient } from "../../services/tbank-client.js";
 import type { TerminalState } from "./state.js";
@@ -37,10 +38,18 @@ function invalidateImportedView(
 }
 
 /** Retry only the committed profile's restoration, without repeating any backup writes. */
-export async function restoreImportedProfile(bridge: ImportBridge): Promise<void> {
+export async function restoreImportedProfile(
+  bridge: ImportBridge,
+  guard?: () => boolean
+): Promise<void> {
   const { owner, name } = bridge.getState(),
     client = bridge.getClient(),
-    valid = () => bridge.session.matches(client) && owner === bridge.getState().owner;
+    sessionValid = () => bridge.session.matches(client) && owner === bridge.getState().owner,
+    valid = () => {
+      if (!sessionValid()) return false;
+      assertImportCurrent(guard);
+      return true;
+    };
   try {
     await resetSharedChartCamera(owner);
     if (!valid()) return;
@@ -58,7 +67,7 @@ export async function restoreImportedProfile(bridge: ImportBridge): Promise<void
     invalidateImportedView(bridge, false);
     await bridge.loadHistory();
   } catch (error) {
-    if (valid()) {
+    if (sessionValid()) {
       const chart = bridge.getChart();
       if (chart) {
         chart.retired = true;
@@ -76,15 +85,21 @@ export async function restoreImportedProfile(bridge: ImportBridge): Promise<void
   }
 }
 
-export async function importTerminalBackup(input: unknown, bridge: ImportBridge): Promise<void> {
+export async function importTerminalBackup(
+  input: unknown,
+  bridge: ImportBridge,
+  options: BackupImportOptions = {}
+): Promise<void> {
   const data = validateBackup(input),
     { owner } = bridge.getState(),
     client = bridge.getClient(),
     valid = () => bridge.session.matches(client) && owner === bridge.getState().owner;
   await bridge.editing.flush();
   if (!valid()) return;
+  assertImportCurrent(options.valid);
   await bridge.saveView();
   if (!valid()) return;
+  assertImportCurrent(options.valid);
   const outgoing = bridge.getChart(),
     previousPersistence = outgoing?.persistView,
     previousRetired = outgoing?.retired;
@@ -94,7 +109,10 @@ export async function importTerminalBackup(input: unknown, bridge: ImportBridge)
   }
   let result: Awaited<ReturnType<typeof storage.importBackup>>;
   try {
-    result = await storage.importBackup(owner, data);
+    result = await storage.importBackup(owner, data, {
+      ...options,
+      valid: () => valid() && (options.valid?.() ?? true)
+    });
   } catch (error) {
     if (outgoing) {
       if (previousPersistence === undefined) delete outgoing.persistView;
@@ -105,10 +123,12 @@ export async function importTerminalBackup(input: unknown, bridge: ImportBridge)
     throw error;
   }
   if (!valid()) return;
+  assertImportCurrent(options.valid);
+  options.onCommitted?.();
   // Commit succeeded: invalidate all old/newborn canvas work before any next await.
   bridge.editing.reset();
   invalidateImportedView(bridge, false);
-  await restoreImportedProfile(bridge);
+  await restoreImportedProfile(bridge, options.valid);
   if (valid())
     bridge.notify(`Импортировано: ${result.drawings} рисунков, ${result.images} изображений.`);
 }
