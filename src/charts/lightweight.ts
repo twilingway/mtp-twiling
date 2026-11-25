@@ -124,6 +124,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
   series.setSeriesOrder(3);
   const model = new MtpModel();
   if (settings.indicatorOptions) model.styles = settings.indicatorOptions;
+  model.styleKey = indicators.mtpAll ? "mtpAll" : undefined;
   const mtp = lightweightMtp(
     {
       timeScale: () => ({

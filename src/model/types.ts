@@ -76,9 +76,11 @@ export interface MarketRow {
   availability: "pending" | "available" | "unavailable";
   note?: string | null;
 }
-export type IndicatorKey = "ma" | "ema" | "volume" | "mtp160" | "mtp440" | "mtp640";
+export type IndicatorKey = "ma" | "ema" | "volume" | "mtp160" | "mtp440" | "mtp640" | "mtpAll";
 export type MtpKey = Extract<IndicatorKey, `mtp${string}`>;
-export type IndicatorFlags = Record<IndicatorKey, boolean>;
+export type IndicatorFlags = Record<Exclude<IndicatorKey, "mtpAll">, boolean> & {
+  mtpAll?: boolean;
+};
 export interface IndicatorStyle {
   opacity?: number;
   color: string;

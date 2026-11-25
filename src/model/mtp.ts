@@ -1,7 +1,7 @@
 import type { Candle, IndicatorOptions, MtpKey } from "./types.js";
 // Exact periods transcribed from the user's three original Pine sources.
 export const MTP_DEFINITIONS: Record<
-  MtpKey,
+  Exclude<MtpKey, "mtpAll">,
   { name: string; color: string; width: number; periods: number[] }
 > = {
   mtp160: {
@@ -35,14 +35,16 @@ export const MTP_DEFINITIONS: Record<
     ]
   }
 };
+const originalKeys = Object.keys(MTP_DEFINITIONS) as (keyof typeof MTP_DEFINITIONS)[];
+export const MTP_COMBINED_PERIODS: readonly number[] = originalKeys.flatMap(
+  (key) => MTP_DEFINITIONS[key].periods
+);
 export const activeMtpPeriods = (flags: Partial<Record<MtpKey, boolean>>): number[] =>
-  (Object.keys(MTP_DEFINITIONS) as MtpKey[])
-    .filter((key) => flags[key])
-    .flatMap((key) => MTP_DEFINITIONS[key].periods);
+  flags.mtpAll
+    ? [...MTP_COMBINED_PERIODS]
+    : originalKeys.filter((key) => flags[key]).flatMap((key) => MTP_DEFINITIONS[key].periods);
 const periodGroup = new Map<number, MtpKey>(
-  (Object.keys(MTP_DEFINITIONS) as MtpKey[]).flatMap((key) =>
-    MTP_DEFINITIONS[key].periods.map((p) => [p, key] as const)
-  )
+  originalKeys.flatMap((key) => MTP_DEFINITIONS[key].periods.map((p) => [p, key] as const))
 );
 interface Bounds {
   mtpLow: number | undefined;
@@ -55,6 +57,7 @@ export class MtpModel {
   bounds: Bounds[];
   length = 0;
   styles: IndicatorOptions | undefined;
+  styleKey: MtpKey | undefined;
   constructor() {
     this.data = [];
     this.periods = [];
@@ -140,7 +143,7 @@ export class MtpModel {
     ctx.strokeStyle = "#1e90ff";
     ctx.lineWidth = 1;
     for (const period of this.periods) {
-      const group = periodGroup.get(period);
+      const group = this.styleKey ?? periodGroup.get(period);
       const style = group ? this.styles?.[group] : undefined;
       ctx.strokeStyle = style?.color || "#1e90ff";
       ctx.lineWidth = style?.width || 1;

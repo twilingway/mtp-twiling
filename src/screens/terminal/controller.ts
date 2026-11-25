@@ -5,6 +5,7 @@ import type { BackupImportOptions } from "../../model/backup-import.js";
 import { moveWatchlistRow, type WatchlistMove } from "../../services/watchlist-order.js";
 import { loadCandleCalendar } from "../../services/tbank-calendar.js";
 import { saveChartView } from "../../services/chart-camera.js";
+import { toggleIndicatorFlags } from "../../model/indicator-flags.js";
 import type { TradingCalendarDay } from "../../model/candle-clock.js";
 import { resolveWatchlist } from "../../model/market-model.js";
 import { pinSelectedInstrument, selectedMarketRow } from "../../model/selected-instrument.js";
@@ -310,10 +311,7 @@ export class TerminalController {
       client = this.client;
     await this.saveView();
     if (!this.session.matches(client) || !importWritable(this.state, owner)) return;
-    const indicators = {
-      ...this.state.preferences.indicators,
-      [key]: !this.state.preferences.indicators[key]
-    };
+    const indicators = toggleIndicatorFlags(this.state.preferences.indicators, key);
     const chartSettings = {
       ...this.state.preferences.chartSettings,
       removedIndicators:

@@ -42,6 +42,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
   const palette = chartPalette(settings);
   const model = new MtpModel();
   if (settings.indicatorOptions) model.styles = settings.indicatorOptions;
+  model.styleKey = indicators.mtpAll ? "mtpAll" : undefined;
   registerIndicator({
     name: "MTP_PERSONAL",
     shortName: "",

@@ -23,7 +23,8 @@ export const DEFAULT_INDICATORS: IndicatorFlags = {
   volume: true,
   mtp160: true,
   mtp440: true,
-  mtp640: false
+  mtp640: false,
+  mtpAll: false
 };
 export const DEFAULT_CHART_SETTINGS: ChartSettings = {
   grid: true,
@@ -44,6 +45,7 @@ export const DEFAULT_CHART_SETTINGS: ChartSettings = {
 };
 export const INDICATOR_NAMES: Record<IndicatorKey, string> = {
   volume: "Объём",
+  mtpAll: "MTP 4–640",
   mtp640: "MTP160+440+640",
   mtp440: "MTP160+440",
   mtp160: "MTP160",

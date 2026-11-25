@@ -1,5 +1,13 @@
 import type { ChartSettings, IndicatorFlags, IndicatorKey } from "./types.js";
-const order: readonly IndicatorKey[] = ["volume", "mtp640", "mtp440", "mtp160", "ma", "ema"];
+const order: readonly IndicatorKey[] = [
+  "volume",
+  "mtpAll",
+  "mtp640",
+  "mtp440",
+  "mtp160",
+  "ma",
+  "ema"
+];
 export function indicatorLegendKeys(
   settings: ChartSettings,
   flags: IndicatorFlags
@@ -7,6 +15,10 @@ export function indicatorLegendKeys(
   return order.filter(
     (key) =>
       !settings.removedIndicators?.includes(key) &&
-      (key.startsWith("mtp") || key === "volume" || flags[key] || settings.indicatorOptions?.[key])
+      !(flags.mtpAll && ["mtp160", "mtp440", "mtp640"].includes(key)) &&
+      ((key.startsWith("mtp") && key !== "mtpAll") ||
+        key === "volume" ||
+        flags[key] ||
+        settings.indicatorOptions?.[key])
   );
 }

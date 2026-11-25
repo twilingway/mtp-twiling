@@ -17,7 +17,8 @@ const indicatorKeys: readonly IndicatorKey[] = [
   "volume",
   "mtp160",
   "mtp440",
-  "mtp640"
+  "mtp640",
+  "mtpAll"
 ];
 
 /** Only settings read by native canvases belong to the adapter's lifetime. */
@@ -61,7 +62,8 @@ export function chartRenderConfigKey(settings: ChartSettings, flags: IndicatorFl
       volume: !tools.indicatorsHidden && flags.volume,
       mtp160: !tools.indicatorsHidden && flags.mtp160,
       mtp440: !tools.indicatorsHidden && flags.mtp440,
-      mtp640: !tools.indicatorsHidden && flags.mtp640
+      mtp640: !tools.indicatorsHidden && flags.mtp640,
+      mtpAll: !tools.indicatorsHidden && !!flags.mtpAll
     }
   };
   return JSON.stringify(config);

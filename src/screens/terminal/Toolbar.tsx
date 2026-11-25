@@ -76,7 +76,7 @@ export function Toolbar() {
                 <input
                   type="checkbox"
                   id={`indicator-${key}`}
-                  checked={p.indicators[key]}
+                  checked={!!p.indicators[key]}
                   onChange={() => {
                     void controller.toggleIndicator(key);
                   }}

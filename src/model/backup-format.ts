@@ -176,7 +176,7 @@ function isIndicatorOptions(value: unknown): boolean {
     isRecord(value) &&
     Object.entries(value).every(
       ([key, style]) =>
-        ["ma", "ema", "volume", "mtp160", "mtp440", "mtp640"].includes(key) &&
+        ["ma", "ema", "volume", "mtp160", "mtp440", "mtp640", "mtpAll"].includes(key) &&
         isRecord(style) &&
         color(style.color) &&
         numberBetween(1, 5)(style.width) &&
@@ -192,8 +192,8 @@ export function isChartSettings(value: unknown): value is ChartSettings {
       drawingTools: isDrawingToolbarSettings,
       removedIndicators: (value) =>
         Array.isArray(value) &&
-        value.length <= 6 &&
-        value.every(member(["ma", "ema", "volume", "mtp160", "mtp440", "mtp640"])),
+        value.length <= 7 &&
+        value.every(member(["ma", "ema", "volume", "mtp160", "mtp440", "mtp640", "mtpAll"])),
       grid: boolean,
       upColor: color,
       downColor: color,
@@ -250,7 +250,8 @@ export function isProfilePreferences(value: unknown): value is ProfilePreference
           volume: boolean,
           mtp160: boolean,
           mtp440: boolean,
-          mtp640: boolean
+          mtp640: boolean,
+          mtpAll: boolean
         })
     })
   );
