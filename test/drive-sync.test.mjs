@@ -35,6 +35,21 @@ const { sanitizeDriveBackup, sha256, prepareDriveBackup, validateManifest, drive
 const { DriveTransport } = load("services/drive/transport.ts");
 const { DriveSync } = load("services/drive/sync.ts");
 const deviceId = crypto.randomUUID();
+test("default browser fetch keeps its global receiver instead of the transport instance", async (t) => {
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = function () {
+    assert.equal(this, globalThis, "native browser fetch requires the global receiver");
+    calls++;
+    return Promise.resolve(new Response(JSON.stringify({ files: [] }), {
+      headers: { "Content-Type": "application/json" }
+    }));
+  };
+  t.after(() => { globalThis.fetch = original; });
+  const transport = new DriveTransport(authorization());
+  assert.deepEqual(await transport.list("snapshot"), []);
+  assert.equal(calls, 1);
+});
 test("Drive preserves the combined MTP selection and shared style", async () => {
   const backup = {
     application: "personal-terminal",

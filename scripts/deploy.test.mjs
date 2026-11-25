@@ -58,7 +58,14 @@ test("semantic version must increase for release inputs only", () => {
   assert.equal(versionIncreased("1.2.3", "1.2.3"), false);
   assert.equal(versionIncreased("1.2.3", "1.1.99"), false);
   assert.throws(() => versionIncreased("1.2.3", "1.2.4-beta"));
-  for (const file of ["src/main.tsx", "public/index.html", "scripts/build.mjs", "package.json"])
+  for (const file of [
+    "src/main.tsx",
+    "public/index.html",
+    "scripts/build.mjs",
+    "package.json",
+    "server.mjs",
+    "deploy/static/nginx.conf"
+  ])
     assert.equal(isReleaseInput(file), true);
   for (const file of [
     "docs/deployment.md",
@@ -73,13 +80,16 @@ test("version preparation works cold and ignores generated outputs on repetition
   await mkdir(join(root, "src"));
   await mkdir(join(root, "public"));
   await mkdir(join(root, "scripts"));
+  await mkdir(join(root, "deploy/static"), { recursive: true });
   await writeFile(join(root, "package.json"), '{"version":"0.3.8"}');
   for (const file of [
     "pnpm-lock.yaml",
     "tsconfig.json",
     "scripts/build.mjs",
     "scripts/prepare-version.mjs",
-    "scripts/service-worker.template.js"
+    "scripts/service-worker.template.js",
+    "server.mjs",
+    "deploy/static/nginx.conf"
   ])
     await writeFile(join(root, file), "source");
   await writeFile(join(root, "src/main.tsx"), "source");
@@ -96,6 +106,15 @@ test("version preparation works cold and ignores generated outputs on repetition
   await writeFile(join(root, "public/app-entry.js"), "generated");
   await writeFile(join(root, "public/version.json"), "generated");
   assert.deepEqual(await prepareVersion(root), first);
+  // Cached navigation responses retain CSP. Either host's policy must roll the PWA cache.
+  await writeFile(join(root, "server.mjs"), "server CSP changed");
+  const changedServer = await prepareVersion(root);
+  assert.notEqual(changedServer.buildId, first.buildId);
+  assert.deepEqual(await prepareVersion(root), changedServer);
+  await writeFile(join(root, "deploy/static/nginx.conf"), "nginx CSP changed");
+  const changedNginx = await prepareVersion(root);
+  assert.notEqual(changedNginx.buildId, changedServer.buildId);
+  assert.deepEqual(await prepareVersion(root), changedNginx);
   await writeFile(join(root, "src/main.tsx"), "changed");
   assert.notEqual((await prepareVersion(root)).buildId, first.buildId);
 });

@@ -27,6 +27,8 @@ export function isReleaseInput(file) {
       "scripts/prepare-version.mjs",
       "scripts/build-vendor.mjs",
       "scripts/service-worker.template.js",
+      "server.mjs",
+      "deploy/static/nginx.conf",
       "tsconfig.json"
     ].includes(file)
   );

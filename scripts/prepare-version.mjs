@@ -38,6 +38,8 @@ export async function prepareVersion(projectRoot = root) {
     "scripts/build.mjs",
     "scripts/prepare-version.mjs",
     "scripts/service-worker.template.js",
+    "server.mjs",
+    "deploy/static/nginx.conf",
     "tsconfig.json"
   ]) {
     hash.update(file);

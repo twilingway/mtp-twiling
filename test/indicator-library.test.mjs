@@ -478,6 +478,44 @@ test("split controls route main click to library, chevron to quick panel, and di
   assert.equal(open, false);
 });
 
+test("quick menu Escape still dismisses after an async disabled control moves focus outside", (t) => {
+  const originalWindow = globalThis.window, originalDocument = globalThis.document;
+  const listeners = new Map(), cleanups = [];
+  let open = true, focused = 0, refIndex = 0;
+  const refs = [{ current: { focus: () => focused++ } }, { current: null }];
+  const target = {
+    addEventListener: (name, callback, capture) => listeners.set(name, { callback, capture }),
+    removeEventListener: (name) => listeners.delete(name)
+  };
+  globalThis.window = target;
+  globalThis.document = target;
+  t.after(() => {
+    for (const cleanup of cleanups) cleanup();
+    globalThis.window = originalWindow;
+    globalThis.document = originalDocument;
+  });
+  const load = modules({
+    react: { ...react,
+      useEffect: (callback) => { const cleanup = callback(); if (cleanup) cleanups.push(cleanup); },
+      useState: () => [open, (next) => { open = next; }],
+      useRef: () => refs[refIndex++]
+    },
+    "screens/terminal/context.js": { useTerminal: () => ({ state: {
+      preferences: { indicators: {}, chartSettings: {} }
+    }, controller: {} }) },
+    "screens/terminal/useIndicatorMenuAction.js": { useIndicatorMenuAction: () => ({ pending: true }) }
+  });
+  load("screens/terminal/TerminalIndicatorControls.js").TerminalIndicatorControls();
+  const handler = listeners.get("keydown");
+  assert.equal(handler.capture, true);
+  let prevented = false, stopped = false;
+  handler.callback({ key: "Escape", target: { tagName: "BODY" },
+    preventDefault: () => { prevented = true; }, stopPropagation: () => { stopped = true; } });
+  assert.equal(open, false);
+  assert.equal(focused, 1);
+  assert.equal(prevented && stopped, true);
+});
+
 test("pending indicator action catches failure, releases pending and suppresses errors after owner bounce", async () => {
   for (const bounce of [false, true]) {
     const f = terminalFixture(),

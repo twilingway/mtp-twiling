@@ -384,9 +384,11 @@ function fixture() {
     {
       auth: {
         prepare: async () => {},
+        restore: async () => undefined,
+        suspend: () => auth?.abort(),
         connectFromUserGesture: async () => {
           auth = new AbortController();
-          return { signal: auth.signal, invalidate: () => auth.abort() };
+          return { signal: auth.signal, getAccessToken: () => "fixture-test-token", invalidate: () => auth.abort() };
         },
         disconnect: async () => auth?.abort()
       },

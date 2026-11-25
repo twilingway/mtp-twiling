@@ -27,8 +27,19 @@ export function TerminalIndicatorControls() {
   useEffect(() => {
     const moved = () => setOpen(false);
     if (!open) return;
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      setOpen(false);
+      trigger.current?.focus();
+    };
     window.addEventListener("resize", moved);
-    return () => window.removeEventListener("resize", moved);
+    document.addEventListener("keydown", escape, true);
+    return () => {
+      window.removeEventListener("resize", moved);
+      document.removeEventListener("keydown", escape, true);
+    };
   }, [open]);
   return (
     <div
@@ -52,8 +63,8 @@ export function TerminalIndicatorControls() {
           controller.setDialog("indicator-library");
         }}
       >
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <path d="M13 3h-2a2 2 0 0 0-2 1.7L6.5 17H4M5 7h8m1 4 4 6m0-6-4 6" />
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M3 21v-5h4v5m3 0v-8h4v8m3 0V10h4v11M3 11l5-5 5 2 8-5" />
         </svg>
         <span>{t("Индикаторы")}</span>
       </button>

@@ -151,7 +151,9 @@ export function Watchlist() {
           aria-label={t("Добавить инструмент")}
           onClick={() => controller.setDialog(state.authenticated ? "instruments" : "account")}
         >
-          ＋
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
         </button>
         <button
           id="reset-order"
@@ -161,7 +163,9 @@ export function Watchlist() {
             setQuery("");
           }}
         >
-          ↻
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M20 12a8 8 0 1 1-2.35-5.65M20 5v6h-6" />
+          </svg>
         </button>
       </div>
       <div className="watchlist-search">

@@ -264,7 +264,11 @@ function restoredAuthorization() {
     getAccessToken() { if (abort.signal.aborted) throw Object.assign(new Error("expired"), { code: "auth-required" }); return "unit-restored-access"; },
     invalidate: () => abort.abort() };
 }
-async function until(condition) { for (let i = 0; i < 200 && !condition(); i++) await tick(); assert.ok(condition(), "condition completed"); }
+async function until(condition) {
+  const deadline = performance.now() + 5000;
+  while (!condition() && performance.now() < deadline) await new Promise(resolve => setTimeout(resolve, 5));
+  assert.ok(condition(), "condition completed");
+}
 
 test("startup restores valid authorization without account settings/GIS and honors saved automatic=false", async t => {
   for (const automatic of [true, false]) {
@@ -361,7 +365,7 @@ test("one online event wakes automatic sync once and teardown removes that liste
   const state = { preferences: {}, rows: [], drawings: [], images: [] };
   let dispose;
   try {
-    dispose = start({ getSnapshot: () => state, subscribe: () => () => {} });
+    dispose = start({ getSnapshot: () => state, sessionKey: () => "fixture-session", subscribe: () => () => {} });
     assert.equal(resumes, 1); listeners.get("online")(); assert.equal(syncs, 1);
     dispose(); dispose = undefined; assert.equal(listeners.has("online"), false); assert.equal(suspends, 1);
   } finally {
