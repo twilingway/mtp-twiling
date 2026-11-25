@@ -11,9 +11,12 @@
         line-height: 1.65;
       }
       body {
+        box-sizing: border-box;
+        width: 100%;
         max-width: 850px;
         margin: auto;
         padding: 24px;
+        overflow-wrap: anywhere;
       }
       a {
         color: light-dark(#0757ae, #80baff);
@@ -21,6 +24,9 @@
       h1,
       h2 {
         line-height: 1.25;
+      }
+      h1 {
+        font-size: clamp(1.5rem, 6vw, 2rem);
       }
       section {
         margin-block: 36px;
