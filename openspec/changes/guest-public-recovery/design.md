@@ -56,6 +56,16 @@ export. Невалидный источник не копируется. Неи�
 консервативно. Экспорт старых данных не заменяет текущий workspace; пользователь импортирует файл
 явно.
 
+## Inert Drive Bootstrap
+
+Browser blocker C19 уточнил bootstrap footprint: `loadDriveRecord(public)` в .18 создаёт инертный
+`drive-v2:public`. Только exact envelope id/owner/value, exact value
+schemaVersion/markerId/deviceId/baseHeads/automatic, schemaVersion 1, automatic true, пустой список
+heads и валидные v4 UUID с точным совпадением отдельного `drive-device` разрешены как bootstrap.
+Любые дополнительные/linked/pending/digest поля, иной envelope/ID или mismatch остаются occupied.
+Classifier читает только эти два exact metadata key; Drive, source и прежние decision markers не
+удаляются и не переписываются.
+
 ## Open Questions
 
 Нет; контракт согласован координатором до реализации.
