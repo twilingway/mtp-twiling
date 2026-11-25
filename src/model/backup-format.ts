@@ -1,4 +1,5 @@
 import { TOOL_NAMES } from "./drawing-model.js";
+import { isInstrumentSymbol, isInstrumentViewKey } from "./instrument-symbol.js";
 import { isLocale, isTimeZone } from "../i18n/preferences.js";
 import { isDrawingToolbarSettings } from "./drawing-toolbar.js";
 import { isNativeIntervalId } from "./intervals/registry.js";
@@ -24,7 +25,6 @@ import type {
 
 type Validator = (value: unknown) => boolean;
 type UnknownRecord = Record<string, unknown>;
-const symbolPattern = /^[A-Z0-9!._-]{1,40}$/;
 const colorPattern = /^#[0-9a-f]{6}$/i;
 const forbidden = new Set([
   "__proto__",
@@ -234,7 +234,7 @@ export function isProfilePreferences(value: unknown): value is ProfilePreference
       timeZone: isTimeZone,
       rightPanelCollapsed: boolean,
       rightPanelTab: member(["watchlist", "objects"]),
-      symbol: string,
+      symbol: isInstrumentSymbol,
       instrumentUid: nullable((value) => string(value) && value.length > 0 && value.length <= 200),
       timeframe: isTimeframe,
       favoriteIntervals: isIntervalFavorites,
@@ -278,8 +278,7 @@ function isBackupMarketRow(value: unknown): value is BackupMarketRow {
   return (
     isRecord(value) &&
     (value.uid === null || (string(value.uid) && value.uid.length <= 100)) &&
-    string(value.symbol) &&
-    symbolPattern.test(value.symbol) &&
+    isInstrumentSymbol(value.symbol) &&
     string(value.name) &&
     value.name.length <= 300 &&
     fields(value, {
@@ -319,8 +318,7 @@ function isBackupMarketRow(value: unknown): value is BackupMarketRow {
 function isBackupImage(value: unknown): value is BackupImage {
   return (
     isRecord(value) &&
-    string(value.symbol) &&
-    symbolPattern.test(value.symbol) &&
+    isInstrumentSymbol(value.symbol) &&
     member(["image/png", "image/jpeg", "image/webp", "image/gif"])(value.type) &&
     string(value.data) &&
     value.data.length <= 28 * 1024 * 1024 &&
@@ -347,8 +345,7 @@ function isBackup(value: unknown): value is Backup {
     list(
       (document) =>
         isRecord(document) &&
-        string(document.symbol) &&
-        symbolPattern.test(document.symbol) &&
+        isInstrumentSymbol(document.symbol) &&
         list(isBackupDrawing, 10000)(document.items),
       10000
     )(value.drawings) &&
@@ -359,8 +356,7 @@ function isBackup(value: unknown): value is Backup {
       watchlist: list(isBackupMarketRow, 300),
       history: list(isBackupHistory),
       views: list(
-        (view) =>
-          isRecord(view) && string(view.key) && view.key.length <= 200 && isChartView(view.value)
+        (view) => isRecord(view) && isInstrumentViewKey(view.key) && isChartView(view.value)
       )
     })
   );

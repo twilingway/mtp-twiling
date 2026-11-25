@@ -1,4 +1,5 @@
 import { fromBase64, isRecord, toBase64, validateBackup } from "../../model/backup-format.js";
+import { isWatchlistFlags } from "../../model/watchlist-flags.js";
 import type { Backup } from "../../model/types.js";
 import { DriveError } from "./types.js";
 import type { ContentReference, SnapshotManifest } from "./types.js";
@@ -117,20 +118,7 @@ export function sanitizeDriveBackup(value: unknown): Backup {
   const flagColors = ["red", "blue", "green", "yellow", "purple", "cyan", "pink"];
   if (isRecord(value) && isRecord(value.layout) && value.layout.watchlistFlags !== undefined) {
     const flags = value.layout.watchlistFlags;
-    if (
-      !isRecord(flags) ||
-      (Object.getPrototypeOf(flags) !== Object.prototype &&
-        Object.getPrototypeOf(flags) !== null) ||
-      Object.keys(flags).length > 5000 ||
-      !Object.entries(flags).every(
-        ([key, flag]) =>
-          key.length <= 200 &&
-          (/^uid:[A-Za-z0-9][A-Za-z0-9._-]*$/.test(key) ||
-            /^legacy:[A-Z0-9!._-]{1,40}$/.test(key)) &&
-          typeof flag === "string" &&
-          flagColors.includes(flag)
-      )
-    )
+    if (!isWatchlistFlags(flags))
       throw new DriveError("remote-invalid", "Некорректные цветные метки инструментов.");
   }
   if (

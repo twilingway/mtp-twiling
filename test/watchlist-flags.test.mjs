@@ -76,7 +76,8 @@ test("stable UID flags distinguish duplicate symbols, share aliases, preserve br
   assert.deepEqual(moved.map((item) => flags.watchlistFlag(map, item)), ["pink", "red", "blue", "red"]);
   assert.equal(JSON.stringify(rows), before);
   assert.equal(flags.watchlistFlagKey(row("BAD", "")), null);
-  assert.equal(flags.watchlistFlagKey(row("invalid space", null)), null);
+  assert.equal(flags.watchlistFlagKey(row("AZN LN", null)), "legacy:AZN LN");
+  assert.equal(flags.watchlistFlagKey(row("invalid\nspace", null)), null);
 });
 
 test("flag validator bounds keys/maps, rejects prototype and arbitrary values, keeps old backup compatible", () => {
@@ -86,7 +87,7 @@ test("flag validator bounds keys/maps, rejects prototype and arbitrary values, k
   assert.equal(flags.isWatchlistFlags(Object.assign(Object.create(null), { "uid:one": "red" })), true);
   for (const map of [[], null, { x: "red" }, { "uid:": "red" }, { "uid:bad key": "red" },
     { ["uid:" + "a".repeat(197)]: "red" }, { "uid:one": "orange" }, { "uid:one": "#ff5252" },
-    { "legacy:a b": "blue" }, JSON.parse('{"__proto__":"red"}'), Object.create({ "uid:a": "red" }),
+    { "legacy:a\nb": "blue" }, JSON.parse('{"__proto__":"red"}'), Object.create({ "uid:a": "red" }),
     Object.fromEntries(Array.from({ length: 5001 }, (_, i) => [`uid:${i}`, "red"]))]) {
     assert.equal(flags.isWatchlistFlags(map), false);
     assert.throws(() => validateBackup(backup({ watchlistFlags: map })));
