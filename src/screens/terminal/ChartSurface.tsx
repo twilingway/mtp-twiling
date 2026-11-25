@@ -14,10 +14,11 @@ import { useTerminal } from "./context.js";
 import type { TerminalState } from "./state.js";
 import { drawingVisibleOnInterval } from "../../model/intervals/drawing-visibility.js";
 import { useCameraInput } from "./camera-input.js";
+import { drawingRenderList } from "./drawing-settings-preview.js";
 
 export function visibleDrawings(state: TerminalState): Drawing[] {
   if (drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden) return [];
-  return state.drawings.filter((drawing) =>
+  return drawingRenderList(state).filter((drawing) =>
     drawingVisibleOnInterval(drawing.visibility, state.preferences.timeframe)
   );
 }

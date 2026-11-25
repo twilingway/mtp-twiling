@@ -195,5 +195,11 @@ export function useChartCanvas(
   }, [state.candles, state.historyViewReady, state.importingBackup, state.importRecoveryRequired]);
   useEffect(() => {
     adapterRef.current?.redrawDrawings();
-  }, [state.drawings, state.preview, state.selectedObject, drawingsHidden]);
+  }, [
+    state.drawings,
+    state.drawingSettingsPreview,
+    state.preview,
+    state.selectedObject,
+    drawingsHidden
+  ]);
 }

@@ -24,6 +24,7 @@ import type { ChartAdapter } from "../../charts/adapter.js";
 import { TerminalHistory } from "./controller-history.js";
 import { TerminalSession } from "./controller-session.js";
 import { TerminalEditing } from "./controller-editing.js";
+import { createDrawingPreview, drawingPreviewState } from "./drawing-settings-preview.js";
 import { TerminalDrawingTools } from "./controller-drawing-tools.js";
 import { TerminalPanel } from "./controller-panel.js";
 import { TerminalBackups } from "./controller-backups.js";
@@ -67,6 +68,7 @@ export class TerminalController {
   private readonly session: TerminalSession;
   private selectionEpoch = 0;
   readonly editing: TerminalEditing;
+  readonly drawingSettings: ReturnType<typeof createDrawingPreview>;
   readonly tools: TerminalDrawingTools;
   readonly panel: TerminalPanel;
   private readonly backups: TerminalBackups;
@@ -79,6 +81,7 @@ export class TerminalController {
       notify: (message: string) => this.notify(message)
     };
     this.editing = new TerminalEditing(bridge);
+    this.drawingSettings = createDrawingPreview(bridge, this.editing, () => !this.session.disposed);
     this.tools = new TerminalDrawingTools(this);
     this.panel = new TerminalPanel(this);
     this.history = new TerminalHistory({
@@ -149,7 +152,7 @@ export class TerminalController {
         activeTool: null,
         ...patch
       };
-    this.state = { ...this.state, ...patch };
+    this.state = drawingPreviewState({ ...this.state, ...patch });
     if (patch.preferences) setDisplayPreferences(patch.preferences);
     this.listeners.forEach((listener) => listener());
   };
@@ -175,6 +178,7 @@ export class TerminalController {
   }
   start = (): Promise<void> => this.session.start();
   dispose = (): void => {
+    this.drawingSettings.cancel();
     this.editing.reset();
     this.session.dispose();
     if (this.toastTimer) clearTimeout(this.toastTimer);
@@ -188,7 +192,7 @@ export class TerminalController {
     this.update({ authenticated: false });
     return this.session.logout();
   };
-  setDialog = (dialog: TerminalDialog): void => this.update({ dialog, contextMenu: null });
+  setDialog = (dialog: TerminalDialog): void => this.drawingSettings.setDialog(dialog);
   setContext = (contextMenu: ContextMenu | null): void => this.update({ contextMenu });
   selectObject = (id: string | null): void => this.update({ selectedObject: id });
   focusObject = (id: string): void => {
@@ -212,6 +216,7 @@ export class TerminalController {
   };
   setPreview = (preview: TerminalState["preview"]): void => this.update({ preview });
   undoDrawings = (): Promise<void> => {
+    this.drawingSettings.cancel();
     if (this.state.activeTool && this.state.preview) {
       this.setTool(null);
       return Promise.resolve();

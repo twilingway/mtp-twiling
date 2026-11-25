@@ -19,6 +19,7 @@ import type { TechnicalIndicatorInstance } from "../../model/technical-indicator
 import type { TechnicalPaneLayout } from "../../model/technical-indicator-layout.js";
 import type { WatchlistFlags, WatchlistFlagFilter } from "../../model/watchlist-flags.js";
 import { formatClock, formatNumber } from "../../i18n/format.js";
+import type { DrawingSettingsPreview } from "./drawing-settings-preview.js";
 export const DEFAULT_INDICATORS: IndicatorFlags = {
   ma: false,
   ema: false,
@@ -95,6 +96,7 @@ export interface ContextMenu {
   target: ContextTarget;
 }
 export interface TerminalState {
+  drawingSettingsPreview?: DrawingSettingsPreview | null;
   importingBackup?: boolean;
   importRecoveryRequired?: boolean;
   backupBusy?: boolean;
