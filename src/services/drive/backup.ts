@@ -17,7 +17,7 @@ const drawingSettings: Shape = {
   levels: [true],
   levelStyles: [scalars("value enabled color text")]
 };
-const indicators = "ma ema volume mtp160 mtp440 mtp640";
+const indicators = "ma ema volume mtp160 mtp440 mtp640 mtpAll";
 const chartSettings: Shape = {
   ...scalars(
     "theme legendCollapsed showCandleCountdown bodyVisible wickUpColor wickDownColor borderUpColor borderDownColor borderVisible wickVisible candlePaletteVersion grid upColor downColor background scaleFontSize showLegend priceLine"

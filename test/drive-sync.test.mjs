@@ -32,6 +32,25 @@ const { sanitizeDriveBackup, sha256, prepareDriveBackup, validateManifest, drive
 const { DriveTransport } = load("services/drive/transport.ts");
 const { DriveSync } = load("services/drive/sync.ts");
 const deviceId = crypto.randomUUID();
+test("Drive preserves the combined MTP selection and shared style", async () => {
+  const backup = {
+    application: "personal-terminal",
+    schemaVersion: 1,
+    layout: {
+      indicators: { mtpAll: true, mtp160: false },
+      chartSettings: {
+        indicatorOptions: { mtpAll: { color: "#123456", width: 3, opacity: 0.4 } }
+      }
+    },
+    drawings: [],
+    images: []
+  };
+  const clean = sanitizeDriveBackup(backup);
+  assert.deepEqual(clean.layout, backup.layout);
+  const disabled = structuredClone(backup);
+  disabled.layout.indicators.mtpAll = false;
+  assert.notEqual(await driveBackupDigest(clean), await driveBackupDigest(disabled));
+});
 const code = (expected) => (error) => error.code === expected;
 const fixture = (theme = "dark") => ({
   application: "personal-terminal",
