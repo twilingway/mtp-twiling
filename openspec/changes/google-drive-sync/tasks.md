@@ -15,10 +15,15 @@
 
 ## 3. Интеграция
 
-- [ ] 3.1 Подключить пользовательский UI и локальную привязку профиля; проверить отмену, disconnect,
-      конфликты и reload обоими устройствами.
-- [ ] 3.2 Проверить настоящий OAuth и Drive API, общий check и OpenSpec strict validation перед
-      публикацией.
+- [x] 3.1 Подключить RU/EN UI, локальную привязку и ручную/автоматическую синхронизацию; проверить
+      coordinator fake-store tests с owner/session abort, no echo, preview и concurrent edits.
+- [x] 3.2 Добавить атомарный portable replace через controller queue/barrier/recovery; проверить
+      merge regression, удаления/обновления, rollback, guard/saveView и postcommit recovery тестами.
+- [x] 3.3 Добавить публичную privacy и необходимые GIS/Drive CSP/COOP, проверить типы/линтер/формат.
+- [ ] 3.4 Проверить настоящий OAuth, Drive API и reload/изменения на двух реальных устройствах.
+- [x] 3.5 Выполнить общий check и OpenSpec strict validation: 280 тестов, формат/линтер/типы/сборка
+      и 12/12 спецификаций прошли в изолированной ветке.
+- [ ] 3.6 Выполнить отдельный browser UI gate координатором на общей сборке перед публикацией.
 
 ## Workflow follow-up
 

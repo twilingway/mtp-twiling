@@ -20,7 +20,7 @@ const drawingSettings: Shape = {
 const indicators = "ma ema volume mtp160 mtp440 mtp640";
 const chartSettings: Shape = {
   ...scalars(
-    "theme showCandleCountdown bodyVisible wickUpColor wickDownColor borderUpColor borderDownColor borderVisible wickVisible candlePaletteVersion grid upColor downColor background scaleFontSize showLegend priceLine"
+    "theme legendCollapsed showCandleCountdown bodyVisible wickUpColor wickDownColor borderUpColor borderDownColor borderVisible wickVisible candlePaletteVersion grid upColor downColor background scaleFontSize showLegend priceLine"
   ),
   removedIndicators: [true],
   drawingTools: {
@@ -38,7 +38,12 @@ const chartSettings: Shape = {
 const backupShape: Shape = {
   ...scalars("application schemaVersion exportedAt"),
   layout: {
-    ...scalars("sidebarWidth symbol instrumentUid timeframe engine rangeDays"),
+    ...scalars(
+      "locale timeZone rightPanelCollapsed rightPanelTab sidebarWidth symbol instrumentUid timeframe engine rangeDays watchlistFlagFilter"
+    ),
+    favoriteIntervals: [true],
+    indicatorPaneLayout: { volume: scalars("heightRatio") },
+    watchlistFlags: { $: true },
     chartSettings,
     indicators: scalars(indicators)
   },
@@ -109,6 +114,33 @@ function project(value: unknown, shape: Shape): unknown {
 
 /** Deep allowlist; never serializes local owner, history, tokens or market quote fields. */
 export function sanitizeDriveBackup(value: unknown): Backup {
+  const flagColors = ["red", "blue", "green", "yellow", "purple", "cyan", "pink"];
+  if (isRecord(value) && isRecord(value.layout) && value.layout.watchlistFlags !== undefined) {
+    const flags = value.layout.watchlistFlags;
+    if (
+      !isRecord(flags) ||
+      (Object.getPrototypeOf(flags) !== Object.prototype &&
+        Object.getPrototypeOf(flags) !== null) ||
+      Object.keys(flags).length > 5000 ||
+      !Object.entries(flags).every(
+        ([key, flag]) =>
+          key.length <= 200 &&
+          (/^uid:[A-Za-z0-9][A-Za-z0-9._-]*$/.test(key) ||
+            /^legacy:[A-Z0-9!._-]{1,40}$/.test(key)) &&
+          typeof flag === "string" &&
+          flagColors.includes(flag)
+      )
+    )
+      throw new DriveError("remote-invalid", "Некорректные цветные метки инструментов.");
+  }
+  if (
+    isRecord(value) &&
+    isRecord(value.layout) &&
+    value.layout.watchlistFlagFilter !== undefined &&
+    (typeof value.layout.watchlistFlagFilter !== "string" ||
+      !["all", ...flagColors].includes(value.layout.watchlistFlagFilter))
+  )
+    throw new DriveError("remote-invalid", "Некорректный фильтр меток инструментов.");
   const projected = project(value, backupShape);
   try {
     return validateBackup(projected);

@@ -3,6 +3,8 @@ import { memo, useEffect } from "react";
 import { setupPwa } from "../../services/pwa.js";
 import { DRAWING_CLIPBOARD_MIME } from "../../model/drawing-editing.js";
 import { useTerminal } from "./context.js";
+import { startTerminalDrive } from "./controller-drive.js";
+import { TransferMutationBarrier } from "./TransferMutationBarrier.js";
 export const UpdateBanner = memo(function UpdateBanner() {
   useTerminal();
   return (
@@ -21,6 +23,7 @@ export const UpdateBanner = memo(function UpdateBanner() {
 export function TerminalLifecycle() {
   const { controller } = useTerminal();
   useEffect(() => {
+    const disposeDrive = startTerminalDrive(controller);
     const lifecycle = new AbortController();
     let active = true,
       disposePwa: (() => void) | null = null;
@@ -108,8 +111,9 @@ export function TerminalLifecycle() {
       document.removeEventListener("keydown", keydown);
       document.removeEventListener("copy", copy);
       document.removeEventListener("paste", paste);
+      disposeDrive();
       controller.dispose();
     };
   }, [controller]);
-  return null;
+  return <TransferMutationBarrier />;
 }

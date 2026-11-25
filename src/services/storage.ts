@@ -332,7 +332,7 @@ export async function importBackup(
     ...(image.zOrder !== undefined ? { zOrder: image.zOrder } : {}),
     blob: new Blob([fromBase64(image.data)], { type: image.type })
   }));
-  const history = (data.history ?? []).map((block) => {
+  const history = (options.replacePortable ? [] : (data.history ?? [])).map((block) => {
     const buffer = fromBase64(block.data);
     decodeCandles(buffer);
     return {

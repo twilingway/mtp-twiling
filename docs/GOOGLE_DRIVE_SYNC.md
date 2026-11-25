@@ -1,7 +1,8 @@
-# Google Диск: ядро синхронизации
+# Google Диск: синхронизация личного профиля
 
-Реализовано независимое typed core `src/services/drive/`. Оно пока не подключено к интерфейсу,
-controller или IndexedDB. Реальный OAuth popup и реальные загрузки Google не проверялись.
+Ядро `src/services/drive/` подключено к разделу аккаунта, controller queue/barrier/recovery и
+локальной привязке IndexedDB. Реальный OAuth popup, реальные Google uploads и два устройства пока не
+проверялись. Визуальную проверку и смену общего runtime выполняет координатор отдельно.
 
 ## Авторизация
 
@@ -177,7 +178,69 @@ body-stream regressions проверяют отключение/expiry/reconnect
 некорректный JSON — `remote-invalid`. Проверки охватывают binary, listing, ответ создания файла и
 чтение причины 403; браузерные DOMException/TypeError не выходят в UI.
 
-Typecheck/ESLint/Prettier выполняются отдельно. Из этого не следует готовность реального OAuth,
-Google popup/cross-origin headers, UI, автоматической фоновой синхронизации, import/reload и
-публикации. Эти проверки нужны после интеграции bridge. Production-переключение OAuth и privacy в
-Google Console это ядро не меняет.
+Typecheck/ESLint/Prettier выполняются отдельно. Из fake tests не следует готовность реального OAuth,
+Google popup/cross-origin headers, визуального UI, двух устройств или публикации.
+Production-переключение OAuth и privacy в Google Console это ядро не меняет.
+
+## Подключённый интерфейс и автоматическая работа
+
+`GoogleDriveSettings` находится в окне аккаунта. До готовности GIS кнопка выключена; вход
+запускается по клику. Есть статус/время, кнопка sync, автоматический режим и disconnect. Отключение
+не отзывает consent и не удаляет файлы: управление доступом/скрытыми данными описано в
+`public/privacy.html`.
+
+`controller-drive.ts` владеет coordinator на экземпляр controller (WeakMap), подпиской на portable
+изменения, focus/visibility и периодом 60 секунд только видимой страницы. Обычные изменения
+объединяются debounce 1500 мс; цены/свечи не входят в signature/digest. При открытом другом
+редакторе, active tool, загрузке истории или import/recovery автоматический перенос ждёт. Отключение
+автоматики оставляет явную кнопку. Никаких фоновых popup/refresh tokens нет.
+
+Локальная запись `preferences/drive:<owner>` содержит случайные marker/device UUID, baseHeads,
+последний digest/time и auto flag. `preferences/drive-device` хранит идентификатор установки. Обе
+записи исключены из createBackup; owner и экземпляр банковской сессии проверяются до применения и
+смена любого из них сбрасывает Google OAuth, запросы и старый preview.
+
+Первое подключение к непустому облаку показывает выбор; пустое облако получает новый снимок. При
+дальнейшей работе удалённые изменения применяются автоматически, если локальный digest равен
+последней синхронизации. Обе изменённые стороны или несколько heads требуют preview всех heads
+(максимум восемь), с counts/date. Выбор повторяет export/digest/revision/inspect. Новые изменения
+после preview/pull отменяют импорт без перезаписи.
+
+`controller.importBackup(backup, { replacePortable: true, valid, onCommitted })` использует ту же
+per-owner очередь и import barrier. Полный layout/watchlist/drawings/images/views заменяется одной
+IDB-транзакцией; history/vault/чужие owner/Drive record сохраняются. Режим никогда не импортирует
+history. Guard проверяется после очереди/flush/saveView, перед transaction и перед writes в ней.
+`onCommitted` переключает подавление собственного restore echo; затем экспортируется фактически
+восстановленный профиль с default/migration полями, чтобы не публиковать повторный снимок. Ошибки
+после commit оставляют retired adapter и существующий recovery, не повторяя запись backup.
+
+`importWritable` блокирует новые изменения preferences/watchlist/рисунков/жестов только во время
+import/recovery, с повторными проверками после await. Export/pull остаются интерактивными: новые
+изменения отменяют stale incoming apply. В интерфейсе controls становятся inert с пояснением;
+аккаунт/выход/disconnect доступны. Login/logout синхронно публикуют `authenticated:false`, чтобы
+остановить Google ещё до завершения банковского flush/закрытия.
+
+Allowlist включает locale/timeZone/favoriteIntervals/indicatorPaneLayout/legendCollapsed, toolbar,
+панели, глобальные индикаторы, цвета меток/фильтр. Флаги ограничены семью цветами и uid/legacy
+ключами. Backup v1 по-прежнему использует текущие RF symbol namespaces. Bybit и Backup v2 в эту
+интеграцию не входят, автоматической identity migration нет.
+
+`test/drive-coordinator.test.mjs`, `test/portable-import.test.mjs` и queue/camera regressions
+проверяют реальные TS-модули с fake store/IDB boundary: no echo, нормализацию, owner/session abort,
+истечение, preview race, локальную правку во время pull/commit, atomic delete/update/rollback и
+обычный merge. Настоящая Google-сессия, реальные quota и два устройства ими не подтверждаются.
+
+Локальный `server.mjs` и `deploy/static/nginx.conf` содержат одинаковые узкие CSP Google endpoints и
+COOP `same-origin-allow-popups` по
+[официальному OAuth setup](https://developers.google.com/identity/oauth2/web/guides/get-google-api-clientid).
+Страница privacy опирается на
+[appDataFolder](https://developers.google.com/workspace/drive/api/guides/appdata),
+[token model](https://developers.google.com/identity/oauth2/web/guides/use-token-model),
+[управление скрытыми данными](https://support.google.com/drive/answer/6374270) и
+[Google User Data Policy](https://developers.google.com/terms/api-services-user-data-policy).
+Реальные server headers необходимо проверить после публикации, включая отсутствие второго
+унаследованного CSP/COOP, блокирующего Google.
+
+Проверено 25.11.2026 в `feat/drive-sync-ui`: `pnpm check` PASS (format, ESLint, strict TypeScript,
+изолированная сборка `749c961e0cf8df1a`, 280/280 тестов), `pnpm spec:validate` PASS 12/12. Общий
+localhost:5210, браузер, OAuth и Google Cloud этим прогоном не менялись.

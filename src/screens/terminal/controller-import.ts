@@ -123,7 +123,13 @@ export async function importTerminalBackup(
     throw error;
   }
   if (!valid()) return;
-  assertImportCurrent(options.valid);
+  try {
+    assertImportCurrent(options.valid);
+  } catch (error) {
+    bridge.editing.reset();
+    invalidateImportedView(bridge, true);
+    throw error;
+  }
   options.onCommitted?.();
   // Commit succeeded: invalidate all old/newborn canvas work before any next await.
   bridge.editing.reset();

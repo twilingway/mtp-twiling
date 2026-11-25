@@ -1,0 +1,119 @@
+import { DriveAuth } from "../../services/drive/auth.js";
+import { DriveSync } from "../../services/drive/sync.js";
+import { DriveTransport } from "../../services/drive/transport.js";
+import { DriveCoordinator } from "../../services/drive/coordinator.js";
+import { loadDriveRecord, saveDriveRecord } from "../../services/drive/local.js";
+import { sanitizeDriveBackup } from "../../services/drive/backup.js";
+import type { TerminalController } from "./controller.js";
+import type { TerminalState } from "./state.js";
+
+const drives = new WeakMap<TerminalController, DriveCoordinator>();
+export function terminalDrive(controller: TerminalController): DriveCoordinator {
+  let drive = drives.get(controller);
+  if (!drive) {
+    drive = new DriveCoordinator(
+      {
+        profile: () => {
+          const state = controller.getSnapshot();
+          return {
+            owner: state.owner,
+            session: controller.sessionKey(),
+            authenticated: state.authenticated,
+            blocked: !!(
+              state.backupBusy ||
+              state.importingBackup ||
+              state.importRecoveryRequired ||
+              state.loading ||
+              state.preview ||
+              state.activeTool ||
+              (state.dialog && state.dialog !== "account")
+            )
+          };
+        },
+        exportBackup: () => controller.exportBackup(false),
+        importBackup: (backup, options) => controller.importBackup(backup, options)
+      },
+      {
+        auth: new DriveAuth(),
+        sync: (authorization) => new DriveSync(new DriveTransport(authorization)),
+        load: loadDriveRecord,
+        save: saveDriveRecord
+      }
+    );
+    drives.set(controller, drive);
+  }
+  return drive;
+}
+
+/** Quote ticks never count as portable edits. Pixel blobs are compared by local identity. */
+export function portableStateSignature(state: TerminalState): string {
+  const watchlist = sanitizeDriveBackup({
+    application: "personal-terminal",
+    schemaVersion: 1,
+    drawings: [],
+    images: [],
+    watchlist: state.rows
+  }).watchlist;
+  return JSON.stringify([
+    state.preferences,
+    watchlist,
+    state.drawings,
+    state.images.map((image) => [
+      image.id,
+      image.syncId,
+      image.symbol,
+      image.name,
+      image.point,
+      image.width,
+      image.zOrder,
+      image.lock,
+      image.visible,
+      image.blob.size,
+      image.blob.type
+    ])
+  ]);
+}
+
+export function startTerminalDrive(controller: TerminalController): () => void {
+  const drive = terminalDrive(controller);
+  let previous = controller.getSnapshot(),
+    signature = portableStateSignature(previous);
+  drive.profileChanged();
+  const unsubscribe = controller.subscribe(() => {
+    const state = controller.getSnapshot();
+    drive.profileChanged();
+    if (
+      state.preferences !== previous.preferences ||
+      state.rows !== previous.rows ||
+      state.drawings !== previous.drawings ||
+      state.images !== previous.images
+    ) {
+      const next = portableStateSignature(state);
+      if (
+        signature !== next ||
+        state.images.some((image, index) => image.blob !== previous.images[index]?.blob)
+      )
+        drive.localChanged();
+      signature = next;
+    }
+    previous = state;
+  });
+  const wake = () => {
+    if (
+      document.visibilityState === "visible" &&
+      drive.getSnapshot().automatic &&
+      drive.getSnapshot().phase !== "conflict"
+    )
+      void drive.sync();
+  };
+  const timer = setInterval(wake, 60000);
+  window.addEventListener("focus", wake);
+  document.addEventListener("visibilitychange", wake);
+  return () => {
+    unsubscribe();
+    clearInterval(timer);
+    window.removeEventListener("focus", wake);
+    document.removeEventListener("visibilitychange", wake);
+    drive.disconnect();
+  };
+}

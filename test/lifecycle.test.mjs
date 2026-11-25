@@ -92,6 +92,37 @@ const sampleRow = (name) => ({
   availability: "pending"
 });
 
+test("portable mutation barrier blocks edits/recovery but allows exports and logout", async t => {
+  let reloads = 0;
+  const { controller, clients } = terminalFixture({ onLogout: () => { reloads++; } });
+  t.after(() => controller.dispose()); await controller.start(); await controller.login(`t.${"b".repeat(40)}`, "B", false);
+  for (const flag of ["importingBackup", "importRecoveryRequired"]) {
+    controller.update({ [flag]: true }); const before = controller.getSnapshot().preferences;
+    await controller.setPreferences({ locale: "en" }); await controller.setChartSettings({ theme: "light" }); await controller.toggleIndicator("ma");
+    await controller.setDrawings([]); await controller.addInstrument({}); await controller.removeInstrument({ uid: "uid-B", symbol: "GAZP" });
+    controller.setTool("segment");
+    assert.equal(controller.getSnapshot().preferences, before); assert.equal(controller.getSnapshot().activeTool, null);
+    controller.update({ [flag]: false });
+  }
+  controller.update({ backupBusy: true }); await controller.setPreferences({ locale: "en" });
+  assert.equal(controller.getSnapshot().preferences.locale, "en");
+  controller.update({ importingBackup: true }); const logout = controller.logout();
+  assert.equal(controller.getSnapshot().authenticated, false, "logout signals Google abort synchronously");
+  await logout; assert.equal(reloads, 1); assert.equal(clients[0].closed, true);
+});
+
+test("settings handlers recheck import ownership after awaiting saveView", async t => {
+  const { controller } = terminalFixture(); t.after(() => controller.dispose());
+  await controller.start(); await controller.login(`t.${"b".repeat(40)}`, "B", false);
+  for (const action of [() => controller.setPreferences({ locale: "en" }), () => controller.setChartSettings({ theme: "light" }), () => controller.toggleIndicator("ma")]) {
+    const gate = deferred(), before = controller.getSnapshot().preferences;
+    controller.saveView = () => gate.promise;
+    const pending = action(); controller.update({ importingBackup: true }); gate.resolve(); await pending;
+    assert.equal(controller.getSnapshot().preferences, before);
+    controller.update({ importingBackup: false });
+  }
+});
+
 test("native timeframe changes preserve history lookback, instrument UID and favorites", async (t) => {
   const { controller, modules } = terminalFixture();
   t.after(() => controller.dispose());
@@ -276,7 +307,7 @@ test("live candles follow the selected UID when another row has the same symbol"
   assert.equal(controller.getSnapshot().preferences.instrumentUid, "uid-other");
 });
 
-function terminalFixture({ restore = async () => null, candles, importBackup } = {}) {
+function terminalFixture({ restore = async () => null, candles, importBackup, onLogout } = {}) {
   const clients = [],
     savedSessions = [];
   const storage = {
@@ -291,6 +322,7 @@ function terminalFixture({ restore = async () => null, candles, importBackup } =
     savePreferences: async () => {},
     saveView: async () => {},
     flush: async () => {},
+    clearSession: async () => {},
     saveSession: async (session) => {
       savedSessions.push(session);
     },
@@ -346,7 +378,7 @@ function terminalFixture({ restore = async () => null, candles, importBackup } =
       navigator: { onLine: true },
       requestAnimationFrame: () => 1,
       cancelAnimationFrame: () => {},
-      location: { reload: () => assert.fail("unexpected reload") }
+      location: { reload: () => onLogout ? onLogout() : assert.fail("unexpected reload") }
     },
     {
       "services/storage.ts": storage,

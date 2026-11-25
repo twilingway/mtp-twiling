@@ -113,6 +113,18 @@ function fixture({ saveDocument = async () => {} } = {}) {
   };
 }
 
+test("drawing mutations and gestures wait for import/recovery, while export remains editable", async () => {
+  const f = fixture();
+  for (const flag of ["importingBackup", "importRecoveryRequired"]) {
+    f.update({ [flag]: true }); const before = f.state().drawings;
+    await f.editing.change({ drawings: [] }); await f.editing.undo(); await f.editing.redo();
+    assert.equal(f.editing.beginGesture(), -1); assert.equal(f.state().drawings, before); assert.equal(f.writes.length, 0);
+    f.update({ [flag]: false });
+  }
+  f.update({ backupBusy: true }); await f.editing.change({ drawings: [] });
+  assert.equal(f.state().drawings.length, 0); assert.equal(f.writes.length, 1);
+});
+
 test("copy preserves every setting and uses chart pixel projection on nonlinear prices", () => {
   const { load } = sourceModules({}),
     model = load("model/drawing-editing.ts"),

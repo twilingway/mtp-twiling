@@ -28,6 +28,7 @@ import { TerminalBackups } from "./controller-backups.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { defaultPreferences, terminalHistoryLabel } from "./controller-bridge.js";
 import { nativeTimeframe } from "../../model/intervals/native-timeframes.js";
+import { importWritable } from "./controller-transfer-guard.js";
 import type { ContextMenu, TerminalDialog, TerminalPreferences, TerminalState } from "./state.js";
 
 export class TerminalController {
@@ -109,6 +110,7 @@ export class TerminalController {
     return this.session.client;
   }
   getSnapshot = (): TerminalState => this.state;
+  sessionKey = (): unknown => this.client;
   marketNow = (): number => this.client?.serverNow?.() ?? Date.now();
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -200,12 +202,12 @@ export class TerminalController {
     if (this.toastTimer) clearTimeout(this.toastTimer);
   };
   login = async (token: string, name: string, remember: boolean): Promise<void> => {
+    this.update({ authenticated: false });
     await this.editing.flush();
-    this.editing.reset();
     await this.session.login(token, name, remember);
   };
   logout = (): Promise<void> => {
-    this.editing.reset();
+    this.update({ authenticated: false });
     return this.session.logout();
   };
   setDialog = (dialog: TerminalDialog): void => this.update({ dialog, contextMenu: null });
@@ -226,6 +228,7 @@ export class TerminalController {
       );
   };
   setTool = (tool: DrawingTool | null): void => {
+    if (!importWritable(this.state)) return;
     this.editing.cancelGesture();
     this.update({ activeTool: tool, preview: null, selectedObject: null, contextMenu: null });
   };
@@ -242,6 +245,7 @@ export class TerminalController {
     forceReload = false,
     valid: () => boolean = () => true
   ): Promise<void> => {
+    if (!importWritable(this.state)) return;
     const routing =
       forceReload ||
       ["symbol", "instrumentUid", "timeframe", "rangeDays", "engine"].some((key) => key in patch);
@@ -252,7 +256,7 @@ export class TerminalController {
     await this.editing.flush();
     if (
       !this.session.matches(client) ||
-      owner !== this.state.owner ||
+      !importWritable(this.state, owner) ||
       (routing && epoch !== this.selectionEpoch) ||
       !valid()
     )
@@ -305,7 +309,7 @@ export class TerminalController {
     const owner = this.state.owner,
       client = this.client;
     await this.saveView();
-    if (!this.session.matches(client) || owner !== this.state.owner) return;
+    if (!this.session.matches(client) || !importWritable(this.state, owner)) return;
     const indicators = {
       ...this.state.preferences.indicators,
       [key]: !this.state.preferences.indicators[key]
@@ -324,7 +328,7 @@ export class TerminalController {
     const owner = this.state.owner,
       client = this.client;
     await this.saveView();
-    if (!this.session.matches(client) || owner !== this.state.owner) return;
+    if (!this.session.matches(client) || !importWritable(this.state, owner)) return;
     this.update({
       preferences: {
         ...this.state.preferences,
@@ -389,9 +393,9 @@ export class TerminalController {
     instrument: Parameters<TBankClient["addInstrument"]>[0]
   ): Promise<void> => {
     const client = this.client;
-    if (!client) return;
+    if (!client || !importWritable(this.state)) return;
     const row = await client.addInstrument(instrument);
-    if (!this.session.matches(client)) return;
+    if (!this.session.matches(client) || !importWritable(this.state)) return;
     this.session.applyBankState(client.snapshot());
     this.update({ dialog: null });
     await this.setPreferences({ symbol: row.symbol, instrumentUid: row.uid });
@@ -401,12 +405,12 @@ export class TerminalController {
   ): Promise<void> => {
     const client = this.client,
       owner = this.state.owner;
-    if (!client) return;
+    if (!client || !importWritable(this.state)) return;
     await this.flush();
-    if (!this.session.matches(client) || owner !== this.state.owner) return;
+    if (!this.session.matches(client) || !importWritable(this.state, owner)) return;
     const selected = selectedMarketRow(this.state.rows, this.state.preferences);
     await client.removeInstrument(reference);
-    if (!this.session.matches(client) || owner !== this.state.owner) return;
+    if (!this.session.matches(client) || !importWritable(this.state, owner)) return;
     this.session.applyBankState(client.snapshot());
     const removedSelected =
       selected &&
@@ -426,15 +430,15 @@ export class TerminalController {
   };
   reorderWatchlist = async (move: WatchlistMove, expectedOwner: string): Promise<boolean> => {
     const client = this.client;
-    if (!client || this.state.owner !== expectedOwner || !this.session.matches(client))
+    if (!client || !importWritable(this.state, expectedOwner) || !this.session.matches(client))
       return false;
     if (!moveWatchlistRow(this.state.rows, move)) return false;
     const preferences = pinSelectedInstrument(this.state.rows, this.state.preferences);
     if (preferences !== this.state.preferences) this.update({ preferences });
     await this.savePreferences();
-    if (!this.session.matches(client) || this.state.owner !== expectedOwner) return false;
+    if (!this.session.matches(client) || !importWritable(this.state, expectedOwner)) return false;
     const changed = await client.reorderWatchlist(move);
-    if (!this.session.matches(client) || this.state.owner !== expectedOwner) return false;
+    if (!this.session.matches(client) || !importWritable(this.state, expectedOwner)) return false;
     if (changed) this.session.applyBankState(client.snapshot());
     return changed;
   };

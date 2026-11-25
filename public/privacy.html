@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>mtp.twiling.ru — Privacy / Конфиденциальность</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+        line-height: 1.65;
+      }
+      body {
+        max-width: 850px;
+        margin: auto;
+        padding: 24px;
+      }
+      a {
+        color: light-dark(#0757ae, #80baff);
+      }
+      h1,
+      h2 {
+        line-height: 1.25;
+      }
+      section {
+        margin-block: 36px;
+      }
+    </style>
+  </head>
+  <body>
+    <nav><a href="./">mtp.twiling.ru</a> · <a href="#english" lang="en">English</a></nav>
+    <h1>Конфиденциальность личного терминала</h1>
+    <p>
+      Обновлено: <time datetime="2026-11-25">25 ноября 2026</time>. Эта страница описывает работу
+      mtp.twiling.ru и его тестового экземпляра mtp-test.twiling.ru.
+    </p>
+    <section>
+      <h2>Данные на устройстве и Т‑Банк</h2>
+      <p>
+        Терминал — клиентское PWA. Настройки, рисунки, изображения и история свечей хранятся в
+        IndexedDB браузера. Личный API-ключ используется для прямых запросов к Т‑Банку. При выборе
+        «Запомнить ключ» зашифрованный AES-GCM ключ и локальный ключ расшифрования сохраняются на
+        устройстве; шифрование не защищает от человека или программы с доступом к разблокированному
+        профилю браузера. Без запоминания зашифрованная запись относится к сессии браузера.
+      </p>
+      <p>
+        Сервер приложения раздаёт статические файлы. Он не получает банковский API-ключ, историю и
+        котировки. Сайт может вести обычные журналы доступа nginx: IP-адрес, время, запрошенный URL,
+        код ответа и технические заголовки браузера. Не помещайте личные данные в URL.
+      </p>
+    </section>
+    <section>
+      <h2>Необязательная синхронизация Google Drive</h2>
+      <p>
+        После нажатия «Войти в Google» и вашего согласия приложение запрашивает только разрешение
+        <code>drive.appdata</code>. Оно читает и записывает собственную скрытую папку приложения, а
+        не произвольные файлы вашего Диска. В неё передаются настройки интерфейса и индикаторов,
+        список инструментов и его метки, рисунки с координатами времени UTC, прикреплённые
+        изображения и виды графиков. Добавленные вами подписи и изображения входят в синхронизацию.
+      </p>
+      <p>
+        Банковские и Google-токены, банковский отпечаток/локальный владелец, содержимое хранилища
+        ключей, история свечей и текущие цены в облачный снимок не включаются. Случайные
+        идентификаторы устройства и снимков используются для обнаружения конфликтующих изменений.
+        Данные передаются между браузером и Google по HTTPS; дополнительное шифрование облачных
+        снимков приложением не выполняется.
+      </p>
+      <p>
+        Данные Google используются для видимой функции переноса и синхронизации. Приложение не
+        продаёт их, не использует для рекламы и не отправляет разработчику или другим пользователям.
+        К Google применяются его собственные правила обработки данных. Вход Google загружается при
+        открытии раздела аккаунта; соединение с сервисом Google раскрывает Google обычные сетевые
+        сведения.
+      </p>
+      <p>
+        Access token Google находится только в памяти приложения. После истечения срока,
+        перезагрузки, отключения, выхода из банковского профиля или смены его владельца требуется
+        новый вход. Автоматическая синхронизация работает, пока приложение открыто и сессия Google
+        действительна. Конфликт требует выбора версии; предыдущие облачные снимки сохраняются и
+        занимают место.
+      </p>
+    </section>
+    <section>
+      <h2>Управление и удаление</h2>
+      <p>
+        Кнопка «Отключить Google Диск» останавливает обмен и удаляет токен из памяти, сохраняя
+        локальные и облачные данные. Отозвать разрешение можно в
+        <a href="https://myaccount.google.com/connections">подключениях аккаунта Google</a>. Для
+        удаления скрытых данных откройте Google Drive → Настройки → Управление приложениями →
+        mtp.twiling.ru → параметры удаления скрытых данных. Названия могут зависеть от языка Google;
+        см. <a href="https://support.google.com/drive/answer/6374270?hl=ru">инструкцию Google</a>.
+        Перед удалением отключите синхронизацию на устройствах, чтобы приложение не создало новые
+        снимки.
+      </p>
+      <p>
+        Выход из аккаунта удаляет сохранённый банковский ключ. Для удаления остальных локальных
+        данных очистите данные сайта в браузере: это удалит и локальную историю/настройки. До
+        очистки можно сохранить JSON через «Экспорт»; история свечей включается только при отдельном
+        выборе. Резервные копии, сохранённые вами как файлы, удаляются вами самостоятельно.
+      </p>
+      <p>
+        Вопросы о данных и ошибки:
+        <a href="https://github.com/twilingway/mtp-twiling/issues">GitHub Issues проекта</a>. Не
+        публикуйте ключи, токены и личные резервные копии в обращении.
+      </p>
+    </section>
+    <section id="english" lang="en">
+      <h1>Personal terminal privacy</h1>
+      <p>Updated November 25, 2026. Applies to mtp.twiling.ru and mtp-test.twiling.ru.</p>
+      <h2>Device data and T-Bank</h2>
+      <p>
+        This client-side PWA stores settings, drawings, images and candle history in browser
+        IndexedDB. Your personal bank API key is used for direct T-Bank requests. If you select
+        “Remember key”, the AES-GCM encrypted key and the local decryption key stay on the device.
+        This does not protect against access to your unlocked browser profile. Otherwise the
+        encrypted record is scoped to the browser session.
+      </p>
+      <p>
+        The application server serves static files and does not receive your bank key, quote history
+        or prices. Standard nginx access logs may include IP address, time, requested URL, response
+        status and technical browser headers. Do not put personal data in URLs.
+      </p>
+      <h2>Optional Google Drive sync</h2>
+      <p>
+        After you click “Sign in to Google” and consent, the app requests only
+        <code>drive.appdata</code>, for its own hidden app data rather than your other Drive files.
+        It syncs interface and indicator settings, the instrument list and flags, drawings with UTC
+        coordinates, attached images and chart views. Your own labels and images are included.
+      </p>
+      <p>
+        Bank/Google tokens, bank fingerprints, local owner IDs, the key vault, candle history and
+        live prices are excluded. Random device and snapshot identifiers detect conflicting changes.
+        Browser-to-Google transfers use HTTPS; the app does not add encryption to cloud snapshots.
+      </p>
+      <p>
+        Google data is used for the visible transfer and sync feature. The app does not sell it, use
+        it for advertising, or send it to the developer or other users. Google's own policies apply
+        to its services. Google sign-in loads when you open account settings; Google receives
+        ordinary connection information.
+      </p>
+      <p>
+        The Google access token is held only in app memory. Expiry, reload, disconnect, bank logout
+        or a different bank owner requires signing in again. Automatic sync runs while the app is
+        open and authorized. Conflicts require your choice. Old cloud snapshots remain and consume
+        storage.
+      </p>
+      <h2>Control and deletion</h2>
+      <p>
+        “Disconnect Google Drive” stops sync and clears the memory token, retaining local/cloud
+        data. Revoke permission in
+        <a href="https://myaccount.google.com/connections">Google Account connections</a>. Delete
+        hidden data in Google Drive → Settings → Manage apps → mtp.twiling.ru → hidden app data
+        options; see
+        <a href="https://support.google.com/drive/answer/6374270?hl=en">Google Help</a>. Disconnect
+        your devices first to avoid creating new snapshots.
+      </p>
+      <p>
+        Bank logout deletes the saved bank key. Clearing site data in your browser deletes the other
+        local data, including history and settings. You can export a JSON file first; candle history
+        is optional. You control deletion of exported files.
+      </p>
+      <p>
+        Data questions and bugs:
+        <a href="https://github.com/twilingway/mtp-twiling/issues">project GitHub Issues</a>. Do not
+        post keys, tokens or personal backups.
+      </p>
+    </section>
+    <footer>
+      <p>
+        <a href="https://developers.google.com/workspace/drive/api/guides/appdata"
+          >Google Drive app data documentation</a
+        >
+        ·
+        <a href="https://developers.google.com/identity/oauth2/web/guides/use-token-model"
+          >Google token model</a
+        >
+        ·
+        <a href="https://developers.google.com/terms/api-services-user-data-policy"
+          >Google API Services User Data Policy</a
+        >
+      </p>
+    </footer>
+  </body>
+</html>

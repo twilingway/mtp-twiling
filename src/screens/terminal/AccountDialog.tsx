@@ -6,6 +6,7 @@ import { useTerminal } from "./context.js";
 import { Modal } from "./Modal.js";
 import { PERIOD_LABELS, number } from "./state.js";
 import { ApplicationInfo } from "./ApplicationInfo.js";
+import { GoogleDriveSettings } from "./GoogleDriveSettings.js";
 import { intlLocale } from "../../i18n/preferences.js";
 const bytes = (value: number) =>
   new Intl.NumberFormat(intlLocale(), { maximumFractionDigits: 2 }).format(value / 1024 / 1024) +
@@ -343,6 +344,7 @@ export function AccountDialog() {
       </form>
       <StorageSettings />
       <TransferSettings />
+      <GoogleDriveSettings />
       <ApplicationInfo />
       <span className="dialog-footer">{t("Личные данные остаются на вашем устройстве")}</span>
     </Modal>

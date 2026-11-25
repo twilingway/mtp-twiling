@@ -86,11 +86,12 @@ async function fixture() {
     flush: async () => {
       events.push(`db.flush:${state.owner}`);
     },
-    importBackup: async (owner, data) => {
+    importBackup: async (owner, data, options = {}) => {
       events.push(`import.start:${owner}`);
       commits.add(owner);
       try {
         if (hooks.importGate) await hooks.importGate.promise;
+        if (options.valid && !options.valid()) throw new DOMException("changed", "AbortError");
         if (hooks.importFailure) throw new Error("commit failed");
         for (const item of data.views ?? []) {
           const id = `view:${owner}:${item.key}`;
@@ -156,6 +157,7 @@ async function fixture() {
     session: {
       matches: (captured) => alive && captured === client,
       prepareProfile: async () => {
+        await hooks.prepare?.();
         if (hooks.prepareFailure) throw new Error("postcommit profile failed");
       },
       applyBankState() {}
@@ -231,6 +233,46 @@ test("selected file reserves transfer order before asynchronous file reading fin
   await importing;
   const result = await exporting;
   assert.deepEqual(structuredClone(result.views[0].value), f.viewA);
+});
+
+test("portable guard is checked after queued work and saveView, before retirement or commit", async () => {
+  for (const phase of ["queue", "save"]) {
+    const f = await fixture(); let current = true;
+    const gate = deferred(); let earlier;
+    if (phase === "queue") { f.hooks.flushGate = gate; earlier = f.transfers.export(false); }
+    else f.hooks.saveGate = gate;
+    const importing = f.transfers.import(f.backupA, { replacePortable: true, valid: () => current });
+    const rejected = assert.rejects(importing, { name: "AbortError" });
+    await tick(); current = false; gate.resolve(); await earlier; await rejected;
+    assert.equal(f.events.includes("import.start:A"), false);
+    assert.equal(f.outgoing.retired, undefined);
+    assert.equal(f.state().importingBackup, false);
+  }
+});
+
+test("onCommitted changes the guard phase before own restoration updates, with no second import", async () => {
+  const f = await fixture(); let revision = 1, committed = false;
+  f.hooks.prepare = async () => { revision++; };
+  await f.transfers.import(f.backupA, { replacePortable: true,
+    valid: () => committed || revision === 1,
+    onCommitted: () => { assert.equal(f.events.includes("import.commit:A"), true); committed = true; } });
+  assert.equal(committed, true); assert.equal(revision, 2);
+  assert.equal(f.events.filter(event => event === "import.start:A").length, 1);
+  assert.equal(f.state().importRecoveryRequired, false);
+  assert.equal(f.outgoing.retired, true);
+  assert.equal(f.state().backupBusy, false);
+});
+
+test("postcommit guard failure requires restoration recovery and never repeats a committed import", async () => {
+  const f = await fixture(); let current = true;
+  f.hooks.prepare = async () => { current = false; };
+  await assert.rejects(f.transfers.import(f.backupA, { replacePortable: true, valid: () => current }), { name: "AbortError" });
+  assert.equal(f.state().importRecoveryRequired, true);
+  assert.equal(f.outgoing.retired, true);
+  assert.equal(f.events.filter(event => event === "import.commit:A").length, 1);
+  current = true; f.hooks.prepare = undefined; await f.transfers.recover();
+  assert.equal(f.state().importRecoveryRequired, false);
+  assert.equal(f.events.filter(event => event === "import.commit:A").length, 1);
 });
 
 test("file reading from an old profile cannot import into the new profile", async () => {

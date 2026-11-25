@@ -14,6 +14,7 @@ import { isDrawing } from "../../model/backup-format.js";
 import type { Drawing, DrawingPoint, ImageAsset } from "../../model/types.js";
 import type { ChartAdapter } from "../../charts/adapter.js";
 import type { TerminalState } from "./state.js";
+import { importWritable } from "./controller-transfer-guard.js";
 
 interface EditingBridge {
   getState(): TerminalState;
@@ -73,6 +74,7 @@ export class TerminalEditing {
   change(
     patch: Partial<Pick<TerminalState, "drawings" | "images" | "selectedObject">>
   ): Promise<void> {
+    if (!importWritable(this.bridge.getState())) return Promise.resolve();
     if (this.gesture) {
       this.cancelGesture();
       return Promise.resolve();
@@ -84,6 +86,7 @@ export class TerminalEditing {
     return this.persist(after);
   }
   beginGesture = (): number => {
+    if (!importWritable(this.bridge.getState())) return -1;
     this.cancelGesture();
     this.gesture = this.snapshot();
     return ++this.generation;
@@ -92,10 +95,12 @@ export class TerminalEditing {
     token: number,
     patch: Partial<Pick<TerminalState, "drawings" | "images" | "selectedObject">>
   ): void => {
+    if (!importWritable(this.bridge.getState())) return;
     if (token === this.generation && this.gesture && sameScope(this.gesture, this.snapshot()))
       this.bridge.update(patch);
   };
   finishGesture = (token: number): Promise<void> => {
+    if (!importWritable(this.bridge.getState())) return Promise.resolve();
     const before = this.gesture;
     if (token !== this.generation || !before) return Promise.resolve();
     this.gesture = null;
@@ -118,6 +123,7 @@ export class TerminalEditing {
     this.clipboard = null;
   };
   undo = async (): Promise<void> => {
+    if (!importWritable(this.bridge.getState())) return;
     if (this.gesture) {
       this.cancelGesture();
       return;
@@ -129,6 +135,7 @@ export class TerminalEditing {
     await this.persist(after);
   };
   redo = async (): Promise<void> => {
+    if (!importWritable(this.bridge.getState())) return;
     this.cancelGesture();
     const before = this.snapshot(),
       after = this.history.redo(before);
@@ -152,6 +159,7 @@ export class TerminalEditing {
     };
   }
   copySelected = (): string | null => {
+    if (!importWritable(this.bridge.getState())) return null;
     this.cancelGesture();
     const state = this.bridge.getState(),
       token = crypto.randomUUID();
@@ -201,6 +209,7 @@ export class TerminalEditing {
     return true;
   };
   clone = async (object: Drawing | ImageAsset, placement?: ClipboardPlacement): Promise<void> => {
+    if (!importWritable(this.bridge.getState())) return;
     this.cancelGesture();
     const chart = this.bridge.getChart(),
       state = this.bridge.getState();

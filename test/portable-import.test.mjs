@@ -68,6 +68,7 @@ function fixture() {
 
 test("portable replace updates and deletes drawings/images and preserves history, vault and other owners", async () => {
   const f = fixture(), untouched = JSON.stringify([...f.stores.drawings.get("B:SBER").items]);
+  f.backup.history = [{ uid: "private", timeframe: "1d", day: "2026-01-01", data: "SHOULD-NOT-BE-DECODED-OR-WRITTEN" }];
   await f.storage.importBackup("A", f.backup, { replacePortable: true });
   assert.equal(f.stores.drawings.get("A:SBER").items.length, 1);
   assert.equal(f.stores.drawings.get("A:SBER").items[0].points[0].value, 100);
@@ -78,6 +79,14 @@ test("portable replace updates and deletes drawings/images and preserves history
   assert.equal(JSON.stringify(f.stores.drawings.get("B:SBER").items), untouched);
   assert.equal(f.stores.images.has("B:old"), true);
   assert.equal(f.stores.history.get("A").data, "history"); assert.equal(f.stores.vault.get("A").data, "private");
+});
+
+test("replacement image bytes retain the local image id for the same sync identity", async () => {
+  const f = fixture(); f.stores.images.get("A:old").syncId = "new";
+  await f.storage.importBackup("A", f.backup, { replacePortable: true });
+  const image = f.stores.images.get("A:old");
+  assert.ok(image); assert.equal(image.syncId, "new"); assert.equal(await image.blob.text(), "new bytes");
+  assert.equal([...f.stores.images.values()].filter(item => item.owner === "A").length, 1);
 });
 
 test("ordinary import retains merge semantics", async () => {
