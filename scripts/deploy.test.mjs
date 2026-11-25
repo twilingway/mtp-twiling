@@ -357,6 +357,7 @@ async function controllerFixture(t, options = {}) {
   const bin = join(root, "bin");
   const source = await fixture(root);
   const eventsFile = join(root, "events.jsonl");
+  const commandEnvFile = join(root, "command-env.jsonl");
   const config = join(root, "config.json");
   await mkdir(bin);
   await mkdir(join(root, "state"));
@@ -368,6 +369,7 @@ async function controllerFixture(t, options = {}) {
     await switchRelease(root, previous);
   }
   await writeFile(eventsFile, "");
+  await writeFile(commandEnvFile, "");
   await writeFile(
     config,
     JSON.stringify({
@@ -377,7 +379,7 @@ async function controllerFixture(t, options = {}) {
       publicOrigin: "https://example.invalid"
     })
   );
-  const setup = { root, source, eventsFile, sha, olderSha, repo, ...options };
+  const setup = { root, source, eventsFile, commandEnvFile, sha, olderSha, repo, ...options };
   const fake = `#!${process.execPath}
 const fs = require('node:fs');
 const path = require('node:path');
@@ -385,6 +387,7 @@ const setup = ${JSON.stringify(setup)};
 const program = path.basename(process.argv[1]);
 const args = process.argv.slice(2);
 fs.appendFileSync(setup.eventsFile, JSON.stringify([program, ...args]) + '\\n');
+fs.appendFileSync(setup.commandEnvFile, JSON.stringify({program, workers: process.env.PNPM_MAX_WORKERS, nodeOptions: process.env.NODE_OPTIONS}) + '\\n');
 if (program === 'git') {
   if (args[0] === 'ls-remote') {
     const calls = fs.readFileSync(setup.eventsFile, 'utf8').split('\\n').filter(line => line.includes('ls-remote')).length;
@@ -430,7 +433,9 @@ globalThis.fetch = async input => {
         MTP_DEPLOY_ROOT: root,
         MTP_DEPLOY_CONFIG: config,
         MTP_DEPLOY_LOCKED: "1",
-        MTP_DEPLOY_EXPECTED_SHA: options.expectedSha
+        MTP_DEPLOY_EXPECTED_SHA: options.expectedSha,
+        PNPM_MAX_WORKERS: "17",
+        NODE_OPTIONS: "--max-old-space-size=128"
       },
       timeout: 30000
     });
@@ -440,7 +445,13 @@ globalThis.fetch = async input => {
       .split("\n")
       .filter(Boolean)
       .map((line) => JSON.parse(line));
-  return { root, run, events };
+  const commandEnv = async () =>
+    (await readFile(commandEnvFile, "utf8"))
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  return { root, run, events, commandEnv };
 }
 
 test(
@@ -504,7 +515,7 @@ test(
   "controller builds only after green CI and rechecks before activation",
   { skip: process.platform !== "linux" && "Linux executable fixtures; exercised in hosted CI" },
   async (t) => {
-    await t.test("green exact CI installs frozen and builds directly on VDS", async (t) => {
+    await t.test("green exact CI skips install scripts and builds directly on VDS", async (t) => {
       const scenario = await controllerFixture(t);
       const result = scenario.run();
       assert.equal(result.status, 0, result.stderr);
@@ -522,6 +533,7 @@ test(
             "pnpm",
             "install",
             "--frozen-lockfile",
+            "--ignore-scripts",
             "--child-concurrency=1",
             "--network-concurrency=1"
           ]
@@ -530,6 +542,23 @@ test(
       assert.deepEqual(
         events.filter((event) => event[0] === "node"),
         [["node", "scripts/build.mjs"]]
+      );
+      const environment = await scenario.commandEnv();
+      assert.deepEqual(
+        environment.find((entry) => entry.program === "pnpm"),
+        {
+          program: "pnpm",
+          workers: "1",
+          nodeOptions: "--max-old-space-size=128"
+        }
+      );
+      assert.deepEqual(
+        environment.find((entry) => entry.program === "node"),
+        {
+          program: "node",
+          workers: "17",
+          nodeOptions: "--max-old-space-size=128"
+        }
       );
       assert.equal((await readFile(join(scenario.root, "state/deployed-sha"), "utf8")).trim(), sha);
       const count = events.length;
