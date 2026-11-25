@@ -132,7 +132,7 @@ export class DriveTransport implements DriveStore {
     private readonly authorization: DriveAuthorization,
     options: DriveTransportOptions = {}
   ) {
-    this.fetcher = options.fetch ?? fetch;
+    this.fetcher = options.fetch ?? fetch.bind(globalThis);
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.random = options.random ?? Math.random;
   }

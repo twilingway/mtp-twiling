@@ -1,5 +1,7 @@
 import { DRIVE_CLIENT_ID, DRIVE_SCOPE, DriveError } from "./types.js";
 import type { DriveAuthorization } from "./types.js";
+import { EncryptedDriveAuthVault } from "./auth-vault.js";
+import type { DriveAuthVault, DriveCredential } from "./auth-vault.js";
 
 interface TokenResponse {
   access_token?: string;
@@ -48,8 +50,8 @@ export function loadGoogleIdentity(): Promise<GoogleIdentityOAuth> {
 
 export class DriveAuth {
   private sdk: GoogleIdentityOAuth | undefined;
-  private token: string | undefined;
-  private expiresAt = 0;
+  private credential: DriveCredential | undefined;
+  private owner = "";
   private epoch = 0;
   private controller = new AbortController();
   private expiryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -59,7 +61,8 @@ export class DriveAuth {
 
   constructor(
     private readonly loader = loadGoogleIdentity,
-    private readonly now = Date.now
+    private readonly now = Date.now,
+    private readonly vault: DriveAuthVault = new EncryptedDriveAuthVault()
   ) {}
 
   async prepare(): Promise<void> {
@@ -68,12 +71,15 @@ export class DriveAuth {
   }
 
   /** Call directly inside a click handler, after prepare() has completed. */
-  connectFromUserGesture(): Promise<DriveAuthorization> {
+  connectFromUserGesture(owner: string): Promise<DriveAuthorization> {
     if (!this.sdk)
       return Promise.reject(new DriveError("not-ready", "Авторизация Google ещё загружается."));
     if (this.pending)
       return Promise.reject(new DriveError("busy", "Подключение Google уже выполняется."));
-    this.clear();
+    if (!owner)
+      return Promise.reject(new DriveError("auth-required", "Подключите банковский профиль."));
+    this.suspend();
+    this.owner = owner;
     const epoch = this.epoch;
     return new Promise((resolve, reject) => {
       this.pending = { resolve, reject };
@@ -87,7 +93,7 @@ export class DriveAuth {
           scope: DRIVE_SCOPE,
           include_granted_scopes: false,
           callback: (response) => {
-            if (epoch === this.epoch) this.accept(response);
+            if (epoch === this.epoch) void this.accept(response, epoch);
           },
           error_callback: () => {
             if (epoch === this.epoch) this.fail("auth-cancelled", "Подключение Google отменено.");
@@ -100,7 +106,23 @@ export class DriveAuth {
     });
   }
 
-  private accept(response: TokenResponse): void {
+  /** Restores only a still-valid local credential. Never loads GIS or opens OAuth. */
+  async restore(owner: string): Promise<DriveAuthorization | undefined> {
+    this.suspend();
+    this.owner = owner;
+    const epoch = this.epoch;
+    let credential: DriveCredential | undefined;
+    try {
+      credential = await this.vault.load(owner, DRIVE_CLIENT_ID);
+    } catch {
+      return undefined;
+    }
+    if (epoch !== this.epoch || !credential) return undefined;
+    this.install(credential);
+    return this.authorization(epoch, true, false);
+  }
+
+  private async accept(response: TokenResponse, epoch: number): Promise<void> {
     if (!this.pending) return;
     const seconds = Number(response.expires_in);
     if (
@@ -114,56 +136,109 @@ export class DriveAuth {
       this.fail("auth-required", "Google не предоставил доступ к данным приложения.");
       return;
     }
-    this.token = response.access_token;
     clearTimeout(this.popupTimer);
     this.popupTimer = undefined;
-    this.expiresAt = this.now() + (seconds - 30) * 1000;
-    this.expiryTimer = setTimeout(() => this.clear(), (seconds - 30) * 1000);
-    const epoch = this.epoch;
-    const authorization: DriveAuthorization = {
-      connectionId: crypto.randomUUID(),
-      signal: this.controller.signal,
-      getAccessToken: () => {
-        if (epoch !== this.epoch || !this.token || this.now() >= this.expiresAt) {
-          if (epoch === this.epoch) this.clear();
-          throw new DriveError("auth-required", "Подключите Google Диск повторно.");
-        }
-        return this.token;
-      },
-      invalidate: () => {
-        if (epoch === this.epoch) this.clear();
-      }
-    };
+    const issuedAt = this.now(),
+      credential: DriveCredential = {
+        version: 1,
+        credentialId: crypto.randomUUID(),
+        owner: this.owner,
+        clientId: DRIVE_CLIENT_ID,
+        token: response.access_token,
+        issuedAt,
+        expiresAt: Math.floor(issuedAt + (seconds - 30) * 1000),
+        scopes: [...new Set(response.scope.split(/\s+/).filter(Boolean))]
+      };
+    this.install(credential);
+    let stored = false;
+    try {
+      await this.vault.remove(credential.owner, credential.clientId);
+      if (epoch !== this.epoch) return;
+      await this.vault.save(credential, this.controller.signal);
+      stored = true;
+    } catch {
+      /* A usable current session must survive unavailable device storage. */
+    }
+    if (epoch !== this.epoch || !this.pending) return;
     const pending = this.pending;
     this.pending = undefined;
-    pending.resolve(authorization);
+    pending.resolve(this.authorization(epoch, stored, !stored));
+  }
+  private install(credential: DriveCredential): void {
+    this.credential = credential;
+    this.expiryTimer = setTimeout(
+      () => this.expire(),
+      Math.max(0, credential.expiresAt - this.now())
+    );
+  }
+  private authorization(
+    epoch: number,
+    stored: boolean,
+    persistenceError: boolean
+  ): DriveAuthorization {
+    return {
+      connectionId: crypto.randomUUID(),
+      signal: this.controller.signal,
+      stored,
+      persistenceError,
+      getAccessToken: () => {
+        if (epoch !== this.epoch || !this.credential || this.now() >= this.credential.expiresAt) {
+          if (epoch === this.epoch) this.expire();
+          throw new DriveError("auth-required", "Подключите Google Диск повторно.");
+        }
+        return this.credential.token;
+      },
+      invalidate: () => {
+        if (epoch === this.epoch) this.expire();
+      }
+    };
   }
 
   private fail(code: "auth-required" | "auth-cancelled", message: string): void {
     const pending = this.pending;
     this.pending = undefined;
-    this.clear();
+    this.reset();
     pending?.reject(new DriveError(code, message));
   }
 
-  private clear(): void {
+  private expire(): void {
+    const credential = this.credential,
+      pending = this.pending;
+    this.pending = undefined;
+    this.reset();
+    pending?.reject(new DriveError("auth-required", "Войдите в Google повторно."));
+    if (credential)
+      void this.vault
+        .remove(credential.owner, credential.clientId, credential.credentialId)
+        .catch(() => {});
+  }
+  private reset(): void {
     clearTimeout(this.expiryTimer);
     clearTimeout(this.popupTimer);
     this.popupTimer = undefined;
     this.expiryTimer = undefined;
-    this.token = undefined;
-    this.expiresAt = 0;
+    this.credential = undefined;
     this.epoch++;
     this.controller.abort();
     this.controller = new AbortController();
   }
 
+  /** Page teardown/profile suspension aborts handles without forgetting a valid saved token. */
+  suspend(): void {
+    const pending = this.pending;
+    this.pending = undefined;
+    this.reset();
+    pending?.reject(new DriveError("auth-cancelled", "Google Диск приостановлен."));
+  }
+
   /** revoke=true is reserved for a separate explicit user action. */
   async disconnect(revoke = false): Promise<void> {
-    const token = this.token;
-    this.fail("auth-cancelled", "Google Диск отключён.");
-    if (revoke && token && this.sdk) {
-      const sdk = this.sdk;
+    const token = this.credential?.token,
+      owner = this.owner;
+    this.suspend();
+    await this.vault.remove(owner, DRIVE_CLIENT_ID);
+    if (revoke && token) {
+      const sdk = this.sdk ?? (await this.loader());
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(
           () => reject(new DriveError("network", "Отзыв доступа Google не подтверждён.")),

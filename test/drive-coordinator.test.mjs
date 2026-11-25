@@ -24,11 +24,11 @@ const load = sources(), { DriveCoordinator } = load("services/drive/coordinator.
   { sanitizeDriveBackup, driveBackupDigest } = load("services/drive/backup.ts");
 class Store {
   files = []; bodies = new Map(); hooks = {};
-  async list(kind) { return this.files.filter(file => file.appProperties.mtpKind === kind).map(file => structuredClone(file)); }
+  async list(kind) { await this.hooks.list?.(kind); return this.files.filter(file => file.appProperties.mtpKind === kind).map(file => structuredClone(file)); }
   async read(file, max) { await this.hooks.read?.(file); const body = this.bodies.get(file.id); assert.ok(body.size <= max); return body; }
   async create(kind, key, hash, body) {
     const file = { id: crypto.randomUUID(), name: kind, size: body.size, appProperties: { mtpNamespace: "mtp-drive-v1", mtpKind: kind, mtpKey: key, mtpHash: hash } };
-    this.files.push(file); this.bodies.set(file.id, body); return structuredClone(file);
+    await this.hooks.create?.(kind); this.files.push(file); this.bodies.set(file.id, body); return structuredClone(file);
   }
   count() { return this.files.filter(file => file.appProperties.mtpKind === "snapshot").length; }
 }
@@ -42,15 +42,15 @@ function backup(theme = "dark") {
 }
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
 const tick = () => new Promise(setImmediate);
-function fixture(store = new Store()) {
-  let local = backup(), profile = { owner: "A", session: {}, authenticated: true, blocked: false }, authorization, record = { schemaVersion: 1, deviceId: crypto.randomUUID(), markerId: crypto.randomUUID(), baseHeads: [], automatic: true }, disconnects = 0;
-  const hooks = {}, imports = [], writes = [], events = [];
+function fixture(store = new Store(), options = {}) {
+  let local = backup(), profile = { owner: "A", session: {}, authenticated: true, blocked: options.blocked ?? false }, online = options.online ?? true, authorization, record = { schemaVersion: 1, deviceId: crypto.randomUUID(), markerId: crypto.randomUUID(), baseHeads: [], automatic: options.automatic ?? true }, disconnects = 0;
+  const hooks = { ...options.hooks }, imports = [], writes = [], events = [];
   const auth = { async prepare() { events.push("prepare"); }, connectFromUserGesture() {
     events.push("click"); const abort = new AbortController();
     authorization = { connectionId: crypto.randomUUID(), signal: abort.signal, getAccessToken: () => "fake-token", invalidate: () => abort.abort() };
     return Promise.resolve(authorization);
-  }, async disconnect() { disconnects++; authorization?.invalidate(); } };
-  const bridge = { profile: () => profile, async exportBackup() { await hooks.export?.(); return structuredClone(local); }, async importBackup(incoming, options) {
+  }, async restore(owner) { authorization = await hooks.restore?.(owner); return authorization; }, suspend() { authorization?.invalidate(); }, async disconnect() { disconnects++; authorization?.invalidate(); await hooks.disconnect?.(); } };
+  const bridge = { profile: () => profile, async exportBackup() { events.push("export"); await hooks.export?.(); return structuredClone(local); }, async importBackup(incoming, options) {
     assert.equal(options.replacePortable, true); await hooks.beforeCommit?.();
     if (!options.valid()) throw new DOMException("changed", "AbortError");
     local = structuredClone(incoming); imports.push(local); options.onCommitted();
@@ -58,11 +58,11 @@ function fixture(store = new Store()) {
     local.layout.rangeDays ??= 365; // prepareProfile fills defaults.
     await hooks.postcommit?.();
   } };
-  const coordinator = new DriveCoordinator(bridge, { auth, sync: () => new DriveSync(store), load: async () => structuredClone(record), save: async (owner, value) => { writes.push({ owner, value: structuredClone(value) }); record = structuredClone(value); } });
+  const coordinator = new DriveCoordinator(bridge, { auth, online: () => online, sync: () => new DriveSync(store), load: async () => structuredClone(record), save: async (owner, value) => { writes.push({ owner, value: structuredClone(value) }); record = structuredClone(value); } });
   coordinator.profileChanged();
   return { coordinator, store, hooks, imports, writes, events, local: () => local, record: () => record, authorization: () => authorization, disconnects: () => disconnects,
     edit(patch) { local = { ...local, ...patch }; coordinator.localChanged(); },
-    changeProfile(patch) { profile = { ...profile, ...patch }; coordinator.profileChanged(); },
+    setOnline(value) { online = value; }, setRecord(patch) { record = { ...record, ...patch }; }, changeProfile(patch) { profile = { ...profile, ...patch }; coordinator.profileChanged(); },
     async connect() { await coordinator.prepare(); await coordinator.connect(); },
     async remote(incoming) { const sync = new DriveSync(store), inspection = await sync.inspect(); return sync.publish(incoming, { deviceId: crypto.randomUUID(), parents: inspection.heads }); }
   };
@@ -257,3 +257,126 @@ for (const choice of ["local", "remote"]) {
     });
   }
 }
+
+function restoredAuthorization() {
+  const abort = new AbortController();
+  return { connectionId: crypto.randomUUID(), signal: abort.signal, stored: true,
+    getAccessToken() { if (abort.signal.aborted) throw Object.assign(new Error("expired"), { code: "auth-required" }); return "unit-restored-access"; },
+    invalidate: () => abort.abort() };
+}
+async function until(condition) {
+  const deadline = performance.now() + 5000;
+  while (!condition() && performance.now() < deadline) await new Promise(resolve => setTimeout(resolve, 5));
+  assert.ok(condition(), "condition completed");
+}
+
+test("startup restores valid authorization without account settings/GIS and honors saved automatic=false", async t => {
+  for (const automatic of [true, false]) {
+    const f = fixture(undefined, { automatic, hooks: { restore: async () => restoredAuthorization() } }); t.after(() => f.coordinator.disconnect());
+    await until(() => f.coordinator.getSnapshot().connected && f.coordinator.getSnapshot().phase === "idle");
+    assert.equal(f.coordinator.getSnapshot().authorizationStored, true);
+    assert.equal(f.coordinator.getSnapshot().automatic, automatic);
+    assert.equal(f.store.count(), automatic ? 1 : 0); assert.ok(!f.events.includes("prepare")); assert.ok(!f.events.includes("click"));
+    if (!automatic) { assert.equal(f.events.includes("export"), false); await f.coordinator.sync(); assert.equal(f.store.count(), 1); }
+  }
+});
+
+test("offline pauses before export/API and preserves dirty changes until a successful wake", async t => {
+  const f = fixture(undefined, { online: false }); t.after(() => f.coordinator.disconnect());
+  f.edit({ layout: { ...f.local().layout, locale: "ru" } }); await f.connect();
+  assert.equal(f.events.includes("export"), false); assert.equal(f.store.count(), 0);
+  assert.equal(f.coordinator.getSnapshot().pauseReason, "offline"); assert.equal(f.coordinator.getSnapshot().pendingChanges, true);
+  assert.equal(f.coordinator.getSnapshot().lastSyncedAt, undefined);
+  f.setOnline(true); await f.coordinator.sync();
+  assert.equal(f.store.count(), 1); assert.equal(f.coordinator.getSnapshot().pendingChanges, false);
+  assert.equal(f.coordinator.getSnapshot().pauseReason, undefined);
+});
+
+test("expired credential is detected before local export and does not masquerade as network failure", async t => {
+  const f = fixture(); t.after(() => f.coordinator.disconnect()); await f.connect();
+  f.edit({ layout: { ...f.local().layout, locale: "ru" } });
+  const exports = f.events.filter(x => x === "export").length;
+  f.authorization().getAccessToken = () => { throw new Error("expired fixture"); };
+  await f.coordinator.sync();
+  assert.equal(f.events.filter(x => x === "export").length, exports); assert.equal(f.store.count(), 1);
+  assert.equal(f.coordinator.getSnapshot().phase, "auth-required"); assert.equal(f.coordinator.getSnapshot().pauseReason, "auth-required");
+  assert.equal(f.coordinator.getSnapshot().pendingChanges, true);
+});
+
+test("failed Google network request keeps the accepted base/digest/time and pending changes", async t => {
+  const f = fixture(); t.after(() => f.coordinator.disconnect()); await f.connect();
+  const before = structuredClone(f.record()), last = f.coordinator.getSnapshot().lastSyncedAt;
+  f.edit({ layout: { ...f.local().layout, locale: "ru" } });
+  f.store.hooks.list = () => { throw new Error("unit network outage"); }; await f.coordinator.sync();
+  assert.deepEqual(f.record().baseHeads, before.baseHeads); assert.equal(f.record().lastSyncedDigest, before.lastSyncedDigest);
+  assert.equal(f.coordinator.getSnapshot().lastSyncedAt, last); assert.equal(f.store.count(), 1);
+  assert.equal(f.coordinator.getSnapshot().pendingChanges, true); assert.equal(f.coordinator.getSnapshot().pauseReason, "network");
+  delete f.store.hooks.list; await f.coordinator.sync();
+  assert.equal(f.store.count(), 2); assert.equal(f.coordinator.getSnapshot().pendingChanges, false);
+});
+
+test("local edit during publication stays dirty although the completed older snapshot is acknowledged", async t => {
+  const f = fixture(); t.after(() => f.coordinator.disconnect()); await f.connect();
+  f.edit({ layout: { ...f.local().layout, locale: "ru" } }); let changed = false;
+  f.store.hooks.create = kind => { if (kind === "snapshot" && !changed) { changed = true; f.edit({ layout: { ...f.local().layout, sidebarWidth: 499 } }); } };
+  await f.coordinator.sync(); assert.equal(f.store.count(), 2); assert.equal(f.coordinator.getSnapshot().pendingChanges, true);
+  assert.equal(f.record().pendingChanges, true);
+  assert.notEqual(f.record().lastSyncedDigest, await driveBackupDigest(f.local()));
+  await f.coordinator.sync(); assert.equal(f.store.count(), 3); assert.equal(f.coordinator.getSnapshot().pendingChanges, false);
+});
+
+test("late authorization restore from the old bank owner is aborted before any export/API", async t => {
+  const gate = deferred(), old = restoredAuthorization(); let entered = false;
+  const f = fixture(undefined, { hooks: { restore: async owner => { if (owner === "A") { entered = true; await gate.promise; return old; } return undefined; } } }); t.after(() => f.coordinator.disconnect());
+  await until(() => entered); f.changeProfile({ owner: "B", session: {} }); gate.resolve();
+  await until(() => old.signal.aborted); assert.equal(f.coordinator.getSnapshot().connected, false);
+  assert.equal(f.events.includes("export"), false); assert.equal(f.store.count(), 0);
+});
+
+test("restored automatic sync waits for startup transfer barriers and resumes once they settle", async t => {
+  const f = fixture(undefined, { blocked: true, hooks: { restore: async () => restoredAuthorization() } }); t.after(() => f.coordinator.disconnect());
+  await until(() => f.coordinator.getSnapshot().connected);
+  assert.equal(f.events.includes("export"), false); f.changeProfile({ blocked: false });
+  await until(() => f.store.count() === 1 && f.coordinator.getSnapshot().phase === "idle");
+  f.changeProfile({ blocked: false }); await tick(); assert.equal(f.store.count(), 1);
+});
+
+test("lifecycle remount restores after suspend without clearing saved authorization", async t => {
+  const f = fixture(); t.after(() => f.coordinator.disconnect()); await f.connect();
+  const disconnects = f.disconnects(); f.coordinator.suspend();
+  f.hooks.restore = async () => restoredAuthorization(); f.coordinator.resume();
+  await until(() => f.coordinator.getSnapshot().connected && f.coordinator.getSnapshot().phase === "idle");
+  assert.equal(f.disconnects(), disconnects); assert.equal(f.store.count(), 1); assert.equal(f.events.filter(x => x === "click").length, 1);
+});
+
+test("one online event wakes automatic sync once and teardown removes that listener without logout", () => {
+  const listeners = new Map(), docListeners = new Map(); let syncs = 0, suspends = 0, resumes = 0;
+  class Coordinator {
+    resume() { resumes++; } profileChanged() {} localChanged() {} localIntent() {}
+    getSnapshot() { return { automatic: true, phase: "idle" }; }
+    async sync() { syncs++; } suspend() { suspends++; }
+  }
+  const start = sources({ "services/drive/coordinator.ts": { DriveCoordinator: Coordinator }, "services/drive/local.ts": {},
+    "screens/terminal/controller-camera-sync.ts": { cameraPending: () => false, flushCamera: async () => {}, subscribeCamera: () => () => {} }
+  })("screens/terminal/controller-drive.ts").startTerminalDrive;
+  const oldWindow = globalThis.window, oldDocument = globalThis.document;
+  globalThis.window = { addEventListener: (name, fn) => listeners.set(name, fn), removeEventListener: name => listeners.delete(name) };
+  globalThis.document = { visibilityState: "visible", addEventListener: (name, fn) => docListeners.set(name, fn), removeEventListener: name => docListeners.delete(name) };
+  const state = { preferences: {}, rows: [], drawings: [], images: [] };
+  let dispose;
+  try {
+    dispose = start({ getSnapshot: () => state, sessionKey: () => "fixture-session", subscribe: () => () => {} });
+    assert.equal(resumes, 1); listeners.get("online")(); assert.equal(syncs, 1);
+    dispose(); dispose = undefined; assert.equal(listeners.has("online"), false); assert.equal(suspends, 1);
+  } finally {
+    dispose?.(); if (oldWindow === undefined) delete globalThis.window; else globalThis.window = oldWindow;
+    if (oldDocument === undefined) delete globalThis.document; else globalThis.document = oldDocument;
+  }
+});
+
+test("a failed persisted-credential deletion is visible after disconnect", async () => {
+  const f = fixture(); await f.connect(); f.hooks.disconnect = () => { throw new Error("unit storage deletion failure"); };
+  f.coordinator.disconnect(); await tick();
+  assert.equal(f.coordinator.getSnapshot().connected, false);
+  assert.equal(f.coordinator.getSnapshot().credentialSaveError, true);
+});

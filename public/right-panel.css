@@ -11,17 +11,26 @@
 }
 .panel-divider {
   position: absolute;
-  left: -3px;
+  left: -4px;
   top: 0;
   bottom: 0;
-  width: 6px;
+  width: 8px;
   z-index: 30;
   cursor: col-resize;
   touch-action: none;
 }
+.panel-divider::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 3px;
+  width: 3px;
+  background: var(--control-line, #444444);
+  pointer-events: none;
+}
 .panel-divider:hover,
 .panel-divider:focus-visible {
-  background: #2962ff88;
+  background: transparent;
   outline: none;
 }
 .resizing-panels,

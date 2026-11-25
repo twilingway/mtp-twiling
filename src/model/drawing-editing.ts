@@ -1,4 +1,5 @@
 import { isDrawing, isRecord } from "./backup-format.js";
+import { isInstrumentSymbol } from "./instrument-symbol.js";
 import type { Drawing, DrawingPoint, ImageAsset, PixelPoint } from "./types.js";
 
 export interface EditingScope {
@@ -236,8 +237,7 @@ export function parseObjectClipboard(text: string): ObjectClipboardPayload | nul
         placement !== undefined &&
         (!isRecord(placement) ||
           !onlyKeys(placement, new Set(["symbol", "points"])) ||
-          typeof placement.symbol !== "string" ||
-          !/^[A-Z0-9!._-]{1,40}$/.test(placement.symbol) ||
+          !isInstrumentSymbol(placement.symbol) ||
           !Array.isArray(placement.points) ||
           placement.points.length !== value.drawing.points.length ||
           !placement.points.every(

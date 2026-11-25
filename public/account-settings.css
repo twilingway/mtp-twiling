@@ -5,6 +5,28 @@
   overflow-y: auto;
   box-sizing: border-box;
 }
+#account-dialog {
+  height: min(760px, calc(100dvh - 24px));
+  overflow: hidden;
+}
+#account-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+#account-dialog > :is(header, .account-sections, .account-help-links, .dialog-footer) {
+  flex-shrink: 0;
+}
+#account-dialog > .account-section {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding: 16px 6px 4px 0;
+}
+#account-dialog > .account-help-links {
+  margin-top: 12px;
+  padding-top: 12px;
+}
 .account-sections {
   display: flex;
   gap: 6px;
@@ -26,6 +48,37 @@
 }
 .account-section[hidden] {
   display: none;
+}
+#account-form[hidden] {
+  display: none;
+}
+.bank-connection-status {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border: 1px solid var(--control-line);
+  border-radius: 8px;
+  background: var(--surface-input);
+}
+.bank-connection-status[data-connected="true"] {
+  border-color: #089981;
+}
+.bank-connection-status strong {
+  font-size: 16px;
+}
+.bank-connection-status :is(p, span) {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.account-edit-key {
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  background: var(--surface-input);
+  color: var(--text);
 }
 .account-help-links,
 .settings-actions {
@@ -212,6 +265,9 @@
     padding: 18px;
     width: calc(100vw - 16px);
     max-height: calc(100dvh - 16px);
+  }
+  #account-dialog {
+    height: calc(100dvh - 16px);
   }
   .storage-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));

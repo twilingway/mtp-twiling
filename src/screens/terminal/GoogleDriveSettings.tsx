@@ -57,7 +57,7 @@ export function GoogleDriveSettings() {
     void drive.prepare();
   }, [drive]);
   return (
-    <section className="transfer-settings" id="google-drive-settings">
+    <section className="transfer-settings drive-settings" id="google-drive-settings">
       <h3>{t("Личный Google Диск")}</h3>
       <a className="settings-link" href="./privacy.html" target="_blank" rel="noopener">
         {t("Политика конфиденциальности")}
@@ -67,19 +67,33 @@ export function GoogleDriveSettings() {
           "Настройки, инструменты, индикаторы, рисунки и изображения синхронизируются с вашим Google Диском. Ключ банка и история котировок остаются на устройстве."
         )}
       </p>
-      <p id="google-drive-status" role="status">
-        {t(phases[status.phase])}
-      </p>
-      <small>
-        {t("Последняя синхронизация")}:{" "}
-        <time id="google-drive-last-sync" dateTime={status.lastSyncedAt}>
-          {date(status.lastSyncedAt)}
-        </time>
-      </small>
+      <div className="drive-status-card" data-drive-phase={status.phase}>
+        <p id="google-drive-status" role="status">
+          {t(phases[status.phase])}
+        </p>
+        <p className="drive-pending-status">
+          {t(
+            status.pendingChanges
+              ? "Есть несинхронизированные изменения"
+              : status.lastSyncedAt && status.connected && status.phase === "idle" && !status.error
+                ? "Изменения синхронизированы"
+                : status.lastSyncedAt
+                  ? "Данные сохранены на устройстве. Ожидаем проверки Google Диска."
+                  : "Синхронизация ещё не выполнялась"
+          )}
+        </p>
+        <small>
+          {t("Последняя синхронизация")}:{" "}
+          <time id="google-drive-last-sync" dateTime={status.lastSyncedAt}>
+            {date(status.lastSyncedAt)}
+          </time>
+        </small>
+      </div>
       {!state.authenticated && <p>{t("Сначала подключите личный ключ Т‑Банка")}</p>}
       {!status.connected ? (
         <button
           id="google-drive-connect"
+          className="primary-button"
           type="button"
           disabled={!state.authenticated || busy || !status.prepared}
           onClick={() => {
@@ -93,9 +107,10 @@ export function GoogleDriveSettings() {
               : t("Войти в Google")}
         </button>
       ) : (
-        <div>
+        <div className="drive-actions">
           <button
             id="google-drive-sync-now"
+            className="primary-button"
             type="button"
             disabled={busy}
             onClick={() => {
@@ -119,29 +134,42 @@ export function GoogleDriveSettings() {
           {t("Повторить загрузку входа")}
         </button>
       )}
-      {status.connected && (
-        <label className="checkbox-label">
-          <input
-            id="google-drive-automatic"
-            type="checkbox"
-            checked={status.automatic}
-            disabled={busy}
-            onChange={(event) => {
-              void drive
-                .setAutomatic(event.target.checked)
-                .catch(() => controller.notify(t("Не удалось сохранить настройку синхронизации")));
-            }}
-          />
-          {t("Автоматическая синхронизация")}
-        </label>
+      <label className="checkbox-label drive-automatic">
+        <input
+          id="google-drive-automatic"
+          type="checkbox"
+          checked={status.automatic}
+          disabled={busy || !state.authenticated}
+          onChange={(event) => {
+            void drive
+              .setAutomatic(event.target.checked)
+              .catch(() => controller.notify(t("Не удалось сохранить настройку синхронизации")));
+          }}
+        />
+        {t("Автоматическая синхронизация")}
+      </label>
+      {status.automatic && status.pauseReason && (
+        <p className="drive-pause-status" role="status">
+          {t(
+            status.pauseReason === "auth-required"
+              ? "Автосинхронизация на паузе: подключите Google."
+              : status.pauseReason === "offline"
+                ? "Автосинхронизация на паузе: нет интернета."
+                : "Автосинхронизация на паузе: Google Диск недоступен. Повторим при восстановлении связи."
+          )}
+        </p>
       )}
       {status.error && (
         <p role="alert" id="google-drive-error">
-          {t(errors[status.error])}
+          {t(
+            !status.prepared && status.error === "network"
+              ? "Не удалось загрузить вход Google. Нажмите «Повторить загрузку входа»."
+              : errors[status.error]
+          )}
         </p>
       )}
       {status.conflict && (
-        <div id="google-drive-conflict">
+        <div id="google-drive-conflict" className="drive-conflict">
           <h4>{t("Выберите сохраняемую версию")}</h4>
           <p>
             {t(
@@ -180,9 +208,25 @@ export function GoogleDriveSettings() {
           ))}
         </div>
       )}
-      <small>
+      {status.credentialSaveError && (
+        <p className="drive-storage-error" role="alert">
+          {t(
+            status.connected
+              ? "Не удалось сохранить вход Google на устройстве. В текущем окне подключение работает; после перезапуска войдите снова."
+              : "Не удалось удалить сохранённый вход Google на устройстве. Повторите удаление."
+          )}
+        </p>
+      )}
+      {!status.connected && status.credentialSaveError && (
+        <button type="button" onClick={drive.disconnect}>
+          {t("Повторить удаление входа Google")}
+        </button>
+      )}
+      <small className="drive-auth-note">
         {t(
-          "Вход Google действует до истечения сессии или перезагрузки приложения. После этого войдите повторно; сохранённые данные останутся."
+          status.authorizationStored
+            ? "Вход сохранён на этом устройстве. Когда срок доступа Google истечёт, синхронизация приостановится до повторного подключения."
+            : "Подключение Google будет сохранено на этом устройстве в зашифрованном виде до окончания срока токена."
         )}
       </small>
     </section>

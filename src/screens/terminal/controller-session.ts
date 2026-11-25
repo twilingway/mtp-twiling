@@ -263,7 +263,7 @@ export class TerminalSession {
     await client?.close();
     await this.sessionWrites;
     if (!this.current(lifecycle, activation)) return;
-    await storage.clearSession();
+    await storage.clearSession(client?.owner);
     if (this.current(lifecycle, activation)) location.reload();
   }
 }

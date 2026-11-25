@@ -1,0 +1,126 @@
+#google-drive-settings {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding-top: 4px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+#google-drive-settings :is(h3, h4, p) {
+  margin: 0;
+}
+#google-drive-settings h3 {
+  font-size: 18px;
+}
+#google-drive-settings > p,
+#google-drive-settings small {
+  color: var(--muted);
+}
+#google-drive-settings small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+#google-drive-settings .settings-link {
+  justify-self: start;
+  color: var(--accent);
+  text-underline-offset: 3px;
+}
+#google-drive-settings .drive-status-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--control-line);
+  border-radius: 8px;
+  background: var(--surface-input);
+  min-height: 116px;
+  box-sizing: border-box;
+}
+#google-drive-status {
+  font-size: 15px;
+  font-weight: 600;
+}
+#google-drive-settings .drive-pending-status {
+  font-size: 13px;
+}
+#google-drive-settings .drive-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: stretch;
+}
+#google-drive-settings button {
+  min-width: 0;
+  max-width: 100%;
+  min-height: 40px;
+  padding: 9px 14px;
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  white-space: normal;
+  line-height: 1.4;
+  font-size: 13px;
+}
+#google-drive-settings > button {
+  justify-self: start;
+}
+#google-drive-settings button:not(.primary-button) {
+  background: var(--surface-input);
+  color: var(--text);
+}
+#google-drive-settings button.primary-button {
+  color: #fff;
+  background: #2962ff;
+  border-color: #2962ff;
+}
+#google-drive-settings button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+#google-drive-settings .drive-automatic {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  color: var(--text);
+}
+#google-drive-settings .drive-automatic input {
+  width: 16px;
+  height: 16px;
+  margin: 3px 0 0;
+  flex-shrink: 0;
+}
+#google-drive-settings :is(#google-drive-error, .drive-storage-error, .drive-pause-status) {
+  padding: 12px 14px;
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  background: var(--surface-input);
+  color: var(--text);
+}
+#google-drive-settings :is(#google-drive-error, .drive-storage-error) {
+  border-color: var(--danger);
+}
+#google-drive-settings .drive-conflict {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+}
+#google-drive-conflict > div {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+#google-drive-settings .drive-auth-note {
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 500px) {
+  #google-drive-settings .drive-actions,
+  #google-drive-settings .drive-actions button,
+  #google-drive-settings > button {
+    width: 100%;
+  }
+}

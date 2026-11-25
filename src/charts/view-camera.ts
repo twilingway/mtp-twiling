@@ -1,4 +1,5 @@
 import type { ChartCamera, ChartView } from "../model/types.js";
+import { isInstrumentViewKey } from "../model/instrument-symbol.js";
 
 export function isChartCamera(value: unknown): value is ChartCamera {
   if (!value || typeof value !== "object") return false;
@@ -44,6 +45,7 @@ export function signedRightOffset(width: number, lastBarX: number, barSpace: num
 export function parseChartViewKey(
   key: string
 ): { symbol: string; engine: string; timeframe: string } | null {
+  if (!isInstrumentViewKey(key)) return null;
   const fields = key.split(":"),
     rangeDays = fields.pop(),
     engine = fields.pop(),

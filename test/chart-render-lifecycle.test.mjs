@@ -36,6 +36,7 @@ function sourceModules(overrides) {
 
 test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings redraws it and native appearance still updates", async () => {
   const cells = [],
+    listeners = new Set(), metadata = [],
     adapters = [],
     paints = [],
     layoutWrites = [];
@@ -48,6 +49,8 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
     savedView,
     nearStarts = 0,
     crosshairs = 0;
+  let releaseFirstView;
+  const firstView = new Promise(resolve => { releaseFirstView = resolve; });
   const equal = (a, b) =>
     a && a.length === b.length && a.every((value, index) => Object.is(value, b[index]));
   const hooks = {
@@ -95,6 +98,7 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
     chart: null,
     sessionKey: () => null,
     getSnapshot: () => state,
+    subscribe: (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
     setPreferences: async (patch, _reload, valid) => {
       await Promise.resolve();
       if (valid && !valid()) return;
@@ -127,6 +131,7 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
         }
       },
       updateBar() {},
+      updatePriceFormat(value) { metadata.push(value); },
       setView(view) {
         if (hasData) currentView = view;
         else pendingView = view;
@@ -150,6 +155,7 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
     "services/chart-camera.ts": {
       loadChartView: async () => {
         viewLoads++;
+        if (viewLoads === 1) await firstView;
         return savedView;
       },
       saveAdapterView: async (adapter) => {
@@ -190,8 +196,17 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
     await render();
   }
   await render();
+  assert.equal(controller.chart,null,"native factory is still awaiting its view");
+  state={...state,rows:state.rows.map(row=>({...row,step:.005}))};
+  await render();releaseFirstView();await new Promise(setImmediate);
   const original = controller.chart,
     canvas = original.canvas;
+  assert.equal(metadata.at(-1).step,.005,"latest metadata arriving during async initialization is applied");
+  const loadsBefore=viewLoads,viewBefore=original.getView();
+  state={...state,rows:state.rows.map(row=>({...row,step:.000002}))};
+  listeners.forEach(listener=>listener());await render();
+  assert.equal(metadata.at(-1).step,.000002);assert.equal(controller.chart,original);
+  assert.equal(original.getView(),viewBefore);assert.equal(viewLoads,loadsBefore);assert.equal(adapters.length,1);
   original.options.onIndicatorLayout({ volume: { heightRatio: 0.33 } });
   await new Promise(setImmediate);
   await render();

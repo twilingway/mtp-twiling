@@ -26,6 +26,8 @@ export class DriveError extends Error {
 export interface DriveAuthorization {
   readonly connectionId: string;
   readonly signal: AbortSignal;
+  readonly stored?: boolean;
+  readonly persistenceError?: boolean;
   getAccessToken(): string;
   invalidate(): void;
 }

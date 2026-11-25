@@ -11,6 +11,8 @@ import type {
 } from "../model/types.js";
 import { monthPosition, shiftUtcMonths } from "../model/intervals/calendar.js";
 import type { DisplayPreferences } from "../i18n/preferences.js";
+import { chartPriceFormat } from "./price-format.js";
+import type { PriceMetadata } from "./price-format.js";
 
 export interface ChartAdapter {
   source?: { owner: string; viewKey: string; uid: string };
@@ -19,6 +21,7 @@ export interface ChartAdapter {
   retired?: boolean;
   setData(data: Candle[], fit: boolean): void;
   updateBar(bar: Candle): void;
+  updatePriceFormat?(metadata: PriceMetadata): void;
   getView(): ChartView | null;
   setView(view: ChartView): void;
   fit(): void;
@@ -124,9 +127,5 @@ export function movingAverage(
   return result;
 }
 export function precision(row: MarketRow): number {
-  return row.step && row.step > 0
-    ? Math.min(6, Math.max(2, String(row.step).split(".")[1]?.length ?? 0))
-    : row.symbol === "NG"
-      ? 3
-      : 2;
+  return chartPriceFormat(row).precision;
 }

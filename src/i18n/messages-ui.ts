@@ -1,4 +1,30 @@
 export const uiMessages = {
+  "Т‑Банк подключён": "T-Bank is connected",
+  "Аккаунт Т‑Банка настроен": "T-Bank account is configured",
+  "Котировки поступают по WebSocket": "Receiving quotes over WebSocket",
+  "Восстанавливаем связь с сервисом котировок": "Reconnecting to market data",
+  "Изменить API-ключ": "Change API key",
+  "Сохранить новый ключ": "Save new key",
+  "Есть несинхронизированные изменения": "There are unsynced changes",
+  "Не удалось удалить сохранённый вход Google на устройстве. Повторите удаление.":
+    "Saved Google access could not be removed from this device. Retry removal.",
+  "Повторить удаление входа Google": "Retry removing saved Google access",
+  "Изменения синхронизированы": "Changes are synced",
+  "Данные сохранены на устройстве. Ожидаем проверки Google Диска.":
+    "Data is saved on this device. Waiting to check Google Drive.",
+  "Синхронизация ещё не выполнялась": "Not synced yet",
+  "Автосинхронизация на паузе: подключите Google.": "Auto sync is paused: connect Google.",
+  "Автосинхронизация на паузе: нет интернета.": "Auto sync is paused: you are offline.",
+  "Автосинхронизация на паузе: Google Диск недоступен. Повторим при восстановлении связи.":
+    "Auto sync is paused: Google Drive is unavailable. We will retry when the connection returns.",
+  "Не удалось загрузить вход Google. Нажмите «Повторить загрузку входа».":
+    "Google sign-in could not load. Select Retry loading sign-in.",
+  "Не удалось сохранить вход Google на устройстве. В текущем окне подключение работает; после перезапуска войдите снова.":
+    "Google sign-in could not be saved on this device. This window is connected; sign in again after restarting.",
+  "Вход сохранён на этом устройстве. Когда срок доступа Google истечёт, синхронизация приостановится до повторного подключения.":
+    "Sign-in is saved on this device. When Google access expires, sync pauses until you reconnect.",
+  "Подключение Google будет сохранено на этом устройстве в зашифрованном виде до окончания срока токена.":
+    "Google access will be saved encrypted on this device until the token expires.",
   "Быстрый выбор индикаторов": "Quick indicator selection",
   "Сохранение…": "Saving…",
   "Закрыть быстрое меню": "Close quick menu",

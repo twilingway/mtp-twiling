@@ -7,6 +7,7 @@ import type { DriveAuthorization, DriveLocalAssociation, DriveErrorCode } from "
 export interface DriveRecord extends DriveLocalAssociation {
   lastSyncedAt?: string;
   automatic: boolean;
+  pendingChanges?: boolean;
 }
 export interface DriveSummary {
   instruments: number;
@@ -28,6 +29,10 @@ export interface DriveStatus {
   preparing: boolean;
   connected: boolean;
   automatic: boolean;
+  pendingChanges: boolean;
+  pauseReason?: "offline" | "auth-required" | "network" | undefined;
+  authorizationStored: boolean;
+  credentialSaveError: boolean;
   lastSyncedAt?: string | undefined;
   error?: DriveErrorCode | "local-changed" | undefined;
   conflict?: DriveConflict | undefined;
@@ -38,7 +43,11 @@ export interface DriveBridge {
   importBackup(backup: Backup, options: BackupImportOptions): Promise<void>;
 }
 export interface DriveDependencies {
-  auth: Pick<DriveAuth, "prepare" | "connectFromUserGesture" | "disconnect">;
+  auth: Pick<
+    DriveAuth,
+    "prepare" | "connectFromUserGesture" | "disconnect" | "restore" | "suspend"
+  >;
+  online?(): boolean;
   sync(
     authorization: DriveAuthorization
   ): Pick<DriveSync, "inspect" | "download" | "publish" | "resolve">;

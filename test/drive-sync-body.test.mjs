@@ -26,7 +26,10 @@ function load(relative) {
   return module.exports;
 }
 const { DriveError, DRIVE_NAMESPACE, DRIVE_SCOPE } = load("services/drive/types.ts");
-const { DriveAuth } = load("services/drive/auth.ts");
+const { DriveAuth: RealDriveAuth } = load("services/drive/auth.ts");
+class DriveAuth extends RealDriveAuth {
+  constructor(loader, now) { super(loader, now, { load: async () => undefined, save: async () => {}, remove: async () => {} }); }
+}
 const { DriveTransport } = load("services/drive/transport.ts");
 const expectCode = (code) => (error) => {
   assert.ok(error instanceof DriveError);
@@ -135,7 +138,7 @@ for (const operation of ["binary", "json-list"]) {
       );
       try {
         await auth.prepare();
-        const first = auth.connectFromUserGesture();
+        const first = auth.connectFromUserGesture("fixture-owner");
         configs[0].callback({ access_token: "first-fake", scope: DRIVE_SCOPE, expires_in: 3600 });
         const bound = await first;
         const stream = streaming();
@@ -147,7 +150,7 @@ for (const operation of ["binary", "json-list"]) {
           now += 3600000;
           stream.controller.enqueue(new TextEncoder().encode("}"));
         } else {
-          const second = auth.connectFromUserGesture();
+          const second = auth.connectFromUserGesture("fixture-owner");
           configs[1].callback({
             access_token: "second-fake",
             scope: DRIVE_SCOPE,

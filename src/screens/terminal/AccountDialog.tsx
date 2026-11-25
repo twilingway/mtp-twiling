@@ -96,6 +96,7 @@ export function AccountDialog() {
     [remember, setRemember] = useState(true),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
+    [editingKey, setEditingKey] = useState(false),
     [section, setSection] = useState<"account" | "drive" | "storage" | "transfer">("account");
   return (
     <Modal
@@ -124,8 +125,33 @@ export function AccountDialog() {
         ))}
       </nav>
       <div className="account-section" id="account-section-account" hidden={section !== "account"}>
+        {state.authenticated && (
+          <div
+            className="bank-connection-status"
+            data-connected={state.status === "connected"}
+            role="status"
+          >
+            <strong>
+              {t(state.status === "connected" ? "Т‑Банк подключён" : "Аккаунт Т‑Банка настроен")}
+            </strong>
+            <p>
+              {state.status === "connected"
+                ? t("Котировки поступают по WebSocket")
+                : state.error
+                  ? systemText(state.error)
+                  : t("Восстанавливаем связь с сервисом котировок")}
+            </p>
+            <span>{state.name}</span>
+          </div>
+        )}
+        {state.authenticated && !editingKey && (
+          <button type="button" className="account-edit-key" onClick={() => setEditingKey(true)}>
+            {t("Изменить API-ключ")}
+          </button>
+        )}
         <form
           id="account-form"
+          hidden={state.authenticated && !editingKey}
           onSubmit={(e) => {
             e.preventDefault();
             const input = token;
@@ -134,6 +160,7 @@ export function AccountDialog() {
             setError("");
             void controller
               .login(input, name, remember)
+              .then(() => setEditingKey(false))
               .catch((error: unknown) =>
                 setError(error instanceof Error ? error.message : t("Подключение недоступно"))
               )
@@ -192,21 +219,35 @@ export function AccountDialog() {
             </p>
           )}
           <button className="primary-button" id="login-button" type="submit" disabled={busy}>
-            {busy ? t("Проверяем ключ…") : t("Подключить котировки")}
+            {busy
+              ? t("Проверяем ключ…")
+              : t(state.authenticated ? "Сохранить новый ключ" : "Подключить котировки")}
           </button>
-          {state.authenticated && (
+          {state.authenticated && editingKey && (
             <button
               type="button"
-              id="logout-button"
-              className="logout-button"
+              className="account-edit-key"
               onClick={() => {
-                void controller.logout();
+                setToken("");
+                setEditingKey(false);
               }}
             >
-              {t("Выйти и удалить сохранённый ключ")}
+              {t("Отмена")}
             </button>
           )}
         </form>
+        {state.authenticated && (
+          <button
+            type="button"
+            id="logout-button"
+            className="logout-button"
+            onClick={() => {
+              void controller.logout();
+            }}
+          >
+            {t("Выйти и удалить сохранённый ключ")}
+          </button>
+        )}
         <ApplicationInfo />
       </div>
       <div className="account-section" id="account-section-drive" hidden={section !== "drive"}>

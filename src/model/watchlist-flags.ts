@@ -1,4 +1,5 @@
 import type { MarketRow } from "./types.js";
+import { isInstrumentSymbol } from "./instrument-symbol.js";
 
 export const WATCHLIST_FLAG_COLORS = {
   red: "#ff5252",
@@ -23,7 +24,8 @@ export function isWatchlistFlagFilter(value: unknown): value is WatchlistFlagFil
 export function isWatchlistFlagKey(key: string): boolean {
   return (
     key.length <= 200 &&
-    (/^uid:[A-Za-z0-9][A-Za-z0-9._-]*$/.test(key) || /^legacy:[A-Z0-9!._-]{1,40}$/.test(key))
+    (/^uid:[A-Za-z0-9][A-Za-z0-9._-]*$/.test(key) ||
+      (key.startsWith("legacy:") && isInstrumentSymbol(key.slice(7))))
   );
 }
 export function isWatchlistFlags(value: unknown): value is WatchlistFlags {

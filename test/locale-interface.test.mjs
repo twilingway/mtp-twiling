@@ -92,6 +92,7 @@ function render(file, name, locale) {
   }
   const controller = {
     getSnapshot: () => state,
+    sessionKey: () => "test-session",
     subscribe: () => () => {},
     marketNow: () => Date.parse("2026-07-15T12:00:00Z"),
     tools: { scopeKey: () => "test" },
