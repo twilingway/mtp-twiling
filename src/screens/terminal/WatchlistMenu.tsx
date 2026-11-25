@@ -8,25 +8,45 @@ import { watchlistFlag } from "../../model/watchlist-flags.js";
 import type { WatchlistFlagColor } from "../../model/watchlist-flags.js";
 import { persistWatchlistFlagChange } from "./watchlist-flag-preferences.js";
 import { flagText } from "../../i18n/messages-watchlist-flags.js";
+import { sectionText } from "../../i18n/messages-watchlist-sections.js";
+import type { WatchlistSection } from "../../model/watchlist-sections.js";
+import { SectionIcon } from "./WatchlistSectionMenu.js";
 
 export function WatchlistMenu({
   row,
   x,
   y,
   mode,
+  onAddSection,
+  onStep,
+  onAssign,
+  sections = [],
+  canUp = false,
+  canDown = false,
   onClose
 }: {
   row: MarketRow;
   x: number;
   y: number;
   mode?: "flag";
+  onAddSection?: () => void;
+  onStep?: (direction: -1 | 1) => void;
+  onAssign?: (section: string | null) => void;
+  sections?: WatchlistSection[];
+  canUp?: boolean;
+  canDown?: boolean;
   onClose: () => void;
 }) {
   const { controller, state } = useTerminal();
   const menuWidth = Math.min(mode === "flag" ? 282 : 320, window.innerWidth - 12);
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y });
-  const disabled = !!(state.backupBusy || state.importingBackup || state.importRecoveryRequired);
+  const disabled = !!(
+    state.backupBusy ||
+    state.importingBackup ||
+    state.importRecoveryRequired ||
+    state.profileTransition
+  );
   useLayoutEffect(() => {
     const place = () =>
       setPosition({
@@ -118,14 +138,81 @@ export function WatchlistMenu({
         onChange={changeFlag}
       />
       {!mode && (
-        <button role="menuitem" onClick={remove} disabled={disabled}>
-          <DeleteIcon />{" "}
-          <span>
-            {t("Удалить")}
-            {row.ticker} {t("из списка")}
-          </span>{" "}
-          <kbd>Del</kbd>
-        </button>
+        <>
+          {onAddSection && (
+            <button
+              role="menuitem"
+              disabled={disabled}
+              onClick={() => {
+                onClose();
+                onAddSection();
+              }}
+            >
+              <SectionIcon action="add" />
+              <span>{sectionText("add")}</span>
+            </button>
+          )}
+          {onStep && (
+            <>
+              <button
+                role="menuitem"
+                disabled={disabled || !canUp}
+                onClick={() => {
+                  onClose();
+                  onStep(-1);
+                }}
+              >
+                <SectionIcon action="up" />
+                <span>{sectionText("up")}</span>
+              </button>
+              <button
+                role="menuitem"
+                disabled={disabled || !canDown}
+                onClick={() => {
+                  onClose();
+                  onStep(1);
+                }}
+              >
+                <SectionIcon action="down" />
+                <span>{sectionText("down")}</span>
+              </button>
+            </>
+          )}
+          {onAssign && (
+            <label className="watchlist-section-destination">
+              <span>{sectionText("move")}</span>
+              <select
+                disabled={disabled}
+                aria-label={sectionText("move")}
+                value=""
+                onChange={(event) => {
+                  if (event.target.value) {
+                    onClose();
+                    onAssign(event.target.value === "top" ? null : event.target.value);
+                  }
+                }}
+              >
+                <option value="" disabled>
+                  {sectionText("move")}
+                </option>
+                <option value="top">{sectionText("top")}</option>
+                {sections.map((section) => (
+                  <option key={section.id} value={section.id}>
+                    {section.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <button role="menuitem" onClick={remove} disabled={disabled}>
+            <DeleteIcon />{" "}
+            <span>
+              {t("Удалить")}
+              {row.ticker} {t("из списка")}
+            </span>{" "}
+            <kbd>Del</kbd>
+          </button>
+        </>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import type { MarketSnapshot } from "../../services/market-client.js";
 import { TIMEFRAMES, updateCandleList } from "../../model/history-codec.js";
 import { migrateCandlePalette } from "../../model/candle-palette.js";
 import { pinSelectedInstrument, selectedMarketRow } from "../../model/selected-instrument.js";
+import { orderedWatchlistRows } from "../../model/watchlist-sections.js";
 import type { Candle } from "../../model/types.js";
 import { DEFAULT_CHART_SETTINGS, DEFAULT_INDICATORS } from "./state.js";
 import type { TerminalPreferences } from "./state.js";
@@ -237,7 +238,7 @@ export class TerminalSession {
       this.applyBankState(candidate.snapshot());
       const state = this.bridge.getState();
       if (!selectedMarketRow(state.rows, state.preferences)) {
-        const first = state.rows[0];
+        const first = orderedWatchlistRows(state.rows, state.preferences.watchlistSections)[0];
         this.bridge.update({
           preferences: {
             ...state.preferences,

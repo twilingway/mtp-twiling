@@ -35,7 +35,8 @@ export const QuoteRow = memo(function QuoteRow({
   onDragStart,
   onDragOver,
   onDrop,
-  onDragEnd
+  onDragEnd,
+  onStep
 }: {
   row: MarketRow;
   selected: boolean;
@@ -50,6 +51,7 @@ export const QuoteRow = memo(function QuoteRow({
   onDragOver: (event: DragEvent<HTMLTableRowElement>, position: WatchlistPosition) => void;
   onDrop: (event: DragEvent<HTMLTableRowElement>, position: WatchlistPosition) => void;
   onDragEnd: () => void;
+  onStep?: (direction: -1 | 1) => void;
 }) {
   const digits = precision(row);
   const { state } = useTerminal();
@@ -91,6 +93,12 @@ export const QuoteRow = memo(function QuoteRow({
       onDrop={(event) => onDrop(event, position)}
       onDragEnd={onDragEnd}
       onKeyDown={(e) => {
+        if (e.altKey && onStep && ["ArrowUp", "ArrowDown"].includes(e.key)) {
+          e.preventDefault();
+          e.stopPropagation();
+          onStep(e.key === "ArrowUp" ? -1 : 1);
+          return;
+        }
         if (e.key === "Delete") {
           e.preventDefault();
           e.stopPropagation();

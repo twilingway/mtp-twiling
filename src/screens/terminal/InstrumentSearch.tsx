@@ -5,6 +5,7 @@ import { useTerminal } from "./context.js";
 import { Modal } from "./Modal.js";
 import { intlLocale } from "../../i18n/preferences.js";
 import { providerAttributes } from "../../model/market-provider.js";
+import { orderedWatchlistRows } from "../../model/watchlist-sections.js";
 type Kind = InstrumentSearchKind;
 const KINDS: { kind: Kind; label: string }[] = [
   { kind: "all", label: "Все" },
@@ -127,11 +128,8 @@ export function InstrumentSearch() {
   const cleanQuery = query.trim();
   const current = response.revision === revision && response.owner === state.owner;
   const busy = !!cleanQuery && !current;
-  const results = cleanQuery
-    ? current
-      ? response.items
-      : []
-    : state.rows.map(watchlistInstrument);
+  const displayed = orderedWatchlistRows(state.rows, state.preferences.watchlistSections);
+  const results = cleanQuery ? (current ? response.items : []) : displayed.map(watchlistInstrument);
   const error = current ? response.error : "";
   useEffect(() => {
     if (!cleanQuery) return;
@@ -225,7 +223,7 @@ export function InstrumentSearch() {
         ) : (
           results.map((item, index) => {
             const key = instrumentKey(item);
-            const row = cleanQuery ? undefined : state.rows[index];
+            const row = cleanQuery ? undefined : displayed[index];
             const added =
               !!row ||
               state.rows.some(

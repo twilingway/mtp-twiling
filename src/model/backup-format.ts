@@ -8,6 +8,7 @@ import { isNativeIntervalId } from "./intervals/registry.js";
 import { isIntervalFavorites } from "./intervals/favorites.js";
 import { isIndicatorPaneLayout } from "./indicator-layout.js";
 import { isWatchlistFlags, isWatchlistFlagFilter } from "./watchlist-flags.js";
+import { isWatchlistSections, validWatchlistSectionsField } from "./watchlist-sections.js";
 import { isTechnicalIndicatorInstanceList } from "./technical-indicators/instances.js";
 import { isTechnicalPaneLayout } from "./technical-indicator-layout.js";
 import type {
@@ -71,9 +72,10 @@ function fields(value: UnknownRecord, checks: Record<string, Validator>): boolea
 function plain(value: unknown, depth = 0): void {
   if (depth > 30) throw new Error("Слишком сложный файл.");
   if (value && typeof value === "object")
-    for (const [key, item] of Object.entries(value)) {
+    for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(value))) {
       if (forbidden.has(key)) throw new Error("Файл содержит запрещённые поля.");
-      plain(item, depth + 1);
+      if (!("value" in descriptor)) throw new Error("Файл содержит вычисляемые поля.");
+      plain(descriptor.value, depth + 1);
     }
 }
 export function isTimeframe(value: unknown): value is Timeframe {
@@ -231,12 +233,14 @@ export function isChartSettings(value: unknown): value is ChartSettings {
 export function isProfilePreferences(value: unknown): value is ProfilePreferences {
   return (
     isRecord(value) &&
+    validWatchlistSectionsField(value) &&
     validLayoutProvider(value) &&
     fields(value, {
       technicalIndicators: isTechnicalIndicatorInstanceList,
       technicalPaneLayout: isTechnicalPaneLayout,
       providerRef: isProviderRef,
       watchlistFlags: isWatchlistFlags,
+      watchlistSections: isWatchlistSections,
       watchlistFlagFilter: isWatchlistFlagFilter,
       locale: isLocale,
       timeZone: isTimeZone,

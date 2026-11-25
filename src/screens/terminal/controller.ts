@@ -10,6 +10,7 @@ import { historyDepthTransition, saveControllerView } from "./controller-camera.
 import type { TradingCalendarDay } from "../../model/candle-clock.js";
 import { resolveWatchlist } from "../../model/market-model.js";
 import { pinSelectedInstrument, selectedMarketRow } from "../../model/selected-instrument.js";
+import { watchlistSelectionFallback } from "../../model/watchlist-sections.js";
 import type {
   Backup,
   Candle,
@@ -426,11 +427,7 @@ export class TerminalController {
       (this.state.preferences.instrumentUid === undefined ||
         this.state.preferences.instrumentUid === selected.uid)
     ) {
-      const next = this.state.rows.find((item) => item.uid) ?? this.state.rows[0];
-      await this.setPreferences(
-        { symbol: next?.symbol ?? "", instrumentUid: next?.uid ?? null },
-        true
-      );
+      await this.setPreferences(watchlistSelectionFallback(this.state), true);
     }
   };
   reorderWatchlist = async (move: WatchlistMove, expectedOwner: string): Promise<boolean> => {

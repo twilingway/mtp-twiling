@@ -18,6 +18,7 @@ import type { DisplayPreferences } from "../../i18n/preferences.js";
 import type { TechnicalIndicatorInstance } from "../../model/technical-indicators/types.js";
 import type { TechnicalPaneLayout } from "../../model/technical-indicator-layout.js";
 import type { WatchlistFlags, WatchlistFlagFilter } from "../../model/watchlist-flags.js";
+import type { WatchlistSections } from "../../model/watchlist-sections.js";
 import type { MarketProviderRef } from "../../model/market-provider.js";
 import { formatClock, formatNumber } from "../../i18n/format.js";
 import type { DrawingSettingsPreview } from "./drawing-settings-preview.js";
@@ -62,6 +63,7 @@ export interface TerminalPreferences extends DisplayPreferences {
   technicalPaneLayout?: TechnicalPaneLayout;
   providerRef?: MarketProviderRef | undefined;
   watchlistFlags?: WatchlistFlags;
+  watchlistSections?: WatchlistSections;
   watchlistFlagFilter?: WatchlistFlagFilter;
   indicatorPaneLayout?: IndicatorPaneLayout;
   favoriteIntervals?: IntervalId[];
