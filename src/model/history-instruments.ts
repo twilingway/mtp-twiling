@@ -10,7 +10,8 @@ export interface HistoryInstrument {
   bytes: number;
   groups: HistoryGroup[];
 }
-const normalize = (value: string) => value.normalize("NFKC").toLocaleLowerCase().replace(/ё/g, "е");
+const normalize = (value: string) =>
+  value.normalize("NFKC").toLocaleLowerCase("ru-RU").replace(/ё/g, "е");
 
 /** UID preserves distinct trading instruments even when names or tickers coincide. */
 export function historyInstruments(
