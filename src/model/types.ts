@@ -69,6 +69,8 @@ export interface MarketRow {
   firstTradeDate?: string | undefined;
   price: number | null;
   previousClose: number | null;
+  previousCloseDay?: string | null;
+  previousCloseSource?: "evening" | "exchange-day" | null;
   closeTime?: string | null | undefined;
   time?: string | null;
   change?: number | null;

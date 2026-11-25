@@ -2,10 +2,11 @@ import { searchCatalog } from "./tbank-instruments.js";
 import { MutationQueue } from "./mutation-queue.js";
 import { persistWatchlistMove, type WatchlistMove } from "./watchlist-order.js";
 import { quoteSnapshot } from "./quote-snapshot.js";
+import { QuoteDayBases, MISSING_DAY_BASE } from "./quote-day-bases.js";
 import { profileKey } from "./profile-key.js";
 import { selectedMarketRow } from "../model/selected-instrument.js";
 import { lastPriceSubscription } from "./market-subscriptions.js";
-import { resolveWatchlist, quotation, dayChange, normaliseCandles } from "../model/market-model.js";
+import { resolveWatchlist, quotation, normaliseCandles } from "../model/market-model.js";
 import { TIMEFRAMES, splitRanges, subtractRanges, mergeCandles } from "../model/history-codec.js";
 import { historyRequestWindow, shiftTimeframe } from "../model/intervals/calendar.js";
 import { nativeTimeframe } from "../model/intervals/native-timeframes.js";
@@ -54,12 +55,20 @@ export class TBankClient extends EventTarget {
   private flushTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly transport: BankTransport;
   private readonly mutations = new MutationQueue();
+  private readonly dayBases: QuoteDayBases;
   constructor(
     private readonly token: string,
     public readonly name: string,
     private readonly cache: Cache
   ) {
     super();
+    this.dayBases = new QuoteDayBases(
+      this,
+      () => this.serverNow(),
+      (row) => !this.closed && this.rows.includes(row),
+      () => this.notify(),
+      () => this.emit("notice", MISSING_DAY_BASE)
+    );
     this.transport = new BankTransport(token, {
       connecting: () => {
         this.state = "connecting";
@@ -67,6 +76,7 @@ export class TBankClient extends EventTarget {
         this.notify();
       },
       open: () => {
+        this.dayBases.retryMissing();
         const ids = this.rows.flatMap((row) => (row.uid ? [row.uid] : []));
         if (ids.length) this.send(lastPriceSubscription("subscribe", ids));
         else {
@@ -184,13 +194,11 @@ export class TBankClient extends EventTarget {
     }
     const [prices, close] = await quoteSnapshot(this, ids);
     if (prices.status === "rejected") throw prices.reason;
-    const closes = close.status === "fulfilled" ? list(close.value.closePrices).map(object) : [];
-    for (const row of this.rows) {
-      const previous = closes.find((price) => price?.instrumentUid === row.uid);
-      row.previousClose = quotation(previous?.price);
-      row.closeTime = text(previous?.time) ?? null;
-    }
+    this.dayBases.clear();
+    this.dayBases.seed(close.status === "fulfilled" ? close.value.closePrices : []);
+    for (const row of this.rows) this.dayBases.invalidate(row);
     for (const price of list(prices.value.lastPrices)) this.applyPrice(price, false);
+    await this.dayBases.settled();
     this.updatedAt = new Date().toISOString();
     this.notify();
     await this.cache.saveMarket(this.owner, { rows: this.rows, at: Date.now() });
@@ -209,7 +217,7 @@ export class TBankClient extends EventTarget {
     row.price = value;
     row.time = text(price.time) ?? null;
     row.availability = "available";
-    Object.assign(row, dayChange(value, row.previousClose));
+    this.dayBases.update(row);
     this.updatedAt = new Date().toISOString();
     if (notify) this.notify();
   }
@@ -280,19 +288,11 @@ export class TBankClient extends EventTarget {
       }
     });
     try {
-      const [prices, close] = await Promise.all([
-        this.request("MarketDataService", "GetLastPrices", {
-          instrumentId: [row.uid],
-          lastPriceType: "LAST_PRICE_EXCHANGE"
-        }),
-        this.request("MarketDataService", "GetClosePrices", {
-          instruments: [{ instrumentId: row.uid }]
-        })
-      ]);
-      const previous = object(list(close.closePrices)[0]);
-      row.previousClose = quotation(previous?.price);
-      row.closeTime = text(previous?.time) ?? null;
-      for (const price of list(prices.lastPrices)) this.applyPrice(price, false);
+      const [prices, close] = await quoteSnapshot(this, [uid]);
+      if (prices.status === "rejected") throw prices.reason;
+      this.dayBases.seed(close.status === "fulfilled" ? close.value.closePrices : []);
+      for (const price of list(prices.value.lastPrices)) this.applyPrice(price, false);
+      await this.dayBases.settled();
       await this.cache.saveMarket(this.owner, { rows: this.rows, at: Date.now() });
       this.notify();
     } catch (error) {

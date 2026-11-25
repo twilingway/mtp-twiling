@@ -106,5 +106,7 @@ export const errorMessages = {
   "Поток банка временно недоступен. Переподключаемся…":
     "Bank stream is temporarily unavailable. Reconnecting…",
   "Поток прерван. Переподключаемся…": "Stream interrupted. Reconnecting…",
-  "Неизвестная ошибка.": "Unknown error."
+  "Неизвестная ошибка.": "Unknown error.",
+  "Предыдущее дневное закрытие недоступно. Изменение показано прочерком.":
+    "Previous daily close is unavailable. Change is shown as a dash."
 } as const;

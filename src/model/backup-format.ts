@@ -304,6 +304,8 @@ function isBackupMarketRow(value: unknown): value is BackupMarketRow {
       firstTradeDate: string,
       price: nullable(finite),
       previousClose: nullable(finite),
+      previousCloseDay: nullable(string),
+      previousCloseSource: nullable(member(["evening", "exchange-day"])),
       closeTime: nullable(string),
       time: nullable(string),
       change: nullable(finite),

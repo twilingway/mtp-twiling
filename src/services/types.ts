@@ -130,10 +130,16 @@ export function normaliseRows(value: unknown): MarketRow[] {
         const value = text(raw[key]);
         if (value !== undefined) row[key] = value;
       }
-      for (const key of ["time", "closeTime", "note"] as const) {
+      for (const key of ["time", "closeTime", "note", "previousCloseDay"] as const) {
         const value = raw[key];
         if (typeof value === "string" || value === null) row[key] = value;
       }
+      if (
+        raw.previousCloseSource === "evening" ||
+        raw.previousCloseSource === "exchange-day" ||
+        raw.previousCloseSource === null
+      )
+        row.previousCloseSource = raw.previousCloseSource;
       for (const key of ["change", "changePercent"] as const) {
         const value = raw[key];
         if (finite(value) || value === null) row[key] = value;

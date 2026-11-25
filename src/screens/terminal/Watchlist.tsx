@@ -287,13 +287,22 @@ export function Watchlist() {
             <strong id="detail-price">{number(selected.price, precision(selected))}</strong>
             <span id="detail-currency">{selected.currency.toUpperCase()}</span>
           </div>
-          <p className={`detail-change ${signClass(selected.change)}`} id="detail-change">
-            {number(selected.change, precision(selected), true)} (
-            {number(selected.changePercent, 2, true)}%)
+          <p
+            className={`detail-change ${signClass(selected.change)}`}
+            id="detail-change"
+            title={t(
+              selected.type === "future"
+                ? "К предыдущему закрытию Т-Банка"
+                : "К предыдущему дневному закрытию"
+            )}
+          >
+            {selected.change == null || selected.changePercent == null
+              ? "—"
+              : `${number(selected.change, precision(selected), true)} (${number(selected.changePercent, 2, true)}%)`}
           </p>
           <div className="detail-facts">
             <div>
-              <span>{t("Закрытие сессии")}</span>
+              <span>{t("Предыдущее дневное закрытие")}</span>
               <b id="detail-close">{number(selected.previousClose, precision(selected))}</b>
             </div>
             <div>
@@ -314,11 +323,14 @@ export function Watchlist() {
             </div>
           </div>
           <p className="detail-note" id="detail-note">
-            {selected.note
-              ? systemText(selected.note)
-              : t(
-                  "Изменение — к закрытию сессии из API. При закрытом рынке показывается последняя сделка."
-                )}
+            {t(
+              selected.previousClose == null
+                ? "Предыдущее закрытие недоступно"
+                : selected.type === "future"
+                  ? "К предыдущему закрытию Т-Банка"
+                  : "К предыдущему дневному закрытию"
+            )}
+            {selected.note ? " · " + systemText(selected.note) : ""}
           </p>
         </section>
       )}

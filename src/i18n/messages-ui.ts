@@ -194,6 +194,10 @@ export const uiMessages = {
   "с ценой": "with a price",
   "WebSocket · напрямую": "WebSocket · direct",
   "Закрытие сессии": "Session close",
+  "Предыдущее дневное закрытие": "Previous daily close",
+  "К предыдущему дневному закрытию": "Relative to the previous daily close",
+  "К предыдущему закрытию Т-Банка": "Relative to the previous T-Bank close",
+  "Предыдущее закрытие недоступно": "Previous close is unavailable",
   "Время последней сделки": "Last trade time",
   Источник: "Source",
   "Изменение — к закрытию сессии из API. При закрытом рынке показывается последняя сделка.":

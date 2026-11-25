@@ -53,6 +53,13 @@ export const QuoteRow = memo(function QuoteRow({
 }) {
   const digits = precision(row);
   const { state } = useTerminal();
+  const changeTitle = t(
+    row.previousClose == null
+      ? "Предыдущее закрытие недоступно"
+      : row.type === "future"
+        ? "К предыдущему закрытию Т-Банка"
+        : "К предыдущему дневному закрытию"
+  );
   return (
     <tr
       className={`quote-row ${selected ? "selected" : ""} ${row.availability === "unavailable" ? "unavailable" : ""} ${dragClass}`}
@@ -107,8 +114,8 @@ export const QuoteRow = memo(function QuoteRow({
         </span>
       </td>
       <td className={direction}>{number(row.price, digits)}</td>
-      <td className={signClass(row.change)}>{number(row.change, digits, true)}</td>
-      <td className={signClass(row.changePercent)}>
+      <td className={signClass(row.change)} title={changeTitle}>{number(row.change, digits, true)}</td>
+      <td className={signClass(row.changePercent)} title={changeTitle}>
         <span className="quote-percent">
           {number(row.changePercent, 2, true)}
           {row.changePercent != null ? "%" : ""}
