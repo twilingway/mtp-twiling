@@ -115,8 +115,19 @@ sudo systemctl reload nginx
 Если nginx -t неуспешен, восстановить backup и повторить проверку, reload не выполнять. Reload при
 установке vhost — отдельная операция; каждый обычный deploy переключает symlink без reload.
 
-Прежде чем включать timer, дождаться зелёного CI точного main SHA. Первый запуск выполнить через
-`systemctl start mtp-deploy.service`, проверить журнал и публичные файлы, затем:
+Прежде чем включать timer, дождаться зелёного CI точного main SHA. Для проверенной разовой попытки
+задать `Environment=MTP_DEPLOY_EXPECTED_SHA=<полный lowercase SHA из 40 hex>` только в отдельном
+drop-in `mtp-deploy.service`. Некорректное значение отклоняется. Если main уже отличается от pin,
+контроллер завершится с ошибкой до GitHub CI query, записи cooldown, install/build и активации, даже
+когда новый main зелёный. Перед активацией выбранный SHA снова сверяется с pin; оба обычных main/CI
+gates также сохраняются. Pin фиксируется на весь запуск. Без переменной поведение timer прежнее.
+Изменение только controller не требует новой PWA version/buildId, но меняет sourceSha.
+
+Первый запуск выполнить через `systemctl start mtp-deploy.service`, проверить журнал, публичные
+файлы и браузерный сценарий. Timer до этого остаётся disabled. После успешной проверки удалить
+только строку pin из своего MTP drop-in, сохранив ресурсные ограничения, выполнить daemon-reload,
+убедиться через `systemctl show mtp-deploy.service -p Environment`, что pin отсутствует, затем
+включить timer:
 
 ```bash
 sudo systemctl daemon-reload

@@ -25,6 +25,13 @@
 
 ## Workflow follow-up
 
+- [x] Проверить optional SHA pin: malformed, expected A/current green B без query/build/activation,
+      успешный pinned A и смену main перед активацией; прогнать deploy/check/spec на изолированной
+      ветке и подтвердить неизменный PWA buildId.
+
+  Проверено 26.11.2026: pnpm check 447/447, WSL Ubuntu Node22.22.1 deploy-тесты 27/27 без skip,
+  strict spec25/25. PWA0.3.15, buildId652005923294e034; src/public/package не изменены.
+
 - Создать remote/private GitHub repository и настроить доступ после интеграции.
 - Проверить VDS DNS/TLS/routes, установить watcher и выполнить публичный SHA smoke.
 - Проверить обновление PWA отдельным визуальным reviewer до объявления deploy завершённым.

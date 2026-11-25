@@ -17,6 +17,7 @@ import {
 } from "./deploy-lib.mjs";
 import { isReleaseInput, requireVersion, versionIncreased } from "./deploy-version.mjs";
 import { prepareVersion } from "./prepare-version.mjs";
+import { expectedDeploymentSha } from "./deploy-static.mjs";
 import {
   githubRequest,
   queryState,
@@ -29,6 +30,12 @@ const sha = "a".repeat(40);
 const olderSha = "b".repeat(40);
 const repo = "owner/mtp-twiling";
 const buildId = "1234567890abcdef";
+
+test("optional deployment SHA pin rejects malformed values", () => {
+  assert.equal(expectedDeploymentSha(sha), sha);
+  for (const value of ["", "main", sha.slice(1), sha + "0", sha.toUpperCase(), ` ${sha}`])
+    assert.throws(() => expectedDeploymentSha(value), /MTP_DEPLOY_EXPECTED_SHA/);
+});
 
 async function workspace(t) {
   const root = await mkdtemp(join(tmpdir(), "mtp-deploy-test-"));
@@ -422,7 +429,8 @@ globalThis.fetch = async input => {
         PATH: bin + ":" + process.env.PATH,
         MTP_DEPLOY_ROOT: root,
         MTP_DEPLOY_CONFIG: config,
-        MTP_DEPLOY_LOCKED: "1"
+        MTP_DEPLOY_LOCKED: "1",
+        MTP_DEPLOY_EXPECTED_SHA: options.expectedSha
       },
       timeout: 30000
     });
@@ -434,6 +442,63 @@ globalThis.fetch = async input => {
       .map((line) => JSON.parse(line));
   return { root, run, events };
 }
+
+test(
+  "controller pin stops a newer green main before query/build or activation",
+  { skip: process.platform !== "linux" && "Linux executable fixtures; exercised in hosted CI" },
+  async (t) => {
+    for (const options of [
+      { expectedSha: sha, sha: olderSha },
+      { expectedSha: "" },
+      { expectedSha: "main" }
+    ]) {
+      await t.test(`reject pin ${options.expectedSha || "empty"}`, async (t) => {
+        const scenario = await controllerFixture(t, options);
+        const result = scenario.run();
+        assert.equal(result.status, 1, result.stderr);
+        assert.match(result.stderr, /MTP_DEPLOY_EXPECTED_SHA/);
+        const events = await scenario.events();
+        assert.deepEqual(
+          events.map((event) => event[0]),
+          options.sha === olderSha ? ["git"] : []
+        );
+        assert.deepEqual(await readdir(join(scenario.root, "state")), []);
+        assert.deepEqual(await readdir(join(scenario.root, "releases")), []);
+        assert.equal(await currentRelease(scenario.root), null);
+        assert.equal(
+          (await readdir(scenario.root)).some((name) => name.startsWith("build-")),
+          false
+        );
+      });
+    }
+    await t.test(
+      "matching pin still requires both green gates and publishes exact SHA",
+      async (t) => {
+        const scenario = await controllerFixture(t, { expectedSha: sha });
+        const result = scenario.run();
+        assert.equal(result.status, 0, result.stderr);
+        const events = await scenario.events();
+        assert.equal(events.filter((event) => event[0] === "ci").length, 2);
+        assert.ok(events.some((event) => event[0] === "node"));
+        assert.ok(events.some((event) => event[0] === "public"));
+        assert.equal(
+          (await readFile(join(scenario.root, "state/deployed-sha"), "utf8")).trim(),
+          sha
+        );
+        assert.equal(await currentRelease(scenario.root), join(scenario.root, "releases", sha));
+      }
+    );
+    await t.test("main advancing during pinned build never activates", async (t) => {
+      const scenario = await controllerFixture(t, { expectedSha: sha, advanceMain: true });
+      assert.equal(scenario.run().status, 0);
+      assert.equal(await currentRelease(scenario.root), null);
+      assert.equal(
+        (await scenario.events()).some((event) => event[0] === "public"),
+        false
+      );
+    });
+  }
+);
 
 test(
   "controller builds only after green CI and rechecks before activation",

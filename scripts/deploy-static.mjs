@@ -20,6 +20,17 @@ const exists = async (path) =>
   );
 const log = (message) => console.log(`${new Date().toISOString()} ${message}`);
 
+export function expectedDeploymentSha(value = process.env.MTP_DEPLOY_EXPECTED_SHA) {
+  if (value !== undefined && !shaPattern.test(value))
+    throw new Error("MTP_DEPLOY_EXPECTED_SHA must be a full lowercase 40-character Git SHA");
+  return value;
+}
+
+function assertExpectedSha(sha, expected) {
+  if (expected !== undefined && sha !== expected)
+    throw new Error("Selected main SHA differs from MTP_DEPLOY_EXPECTED_SHA; deployment stopped");
+}
+
 function command(program, args, cwd, output = false) {
   try {
     const env = { ...process.env, CI: "true" };
@@ -78,7 +89,7 @@ async function green(config, sha) {
   return successfulRun(body, sha, config.repository);
 }
 
-async function release(config, sha) {
+async function release(config, sha, expected) {
   const { root } = config;
   const repo = join(root, "repo");
   command("git", ["fetch", "--no-tags", "origin", "refs/heads/main"], repo);
@@ -113,6 +124,7 @@ async function release(config, sha) {
     } else await rename(staging, target);
     if ((await latestMain(repo)) !== sha || !(await green(config, sha)))
       throw new WaitForCi("main or CI changed before activation; keeping current release");
+    assertExpectedSha(sha, expected);
     await activate(root, target, metadata, verifyPublic, config.publicOrigin);
     await writeFile(join(root, "state", "deployed-sha"), sha + "\n");
     log(`Released ${sha} v${metadata.version} build ${metadata.buildId}`);
@@ -123,9 +135,11 @@ async function release(config, sha) {
 }
 
 async function watch(config) {
+  const expected = expectedDeploymentSha();
   const state = join(config.root, "state");
   if (await exists(join(state, "paused"))) return log("Paused; current release retained");
   const sha = await latestMain(join(config.root, "repo"));
+  assertExpectedSha(sha, expected);
   const current = await currentRelease(config.root);
   if (current && (await json(join(current, "deployment.json"))).sourceSha === sha) return;
   if (await exists(join(state, "failed-sha"))) {
@@ -138,7 +152,7 @@ async function watch(config) {
   if (!(await reserveQuery(queryFile, sha))) return;
   if (!(await green(config, sha))) return log(`Waiting for successful main push CI at ${sha}`);
   try {
-    await release(config, sha);
+    await release(config, sha, expected);
     await rm(join(state, "failed-sha"), { force: true });
   } catch (error) {
     if (error instanceof WaitForCi) return log(error.message);
