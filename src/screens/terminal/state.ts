@@ -71,6 +71,7 @@ export interface TerminalPreferences extends DisplayPreferences {
 }
 export type TerminalDialog =
   | null
+  | "welcome"
   | "delete-object"
   | "account"
   | "instruments"

@@ -5,6 +5,7 @@ import { DRAWING_CLIPBOARD_MIME } from "../../model/drawing-editing.js";
 import { useTerminal } from "./context.js";
 import { startTerminalDrive } from "./controller-drive.js";
 import { TransferMutationBarrier } from "./TransferMutationBarrier.js";
+import { WelcomeGate } from "./WelcomeDialog.js";
 export const UpdateBanner = memo(function UpdateBanner() {
   useTerminal();
   return (
@@ -115,5 +116,10 @@ export function TerminalLifecycle() {
       controller.dispose();
     };
   }, [controller]);
-  return <TransferMutationBarrier />;
+  return (
+    <>
+      <TransferMutationBarrier />
+      <WelcomeGate />
+    </>
+  );
 }
