@@ -1,6 +1,6 @@
 # Версия 0.3.19: интеграционная проверка
 
-Изолированная ветка `feat/release-0319`, worktree `vps/artifacts/release-0319-worktree`. Она не
+Изолированная ветка `feat/release-0319`, worktree `vps/artifacts/release-0319-worktree`. Она
 содержит следующую версию после опубликованной0.3.18. Публичный main остаётся `3a31c02` до
 завершения приёмки этого пакета.
 
@@ -53,8 +53,27 @@ Guest recovery `549f17b` включён как `53fc5b7`. Raw guest перено
 
 Final browser QA в `vps/artifacts/guest-recovery-final-qa` подтвердила A raw17 и B occupied18:
 исходный guest byte-exact, текущий public сохраняется; offline export, явный import и возврат
-текущего backup работают. Для C genuine empty18 найден blocker: автоматически созданная инертная
-запись drive-v2:public считается пользовательским содержимым. До строгого исправления classifier и
-повторной приёмки из сохранённого .18 baseline публикация .19 запрещена. Исходный baseline и
-ошибочный C-run сохраняются; decision не удаляется ради теста. Native IndexedDB fault/race cases ещё
-проверяются. Реальный Google login/sync и публикация этой версии не выполнены.
+текущего backup работают. Для C genuine empty18 первый прогон нашёл blocker: автоматически созданная
+инертная запись drive-v2:public считалась пользовательским содержимым. Узкий fix `be6dfc2` включён
+как `3757264`, полный check697/697, spec39/39, build `9d68e99e91dea44d`, GitHub CI45723932977/run17
+PASS. Независимое source review не нашло material bugs.
+
+Повтор C из исходного сохранённого .18 baseline прошёл через обычную кнопку Обновить. Видимые
+KLine/180/en/light и сохранённые gridfalse/font13 восстановлены; decision copied. Raw guest,
+drive-device и весь drive-v2:public byte-exact прежние до и после reload, дублей нет. Исходный
+baseline и ошибочный C-run сохраняются; их decision не удалялся ради теста.
+
+Native IndexedDB D fixture подтвердила перенос view/drawing/PNG/history/coverage, неизменность
+исходных bytes и отсутствие дублей после reload. Без include-history payload не читался; с ним
+экспортированы исходные1152bytes с прежним SHA. Native DOMException quota через контролируемую
+асинхронную IDB fault injection откатывает copies/decision, сохраняет source и оставляет рабочий
+пустой public bootstrap, предупреждение и реальное скачивание без истории. Это контролируемый отказ
+IDB, не заполнение пользовательского диска. Поздний DB callback/owner bounce и Blob await с реальным
+UI import подавляют старый download/alert. Foreign/vault read trap не срабатывал.
+
+Финальный smoke3757264 после C fix также прошёл: восстановленные настройки, затем реальный Bybit BTC
+spot с RSI в обоих движках, разделы/rename/collapse/sidebar без изменения getView и без новых
+запросов kline. На375px длинное меню300×242 без горизонтального overflow. Recovery card видна только
+public, исчезает у контролируемого другого owner и возвращается обратно. Pristine C-fixed сохранён
+отдельно от smoke. Итоговый отчёт: `vps/artifacts/guest-recovery-final-qa/report.json`. Настоящие
+Google login/sync, bank credentials и публикация этой версии не проверялись.

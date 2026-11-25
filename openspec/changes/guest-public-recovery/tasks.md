@@ -15,7 +15,7 @@
 ## 3. Проверки
 
 - [x] 3.1 Выполнить source type/lint/format/spec и focused regressions, сохранить отчёт.
-- [ ] 3.2 Координатор проверяет UI offline/mobile/themes и реальный download в свежем изолированном
+- [x] 3.2 Координатор проверяет UI offline/mobile/themes и реальный download в свежем изолированном
       browser QA.
 
 ## Workflow follow-up
