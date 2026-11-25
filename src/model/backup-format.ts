@@ -242,6 +242,7 @@ export function isProfilePreferences(value: unknown): value is ProfilePreference
       engine: member(["kline", "tradingview"]),
       rangeDays: numberBetween(1, 3650),
       sidebarWidth: numberBetween(240, 720),
+      rightDetailsHeightRatio: numberBetween(0.15, 0.85),
       chartSettings: isChartSettings,
       indicators: (value) =>
         isRecord(value) &&

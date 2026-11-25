@@ -220,6 +220,7 @@ export interface ProfilePreferences extends DisplayPreferences {
   rightPanelCollapsed?: boolean;
   rightPanelTab?: "watchlist" | "objects";
   sidebarWidth?: number;
+  rightDetailsHeightRatio?: number;
   symbol?: string;
   instrumentUid?: string | null;
   timeframe?: Timeframe;

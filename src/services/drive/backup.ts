@@ -40,7 +40,7 @@ const backupShape: Shape = {
   ...scalars("application schemaVersion exportedAt"),
   layout: {
     ...scalars(
-      "locale timeZone rightPanelCollapsed rightPanelTab sidebarWidth symbol instrumentUid timeframe engine rangeDays watchlistFlagFilter"
+      "locale timeZone rightPanelCollapsed rightPanelTab sidebarWidth rightDetailsHeightRatio symbol instrumentUid timeframe engine rangeDays watchlistFlagFilter"
     ),
     favoriteIntervals: [true],
     indicatorPaneLayout: { volume: scalars("heightRatio") },
