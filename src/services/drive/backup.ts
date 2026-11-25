@@ -39,6 +39,7 @@ const chartSettings: Shape = {
 const backupShape: Shape = {
   ...scalars("application schemaVersion exportedAt"),
   layout: {
+    providerRef: scalars("provider category symbol"),
     ...scalars(
       "locale timeZone rightPanelCollapsed rightPanelTab sidebarWidth rightDetailsHeightRatio symbol instrumentUid timeframe engine rangeDays watchlistFlagFilter"
     ),
@@ -62,8 +63,9 @@ const backupShape: Shape = {
   watchlist: [
     {
       ...scalars(
-        "symbol name uid color mark ticker figi classCode exchange realExchange currency step type expirationDate first1minCandleDate first1dayCandleDate firstTradeDate"
+        "symbol name uid color mark ticker figi classCode exchange realExchange currency step type expirationDate first1minCandleDate first1dayCandleDate firstTradeDate assetClass productKind baseCoin quoteCoin settleCoin marketRegion underlyingTicker symbolType comparisonBasis nativePriceStep"
       ),
+      providerRef: scalars("provider category symbol"),
       brand: scalars("logoName logoBaseColor textColor")
     }
   ],

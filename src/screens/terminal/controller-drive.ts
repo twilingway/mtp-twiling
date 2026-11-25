@@ -8,6 +8,8 @@ import type { TerminalController } from "./controller.js";
 import type { TerminalState } from "./state.js";
 import { cameraPending, flushCamera, subscribeCamera } from "./controller-camera-sync.js";
 import { optionalDriveObserver } from "./controller-drive-observer.js";
+import { marketAvailable } from "./market-readiness.js";
+import { LEGACY_DRIVE_NAMESPACE } from "../../services/drive/types.js";
 
 const drives = new WeakMap<TerminalController, DriveCoordinator>();
 export function terminalDrive(controller: TerminalController): DriveCoordinator {
@@ -20,8 +22,9 @@ export function terminalDrive(controller: TerminalController): DriveCoordinator 
           return {
             owner: state.owner,
             session: controller.sessionKey(),
-            authenticated: state.authenticated,
+            authenticated: marketAvailable(state),
             blocked: !!(
+              state.profileTransition ||
               cameraPending(controller) ||
               state.backupBusy ||
               state.importingBackup ||
@@ -43,6 +46,11 @@ export function terminalDrive(controller: TerminalController): DriveCoordinator 
         auth: new DriveAuth(),
         online: () => navigator.onLine,
         sync: (authorization) => new DriveSync(new DriveTransport(authorization)),
+        legacySync: (authorization) =>
+          new DriveSync(
+            new DriveTransport(authorization, { namespace: LEGACY_DRIVE_NAMESPACE }),
+            LEGACY_DRIVE_NAMESPACE
+          ),
         load: loadDriveRecord,
         save: saveDriveRecord
       }
@@ -56,7 +64,7 @@ export function terminalDrive(controller: TerminalController): DriveCoordinator 
 export function portableStateSignature(state: TerminalState): string {
   const watchlist = sanitizeDriveBackup({
     application: "personal-terminal",
-    schemaVersion: 1,
+    schemaVersion: 2,
     drawings: [],
     images: [],
     watchlist: state.rows

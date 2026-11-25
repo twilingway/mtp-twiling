@@ -19,7 +19,7 @@ const storageBoundary = {
 function load(relative) {
   const filename = path.resolve(sourceRoot, relative).replace(/\.js$/, ".ts");
   assert.ok(filename.startsWith(sourceRoot));
-  if (/services[\\/]storage\.ts$/.test(filename)) return storageBoundary;
+  if (/services[\\/]storage(?:-v2)?\.ts$/.test(filename)) return storageBoundary;
   if (/services[\\/]chart-camera\.ts$/.test(filename))
     return new Proxy(
       {},
@@ -303,7 +303,7 @@ test("legacy duplicate-symbol selection is pinned before reorder; in-flight hist
   controller.session.client = f.client;
   controller.update({
     owner: f.client.owner,
-    authenticated: true,
+    authenticated: true, marketReady: true,
     rows: f.client.rows,
     preferences: { ...controller.getSnapshot().preferences, symbol: "SAME", engine: "kline" }
   });
@@ -434,7 +434,7 @@ test("switching UIDs with the same symbol resets history and rejects late old ca
   controller.session.client = f.client;
   controller.update({
     owner: f.client.owner,
-    authenticated: true,
+    authenticated: true, marketReady: true,
     rows: f.client.rows,
     preferences: {
       ...controller.getSnapshot().preferences,

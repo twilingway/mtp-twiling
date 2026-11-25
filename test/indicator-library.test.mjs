@@ -14,6 +14,7 @@ function modules(overrides = {}) {
   const cache = new Map();
   function load(relative) {
     relative = relative.replaceAll(path.sep, "/");
+    if (["services/storage-v2.ts", "services/storage-v2.js"].includes(relative)) return load("services/storage.js");
     if (Object.hasOwn(overrides, relative)) return overrides[relative];
     if (relative === "react") return react;
     if (relative === "react/jsx-runtime") return jsx;

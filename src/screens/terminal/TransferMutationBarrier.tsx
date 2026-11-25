@@ -5,7 +5,7 @@ import { useTerminal } from "./context.js";
 /** Keep account/logout/Google disconnect usable while portable mutations are suspended. */
 export function TransferMutationBarrier() {
   const { state } = useTerminal(),
-    blocked = !!(state.importingBackup || state.importRecoveryRequired);
+    blocked = !!(state.profileTransition || state.importingBackup || state.importRecoveryRequired);
   useEffect(() => {
     if (!blocked) return;
     const nodes = [
@@ -40,9 +40,11 @@ export function TransferMutationBarrier() {
         borderRadius: 6
       }}
     >
-      {state.importRecoveryRequired
-        ? t("Завершите восстановление профиля, чтобы изменять настройки.")
-        : t("Применяем настройки. Аккаунт и отключение доступны.")}
+      {state.profileTransition
+        ? t("Переключаем локальный профиль. Аккаунт доступен.")
+        : state.importRecoveryRequired
+          ? t("Завершите восстановление профиля, чтобы изменять настройки.")
+          : t("Применяем настройки. Аккаунт и отключение доступны.")}
     </div>
   ) : null;
 }

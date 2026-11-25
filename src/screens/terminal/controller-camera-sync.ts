@@ -1,3 +1,4 @@
+import { marketAvailable } from "./market-readiness.js";
 import type { ChartAdapter, ChartOptions } from "../../charts/adapter.js";
 import type { ChartView } from "../../model/types.js";
 import type { TerminalController } from "./controller.js";
@@ -47,7 +48,8 @@ export function cameraCurrent(
     chart &&
     chart === controller.chart &&
     source &&
-    state.authenticated &&
+    marketAvailable(state) &&
+    !state.profileTransition &&
     !state.loading &&
     !state.importingBackup &&
     !state.importRecoveryRequired &&

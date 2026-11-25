@@ -13,11 +13,13 @@ export function ApplicationInfo() {
       <p>
         {state.error
           ? systemText(state.error)
-          : state.status === "connected"
+          : state.authenticated && state.status === "connected"
             ? t("Т-Банк: подключено")
             : state.authenticated
               ? t("Сохранённые котировки; подключаемся к Т-Банку…")
-              : t("API не подключён")}
+              : state.marketReady
+                ? t("Публичные данные Bybit · без ключа банка")
+                : t("Открываем локальный профиль")}
       </p>
       <p>{systemText(state.historyHelp)}</p>
       <p>{t("История, рисунки и изображения сохраняются в IndexedDB на устройстве.")}</p>

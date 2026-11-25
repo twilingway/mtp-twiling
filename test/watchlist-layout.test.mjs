@@ -48,6 +48,7 @@ function sources(overrides = {}, globals = {}) {
     const filename = path.resolve(sourceRoot, relative).replace(/\.js$/, ".ts");
     const key = path.relative(sourceRoot, filename).replaceAll(path.sep, "/");
     assert.ok(!key.startsWith("../") && !path.isAbsolute(key));
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (modules.has(filename)) return modules.get(filename).exports;
     const module = { exports: {} };
@@ -630,6 +631,9 @@ test("offline session restoration accepts an explicitly cached empty watchlist",
   let historyLoads = 0;
   let state = { owner: "guest", rows: [], candles: [], pricesDirection: new Map() };
   class OfflineBankClient extends EventTarget {
+    rows = [];
+    authenticated = false;
+    snapshot() { return { rows: this.rows, status: "error", error: "offline" }; }
     async start() {
       throw new Error("simulated offline transport");
     }
@@ -638,18 +642,25 @@ test("offline session restoration accepts an explicitly cached empty watchlist",
   const { load } = sources(
     {
       "services/storage.ts": {
+        PUBLIC_OWNER: "public",
+        prepareProfileV2: async () => {},
+        copyPublicProfile: async () => ({ conflict: false, count: 0 }),
+        loadWatchlist: async () => [],
+        saveWatchlistSnapshot: async () => {},
+        saveMarket: async () => {},
         migrateLegacy: async () => {},
         lastProfile: async () => undefined,
         restoreSession: async () => ({ owner, name: "Offline", token: "unit-test-only-not-real" }),
         loadMarket: async (requestedOwner) => {
-          assert.equal(requestedOwner, owner);
+          assert.ok([owner, "public"].includes(requestedOwner));
           return { rows: [], at: Date.now() };
         },
         loadPreferences: async () => ({ symbol: "ONE" })
       },
-      "services/tbank-client.ts": { TBankClient: OfflineBankClient }
+      "services/tbank-client.ts": { TBankClient: OfflineBankClient },
+      "services/profile-key.ts": { profileKey: async () => owner }
     },
-    { window: new EventTarget() }
+    { window: new EventTarget(), navigator: { onLine: false } }
   );
   const { TerminalSession } = load("screens/terminal/controller-session.ts");
   const session = new TerminalSession({
@@ -675,7 +686,7 @@ test("offline session restoration accepts an explicitly cached empty watchlist",
     assert.deepEqual(symbols(state.rows), []);
     assert.equal(session.client.authenticated, true);
     assert.equal(session.client.owner, owner);
-    assert.equal(historyLoads, 1);
+    assert.equal(historyLoads, 2);
     assert.deepEqual(notices, []);
   } finally {
     session.dispose();

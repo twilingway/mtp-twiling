@@ -227,6 +227,8 @@ test("successful complete, native abort, native error and writer throw all clean
 for(const phase of ["owner","session","logout"]){
   test(`whole Drive -> transfer -> controller import -> storage TX aborts on ${phase} while writes are pending`,async()=>{
     const f=await fixture(), a=countedAbort(), gate=deferred(), entered=deferred();populate(f.database);
+    // Session preparation completes the non-destructive v2 copy before a Drive import is allowed.
+    await f.load("services/storage-v2.ts").prepareProfileV2("A");
     const {DriveCoordinator}=f.load("services/drive/coordinator.ts");
     const {TerminalBackups}=f.load("screens/terminal/controller-backups.ts");
     const {driveBackupDigest}=f.load("services/drive/backup.ts");
@@ -259,7 +261,7 @@ for(const phase of ["owner","session","logout"]){
     if(phase==="session"){client={};profile={...profile,session:client};}
     if(phase==="logout"){state={...state,authenticated:false};profile={...profile,authenticated:false};}
     coordinator.profileChanged();gate.resolve();await connecting;
-    assert.equal(f.database.transactions.find(tx=>tx.mode==="readwrite").state,"aborted");
+    assert.equal(f.database.transactions.findLast(tx=>tx.mode==="readwrite").state,"aborted");
     assert.equal(a.listeners.size,0,"native TX and coordinator once-listeners removed");
     assert.equal(commits,0,"restoration/onCommitted was never reached");unchanged(f.database);
     assert.equal(coordinator.getSnapshot().phase,"disconnected");coordinator.disconnect();

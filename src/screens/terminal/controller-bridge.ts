@@ -1,9 +1,10 @@
 import type { ChartAdapter } from "../../charts/adapter.js";
 import type { Candle } from "../../model/types.js";
-import type { TBankClient } from "../../services/tbank-client.js";
+import type { MarketClient } from "../../services/market-client.js";
 import { DEFAULT_CHART_SETTINGS, DEFAULT_INDICATORS, PERIOD_LABELS } from "./state.js";
 import { t } from "../../i18n/messages.js";
 import type { TerminalPreferences, TerminalState } from "./state.js";
+import { selectedMarketRow } from "../../model/selected-instrument.js";
 
 export interface TerminalBridge {
   getState: () => TerminalState;
@@ -12,7 +13,7 @@ export interface TerminalBridge {
   notify: (message: string) => void;
 }
 export interface HistoryBridge extends TerminalBridge {
-  getClient: () => TBankClient | null;
+  getClient: () => MarketClient | null;
   isAlive: () => boolean;
 }
 export interface SessionBridge extends TerminalBridge {
@@ -42,5 +43,5 @@ export function viewKey(preferences: TerminalPreferences): string {
   return `${preferences.symbol}:${preferences.timeframe}:${preferences.engine}:${preferences.rangeDays}`;
 }
 export function terminalHistoryLabel(state: TerminalState): string {
-  return `${state.preferences.symbol} · ${t(PERIOD_LABELS[state.preferences.timeframe])}`;
+  return `${selectedMarketRow(state.rows, state.preferences)?.ticker ?? state.preferences.symbol} · ${t(PERIOD_LABELS[state.preferences.timeframe])}`;
 }

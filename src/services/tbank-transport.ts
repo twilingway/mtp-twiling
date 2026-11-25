@@ -1,5 +1,6 @@
 import { object } from "./types.js";
 import { ServerClock } from "./server-clock.js";
+import { assertBankRequest } from "./market-bank-cache.js";
 
 const BASE = "https://invest-public-api.tbank.ru/rest/tinkoff.public.invest.api.contract.v1.";
 const STREAM =
@@ -65,6 +66,7 @@ export class BankTransport {
     body: object = {},
     signal?: AbortSignal
   ): Promise<Record<string, unknown>> {
+    assertBankRequest(body);
     const requestSignal = signal
       ? AbortSignal.any([signal, this.lifetime.signal])
       : this.lifetime.signal;

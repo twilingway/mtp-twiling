@@ -4,6 +4,7 @@ import type { DisplayPreferences } from "../i18n/preferences.js";
 import type { WatchlistFlags, WatchlistFlagFilter } from "./watchlist-flags.js";
 import type { TechnicalIndicatorInstance } from "./technical-indicators/types.js";
 import type { TechnicalPaneLayout } from "./technical-indicator-layout.js";
+import type { MarketProviderRef, ProviderAttributes } from "./market-provider.js";
 
 export type Timeframe = NativeIntervalId;
 export interface Candle {
@@ -29,9 +30,10 @@ export interface InstrumentBrand {
   logoBaseColor?: string;
   textColor?: string;
 }
-export type InstrumentKind = "share" | "future" | "index" | "currency";
+export type InstrumentKind =
+  "share" | "future" | "index" | "currency" | "crypto" | "tokenized-stock";
 export type InstrumentSearchKind = "all" | InstrumentKind;
-export interface CatalogInstrument {
+export interface CatalogInstrument extends ProviderAttributes {
   uid?: string;
   instrumentUid?: string;
   figi?: string;
@@ -59,7 +61,7 @@ export interface Catalog {
   indicatives: CatalogInstrument[];
   currencies?: CatalogInstrument[];
 }
-export interface MarketRow {
+export interface MarketRow extends ProviderAttributes {
   symbol: string;
   name: string;
   color: string;
@@ -73,7 +75,8 @@ export interface MarketRow {
   currency: string;
   step: number | null;
   brand?: InstrumentBrand | null;
-  type?: "index" | "future" | "currency" | undefined;
+  type?: "index" | "future" | "currency" | "crypto" | "tokenized-stock" | undefined;
+  comparisonBasis?: "exchange-day" | "rolling-24h";
   expirationDate?: string | null;
   first1minCandleDate?: string | undefined;
   first1dayCandleDate?: string | undefined;
@@ -226,6 +229,7 @@ export interface IndicatorPaneLayout {
 export interface ProfilePreferences extends DisplayPreferences {
   technicalIndicators?: TechnicalIndicatorInstance[];
   technicalPaneLayout?: TechnicalPaneLayout;
+  providerRef?: MarketProviderRef | undefined;
   watchlistFlags?: WatchlistFlags;
   watchlistFlagFilter?: WatchlistFlagFilter;
   indicatorPaneLayout?: IndicatorPaneLayout;
@@ -302,7 +306,7 @@ export type BackupMarketRow = Pick<MarketRow, "symbol" | "name"> & {
 } & Partial<Omit<MarketRow, "symbol" | "name" | "uid">>;
 export interface Backup {
   application: "personal-terminal";
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
   exportedAt?: string;
   layout?: ProfilePreferences;
   watchlist?: BackupMarketRow[];

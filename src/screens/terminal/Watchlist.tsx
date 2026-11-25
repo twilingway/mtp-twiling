@@ -151,7 +151,7 @@ export function Watchlist() {
             id="add-instrument"
             title={t("Добавить инструмент")}
             aria-label={t("Добавить инструмент")}
-            onClick={() => controller.setDialog(state.authenticated ? "instruments" : "account")}
+            onClick={() => controller.setDialog(state.ready ? "instruments" : "account")}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M12 5v14M5 12h14" />
@@ -281,13 +281,19 @@ export function Watchlist() {
               <InstrumentIcon key={selected.uid} row={selected} id="detail-icon" />
               <h3 id="detail-symbol">{selected.ticker}</h3>
               <span className="market-tag" id="detail-type">
-                {selected.type === "future"
-                  ? t("Фьючерс")
-                  : selected.type === "index"
-                    ? t("Индекс")
-                    : selected.type === "currency"
-                      ? t("Валюта")
-                      : t("Акция")}
+                {selected.providerRef
+                  ? selected.type === "tokenized-stock"
+                    ? t("Токенизированная акция")
+                    : selected.assetClass === "crypto"
+                      ? t("Криптовалюта")
+                      : t("Контракт · Bybit")
+                  : selected.type === "future"
+                    ? t("Фьючерс")
+                    : selected.type === "index"
+                      ? t("Индекс")
+                      : selected.type === "currency"
+                        ? t("Валюта")
+                        : t("Акция")}
               </span>
             </div>
             <p id="detail-name">{selected.name}</p>
@@ -299,9 +305,11 @@ export function Watchlist() {
               className={`detail-change ${signClass(selected.change)}`}
               id="detail-change"
               title={t(
-                selected.type === "future"
-                  ? "К предыдущему закрытию Т-Банка"
-                  : "К предыдущему дневному закрытию"
+                selected.comparisonBasis === "rolling-24h"
+                  ? "Изменение за последние 24 часа · Bybit"
+                  : selected.type === "future"
+                    ? "К предыдущему закрытию Т-Банка"
+                    : "К предыдущему дневному закрытию"
               )}
             >
               {selected.change == null || selected.changePercent == null
@@ -310,8 +318,14 @@ export function Watchlist() {
             </p>
             <div className="detail-facts">
               <div>
-                <span>{t("Предыдущее дневное закрытие")}</span>
-                <b id="detail-close">{number(selected.previousClose, precision(selected))}</b>
+                <span>
+                  {t(selected.providerRef ? "База изменения" : "Предыдущее дневное закрытие")}
+                </span>
+                <b id="detail-close">
+                  {selected.providerRef
+                    ? t("Последние 24 часа")
+                    : number(selected.previousClose, precision(selected))}
+                </b>
               </div>
               <div>
                 <span>{t("Время последней сделки")}</span>
@@ -327,16 +341,18 @@ export function Watchlist() {
               </div>
               <div>
                 <span>{t("Источник")}</span>
-                <b>{t("Т‑Инвестиции")}</b>
+                <b>{selected.providerRef ? "Bybit" : t("Т‑Инвестиции")}</b>
               </div>
             </div>
             <p className="detail-note" id="detail-note">
               {t(
-                selected.previousClose == null
-                  ? "Предыдущее закрытие недоступно"
-                  : selected.type === "future"
-                    ? "К предыдущему закрытию Т-Банка"
-                    : "К предыдущему дневному закрытию"
+                selected.providerRef
+                  ? "Bybit · последняя сделка · изменение за 24ч"
+                  : selected.previousClose == null
+                    ? "Предыдущее закрытие недоступно"
+                    : selected.type === "future"
+                      ? "К предыдущему закрытию Т-Банка"
+                      : "К предыдущему дневному закрытию"
               )}
               {selected.note ? " · " + systemText(selected.note) : ""}
             </p>

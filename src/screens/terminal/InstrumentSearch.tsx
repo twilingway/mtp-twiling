@@ -4,13 +4,16 @@ import type { CatalogInstrument, InstrumentSearchKind, MarketRow } from "../../m
 import { useTerminal } from "./context.js";
 import { Modal } from "./Modal.js";
 import { intlLocale } from "../../i18n/preferences.js";
+import { providerAttributes } from "../../model/market-provider.js";
 type Kind = InstrumentSearchKind;
 const KINDS: { kind: Kind; label: string }[] = [
   { kind: "all", label: "Все" },
   { kind: "share", label: "Акции" },
   { kind: "future", label: "Фьючерсы" },
   { kind: "index", label: "Индексы" },
-  { kind: "currency", label: "Валюты" }
+  { kind: "currency", label: "Валюты" },
+  { kind: "crypto", label: "Криптовалюты" },
+  { kind: "tokenized-stock", label: "Токенизированные акции" }
 ];
 interface SearchRequest {
   query: string;
@@ -41,6 +44,14 @@ function CatalogLogo({ item }: { item: CatalogInstrument }) {
   );
 }
 function kindLabel(item: CatalogInstrument): string {
+  if (item.providerRef) {
+    if (item.kind === "tokenized-stock") return t("Токенизированная акция");
+    if (item.kind === "crypto")
+      return item.productKind === "spot" ? t("Крипто · Спот") : t("Крипто · USDT perpetual");
+    return item.assetClass === "stock" || item.assetClass === "etf"
+      ? t("Контракт на акцию/ETF")
+      : t("USDT perpetual");
+  }
   const kind = item.kind ?? item.instrumentType;
   return kind === "currency"
     ? t("Валюта")
@@ -53,6 +64,15 @@ function kindLabel(item: CatalogInstrument): string {
           : t("Инструмент");
 }
 function metadata(item: CatalogInstrument): string {
+  if (item.providerRef)
+    return [
+      "Bybit",
+      item.providerRef.category === "spot" ? "Spot" : "USDT perpetual",
+      item.marketRegion,
+      item.currency
+    ]
+      .filter(Boolean)
+      .join(" · ");
   const source =
     item.exchange === "moex_close"
       ? t("MOEX · данные закрытия")
@@ -76,6 +96,7 @@ function instrumentKey(item: CatalogInstrument): string {
 }
 function watchlistInstrument(row: MarketRow): CatalogInstrument {
   return {
+    ...providerAttributes({ ...row }),
     ticker: row.ticker,
     name: row.name,
     currency: row.currency,
@@ -260,7 +281,9 @@ export function InstrumentSearch() {
         )}
       </div>
       <small id="instrument-search-help">
-        {t("Каталог Т‑Банка · для фьючерса выбирайте срок контракта.")}
+        {t(
+          "Bybit · публичные котировки без ключа. Т‑Банк · личный ключ для российских инструментов. USDT-контракт и токенизированная акция не являются обычной акцией."
+        )}
       </small>
     </Modal>
   );

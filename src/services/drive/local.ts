@@ -4,7 +4,7 @@ import { uuidPattern, shaPattern } from "./backup.js";
 import type { DriveRecord } from "./coordinator-types.js";
 
 export async function loadDriveRecord(owner: string): Promise<DriveRecord> {
-  const value = await get("preferences", `drive:${owner}`);
+  const value = await get("preferences", `drive-v2:${owner}`);
   if (isRecord(value) && isRecord(value.value)) {
     const record = value.value;
     if (
@@ -53,5 +53,5 @@ export async function loadDriveRecord(owner: string): Promise<DriveRecord> {
   return record;
 }
 export function saveDriveRecord(owner: string, record: DriveRecord): Promise<void> {
-  return put("preferences", { id: `drive:${owner}`, owner, value: record });
+  return put("preferences", { id: `drive-v2:${owner}`, owner, value: record });
 }

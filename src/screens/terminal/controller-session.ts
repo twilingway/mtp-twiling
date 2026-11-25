@@ -1,6 +1,7 @@
-import * as storage from "../../services/storage.js";
+import * as storage from "../../services/storage-v2.js";
 import { displayPreferences } from "../../i18n/preferences.js";
-import { TBankClient } from "../../services/tbank-client.js";
+import { MarketClient } from "../../services/market-client.js";
+import type { MarketSnapshot } from "../../services/market-client.js";
 import { TIMEFRAMES, updateCandleList } from "../../model/history-codec.js";
 import { migrateCandlePalette } from "../../model/candle-palette.js";
 import { pinSelectedInstrument, selectedMarketRow } from "../../model/selected-instrument.js";
@@ -9,20 +10,19 @@ import { DEFAULT_CHART_SETTINGS, DEFAULT_INDICATORS } from "./state.js";
 import type { TerminalPreferences } from "./state.js";
 import { defaultPreferences, errorText } from "./controller-bridge.js";
 import type { SessionBridge } from "./controller-bridge.js";
-
-type BankSnapshot = ReturnType<TBankClient["snapshot"]>;
-const cancelled = (): DOMException => new DOMException("Отключено", "AbortError");
+const cancelled = () => new DOMException("Отключено", "AbortError");
 
 export class TerminalSession {
-  client: TBankClient | null = null;
+  client: MarketClient | null = null;
   disposed = false;
   private lifecycle = 0;
   private activation = 0;
+  private transitionAbort: AbortController | undefined;
   private liveFrame: number | null = null;
-  private reconnectClient: TBankClient | null = null;
+  private reconnectClient: MarketClient | null = null;
   private sessionWrites: Promise<void> = Promise.resolve();
   constructor(private readonly bridge: SessionBridge) {}
-  private current(lifecycle: number, activation?: number, client?: TBankClient): boolean {
+  private current(lifecycle: number, activation?: number, client?: MarketClient): boolean {
     return (
       !this.disposed &&
       lifecycle === this.lifecycle &&
@@ -30,7 +30,7 @@ export class TerminalSession {
       (client === undefined || client === this.client)
     );
   }
-  matches(client: TBankClient | null): boolean {
+  matches(client: MarketClient | null): boolean {
     return !this.disposed && client === this.client;
   }
   async prepareProfile(
@@ -40,6 +40,7 @@ export class TerminalSession {
     valid: () => boolean = () => !this.disposed
   ): Promise<void> {
     if (!valid() || (!force && this.bridge.getState().owner === owner)) return;
+    await storage.prepareProfileV2(owner, valid);
     await storage.migrateLegacy(owner, name);
     if (!valid()) return;
     const saved = await storage.loadPreferences(owner),
@@ -58,79 +59,40 @@ export class TerminalSession {
   async start(): Promise<void> {
     this.disposed = false;
     const lifecycle = ++this.lifecycle,
-      initialActivation = this.activation;
-    const bootstrapCurrent = () => this.current(lifecycle, initialActivation);
+      activation = this.activation;
     window.addEventListener("online", this.onOnline);
     window.addEventListener("pagehide", this.onPageHide);
-    this.bridge.update({ loading: false });
-    await storage.migrateLegacy("guest", "");
-    if (!bootstrapCurrent()) return;
-    const previous = await storage.lastProfile();
-    if (!bootstrapCurrent()) return;
-    if (previous) await this.prepareProfile(previous.owner, previous.name, false, bootstrapCurrent);
-    else await this.prepareProfile("guest", "", true, bootstrapCurrent);
-    if (!bootstrapCurrent()) return;
     const session = await storage.restoreSession();
-    if (!bootstrapCurrent()) return;
+    if (!this.current(lifecycle, activation)) return;
+    await this.activate(null, "", lifecycle, storage.PUBLIC_OWNER);
+    if (!this.current(lifecycle)) return;
     this.bridge.update({ ready: true });
-    if (session) {
-      const activation = this.activation + 1;
+    if (session)
       try {
         await this.activate(session.token, session.name, lifecycle);
       } catch (error) {
-        if (!this.current(lifecycle, activation)) return;
-        const client = this.client,
-          cached = await storage.loadMarket(session.owner);
-        if (!this.current(lifecycle, activation)) return;
-        if (cached !== undefined && client) {
-          await this.prepareProfile(session.owner, session.name, false, () =>
-            this.current(lifecycle, activation, client)
-          );
-          if (!this.current(lifecycle, activation, client)) return;
-          client.owner = session.owner;
-          client.rows = cached.rows;
-          client.authenticated = true;
-          this.bridge.update({
-            rows: cached.rows,
-            preferences: pinSelectedInstrument(cached.rows, this.bridge.getState().preferences),
-            authenticated: true,
-            status: "offline",
-            error: null
-          });
-          await this.bridge.loadHistory();
-        } else this.bridge.notify(errorText(error));
+        if (this.current(lifecycle)) this.bridge.notify(errorText(error));
       }
-    }
-    if (!this.current(lifecycle)) return;
   }
   private onOnline = (): void => {
     const client = this.client;
-    if (
-      !client ||
-      this.disposed ||
-      this.bridge.getState().status === "connected" ||
-      this.reconnectClient === client
-    )
-      return;
-    const lifecycle = this.lifecycle,
-      activation = this.activation;
+    if (!client || this.disposed || this.reconnectClient === client) return;
+    const lifecycle = this.lifecycle;
     this.reconnectClient = client;
-    void (async () => {
-      try {
-        const snapshot = await client.start();
-        if (!this.current(lifecycle, activation, client)) return;
-        await this.prepareProfile(client.owner, client.name, false, () =>
-          this.current(lifecycle, activation, client)
-        );
-        if (!this.current(lifecycle, activation, client)) return;
-        this.applyBankState(snapshot);
-        if (!this.bridge.getState().candles.length) await this.bridge.loadHistory();
-      } catch (error) {
-        if (this.current(lifecycle, activation, client)) this.bridge.notify(errorText(error));
-      } finally {
+    void client
+      .start()
+      .then((snapshot) => {
+        if (this.current(lifecycle, undefined, client)) {
+          this.applyBankState(snapshot);
+          if (!this.bridge.getState().candles.length) return this.bridge.loadHistory();
+        }
+      })
+      .catch((error: unknown) => {
+        if (this.current(lifecycle, undefined, client)) this.bridge.notify(errorText(error));
+      })
+      .finally(() => {
         if (this.reconnectClient === client) this.reconnectClient = null;
-      }
-    })();
+      });
   };
   private onPageHide = (): void => {
     void this.bridge.flush().catch(() => undefined);
@@ -139,6 +101,7 @@ export class TerminalSession {
     this.disposed = true;
     this.lifecycle++;
     this.activation++;
+    this.transitionAbort?.abort();
     this.bridge.resetHistory();
     this.cancelLiveFrame();
     const client = this.client;
@@ -151,10 +114,10 @@ export class TerminalSession {
     if (this.liveFrame !== null) cancelAnimationFrame(this.liveFrame);
     this.liveFrame = null;
   }
-  applyBankState(snapshot: BankSnapshot): void {
+  applyBankState(snapshot: MarketSnapshot): void {
     const state = this.bridge.getState(),
-      directions = new Map(state.pricesDirection);
-    const before = new Map(state.rows.map((row) => [row.symbol, row.price]));
+      directions = new Map(state.pricesDirection),
+      before = new Map(state.rows.map((row) => [row.symbol, row.price]));
     const rows = snapshot.rows.map((row) => {
       const previous = before.get(row.symbol);
       if (previous != null && row.price != null && previous !== row.price)
@@ -164,40 +127,51 @@ export class TerminalSession {
     this.bridge.update({
       rows,
       preferences: pinSelectedInstrument(rows, state.preferences),
+      marketReady: snapshot.marketReady,
       authenticated: snapshot.authenticated,
       status: snapshot.status,
       error: snapshot.error ?? null,
       pricesDirection: directions
     });
   }
-  private async activate(
-    token: string,
-    name: string,
-    lifecycle = this.lifecycle
-  ): Promise<TBankClient> {
-    const activation = ++this.activation,
-      previous = this.client;
-    this.client = null;
-    this.reconnectClient = null;
-    this.bridge.resetHistory();
-    this.cancelLiveFrame();
-    this.bridge.update({ loading: false });
-    await previous?.close();
-    if (!this.current(lifecycle, activation)) throw cancelled();
-    const client = new TBankClient(token, name, storage);
-    this.client = client;
-    const valid = () => this.current(lifecycle, activation, client);
+  private attach(client: MarketClient, lifecycle: number): void {
+    const valid = () => this.current(lifecycle, undefined, client);
     client.addEventListener("notice", (event) => {
       if (valid()) this.bridge.notify((event as CustomEvent<string>).detail);
     });
     client.addEventListener("state", (event) => {
-      if (valid()) this.applyBankState((event as CustomEvent<BankSnapshot>).detail);
+      const current = this.bridge.getState();
+      if (
+        valid() &&
+        !current.profileTransition &&
+        !current.importingBackup &&
+        !current.importRecoveryRequired
+      )
+        this.applyBankState((event as CustomEvent<MarketSnapshot>).detail);
+    });
+    client.addEventListener("market-reconnect", (event) => {
+      const state = this.bridge.getState(),
+        row = selectedMarketRow(state.rows, state.preferences);
+      if (
+        valid() &&
+        !state.profileTransition &&
+        !state.importingBackup &&
+        row?.providerRef?.category === (event as CustomEvent<string>).detail
+      )
+        void this.bridge.loadHistory(true).catch(() => undefined);
     });
     client.addEventListener("candle", (event) => {
       const state = this.bridge.getState();
-      if (!valid() || this.bridge.isClearingHistory() || !state.candles.length) return;
-      const detail = (event as CustomEvent<{ uid: string; interval: string; bar: Candle }>).detail;
-      const row = selectedMarketRow(state.rows, state.preferences);
+      if (
+        !valid() ||
+        state.profileTransition ||
+        state.importingBackup ||
+        this.bridge.isClearingHistory() ||
+        !state.candles.length
+      )
+        return;
+      const detail = (event as CustomEvent<{ uid: string; interval: string; bar: Candle }>).detail,
+        row = selectedMarketRow(state.rows, state.preferences);
       if (
         detail.uid !== row?.uid ||
         detail.interval !== TIMEFRAMES[state.preferences.timeframe].stream
@@ -210,41 +184,84 @@ export class TerminalSession {
         if (valid()) this.bridge.update({ candles: this.bridge.getState().candles });
       });
     });
-    const snapshot = await client.start();
-    if (!valid()) throw cancelled();
-    await this.prepareProfile(client.owner, name, false, valid);
-    if (!valid()) throw cancelled();
-    this.bridge.update({ name });
-    this.applyBankState(snapshot);
-    const state = this.bridge.getState();
-    if (
-      state.preferences.instrumentUid === undefined &&
-      !selectedMarketRow(state.rows, state.preferences) &&
-      state.rows[0]
-    )
+  }
+  private async activate(
+    token: string | null,
+    name: string,
+    lifecycle = this.lifecycle,
+    owner?: string
+  ): Promise<MarketClient> {
+    this.transitionAbort?.abort();
+    const transition = new AbortController();
+    this.transitionAbort = transition;
+    const activation = ++this.activation,
+      previous = this.client,
+      sourceOwner = storage.PUBLIC_OWNER,
+      previousPaused = previous?.cachePaused ?? false;
+    const candidate = new MarketClient(token, name, storage, owner ? { owner } : {});
+    const attempt = () => this.current(lifecycle, activation);
+    this.bridge.update({ profileTransition: true });
+    try {
+      await previous?.settleMutations?.();
+      await this.bridge.flush();
+      if (!attempt()) throw cancelled();
+      if (previous) previous.cachePaused = true;
+      const target = await candidate.prepareOwner();
+      if (!attempt()) throw cancelled();
+      await storage.prepareProfileV2(target, attempt, transition.signal);
+      const transfer = await storage.copyPublicProfile(
+        sourceOwner,
+        target,
+        attempt,
+        false,
+        transition.signal
+      );
+      if (!attempt()) throw cancelled();
+      await candidate.start();
+      if (!attempt()) throw cancelled();
+      await previous?.close();
+      if (!attempt()) throw cancelled();
+      this.bridge.resetHistory();
+      this.cancelLiveFrame();
+      this.client = candidate;
+      this.reconnectClient = null;
+      this.attach(candidate, lifecycle);
+      const valid = () => this.current(lifecycle, activation, candidate);
+      await this.prepareProfile(target, name, false, valid);
+      if (!valid()) throw cancelled();
       this.bridge.update({
-        preferences: {
-          ...state.preferences,
-          symbol: state.rows[0].symbol,
-          instrumentUid: state.rows[0].uid
-        }
+        name,
+        profileTransition: false,
+        pendingPublicSource: transfer.conflict ? sourceOwner : null
       });
-    await this.bridge.loadHistory();
-    if (!valid()) throw cancelled();
-    return client;
+      this.applyBankState(candidate.snapshot());
+      const state = this.bridge.getState();
+      if (!selectedMarketRow(state.rows, state.preferences)) {
+        const first = state.rows[0];
+        this.bridge.update({
+          preferences: {
+            ...state.preferences,
+            symbol: first?.symbol ?? "",
+            instrumentUid: first?.uid ?? null,
+            providerRef: first?.providerRef
+          }
+        });
+      }
+      await this.bridge.loadHistory();
+      if (!valid()) throw cancelled();
+      return candidate;
+    } catch (error) {
+      if (candidate !== this.client) await candidate.close();
+      throw error;
+    } finally {
+      if (previous && !previous.closed) previous.cachePaused = previousPaused;
+      if (attempt()) this.bridge.update({ profileTransition: false });
+    }
   }
   async login(token: string, name: string, remember: boolean): Promise<void> {
     const clean = token.trim().replaceAll("\\_", "_");
     if (!/^t\.[A-Za-z0-9_-]{40,200}$/.test(clean))
       throw new Error("Введите корректный read-only токен.");
-    this.bridge.resetHistory();
-    this.bridge.update({
-      loading: false,
-      candles: [],
-      drawings: [],
-      images: [],
-      selectedObject: null
-    });
     const client = await this.activate(clean, name.trim());
     const operation = this.sessionWrites.then(async () => {
       if (!this.matches(client)) throw cancelled();
@@ -255,15 +272,44 @@ export class TerminalSession {
     if (this.matches(client)) this.bridge.update({ dialog: null, ready: true });
   }
   async logout(): Promise<void> {
+    this.bridge.update({ authenticated: false, profileTransition: true });
     const client = this.client,
       lifecycle = this.lifecycle,
       activation = this.activation;
     await this.bridge.flush();
-    if (!this.current(lifecycle, activation)) return;
-    await client?.close();
     await this.sessionWrites;
     if (!this.current(lifecycle, activation)) return;
     await storage.clearSession(client?.owner);
-    if (this.current(lifecycle, activation)) location.reload();
+    if (!this.current(lifecycle, activation)) return;
+    await this.activate(null, "", lifecycle, storage.PUBLIC_OWNER);
+  }
+  async mergePublicProfile(): Promise<void> {
+    const state = this.bridge.getState(),
+      source = state.pendingPublicSource,
+      client = this.client,
+      owner = state.owner;
+    if (!source || !client || state.profileTransition || state.importingBackup || state.backupBusy)
+      return;
+    const valid = () =>
+      this.matches(client) &&
+      this.bridge.getState().owner === owner &&
+      !this.bridge.getState().importingBackup;
+    this.bridge.update({ profileTransition: true });
+    const previousPaused = client.cachePaused;
+    try {
+      await client.settleMutations?.();
+      await this.bridge.flush();
+      client.cachePaused = true;
+      await storage.copyPublicProfile(source, owner, valid, true, this.transitionAbort?.signal);
+      if (!valid()) return;
+      const rows = await storage.loadWatchlist(owner);
+      if (!valid()) return;
+      if (rows) client.rows = rows;
+      this.bridge.update({ pendingPublicSource: null });
+      this.applyBankState(client.snapshot());
+    } finally {
+      client.cachePaused = previousPaused;
+      if (valid()) this.bridge.update({ profileTransition: false });
+    }
   }
 }

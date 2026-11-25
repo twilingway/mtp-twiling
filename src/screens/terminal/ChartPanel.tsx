@@ -1,3 +1,4 @@
+import { marketAvailable } from "./market-readiness.js";
 import { t, systemText } from "../../i18n/messages.js";
 import { memo } from "react";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
@@ -23,6 +24,7 @@ const Version = memo(function Version() {
 });
 export function ChartPanel() {
   const { controller, state } = useTerminal(),
+    available = marketAvailable(state),
     p = state.preferences,
     row = selectedMarketRow(state.rows, p),
     barIndex = state.crosshairBar
@@ -30,7 +32,7 @@ export function ChartPanel() {
       : state.candles.length - 1,
     bar = state.candles[barIndex] ?? state.crosshairBar ?? undefined,
     digits = row ? precision(row) : 2,
-    busy = state.authenticated && (state.loading || state.importingBackup === true);
+    busy = available && (state.loading || state.importingBackup === true);
   return (
     <section
       id="chart-panel"
@@ -59,7 +61,9 @@ export function ChartPanel() {
           >
             {row?.exchange === "dealer_fx_otc" || row?.realExchange === "REAL_EXCHANGE_DEALER"
               ? t("Дилер")
-              : "MOEX"}
+              : row?.providerRef
+                ? `Bybit · ${row.productKind === "spot" ? "Spot" : "USDT perpetual"}`
+                : "MOEX"}
           </span>
           <span id="chart-period">{t(PERIOD_LABELS[p.timeframe])}</span>
         </div>
@@ -72,9 +76,9 @@ export function ChartPanel() {
         <div className="chart-price">
           <strong id="chart-price">{number(row?.price, digits)}</strong>
           <span id="chart-change" className={signClass(row?.change)}>
-            {state.authenticated
-              ? `${number(row?.change, digits, true)} (${number(row?.changePercent, 2, true)}%)`
-              : t("Подключите личный API-ключ")}
+            {available
+              ? `${number(row?.change, digits, true)} (${number(row?.changePercent, 2, true)}%)${row?.comparisonBasis === "rolling-24h" ? ` · ${t("24ч")}` : ""}`
+              : t("Выберите источник котировок")}
           </span>
         </div>
         <IndicatorLegend />
@@ -86,12 +90,12 @@ export function ChartPanel() {
           <DrawingAxisLabels />
           <CandleCountdown />
           <TechnicalIndicatorPanels />
-          {(!state.authenticated ||
+          {(!available ||
             ((!state.candles.length || state.historyViewReady === false) && !state.loading)) && (
             <div className="chart-message" id="chart-message">
               <span className="message-icon">⌃</span>
               <h2>
-                {!state.authenticated
+                {!available
                   ? t("Ваш рынок. Ваш график.")
                   : !state.rows.length
                     ? t("Добавьте инструмент")
@@ -100,13 +104,13 @@ export function ChartPanel() {
                       : t("История недоступна")}
               </h2>
               <p>
-                {!state.authenticated
-                  ? t("Подключите Т‑Инвестиции, чтобы увидеть реальные котировки и историю.")
+                {!available
+                  ? t("Bybit доступен без ключа. Для российских инструментов подключите Т‑Банк.")
                   : !state.rows.length
                     ? t("Нажмите + в списке котировок, чтобы открыть график.")
                     : systemText(state.historyHelp)}
               </p>
-              {!state.authenticated && (
+              {!available && (
                 <button
                   id="connect-chart"
                   className="primary-button"
@@ -115,7 +119,7 @@ export function ChartPanel() {
                   {t("Подключить API")}
                 </button>
               )}
-              {state.authenticated && !state.rows.length && (
+              {available && !state.rows.length && (
                 <button
                   className="primary-button"
                   onClick={() => controller.setDialog("instruments")}
@@ -123,7 +127,7 @@ export function ChartPanel() {
                   {t("Добавить инструмент")}
                 </button>
               )}
-              {state.authenticated && state.rows.length > 0 && (
+              {available && state.rows.length > 0 && (
                 <button
                   className="primary-button"
                   onClick={() => {

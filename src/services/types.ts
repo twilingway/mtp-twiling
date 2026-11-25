@@ -1,5 +1,6 @@
 import type * as Storage from "./storage.js";
 import { isNativeIntervalId } from "../model/intervals/registry.js";
+import { providerAttributes, validProviderIdentity } from "../model/market-provider.js";
 import type {
   Candle,
   Catalog,
@@ -43,7 +44,19 @@ function normaliseQuotation(value: unknown): Quotation | undefined {
 export function normaliseInstrument(value: unknown): CatalogInstrument | undefined {
   const raw = object(value);
   if (!raw || typeof raw.ticker !== "string" || typeof raw.name !== "string") return undefined;
-  const item: CatalogInstrument = { ticker: raw.ticker, name: raw.name };
+  if (
+    !validProviderIdentity({
+      providerRef: raw.providerRef,
+      uid: raw.uid ?? raw.instrumentUid,
+      symbol: raw.symbol
+    })
+  )
+    return undefined;
+  const item: CatalogInstrument = {
+    ticker: raw.ticker,
+    name: raw.name,
+    ...providerAttributes(raw)
+  };
   for (const key of [
     "uid",
     "instrumentUid",
@@ -66,7 +79,9 @@ export function normaliseInstrument(value: unknown): CatalogInstrument | undefin
     raw.kind === "share" ||
     raw.kind === "future" ||
     raw.kind === "index" ||
-    raw.kind === "currency"
+    raw.kind === "currency" ||
+    raw.kind === "crypto" ||
+    raw.kind === "tokenized-stock"
   )
     item.kind = raw.kind;
   const increment = normaliseQuotation(raw.minPriceIncrement);
@@ -111,8 +126,13 @@ export function normaliseRows(value: unknown): MarketRow[] {
     .flatMap((value) => {
       const raw = object(value);
       if (!raw || typeof raw.symbol !== "string" || typeof raw.name !== "string") return [];
+      if (
+        !validProviderIdentity({ providerRef: raw.providerRef, uid: raw.uid, symbol: raw.symbol })
+      )
+        return [];
       const instrument = normaliseInstrument({ ...raw, ticker: text(raw.ticker) ?? raw.symbol });
       const row: MarketRow = {
+        ...providerAttributes(raw),
         symbol: raw.symbol,
         name: raw.name,
         ticker: text(raw.ticker) ?? raw.symbol,
@@ -129,8 +149,16 @@ export function normaliseRows(value: unknown): MarketRow[] {
             ? raw.availability
             : "pending"
       };
-      if (raw.type === "future" || raw.type === "index" || raw.type === "currency")
+      if (
+        raw.type === "future" ||
+        raw.type === "index" ||
+        raw.type === "currency" ||
+        raw.type === "crypto" ||
+        raw.type === "tokenized-stock"
+      )
         row.type = raw.type;
+      if (raw.comparisonBasis === "exchange-day" || raw.comparisonBasis === "rolling-24h")
+        row.comparisonBasis = raw.comparisonBasis;
       if (instrument?.brand !== undefined) row.brand = instrument.brand;
       for (const key of [
         "classCode",

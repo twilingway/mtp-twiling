@@ -25,7 +25,11 @@ export function CandleCountdown() {
   const bar = state.candles.at(-1);
   const timestamp = bar?.timestamp;
   const enabled = chartSettings.showCandleCountdown !== false;
-  const active = enabled && state.authenticated && state.status === "connected";
+  const active =
+    enabled &&
+    state.authenticated &&
+    state.status === "connected" &&
+    !selectedMarketRow(state.rows, state.preferences)?.providerRef;
   const day = Math.floor(now / 86400000);
   const key = `${state.owner}:${uid ?? ""}:${timeframe}:${timestamp ?? ""}:${day}`;
   useEffect(() => {

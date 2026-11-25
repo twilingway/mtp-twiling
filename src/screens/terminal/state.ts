@@ -18,6 +18,7 @@ import type { DisplayPreferences } from "../../i18n/preferences.js";
 import type { TechnicalIndicatorInstance } from "../../model/technical-indicators/types.js";
 import type { TechnicalPaneLayout } from "../../model/technical-indicator-layout.js";
 import type { WatchlistFlags, WatchlistFlagFilter } from "../../model/watchlist-flags.js";
+import type { MarketProviderRef } from "../../model/market-provider.js";
 import { formatClock, formatNumber } from "../../i18n/format.js";
 import type { DrawingSettingsPreview } from "./drawing-settings-preview.js";
 export const DEFAULT_INDICATORS: IndicatorFlags = {
@@ -59,6 +60,7 @@ export const PERIOD_LABELS: Record<Timeframe, string> = NATIVE_PERIOD_LABELS;
 export interface TerminalPreferences extends DisplayPreferences {
   technicalIndicators?: TechnicalIndicatorInstance[];
   technicalPaneLayout?: TechnicalPaneLayout;
+  providerRef?: MarketProviderRef | undefined;
   watchlistFlags?: WatchlistFlags;
   watchlistFlagFilter?: WatchlistFlagFilter;
   indicatorPaneLayout?: IndicatorPaneLayout;
@@ -99,6 +101,9 @@ export interface ContextMenu {
 export interface TerminalState {
   editingTechnicalIndicator?: string;
   drawingSettingsPreview?: DrawingSettingsPreview | null;
+  marketReady?: boolean;
+  profileTransition?: boolean;
+  pendingPublicSource?: string | null;
   importingBackup?: boolean;
   importRecoveryRequired?: boolean;
   backupBusy?: boolean;

@@ -36,10 +36,10 @@ function sameSet(left: string[], right: string[]): boolean {
     [...left].sort().every((value, index) => value === sortedRight[index])
   );
 }
-function fileHash(file: DriveFile, kind: "snapshot" | "blob"): string {
+function fileHash(file: DriveFile, kind: "snapshot" | "blob", namespace: string): string {
   const hash = file.appProperties.mtpHash;
   if (
-    file.appProperties.mtpNamespace !== DRIVE_NAMESPACE ||
+    file.appProperties.mtpNamespace !== namespace ||
     file.appProperties.mtpKind !== kind ||
     !hash ||
     !shaPattern.test(hash)
@@ -47,11 +47,15 @@ function fileHash(file: DriveFile, kind: "snapshot" | "blob"): string {
     throw invalid();
   return hash;
 }
-function inspectGraph(snapshots: RemoteSnapshot[]): DriveInspection {
+function inspectGraph(snapshots: RemoteSnapshot[], namespace: string): DriveInspection {
   const nodes = new Map<string, RemoteSnapshot>();
   for (const snapshot of snapshots) {
     const previous = nodes.get(snapshot.manifest.nodeId);
-    if (previous && fileHash(previous.file, "snapshot") !== fileHash(snapshot.file, "snapshot"))
+    if (
+      previous &&
+      fileHash(previous.file, "snapshot", namespace) !==
+        fileHash(snapshot.file, "snapshot", namespace)
+    )
       throw invalid();
     nodes.set(snapshot.manifest.nodeId, snapshot);
   }
@@ -95,7 +99,10 @@ export interface PublishResult {
 /** No storage/controller coupling: caller owns local association and import confirmation. */
 export class DriveSync {
   private writing = false;
-  constructor(private readonly store: DriveStore) {}
+  constructor(
+    private readonly store: DriveStore,
+    private readonly namespace: string = DRIVE_NAMESPACE
+  ) {}
 
   async inspect(): Promise<DriveInspection> {
     const files = await this.store.list("snapshot");
@@ -103,7 +110,7 @@ export class DriveSync {
       throw new DriveError("limit", "Слишком большой каталог снимков Google Диска.");
     const snapshots: RemoteSnapshot[] = [];
     for (const file of files) {
-      const hash = fileHash(file, "snapshot");
+      const hash = fileHash(file, "snapshot", this.namespace);
       const body = await this.store.read(file, MAX_MANIFEST_BYTES);
       await verifyContent(body, { sha256: hash, size: file.size });
       let value: unknown;
@@ -116,7 +123,7 @@ export class DriveSync {
       if (file.appProperties.mtpKey !== manifest.nodeId) throw invalid();
       snapshots.push({ manifest, file });
     }
-    return inspectGraph(snapshots);
+    return inspectGraph(snapshots, this.namespace);
   }
 
   async download(nodeId: string): Promise<Backup> {
@@ -136,12 +143,16 @@ export class DriveSync {
   }
 
   publish(backup: unknown, options: PublishOptions): Promise<PublishResult> {
+    if (this.namespace !== DRIVE_NAMESPACE)
+      return Promise.reject(new DriveError("permission", "Legacy stream is read-only"));
     if (options.parents.length > 1) return Promise.reject(new DriveConflictError(options.parents));
     return this.write(backup, options, false);
   }
 
   /** The caller must show all conflicting heads and obtain an explicit user choice first. */
   resolve(backup: unknown, options: PublishOptions): Promise<PublishResult> {
+    if (this.namespace !== DRIVE_NAMESPACE)
+      return Promise.reject(new DriveError("permission", "Legacy stream is read-only"));
     if (options.parents.length < 2)
       return Promise.reject(
         new DriveError("conflict", "Для разрешения нужны все конфликтующие снимки.")
@@ -202,7 +213,7 @@ export class DriveSync {
     const files = await this.store.list("blob");
     const result = new Map<string, DriveFile[]>();
     for (const file of files) {
-      const hash = fileHash(file, "blob");
+      const hash = fileHash(file, "blob", this.namespace);
       if (file.appProperties.mtpKey !== hash) throw invalid();
       const group = result.get(hash) ?? [];
       group.push(file);

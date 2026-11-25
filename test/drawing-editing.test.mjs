@@ -27,7 +27,7 @@ function sourceModules(storage) {
   function load(relative) {
     const filename = path.resolve(sourceRoot, relative).replace(/\.js$/, ".ts");
     const key = path.relative(sourceRoot, filename).replaceAll(path.sep, "/");
-    if (key === "services/storage.ts") return storage;
+    if (["services/storage.ts", "services/storage-v2.ts"].includes(key)) return storage;
     if (key === "services/storage-db.ts")
       return new Proxy({}, { get: () => () => assert.fail("unexpected direct IndexedDB access") });
     assert.ok(!key.startsWith("../"));

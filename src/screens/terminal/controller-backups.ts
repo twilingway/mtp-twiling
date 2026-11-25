@@ -1,4 +1,4 @@
-import * as storage from "../../services/storage.js";
+import * as storage from "../../services/storage-v2.js";
 import { assertImportCurrent, type BackupImportOptions } from "../../model/backup-import.js";
 import { importTerminalBackup, restoreImportedProfile } from "./controller-import.js";
 import type { BackupExportOptions } from "../../model/backup-export.js";

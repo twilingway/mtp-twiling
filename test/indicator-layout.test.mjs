@@ -14,6 +14,7 @@ function sources(overrides = {}, globals = {}) {
     let filename = path.resolve(root, relative).replace(/\.js$/, ".ts");
     if (!existsSync(filename) && filename.endsWith(".ts")) filename = filename + "x";
     const key = path.relative(root, filename).replaceAll(path.sep, "/");
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (cells.has(key)) return cells.get(key).exports;
     const module = { exports: {} };
@@ -326,7 +327,7 @@ test("legend collapse exposes an accessible compact count without toggling indic
   let state = {
     owner: "owner",
     chartRevision: 0,
-    authenticated: true,
+    authenticated: true, marketReady: true,
     loading: false,
     candles: [],
     rows: [{ symbol: "SBER", uid: "uid", step: 0.01 }],

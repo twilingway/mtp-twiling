@@ -1,7 +1,8 @@
 export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.appdata";
 export const DRIVE_CLIENT_ID =
   "570894753392-14e7houtg7kc4cdeq6ndpjo7e7sbvnc1.apps.googleusercontent.com";
-export const DRIVE_NAMESPACE = "mtp-drive-v1";
+export const DRIVE_NAMESPACE = "mtp-drive-v2";
+export const LEGACY_DRIVE_NAMESPACE = "mtp-drive-v1";
 export type DriveErrorCode =
   | "auth-required"
   | "auth-cancelled"

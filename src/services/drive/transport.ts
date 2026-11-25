@@ -30,8 +30,8 @@ function parseFile(value: unknown): DriveFile {
     appProperties: value.appProperties as Record<string, string>
   };
 }
-function namespaced(file: DriveFile, kind: DriveKind): boolean {
-  return file.appProperties.mtpNamespace === DRIVE_NAMESPACE && file.appProperties.mtpKind === kind;
+function namespaced(file: DriveFile, kind: DriveKind, namespace: string): boolean {
+  return file.appProperties.mtpNamespace === namespace && file.appProperties.mtpKind === kind;
 }
 function accessToken(authorization: DriveAuthorization): string {
   if (authorization.signal.aborted)
@@ -120,11 +120,13 @@ function query(base: string, params: Record<string, string>): string {
 }
 
 export interface DriveTransportOptions {
+  namespace?: "mtp-drive-v1" | "mtp-drive-v2";
   fetch?: typeof fetch;
   sleep?: (milliseconds: number) => Promise<void>;
   random?: () => number;
 }
 export class DriveTransport implements DriveStore {
+  private readonly namespace: "mtp-drive-v1" | "mtp-drive-v2";
   private readonly fetcher: typeof fetch;
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private readonly random: () => number;
@@ -132,6 +134,7 @@ export class DriveTransport implements DriveStore {
     private readonly authorization: DriveAuthorization,
     options: DriveTransportOptions = {}
   ) {
+    this.namespace = options.namespace ?? DRIVE_NAMESPACE;
     this.fetcher = options.fetch ?? fetch.bind(globalThis);
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.random = options.random ?? Math.random;
@@ -204,7 +207,7 @@ export class DriveTransport implements DriveStore {
           pageSize: "1000",
           pageToken,
           fields: `files(${FIELDS}),nextPageToken,incompleteSearch`,
-          q: `trashed = false and appProperties has { key='mtpNamespace' and value='${DRIVE_NAMESPACE}' } and appProperties has { key='mtpKind' and value='${kind}' }`
+          q: `trashed = false and appProperties has { key='mtpNamespace' and value='${this.namespace}' } and appProperties has { key='mtpKind' and value='${kind}' }`
         })
       );
       const value = await json(response, this.authorization);
@@ -217,7 +220,7 @@ export class DriveTransport implements DriveStore {
         throw invalid();
       for (const item of value.files) {
         const file = parseFile(item);
-        if (!namespaced(file, kind)) throw invalid();
+        if (!namespaced(file, kind, this.namespace)) throw invalid();
         files.set(file.id, file);
       }
       if (files.size > MAX_FILES)
@@ -229,7 +232,8 @@ export class DriveTransport implements DriveStore {
 
   async read(file: DriveFile, maxBytes: number): Promise<Blob> {
     if (
-      (!namespaced(file, "blob") && !namespaced(file, "snapshot")) ||
+      (!namespaced(file, "blob", this.namespace) &&
+        !namespaced(file, "snapshot", this.namespace)) ||
       file.size > maxBytes ||
       !/^[\w-]{1,200}$/.test(file.id)
     )
@@ -243,6 +247,8 @@ export class DriveTransport implements DriveStore {
   }
 
   async create(kind: DriveKind, key: string, hash: string, body: Blob): Promise<DriveFile> {
+    if (this.namespace !== DRIVE_NAMESPACE)
+      throw new DriveError("permission", "Legacy Google Диск доступен только для чтения.");
     if (!/^[\w-]{1,100}$/.test(key) || !shaPattern.test(hash)) throw invalid();
     const generated = await json(
       await this.request(
@@ -263,7 +269,7 @@ export class DriveTransport implements DriveStore {
       name: `mtp-v1-${kind}-${key}`,
       parents: ["appDataFolder"],
       mimeType: body.type || "application/octet-stream",
-      appProperties: { mtpNamespace: DRIVE_NAMESPACE, mtpKind: kind, mtpKey: key, mtpHash: hash }
+      appProperties: { mtpNamespace: this.namespace, mtpKind: kind, mtpKey: key, mtpHash: hash }
     };
     let result: unknown;
     if (body.size <= 5 * 1024 * 1024) {
@@ -290,7 +296,7 @@ export class DriveTransport implements DriveStore {
     const file = parseFile(result);
     if (
       file.id !== id ||
-      !namespaced(file, kind) ||
+      !namespaced(file, kind, this.namespace) ||
       file.appProperties.mtpKey !== key ||
       file.appProperties.mtpHash !== hash ||
       file.size !== body.size

@@ -117,6 +117,7 @@ function fixture({
   function load(relative) {
     const file = path.resolve(root, relative).replace(/\.js$/, ".ts"),
       key = path.relative(root, file).replaceAll(path.sep, "/");
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (cells.has(file)) return cells.get(file).exports;
     const module = { exports: {} };

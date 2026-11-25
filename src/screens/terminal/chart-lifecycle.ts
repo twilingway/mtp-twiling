@@ -1,3 +1,4 @@
+import { marketAvailable } from "./market-readiness.js";
 import { useEffect, useMemo, useRef } from "react";
 import type { RefObject } from "react";
 import type { Candle, Drawing } from "../../model/types.js";
@@ -31,6 +32,7 @@ export function useChartCanvas(
     dataRef = useRef<Candle[]>([]),
     adapterRef = useRef<ChartAdapter | null>(null);
   const p = state.preferences,
+    available = marketAvailable(state),
     session = controller.sessionKey(),
     uid = selectedMarketRow(state.rows, p)?.uid,
     renderKey = chartRenderConfigKey(p.chartSettings, p.indicators),
@@ -41,7 +43,7 @@ export function useChartCanvas(
       owner = state.owner,
       revision = state.chartRevision,
       key = `${p.symbol}:${p.timeframe}:${p.engine}:${p.rangeDays}`;
-    if (!container || !uid || !state.authenticated || state.importRecoveryRequired) return;
+    if (!container || !uid || !available || state.importRecoveryRequired) return;
     let cancelled = false,
       layoutWrite = 0,
       stopPriceMetadata = () => {},
@@ -51,7 +53,7 @@ export function useChartCanvas(
       return (
         !cancelled &&
         !current.importRecoveryRequired &&
-        current.authenticated &&
+        marketAvailable(current) &&
         controller.sessionKey() === session &&
         current.owner === owner &&
         current.chartRevision === revision &&
@@ -190,7 +192,7 @@ export function useChartCanvas(
     visibleDrawings,
     uid,
     state.owner,
-    state.authenticated,
+    available,
     state.chartRevision,
     state.importRecoveryRequired,
     p.engine,

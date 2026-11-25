@@ -15,6 +15,33 @@ function TransferSettings() {
       <h3>{t("Перенос между устройствами")}</h3>
       <p>
         {t(
+          "Формат 2: обновите приложение на другом устройстве. Старые данные и синхронизация формата 1 сохраняются отдельно."
+        )}
+      </p>
+      {state.pendingPublicSource && (
+        <div role="status">
+          <p>
+            {t(
+              "В другом локальном профиле сохранены публичные инструменты. Существующую разметку этого профиля заменять не будем."
+            )}
+          </p>
+          <button
+            type="button"
+            disabled={busy || state.profileTransition}
+            onClick={() => {
+              void controller
+                .mergePublicProfile()
+                .catch((error: unknown) =>
+                  controller.notify(error instanceof Error ? error.message : "Перенос недоступен")
+                );
+            }}
+          >
+            {t("Добавить недостающие публичные данные")}
+          </button>
+        </div>
+      )}
+      <p>
+        {t(
           "Индикаторы, вид графиков, список инструментов, линии и изображения. API-ключ не включается."
         )}
       </p>
@@ -31,7 +58,7 @@ function TransferSettings() {
         <button
           type="button"
           id="export-settings"
-          disabled={busy || state.backupBusy || !state.authenticated}
+          disabled={busy || state.backupBusy || !state.marketReady}
           onClick={() => {
             setBusy(true);
             void controller
@@ -57,7 +84,7 @@ function TransferSettings() {
         <button
           type="button"
           id="import-settings"
-          disabled={busy || state.backupBusy || !state.authenticated}
+          disabled={busy || state.backupBusy || !state.marketReady}
           onClick={() => input.current?.click()}
         >
           {t("Импорт")}
