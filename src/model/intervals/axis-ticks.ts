@@ -3,8 +3,9 @@ import type { CalendarAxisDisplay } from "../../i18n/calendar-axis.js";
 const months = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
 const hourly = new Set<NativeIntervalId>(["1h", "2h", "4h"]);
 const calendar = new Set<NativeIntervalId>(["1d", "1w", "1M"]);
+const minutes = new Set<NativeIntervalId>(["1m", "2m", "3m", "5m", "10m", "15m", "30m"]);
 export const hasCalendarAxis = (timeframe: NativeIntervalId): boolean =>
-  calendar.has(timeframe) || hourly.has(timeframe);
+  calendar.has(timeframe) || hourly.has(timeframe) || minutes.has(timeframe);
 const monthLabel = (date: Date) => months[date.getUTCMonth()]!;
 const dayLabel = (date: Date) => `${date.getUTCDate()} ${monthLabel(date)}`;
 const clockLabel = (date: Date) =>
@@ -18,16 +19,18 @@ export function lightweightCalendarLabel(
   detailed: boolean,
   display?: CalendarAxisDisplay
 ): string | null {
-  if (!calendar.has(timeframe) && !hourly.has(timeframe)) return null;
+  if (!hasCalendarAxis(timeframe)) return null;
   const date = new Date(timestamp);
-  const year = display?.year(timestamp) ?? String(date.getUTCFullYear()),
-    month = display?.month(timestamp) ?? monthLabel(date),
-    day = display?.day(timestamp) ?? dayLabel(date),
-    clock = display?.clock(timestamp) ?? clockLabel(date);
-  if (type === 0) return year;
-  if (type === 1) return calendar.has(timeframe) ? month : day;
-  if (type === 2) return hourly.has(timeframe) || detailed ? day : "";
-  return hourly.has(timeframe) && detailed ? clock : "";
+  if (type === 0) return display?.year(timestamp) ?? String(date.getUTCFullYear());
+  if (type === 1)
+    return calendar.has(timeframe)
+      ? (display?.month(timestamp) ?? monthLabel(date))
+      : (display?.day(timestamp) ?? dayLabel(date));
+  if (type === 2)
+    return !calendar.has(timeframe) || detailed ? (display?.day(timestamp) ?? dayLabel(date)) : "";
+  return minutes.has(timeframe) || (hourly.has(timeframe) && detailed)
+    ? (display?.clock(timestamp) ?? clockLabel(date))
+    : "";
 }
 export interface CalendarAxisTick {
   coord: number;
@@ -46,26 +49,40 @@ export function calendarAxisTicks(
     display?: CalendarAxisDisplay;
   }
 ): CalendarAxisTick[] | null {
-  if (!calendar.has(timeframe) && !hourly.has(timeframe)) return null;
+  if (!hasCalendarAxis(timeframe)) return null;
   const from = Math.max(0, Math.floor(options.from)),
     to = Math.min(data.length - 1, Math.ceil(options.to));
   if (from > to || options.width <= 0) return [];
   const spacing = Math.abs(options.coordinate(from + 1) - options.coordinate(from));
   const detailed = spacing >= 24 && timeframe !== "1M";
+  const minuteAxis = minutes.has(timeframe);
+  const minimumMinutes = minuteAxis
+    ? (80 * Number.parseInt(timeframe)) / Math.max(0.2, spacing)
+    : 1440;
+  const minuteStep =
+    [1, 2, 3, 5, 10, 15, 30, 60, 120, 180, 240, 360, 720, 1440].find(
+      (step) => step >= minimumMinutes
+    ) ?? 1440;
   const candidates: { tick: CalendarAxisTick; priority: number }[] = [];
   const parts = (timestamp: number) => {
     if (options.display) return options.display.parts(timestamp);
     const date = new Date(timestamp);
-    return { year: date.getUTCFullYear(), month: date.getUTCMonth(), day: date.getUTCDate() };
+    return {
+      year: date.getUTCFullYear(),
+      month: date.getUTCMonth(),
+      day: date.getUTCDate(),
+      hour: date.getUTCHours(),
+      minute: date.getUTCMinutes()
+    };
   };
+  let before = from > 0 ? parts(data[from - 1]!.timestamp) : null;
   for (let index = from; index <= to; index++) {
     const timestamp = data[index]!.timestamp,
-      date = parts(timestamp),
-      prev = data[index - 1];
-    const before = prev ? parts(prev.timestamp) : null;
+      date = parts(timestamp);
     const year = !before || date.year !== before.year;
     const month = year || date.month !== before?.month;
     const day = month || date.day !== before?.day;
+    before = date;
     let text: string, priority: number;
     if (year) {
       text = options.display?.year(timestamp) ?? String(date.year);
@@ -73,9 +90,13 @@ export function calendarAxisTicks(
     } else if (month) {
       text = lightweightCalendarLabel(timestamp, timeframe, 1, detailed, options.display)!;
       priority = 3;
-    } else if (day && (hourly.has(timeframe) || detailed)) {
+    } else if (day && (!calendar.has(timeframe) || detailed)) {
       text = lightweightCalendarLabel(timestamp, timeframe, 2, detailed, options.display)!;
       priority = 2;
+    } else if (minuteAxis) {
+      if ((date.hour * 60 + date.minute) % minuteStep !== 0) continue;
+      text = lightweightCalendarLabel(timestamp, timeframe, 3, true, options.display)!;
+      priority = 1;
     } else if (detailed) {
       text = lightweightCalendarLabel(
         timestamp,

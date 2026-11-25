@@ -21,3 +21,10 @@ ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/srv/mtp
 TimeoutStartSec=20min
+# Bound only MTP build resources on the shared 1 GiB VDS.
+Nice=10
+CPUQuota=50%
+MemoryHigh=240M
+MemoryMax=320M
+IOWeight=10
+TasksMax=64

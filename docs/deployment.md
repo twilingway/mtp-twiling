@@ -6,6 +6,10 @@
 
 ## Состояние подготовки
 
+На существующем VDS 1 GiB памяти MTP build ограничен отдельным cgroup: MemoryHigh240M,
+MemoryMax320M, CPUQuota50%, Nice10 и IOWeight10. Нехватка памяти останавливает только сборку MTP;
+старый current остаётся активным. Установка не добавляет swap и не меняет чужие units.
+
 Публичный repository `https://github.com/twilingway/mtp-twiling` создан, Issues включены. CI run,
 установка watcher, TLS и публичный deploy подтверждаются отдельно. Наличие файлов не доказывает
 выполненную публикацию. Release branch: `main`. Primary origin: `https://mtp.twiling.ru` на

@@ -79,3 +79,47 @@ test("calendar grid and painted axis labels use identical local boundary positio
   assert.deepEqual(grid.map((x) => x - 0.5), labels.map((label) => label.x));
   assert.ok(labels.some((label) => label.text.includes("Mar")));
 });
+
+test("minute intervals place the date at local midnight and choose local clock grid marks", () => {
+  const data = bars("2026-03-03T00:00:00Z", 2880, 60000);
+  const display = calendarAxisDisplay("1m", { timeZone: "Europe/Moscow", locale: "en" });
+  const selected = calendarAxisTicks(data, "1m", {
+    from: 0, to: data.length - 1, width: 1300, coordinate: (i) => 40 + i * 0.4, display
+  });
+  const times = Array.from(selected, (tick) => tick.value);
+  assert.ok(times.includes(Date.parse("2026-03-03T21:00:00Z")));
+  assert.ok(!times.includes(Date.parse("2026-03-04T00:00:00Z")));
+  assert.ok(selected.some((tick) => tick.text === "08:00"));
+  const nepal = calendarAxisDisplay("1m", { timeZone: "Asia/Kathmandu", locale: "en" });
+  const fractional = calendarAxisTicks(data, "1m", {
+    from: 500, to: 800, width: 1300, coordinate: (i) => (i - 500) * 4, display: nepal
+  });
+  assert.ok(fractional.some((tick) => {
+    const utc = new Date(tick.value);
+    return utc.getUTCMinutes() === 15 && tick.text.endsWith(":00");
+  }));
+});
+
+test("calendar rendering avoids repeated Intl parts conversion and uses a UTC fast path", () => {
+  const original = Intl.DateTimeFormat.prototype.formatToParts;
+  let calls = 0;
+  Intl.DateTimeFormat.prototype.formatToParts = function (...args) {
+    calls++;
+    return original.apply(this, args);
+  };
+  try {
+    const data = bars("2025-01-01T00:00:00Z", 6200, 3600000);
+    const display = calendarAxisDisplay("1h", { timeZone: "Europe/Moscow", locale: "ru" });
+    const options = { from: 0, to: 6199, width: 1300, coordinate: (i) => i * 0.2, display };
+    calendarAxisTicks(data, "1h", options);
+    assert.ok(calls <= 6200, `one conversion per new timestamp, got ${calls}`);
+    const beforeAxis = calls;
+    calendarAxisTicks(data, "1h", options);
+    assert.equal(calls, beforeAxis, "axis reuses parts already calculated for grid");
+    const daily = calendarAxisDisplay("1d", { timeZone: "America/New_York", locale: "en" });
+    calendarAxisTicks(data, "1d", { ...options, display: daily });
+    assert.equal(calls, beforeAxis, "DWM trading dates use UTC getters");
+  } finally {
+    Intl.DateTimeFormat.prototype.formatToParts = original;
+  }
+});
