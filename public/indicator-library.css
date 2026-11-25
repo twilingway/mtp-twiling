@@ -1,0 +1,229 @@
+#indicator-library-dialog {
+  box-sizing: border-box;
+  width: 840px;
+  max-width: calc(100vw - 40px);
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+#indicator-library-dialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  gap: 12px;
+}
+
+#indicator-library-dialog > header h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: normal;
+}
+
+#indicator-library-dialog > header button {
+  flex: 0 0 32px;
+  height: 32px;
+  font-size: 26px;
+  color: var(--muted);
+}
+
+#indicator-library-dialog .indicator-library-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 24px;
+  border-block: 1px solid var(--line);
+}
+
+.indicator-library-search svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1.5;
+}
+
+#indicator-library-dialog .indicator-library-search input {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  box-shadow: none;
+}
+
+.indicator-library-body {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  height: min(480px, calc(100dvh - 190px));
+  min-height: 200px;
+}
+
+.indicator-library-sidebar {
+  padding: 16px 0;
+  border-inline-end: 1px solid var(--line);
+  overflow-y: auto;
+}
+
+#indicator-library-dialog .indicator-library-sidebar button {
+  display: block;
+  text-align: start;
+  padding: 12px 24px;
+  width: 100%;
+  border-radius: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.indicator-library-sidebar button[aria-current="page"] {
+  color: var(--accent);
+  background: var(--accent-surface);
+}
+
+.indicator-library-group-label {
+  display: block;
+  margin: 26px 24px 5px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.indicator-library-results {
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 18px 0;
+}
+
+.indicator-library-results h3 {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 0 24px;
+  margin: 0 0 12px;
+}
+
+.indicator-library-results ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+#indicator-library-dialog .indicator-library-results li > button {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 24px;
+  min-height: 48px;
+  border-radius: 0;
+  text-align: start;
+  color: var(--text);
+  white-space: normal;
+}
+
+.indicator-library-entry-text {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.indicator-library-entry-name {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.indicator-library-entry-text small,
+.indicator-library-empty small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#indicator-library-dialog button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+#indicator-library-dialog button:not(:disabled):hover {
+  background: var(--surface-hover);
+}
+
+#indicator-library-dialog :is(button, input):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.indicator-library-added {
+  margin-inline-start: auto;
+  color: var(--accent);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.indicator-library-empty {
+  padding: 32px 24px;
+}
+
+@media (max-width: 600px) {
+  #indicator-library-dialog {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  #indicator-library-dialog[open] {
+    display: flex;
+    flex-direction: column;
+  }
+
+  #indicator-library-dialog > header,
+  #indicator-library-dialog .indicator-library-search {
+    padding-inline: 16px;
+  }
+
+  .indicator-library {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    flex-direction: column;
+  }
+
+  .indicator-library-body {
+    grid-template-columns: 122px minmax(0, 1fr);
+    height: auto;
+    min-height: 0;
+    flex: 1;
+  }
+
+  #indicator-library-dialog .indicator-library-sidebar button,
+  #indicator-library-dialog .indicator-library-results li > button {
+    padding-inline: 14px;
+  }
+
+  .indicator-library-results li > button {
+    flex-wrap: wrap;
+  }
+
+  .indicator-library-group-label {
+    margin-inline: 14px;
+  }
+
+  .indicator-library-results h3 {
+    padding-inline: 14px;
+  }
+
+  .indicator-library-empty {
+    padding: 20px 14px;
+  }
+}
