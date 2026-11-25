@@ -23,7 +23,9 @@ function api(f) {
 function outputs(f, instances, data = bars, layout = []) {
   const { technicalIndicatorGroups } = f.load("model/technical-indicator-layout.ts");
   const { getTechnicalIndicatorDefinition, calculateTechnicalIndicator } = api(f);
-  const context = f.load("charts/technical-calculation-context.ts").technicalCalculationContext(f.options.timeframe);
+  const context = f
+    .load("charts/technical-calculation-context.ts")
+    .technicalCalculationContext(f.options.timeframe);
   return technicalIndicatorGroups(instances, layout).flatMap((group) =>
     group.instances
       .filter((item) => item.visible)
@@ -91,14 +93,33 @@ test("LW pane metrics tolerate the model existing before its widget is created",
 });
 
 for (const engine of ["lightweight", "kline"]) {
-  test(`${engine}: actual adapter renders all 29 common formulas, warmup and real timestamps`, () => {
+  test(`${engine}: undefined CHOP length one stays empty without zero substitution or camera reset`, () => {
+    const f = nativeFixture(engine),
+      { createTechnicalIndicatorInstance: create, calculateTechnicalIndicator: calculate } = api(f),
+      instance = create("choppiness-index", "undefined-chop", { params: { length: 1 } });
+    f.adapter.setData(bars);
+    const camera = f.camera(),
+      writes = f.primaryWrites();
+    const result = calculate(instance, bars);
+    assert.equal(result.warmupBars, null);
+    assert.equal(result.alwaysUndefined, true);
+    assert.ok(result.series.value.every((value) => value === null));
+    f.adapter.updateTechnicalIndicators([instance], []);
+    f.ready();
+    assertValues(f, [instance]);
+    assert.deepEqual(f.camera(), camera);
+    assert.equal(f.primaryWrites(), writes);
+    f.adapter.destroy();
+  });
+
+  test(`${engine}: actual adapter renders all 35 common formulas, warmup and real timestamps`, () => {
     const f = nativeFixture(engine),
       { createTechnicalIndicatorInstance: create, technicalIndicatorDefinitions: definitions } =
         api(f);
     const instances = definitions.map((definition, i) =>
       create(definition.id, `instance-${i}`, { order: i })
     );
-    assert.equal(instances.length, 29);
+    assert.equal(instances.length, 35);
     f.adapter.setData(bars);
     const writes = f.primaryWrites(),
       camera = f.camera();
@@ -129,7 +150,13 @@ for (const engine of ["lightweight", "kline"]) {
       "balance-of-power",
       "cmo",
       "ultimate-oscillator",
-      "trix"
+      "trix",
+      "aroon",
+      "aroon-oscillator",
+      "dmi",
+      "adx",
+      "vortex",
+      "choppiness-index"
     ]);
     assert.deepEqual(
       f.adapter.technicalPaneMetrics().map((item) => item.key),
