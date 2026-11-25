@@ -16,7 +16,7 @@ const {
   nativeInterval
 } = loadBybit();
 const { decimal } = loadBybit("types.ts");
-const { normaliseCandle } = loadBybit("market.ts");
+const { normaliseCandle, bybitIntervalStart } = loadBybit("market.ts");
 const now = 1_795_636_000_000;
 const spot = (extra = {}) => ({
   symbol: "BTCUSDT",
@@ -333,6 +333,55 @@ test("history aborts bad page boundaries and page budget rather than claiming fu
     kind("pagination")
   );
   await assert.rejects(loadHistory(http, ref, "1m", { from: 1000, to: 5000 }), kind("pagination"));
+});
+
+test("spot accepts only the containing start candle observed in live daily responses", async () => {
+  const from = 1795469926764,
+    to = 1795642726756;
+  const timestamps = [1795564800000, 1795478400000, 1795392000000];
+  const row = (timestamp) => [String(timestamp), "10", "12", "9", "11", "1", "10"];
+  const { http, calls } = client(() =>
+    response({ category: "spot", symbol: "BTCUSDT", list: timestamps.map(row) })
+  );
+  const candles = await loadHistory(http, instrumentRef("spot", "BTCUSDT"), "1d", { from, to });
+  assert.deepEqual(
+    candles.map((item) => item.timestamp),
+    [...timestamps].reverse()
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url.searchParams.get("start"), String(from));
+  assert.equal(bybitIntervalStart(from, "1d"), 1795392000000);
+  for (const invalid of [1795392000000 - 86400000, 1795392000000 + 1, to + 1]) {
+    const broken = client(() =>
+      response({ category: "spot", symbol: "BTCUSDT", list: [row(invalid)] })
+    );
+    await assert.rejects(
+      loadHistory(broken.http, instrumentRef("spot", "BTCUSDT"), "1d", { from, to }),
+      kind("pagination")
+    );
+  }
+});
+
+test("containing intervals use UTC minute/hour/day, Monday weeks and calendar months", () => {
+  const time = Date.UTC(2026, 1, 15, 13, 47, 3);
+  for (const [interval, expected] of [
+    ["1m", Date.UTC(2026, 1, 15, 13, 47)],
+    ["3m", Date.UTC(2026, 1, 15, 13, 45)],
+    ["5m", Date.UTC(2026, 1, 15, 13, 45)],
+    ["15m", Date.UTC(2026, 1, 15, 13, 45)],
+    ["30m", Date.UTC(2026, 1, 15, 13, 30)],
+    ["1h", Date.UTC(2026, 1, 15, 13)],
+    ["2h", Date.UTC(2026, 1, 15, 12)],
+    ["4h", Date.UTC(2026, 1, 15, 12)],
+    ["6h", Date.UTC(2026, 1, 15, 12)],
+    ["12h", Date.UTC(2026, 1, 15, 12)],
+    ["1d", Date.UTC(2026, 1, 15)],
+    ["1w", Date.UTC(2026, 1, 9)],
+    ["1M", Date.UTC(2026, 1, 1)]
+  ])
+    assert.equal(bybitIntervalStart(time, interval), expected, interval);
+  assert.throws(() => bybitIntervalStart(time, "2m"), /Unsupported/);
+  assert.throws(() => bybitIntervalStart(Number.MAX_SAFE_INTEGER, "1M"), /calendar/);
 });
 
 test("quotes expose rolling24h basis, native units and null empty prices, without bank close fields", async () => {

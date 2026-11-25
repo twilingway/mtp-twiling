@@ -113,6 +113,22 @@ export interface HistoryRequest {
   to: number;
   maxPages?: number;
 }
+/** Spot can return the candle containing start, while linear can omit that overlap. */
+export function bybitIntervalStart(timestamp: number, interval: string): number {
+  nativeInterval(interval);
+  if (interval === "1M") {
+    const date = new Date(timestamp);
+    if (!Number.isFinite(date.getTime())) throw new RangeError("Invalid Bybit calendar timestamp");
+    return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1);
+  }
+  if (interval === "1w") {
+    const monday = 4 * 86400000;
+    return Math.floor((timestamp - monday) / (7 * 86400000)) * 7 * 86400000 + monday;
+  }
+  const unit = interval.endsWith("m") ? 60000 : interval.endsWith("h") ? 3600000 : 86400000;
+  const duration = parseInt(interval, 10) * unit;
+  return Math.floor(timestamp / duration) * duration;
+}
 export async function loadHistory(
   http: BybitHttp,
   ref: InstrumentRef,
@@ -132,6 +148,7 @@ export async function loadHistory(
     maxPages > 1000
   )
     throw new RangeError("Invalid Bybit history range/page budget");
+  const containingStart = bybitIntervalStart(range.from, interval);
   const result = new Map<number, BybitCandle>();
   let end = range.to;
   for (let page = 0; page < maxPages; page++) {
@@ -157,7 +174,7 @@ export async function loadHistory(
     const rows = chronologicalCandles(response.result.list.map((value) => normaliseCandle(value)));
     if (!rows.length) return chronologicalCandles([...result.values()]);
     for (const row of rows) {
-      if (row.timestamp < range.from || row.timestamp > end)
+      if ((row.timestamp < range.from && row.timestamp !== containingStart) || row.timestamp > end)
         throw new BybitError("pagination", "Bybit candle outside requested page");
       if (!result.has(row.timestamp)) result.set(row.timestamp, row);
     }
