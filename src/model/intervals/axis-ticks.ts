@@ -1,5 +1,7 @@
 import type { NativeIntervalId } from "./registry.js";
 import type { CalendarAxisDisplay } from "../../i18n/calendar-axis.js";
+import { NATIVE_TIMEFRAME_CONFIG } from "./native-timeframes.js";
+import { projectedCalendarDomain, projectedCalendarIndices } from "./projected-time.js";
 const months = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
 const hourly = new Set<NativeIntervalId>(["1h", "2h", "4h"]);
 const calendar = new Set<NativeIntervalId>(["1d", "1w", "1M"]);
@@ -37,7 +39,7 @@ export interface CalendarAxisTick {
   value: number;
   text: string;
 }
-/** Build real calendar-boundary ticks from source bars; never relabel every day as a month. */
+/** Real bars and lazy future positions share calendar boundaries; no market data is extended. */
 export function calendarAxisTicks(
   data: readonly { timestamp: number }[],
   timeframe: NativeIntervalId,
@@ -50,10 +52,16 @@ export function calendarAxisTicks(
   }
 ): CalendarAxisTick[] | null {
   if (!hasCalendarAxis(timeframe)) return null;
+  const domain = projectedCalendarDomain(data, NATIVE_TIMEFRAME_CONFIG[timeframe].ms);
+  if (!domain || ![options.from, options.to, options.width].every(Number.isFinite)) return [];
   const from = Math.max(0, Math.floor(options.from)),
-    to = Math.min(data.length - 1, Math.ceil(options.to));
+    to = Math.min(domain.lastIndex, Math.ceil(options.to));
   if (from > to || options.width <= 0) return [];
-  const spacing = Math.abs(options.coordinate(from + 1) - options.coordinate(from));
+  const origin = options.coordinate(from);
+  const spacing = Math.abs(options.coordinate(from + 1) - origin);
+  if (!Number.isFinite(origin) || !Number.isFinite(spacing) || spacing <= 0) return [];
+  const futureFrom = Math.max(from, Math.floor(from - origin / spacing) - 1);
+  const futureTo = Math.min(to, Math.ceil(from + (options.width - origin) / spacing) + 1);
   const detailed = spacing >= 24 && timeframe !== "1M";
   const minuteAxis = minutes.has(timeframe);
   const minimumMinutes = minuteAxis
@@ -69,16 +77,29 @@ export function calendarAxisTicks(
     const date = new Date(timestamp);
     return {
       year: date.getUTCFullYear(),
-      month: date.getUTCMonth(),
+      month: date.getUTCMonth() + 1,
       day: date.getUTCDate(),
       hour: date.getUTCHours(),
       minute: date.getUTCMinutes()
     };
   };
-  let before = from > 0 ? parts(data[from - 1]!.timestamp) : null;
-  for (let index = from; index <= to; index++) {
-    const timestamp = data[index]!.timestamp,
-      date = parts(timestamp);
+  const realTo = Math.min(data.length - 1, to);
+  function* visibleIndices() {
+    for (let index = from; index <= realTo; index++) yield index;
+    yield* projectedCalendarIndices(domain!, futureFrom, futureTo, spacing, minuteStep, parts);
+  }
+  let previousIndex = -2;
+  let previousDate: ReturnType<typeof parts> | null = null;
+  for (const index of visibleIndices()) {
+    const timestamp = domain.timestamp(index);
+    if (timestamp === null) continue;
+    const before =
+      index === previousIndex + 1
+        ? previousDate
+        : index > 0
+          ? parts(domain.timestamp(index - 1)!)
+          : null;
+    const date = parts(timestamp);
     const year = !before || date.year !== before.year;
     const month = year || date.month !== before?.month;
     const day = month || date.day !== before?.day;
@@ -86,7 +107,8 @@ export function calendarAxisTicks(
       !before ||
       Math.floor((date.hour * 60 + date.minute) / minuteStep) !==
         Math.floor((before.hour * 60 + before.minute) / minuteStep);
-    before = date;
+    previousIndex = index;
+    previousDate = date;
     let text: string, priority: number;
     if (year) {
       text = options.display?.year(timestamp) ?? String(date.year);
@@ -112,7 +134,7 @@ export function calendarAxisTicks(
       )!;
       priority = 1;
     } else continue;
-    const coord = options.coordinate(index);
+    const coord = options.coordinate(index < data.length ? index : domain.logical(timestamp));
     if (Number.isFinite(coord) && coord >= 0 && coord <= options.width)
       candidates.push({ tick: { coord, value: timestamp, text }, priority });
   }

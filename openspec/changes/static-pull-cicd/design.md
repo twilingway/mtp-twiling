@@ -20,13 +20,25 @@ test остаётся отдельной последующей настройк
   максимум 24 API вызова/час с повторным gate. Rate headers и HTTP 403/429 откладывают публикацию
   без обхода.
 - Контроллер установлен отдельно от checkout. После exact-SHA push CI git archive создаёт чистый
-  build; VDS выполняет frozen install с пониженным параллелизмом и прямой builder. Hosted CI
-  оставляет полный check, deploy-тесты и spec:validate обязательными. Повторение этих проверок на
-  VDS исключено из-за малого запаса RAM; перед активацией снова проверяются текущий main и CI того
-  же SHA.
+  build; VDS выполняет frozen install с `--ignore-scripts`, пониженным параллелизмом и прямой
+  builder. Hosted CI оставляет полный check, deploy-тесты и spec:validate обязательными. Повторение
+  этих проверок на VDS исключено из-за малого запаса RAM; перед активацией снова проверяются текущий
+  main и CI того же SHA.
 - Прямой builder сам готовит version metadata и использует тот же esbuild, что pnpm build; tsc имеет
   noEmit. Эквивалентность проверяется version/buildId и SHA-256 всех allowlist assets на чистой и
-  повторной сборках. Никакой готовый bundle из CI на сервер не переносится.
+  повторной сборках в одинаковом Linux-окружении. Никакой готовый bundle из CI на сервер не
+  переносится.
+- Pinned esbuild0.28.2 работает через optional `@esbuild/linux-x64` без postinstall. Отключение
+  lifecycle scripts устраняет зависший install.js child первой ограниченной VDS попытки. Наличие
+  optional binary обязательно: его отсутствие завершает builder ошибкой, без fallback установки и
+  увеличения бюджета. Hosted CI сохраняет обычную установку со scripts; будущая смена зависимостей
+  требует повторного Linux-сравнения normal/ignored cold/repeat.
+- Tarball worker pool pnpm10.34.5 независим от child/network concurrency и по умолчанию зависит от
+  available CPUs. Контроллер устанавливает `PNPM_MAX_WORKERS=1` только в env pnpm child. Это
+  отдельный предел параллелизма, не изменение cgroup или NODE_OPTIONS. Проверка только
+  `--ignore-scripts` в локальном cgroup192/240/0 закончилась timeout до скачивания; scoped heap96/4
+  без ограничения workers также закончился timeout. Workers1 без heap override прошёл cold install,
+  builder, packaging и offline health с настоящим Node-controller в том же cgroup.
 - Release manifest сборщика служит allowlist. Пути, symlink и скрытые/секретные файлы отклоняются.
 - Полный каталог releases/SHA переключается rename временного symlink current. Прошлый релиз
   остаётся на диске. Lock через flock принадлежит systemd service; ручные операции используют тот же
@@ -49,9 +61,11 @@ test остаётся отдельной последующей настройк
 - Ошибка public health из-за CDN → откат; шаблон nginx исключает длительное кэширование.
 - Права build-пользователя → отдельный mtp-deploy user, только свой каталог и read-only GitHub.
 - Первый релиз без предыдущего → при ошибке current удаляется, успех не записывается.
-- Пик frozen install и builder под VDS cgroup неизвестен → одна ограниченная попытка после свежего
-  resource snapshot; OOM/timeout не ослабляет CI или health. Снижение параллелизма не доказывает,
-  что установка поместится в выбранный бюджет. Память и swap соседних сервисов не изменяются.
+- Первая попытка с lifecycle scripts завершилась timeout на esbuild postinstall; установка без
+  scripts и builder под VDS cgroup ещё не измерены → новая ограниченная попытка требует отдельного
+  recovery-плана и свежего resource snapshot; OOM/timeout не ослабляет CI или health. Снижение
+  параллелизма не доказывает, что установка поместится в выбранный бюджет. Память и swap соседних
+  сервисов не изменяются.
 - Credentials, DNS, TLS и remote пока не настроены → инструкция фиксирует внешние prerequisites;
   локальные проверки не считаются реальным deploy.
 

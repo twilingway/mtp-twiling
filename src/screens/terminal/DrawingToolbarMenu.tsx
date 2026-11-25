@@ -2,6 +2,7 @@ import { t } from "../../i18n/messages.js";
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { DrawingToolIcon, type DrawingIconName } from "./DrawingToolIcon.js";
+import { ChevronIcon } from "./drawings/controls/ChevronIcon.js";
 
 export interface ToolbarMenuItem {
   id: string;
@@ -90,7 +91,7 @@ export function DrawingToolbarSplit({
           }
         }}
       >
-        <DrawingToolIcon name="chevron" />
+        <ChevronIcon direction="right" />
       </button>
     </div>
   );
@@ -208,7 +209,7 @@ export function DrawingToolbarMenu({ id, title, anchor, sections, onClose }: Pro
             aria-label={t("Назад")}
             onClick={back}
           >
-            <DrawingToolIcon name="chevron" />
+            <ChevronIcon direction="left" />
           </button>
         )}
         <span>{t(level?.label ?? title)}</span>
@@ -276,7 +277,7 @@ export function DrawingToolbarMenu({ id, title, anchor, sections, onClose }: Pro
                   )}
                   {item.children && (
                     <span className="drawing-menu-next">
-                      <DrawingToolIcon name="chevron" />
+                      <ChevronIcon direction="right" />
                     </span>
                   )}
                 </button>

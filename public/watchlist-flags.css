@@ -21,6 +21,17 @@
 .quote-row {
   position: relative;
   transition: none;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "lnum", "tnum";
+}
+.quote-symbol b {
+  line-height: 14px;
+}
+html[data-theme="dark"] .quote-symbol b {
+  color: #b8b8b8;
+}
+html[data-theme="dark"] .quote-row td.positive {
+  color: #22ab94;
 }
 .quote-row::after {
   position: absolute;

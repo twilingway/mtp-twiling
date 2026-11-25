@@ -211,6 +211,7 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
           attachPrimitive(primitive) {
             primitives.push(primitive);
           },
+          priceToCoordinate: (value) => value,
           priceScale: () => ({ applyOptions() {} })
         };
       }
@@ -381,7 +382,7 @@ for(const engine of ["lightweight","kline"]){
  });
 }
 
-test("Lightweight binds actual calendar grid to the bottom primitive and disables native daily grid marks", () => {
+test("Lightweight binds real and visible future calendar grid to the bottom primitive without changing camera", () => {
   const f = harness("lightweight");
   const bars = Array.from({ length: 91 }, (_, index) => ({
     timestamp: Date.UTC(2024, 0, 1) + index * 86400000,
@@ -395,6 +396,7 @@ test("Lightweight binds actual calendar grid to the bottom primitive and disable
   f.ready();
   assert.equal(f.chartOptions().grid.vertLines.visible, false);
   assert.equal(f.chartOptions().grid.horzLines.visible, true);
+  const camera = f.camera();
   const starts = [];
   const context = {
     save() {},
@@ -418,9 +420,13 @@ test("Lightweight binds actual calendar grid to the bottom primitive and disable
   const views = f.primitives[0].paneViews();
   assert.equal(views[0].zOrder(), "bottom");
   views[0].renderer().draw(target);
-  assert.equal(starts.length, 3);
+  assert.equal(starts.length, 4);
+  const future = f.adapter.pointToPixel({ timestamp: Date.UTC(2024, 3, 1), value: 11 });
+  assert.equal(starts.at(-1).x, Math.round(future.x) + 0.5);
   views[1].renderer().draw(target);
-  assert.equal(starts.length, 3, "front drawing layer cannot duplicate calendar grid lines");
+  assert.equal(starts.length, 4, "front drawing layer cannot duplicate calendar grid lines");
+  assert.deepEqual(f.camera(), camera);
+  assert.equal(bars.length, 91);
 });
 
 test("last-price label stays white for both candle directions and removes stale prices on empty data", () => {

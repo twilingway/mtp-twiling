@@ -13,6 +13,7 @@ import { matchesWatchlistFlag } from "../../model/watchlist-flags.js";
 import { WatchlistFlagFilter } from "./WatchlistFlagFilter.js";
 import { InstrumentIcon, QuoteRow } from "./WatchlistQuoteRow.js";
 import { InstrumentDetails } from "./InstrumentDetails.js";
+import { DetailsDivider } from "./DetailsDivider.js";
 export { InstrumentIcon } from "./WatchlistQuoteRow.js";
 type SortKey = "symbol" | "price" | "change" | "changePercent";
 export function Watchlist() {
@@ -143,198 +144,205 @@ export function Watchlist() {
     };
   return (
     <aside className="watchlist-panel" aria-label={t("Список котировок")}>
-      <div className="watchlist-heading">
-        <WatchlistFlagFilter />
-        <button
-          id="add-instrument"
-          title={t("Добавить инструмент")}
-          aria-label={t("Добавить инструмент")}
-          onClick={() => controller.setDialog(state.authenticated ? "instruments" : "account")}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        </button>
-        <button
-          id="reset-order"
-          title={t("Сбросить сортировку")}
-          onClick={() => {
-            setSort(null);
-            setQuery("");
-          }}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d="M20 12a8 8 0 1 1-2.35-5.65M20 5v6h-6" />
-          </svg>
-        </button>
-      </div>
-      <div className="watchlist-search">
-        <svg className="watchlist-search-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="10.5" cy="10.5" r="6.5" />
-          <path d="m15.5 15.5 5 5" />
-        </svg>
-        <input
-          id="search"
-          type="search"
-          placeholder={t("Найти инструмент")}
-          aria-label={t("Поиск в списке")}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-        <kbd>/</kbd>
-      </div>
-      <div className="watchlist-scroll">
-        <table>
-          <thead>
-            <tr>
-              {(
-                [
-                  ["symbol", t("Инструмент")],
-                  ["price", t("Посл. цена")],
-                  ["change", t("Изм.")],
-                  ["changePercent", t("Изм. %")]
-                ] as [SortKey, string][]
-              ).map(([key, label]) => (
-                <th key={key}>
-                  <button
-                    data-sort={key}
-                    onClick={() => {
-                      setDirection(sort === key ? -direction : -1);
-                      setSort(key);
-                    }}
-                  >
-                    {t(label)}
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody
-            id="quotes"
-            onDragLeave={(event) => {
-              if (
-                !(event.relatedTarget instanceof Node) ||
-                !event.currentTarget.contains(event.relatedTarget)
-              )
-                setDropTarget(null);
+      <div className="watchlist-list-region">
+        <div className="watchlist-heading">
+          <WatchlistFlagFilter />
+          <button
+            id="add-instrument"
+            title={t("Добавить инструмент")}
+            aria-label={t("Добавить инструмент")}
+            onClick={() => controller.setDialog(state.authenticated ? "instruments" : "account")}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
+          <button
+            id="reset-order"
+            title={t("Сбросить сортировку")}
+            onClick={() => {
+              setSort(null);
+              setQuery("");
             }}
           >
-            {visible.map(({ row, position }) => (
-              <QuoteRow
-                key={`${row.uid ?? row.symbol}:${position.index}`}
-                row={row}
-                position={position}
-                dragClass={`${dragSource === position.index ? "dragging" : ""} ${dropTarget?.index === position.index ? `drop-${dropTarget.placement}` : ""}`}
-                onDragStart={startDrag}
-                onDragOver={overRow}
-                onDrop={dropRow}
-                onDragEnd={endDrag}
-                selected={row === selected}
-                direction={state.pricesDirection.get(row.symbol) ?? ""}
-                onSelect={select}
-                onRemove={remove}
-                onFlag={(event, row) => {
-                  const rect = event.currentTarget.getBoundingClientRect();
-                  controller.setContext(null);
-                  setMenu({
-                    row,
-                    x: rect.left,
-                    y: rect.bottom + 4,
-                    owner: state.owner,
-                    mode: "flag"
-                  });
-                }}
-                onContext={(event, row) => {
-                  event.preventDefault();
-                  controller.setContext(null);
-                  setMenu({ row, x: event.clientX, y: event.clientY, owner: state.owner });
-                }}
-              />
-            ))}
-          </tbody>
-        </table>
-        {!visible.length && (
-          <p id="empty-search">
-            {state.rows.length
-              ? t("Инструменты не найдены")
-              : t("Список пуст. Добавьте инструмент кнопкой +.")}
-          </p>
-        )}
-      </div>
-      <div className="watchlist-meta">
-        <span id="quote-count">
-          {visible.length} {t("из")}
-          {state.rows.length} · {state.rows.filter((row) => row.price != null).length}{" "}
-          {t("с ценой")}
-        </span>
-        <span>{t("WebSocket · напрямую")}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M20 12a8 8 0 1 1-2.35-5.65M20 5v6h-6" />
+            </svg>
+          </button>
+        </div>
+        <div className="watchlist-search">
+          <svg className="watchlist-search-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="10.5" cy="10.5" r="6.5" />
+            <path d="m15.5 15.5 5 5" />
+          </svg>
+          <input
+            id="search"
+            type="search"
+            placeholder={t("Найти инструмент")}
+            aria-label={t("Поиск в списке")}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <kbd>/</kbd>
+        </div>
+        <div className="watchlist-scroll">
+          <table>
+            <thead>
+              <tr>
+                {(
+                  [
+                    ["symbol", t("Инструмент")],
+                    ["price", t("Посл. цена")],
+                    ["change", t("Изм.")],
+                    ["changePercent", t("Изм. %")]
+                  ] as [SortKey, string][]
+                ).map(([key, label]) => (
+                  <th key={key}>
+                    <button
+                      data-sort={key}
+                      onClick={() => {
+                        setDirection(sort === key ? -direction : -1);
+                        setSort(key);
+                      }}
+                    >
+                      {t(label)}
+                    </button>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody
+              id="quotes"
+              onDragLeave={(event) => {
+                if (
+                  !(event.relatedTarget instanceof Node) ||
+                  !event.currentTarget.contains(event.relatedTarget)
+                )
+                  setDropTarget(null);
+              }}
+            >
+              {visible.map(({ row, position }) => (
+                <QuoteRow
+                  key={`${row.uid ?? row.symbol}:${position.index}`}
+                  row={row}
+                  position={position}
+                  dragClass={`${dragSource === position.index ? "dragging" : ""} ${dropTarget?.index === position.index ? `drop-${dropTarget.placement}` : ""}`}
+                  onDragStart={startDrag}
+                  onDragOver={overRow}
+                  onDrop={dropRow}
+                  onDragEnd={endDrag}
+                  selected={row === selected}
+                  direction={state.pricesDirection.get(row.symbol) ?? ""}
+                  onSelect={select}
+                  onRemove={remove}
+                  onFlag={(event, row) => {
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    controller.setContext(null);
+                    setMenu({
+                      row,
+                      x: rect.left,
+                      y: rect.bottom + 4,
+                      owner: state.owner,
+                      mode: "flag"
+                    });
+                  }}
+                  onContext={(event, row) => {
+                    event.preventDefault();
+                    controller.setContext(null);
+                    setMenu({ row, x: event.clientX, y: event.clientY, owner: state.owner });
+                  }}
+                />
+              ))}
+            </tbody>
+          </table>
+          {!visible.length && (
+            <p id="empty-search">
+              {state.rows.length
+                ? t("Инструменты не найдены")
+                : t("Список пуст. Добавьте инструмент кнопкой +.")}
+            </p>
+          )}
+        </div>
+        <div className="watchlist-meta">
+          <span id="quote-count">
+            {visible.length} {t("из")}
+            {state.rows.length} · {state.rows.filter((row) => row.price != null).length}{" "}
+            {t("с ценой")}
+          </span>
+          <span>{t("WebSocket · напрямую")}</span>
+        </div>
       </div>
       {menu && menu.owner === state.owner && <WatchlistMenu {...menu} onClose={closeMenu} />}
       {selected && (
-        <section className="details">
-          <div className="detail-symbol">
-            <InstrumentIcon key={selected.uid} row={selected} id="detail-icon" />
-            <h3 id="detail-symbol">{selected.ticker}</h3>
-            <span className="market-tag" id="detail-type">
-              {selected.type === "future"
-                ? t("Фьючерс")
-                : selected.type === "index"
-                  ? t("Индекс")
-                  : t("Акция")}
-            </span>
-          </div>
-          <p id="detail-name">{selected.name}</p>
-          <div className="detail-quote">
-            <strong id="detail-price">{number(selected.price, precision(selected))}</strong>
-            <span id="detail-currency">{selected.currency.toUpperCase()}</span>
-          </div>
-          <p
-            className={`detail-change ${signClass(selected.change)}`}
-            id="detail-change"
-            title={t(
-              selected.type === "future"
-                ? "К предыдущему закрытию Т-Банка"
-                : "К предыдущему дневному закрытию"
-            )}
-          >
-            {selected.change == null || selected.changePercent == null
-              ? "—"
-              : `${number(selected.change, precision(selected), true)} (${number(selected.changePercent, 2, true)}%)`}
-          </p>
-          <div className="detail-facts">
-            <div>
-              <span>{t("Предыдущее дневное закрытие")}</span>
-              <b id="detail-close">{number(selected.previousClose, precision(selected))}</b>
+        <>
+          <DetailsDivider />
+          <section className="details watchlist-resizable-details">
+            <div className="detail-symbol">
+              <InstrumentIcon key={selected.uid} row={selected} id="detail-icon" />
+              <h3 id="detail-symbol">{selected.ticker}</h3>
+              <span className="market-tag" id="detail-type">
+                {selected.type === "future"
+                  ? t("Фьючерс")
+                  : selected.type === "index"
+                    ? t("Индекс")
+                    : selected.type === "currency"
+                      ? t("Валюта")
+                      : t("Акция")}
+              </span>
             </div>
-            <div>
-              <span>{t("Время последней сделки")}</span>
-              <b id="detail-time">
-                {timeLabel(selected.time)}{" "}
-                {selected.time
-                  ? timeZoneOffset(
-                      state.preferences.timeZone ?? "Europe/Moscow",
-                      new Date(selected.time).getTime()
-                    )
-                  : ""}
-              </b>
+            <p id="detail-name">{selected.name}</p>
+            <div className="detail-quote">
+              <strong id="detail-price">{number(selected.price, precision(selected))}</strong>
+              <span id="detail-currency">{selected.currency.toUpperCase()}</span>
             </div>
-            <div>
-              <span>{t("Источник")}</span>
-              <b>{t("Т‑Инвестиции")}</b>
-            </div>
-          </div>
-          <p className="detail-note" id="detail-note">
-            {t(
-              selected.previousClose == null
-                ? "Предыдущее закрытие недоступно"
-                : selected.type === "future"
+            <p
+              className={`detail-change ${signClass(selected.change)}`}
+              id="detail-change"
+              title={t(
+                selected.type === "future"
                   ? "К предыдущему закрытию Т-Банка"
                   : "К предыдущему дневному закрытию"
-            )}
-            {selected.note ? " · " + systemText(selected.note) : ""}
-          </p>
-          <InstrumentDetails row={selected} />
-        </section>
+              )}
+            >
+              {selected.change == null || selected.changePercent == null
+                ? "—"
+                : `${number(selected.change, precision(selected), true)} (${number(selected.changePercent, 2, true)}%)`}
+            </p>
+            <div className="detail-facts">
+              <div>
+                <span>{t("Предыдущее дневное закрытие")}</span>
+                <b id="detail-close">{number(selected.previousClose, precision(selected))}</b>
+              </div>
+              <div>
+                <span>{t("Время последней сделки")}</span>
+                <b id="detail-time">
+                  {timeLabel(selected.time)}{" "}
+                  {selected.time
+                    ? timeZoneOffset(
+                        state.preferences.timeZone ?? "Europe/Moscow",
+                        new Date(selected.time).getTime()
+                      )
+                    : ""}
+                </b>
+              </div>
+              <div>
+                <span>{t("Источник")}</span>
+                <b>{t("Т‑Инвестиции")}</b>
+              </div>
+            </div>
+            <p className="detail-note" id="detail-note">
+              {t(
+                selected.previousClose == null
+                  ? "Предыдущее закрытие недоступно"
+                  : selected.type === "future"
+                    ? "К предыдущему закрытию Т-Банка"
+                    : "К предыдущему дневному закрытию"
+              )}
+              {selected.note ? " · " + systemText(selected.note) : ""}
+            </p>
+            <InstrumentDetails row={selected} />
+          </section>
+        </>
       )}
       <div className="private-note">
         <span>◈</span> {t("Личное пространство")}

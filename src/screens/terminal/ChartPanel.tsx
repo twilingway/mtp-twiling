@@ -42,7 +42,24 @@ export function ChartPanel() {
         <div className="instrument-title">
           {row && <InstrumentIcon key={row.uid ?? row.symbol} row={row} id="chart-icon" />}
           <h1 id="instrument-name">{row?.name ?? (p.symbol || t("Выберите инструмент"))}</h1>
-          <span className="market-tag">MOEX</span>
+          <span
+            className="market-tag"
+            title={
+              row?.type === "currency"
+                ? `${t("Валюта")} · ${
+                    row.exchange === "moex_close"
+                      ? t("MOEX · данные закрытия")
+                      : row.exchange === "dealer_fx_otc"
+                        ? t("Дилер · внебиржевой")
+                        : (row.classCode ?? row.exchange ?? "MOEX")
+                  }`
+                : undefined
+            }
+          >
+            {row?.exchange === "dealer_fx_otc" || row?.realExchange === "REAL_EXCHANGE_DEALER"
+              ? t("Дилер")
+              : "MOEX"}
+          </span>
           <span id="chart-period">{t(PERIOD_LABELS[p.timeframe])}</span>
         </div>
         <OhlcLegend

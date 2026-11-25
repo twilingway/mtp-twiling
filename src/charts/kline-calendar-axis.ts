@@ -21,14 +21,18 @@ export function attachCalendarXAxis(
   const name = "personal-calendar-boundaries";
   registerXAxis({
     name,
-    createTicks: ({ range, bounding, defaultTicks }) =>
-      calendarAxisTicks(source.getData(), timeframe, {
-        from: range.from,
-        to: range.to,
-        width: bounding.width,
-        coordinate: source.coordinate,
-        ...(display ? { display } : {})
-      }) ?? defaultTicks
+    createTicks: ({ bounding, defaultTicks }) => {
+      const range = chart.getVisibleRange();
+      return (
+        calendarAxisTicks(source.getData(), timeframe, {
+          from: range.realFrom,
+          to: range.realTo,
+          width: bounding.width,
+          coordinate: source.coordinate,
+          ...(display ? { display } : {})
+        }) ?? defaultTicks
+      );
+    }
   });
   chart.setPaneOptions({ id: "x_axis_pane", axisOptions: { name } });
   return () => {

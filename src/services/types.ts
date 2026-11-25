@@ -49,17 +49,26 @@ export function normaliseInstrument(value: unknown): CatalogInstrument | undefin
     "instrumentUid",
     "figi",
     "classCode",
+    "exchange",
+    "realExchange",
     "currency",
     "expirationDate",
     "first1minCandleDate",
     "first1dayCandleDate",
     "firstTradeDate",
-    "instrumentType"
+    "instrumentType",
+    "instrumentKind"
   ] as const) {
     const value = text(raw[key]);
     if (value !== undefined) item[key] = value;
   }
-  if (raw.kind === "share" || raw.kind === "future" || raw.kind === "index") item.kind = raw.kind;
+  if (
+    raw.kind === "share" ||
+    raw.kind === "future" ||
+    raw.kind === "index" ||
+    raw.kind === "currency"
+  )
+    item.kind = raw.kind;
   const increment = normaliseQuotation(raw.minPriceIncrement);
   if (increment) item.minPriceIncrement = increment;
   const brand = object(raw.brand);
@@ -92,7 +101,8 @@ export function normaliseCatalog(value: unknown): Catalog | undefined {
     at: raw.at,
     shares: normaliseInstruments(raw.shares),
     futures: normaliseInstruments(raw.futures),
-    indicatives: normaliseInstruments(raw.indicatives)
+    indicatives: normaliseInstruments(raw.indicatives),
+    ...(Array.isArray(raw.currencies) ? { currencies: normaliseInstruments(raw.currencies) } : {})
   };
 }
 export function normaliseRows(value: unknown): MarketRow[] {
@@ -119,9 +129,13 @@ export function normaliseRows(value: unknown): MarketRow[] {
             ? raw.availability
             : "pending"
       };
-      if (raw.type === "future" || raw.type === "index") row.type = raw.type;
+      if (raw.type === "future" || raw.type === "index" || raw.type === "currency")
+        row.type = raw.type;
       if (instrument?.brand !== undefined) row.brand = instrument.brand;
       for (const key of [
+        "classCode",
+        "exchange",
+        "realExchange",
         "expirationDate",
         "first1minCandleDate",
         "first1dayCandleDate",

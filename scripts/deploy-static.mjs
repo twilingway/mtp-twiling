@@ -34,6 +34,8 @@ function assertExpectedSha(sha, expected) {
 function command(program, args, cwd, output = false) {
   try {
     const env = { ...process.env, CI: "true" };
+    // pnpm's tarball worker pool is separate from lifecycle/network concurrency.
+    if (program === "pnpm") env.PNPM_MAX_WORKERS = "1";
     // Build tasks need no GitHub API credential.
     if (program !== "git") delete env.GH_TOKEN;
     return execFileSync(program, args, {
@@ -106,10 +108,17 @@ async function release(config, sha, expected) {
     command("tar", ["-xf", archive, "-C", buildDir], temporary);
     command(
       "pnpm",
-      ["install", "--frozen-lockfile", "--child-concurrency=1", "--network-concurrency=1"],
+      [
+        "install",
+        "--frozen-lockfile",
+        "--ignore-scripts",
+        "--child-concurrency=1",
+        "--network-concurrency=1"
+      ],
       buildDir,
       true
     );
+    // Pinned esbuild uses its native optional package without a postinstall child.
     // Exact-SHA hosted CI owns all checks. Build the same payload locally on VDS;
     // the builder prepares version metadata without repeating tsc/lint/tests.
     command("node", ["scripts/build.mjs"], buildDir, true);

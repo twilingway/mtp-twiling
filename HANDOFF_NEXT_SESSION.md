@@ -5,6 +5,73 @@
 
 ## Актуальный этап — читать первым
 
+### Самый новый статус — 26.11.2026, автономная работа
+
+- Пользователь ушёл спать и явно разрешил отдельную автономную копию Chrome без вопросов. Обычный
+  профиль не трогать; ручной Google вход при необходимости отложить, остальное продолжать.
+- Local .16: код6d5fbbf/buildb783575aa314c53d, check479/479, spec29/29, независимая browser QA PASS.
+  Отчёт `docs/RELEASE_0_3_16_QA.md`; exact46 prefs/Drawing/Image/vault восстановлены. Own Chrome
+  closed.
+- PR3 `https://github.com/twilingway/mtp-twiling/pull/3` открыт, main пока5d497ee/.15 после PR2 с
+  deployment pin. PR3 merge до завершения failed-first-release диагностики не выполнялся.
+- Первая VDS attempt .15 exact5d497ee завершилась timeout/ExecMainStatus15, MemoryPeak213032960. Во
+  время postinstall esbuild Node был DN/mem_cg; лимиты192/240MiB не повышались. Соседей не трогали;
+  таймер остаётся disabled. Root apply session48245 закончилась exit1. На сервере теперь upgraded
+  controller/include/profile и anonymous repo, поэтому старый first-release script с требованием
+  пустого repo НЕ запускать повторно. Backup
+  `/root/mtp-release-backup-20261125T201655Z-5d497eebd66b`. Нужно read-only состояние/журнал,
+  доказать lean frozen install без postinstall, затем отдельный reviewed recovery plan с тем же
+  бюджетом и свежими gates, без слепого retry.
+- .17 source: drawing livepreview/opacity готов63d3d935 (112/112 focused), ещё не интегрирован:
+  `vps/artifacts/drawing-settings-preview-worktree`; нуженCSSdrawing-opacity послеdrawing-controls.
+- Bybit foundation готов310e12aa (468/468,21Bybit tests). Следом тот же агент делает реальный market
+  facade/provider refs, public без банковского ключа, namespace/schema2 и old-writer isolation. Его
+  план `profile-v2:<logicalowner>` согласован, private auth/vault owners НЕ менять.
+- RootТАbranch `feat/technical-indicator-integration` worktree
+  technical-indicator-integration-worktree: контракт949d752
+  (instances/panes/preferences/JSON/Drive+immutable reorder), source tests27/27. ТА пока не
+  подключены к экрану. Native worker — бывший watchlist_details_vertical_resize, начинает оба
+  адаптера от949; rootUI/persistence/lifecycle TA hooks — отдельный scope. Отдельный свежий
+  ta_moving_averages делает WMA/VWMA/DEMA/TEMA/HMA/SMMA, verified PineIDs/defaults, без registry
+  edits.
+- Обязательная очередь пользователя: все127 ТА indicators + поиск/настройки/реальные вычисления,
+  overlay/lower placement, перестановка внутри панели и сохранение. Не путать с224 общими entries.
+  Livepreview цвета/толщины/стиля/opacity для всех8 drawing tools, cancel rollback/одноundo/неутечка
+  draft вDrive. Крипта Bybit primary и OKX только при доказанном отсутствии инструмента; USstock
+  perps иxStocks подписывать отдельно. Broad goal остаётся ACTIVE.
+
+### Обновление после 0.3.15 — 26.11.2026
+
+- Main `c2d476b86f0016e62132cb09f73253db3d5631b5`, PR1 merged. Exact push CI `45689854414` success.
+  Локально уже работает 0.3.15/build `652005923294e034`; check447/447, OpenSpec25/25. История SBER,
+  подключение банка, VTBR3decimals и штатный PWA update подтверждены визуально в обычном Chrome.
+  Vault/рисунки/изображения сохранены. Пользователь параллельно пользуется этой вкладкой: не гонять
+  её UI. Google/edit-key/Escape живьём пока не проверены.
+- `release/0.3.16` в `vps/artifacts/release-0316-worktree` объединяет образцы линий, SVG стрелки
+  (`e7054c3`), измеренную типографику списка (`e35a8d3`) и вертикальный разделитель статистики
+  (`d37cb3d`). CSS drawing-controls и watchlist-details-resize подключены координатором. Общий check
+  и свежая визуальная проверка этой версии ещё нужны; canonical runtime не обновлять до них.
+- В отдельном `future-calendar-axis-worktree` готовится ось будущих дат до +9 календарных месяцев,
+  без фальшивых свечей/продолжения индикаторов. Существующие пределы pan сохраняются. Отдельно
+  `watchlist_details_vertical_resize` делает Currencies catalog + поиск USDRUB_TOM aliases.
+- Живой API: Currencies29 есть; FindInstrument("USDRUB_TOM") пуст, но "USD000UTSTOM" возвращает CETS
+  currency. Есть также дилерский USD000UTSTOM/CNGDOTC с другим UID, USDRUB/EES_CETS, USDFIXME/CETS,
+  USDRUBF и срочные Si/UM. Аудит: `vps/artifacts/usdrub-tickers-audit/`.
+- Прежнее объяснение только остановкой торгов USD в 2024 неполно: официальный MOEX s3933
+  подтверждает беспоставочный USDRUB_TOM с рублёвыми расчётами в CETS/CNGD с 16.02.2026.
+- Bybit anonymous V5 реально даёт stock perpetuals AAPLUSDT/NVDAUSDT, ETF SPYUSDT и отдельный spot
+  xStocks AAPLXUSDT/NVDAXUSDT/TSLAXUSDT. Не обычные акции. Crypto выделять отдельно от
+  stock/ETF/forex/commodity/xstocks/mstocks. CORS с mtp.twiling.ru и kline проверены HTTP200.
+  Отчёт/контракт: `vps/artifacts/bybit-equity-crypto-audit/report.md`. Реализация провайдера ещё не
+  начата: нужны source-qualified identity, flags, backup/Drive, history, WS и interval mapping.
+- Первый VDS release ещё не выполнен. Подготовлен и скопирован в `/tmp/mtp-reviewed-release-0315.py`
+  скрипт `root-apply-0315.py`, закреплённый за c2d476b/.15. SHA256
+  `6db3097d62317984716a98c15ca10302e63510c18e16a5522a5c114b092800a3`. Он не запускался на момент
+  записи; сначала независимый review, затем одна bounded попытка с fresh memory>=304MiB,
+  cgroup192/240MiB, timer disabled. Не применять старый root-apply.py .14.
+
+Не считать Google Production, две независимые sync-копии, криптопровайдер или .16 опубликованными.
+
 ### Срочное исправление 0.3.15 — 25.11.2026
 
 Кандидат находится в `vps/artifacts/csp-cache-release-worktree`, ветка `fix/csp-cache-release`.

@@ -1,0 +1,55 @@
+.workspace .watchlist-panel {
+  overflow: hidden;
+}
+.watchlist-list-region {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.watchlist-list-region .watchlist-scroll {
+  min-height: 60px;
+  overscroll-behavior: contain;
+}
+.workspace .watchlist-panel .details.watchlist-resizable-details {
+  display: block;
+  flex: 0 0 var(--watchlist-details-height, 45%);
+  height: var(--watchlist-details-height, 45%);
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-top: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--control-line) transparent;
+}
+.details-divider {
+  position: relative;
+  flex: 0 0 8px;
+  height: 8px;
+  cursor: row-resize;
+  touch-action: none;
+  user-select: none;
+  background: transparent;
+  outline: none;
+}
+.details-divider::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 2px;
+  height: 3px;
+  background: #565b65;
+}
+.details-divider:focus-visible::after {
+  background: #a3a8b1;
+}
+html.resizing-details,
+html.resizing-details * {
+  cursor: row-resize !important;
+  user-select: none !important;
+}
