@@ -9,6 +9,8 @@
 
 - GitHub CI проверяет PR и main; изменение входов сборки в PR требует повышения package version.
 - Сервер опрашивает main, ждёт успешный CI точного SHA, собирает и атомарно переключает статику.
+- Полные проверки остаются в hosted CI; VDS выполняет frozen install и тот же builder без повторного
+  lint/typecheck/test/spec. Повторный exact-SHA CI gate перед активацией сохраняется.
 - Публичный deployment.json связывает SHA, semantic version, content buildId и контрольные суммы.
 - Health проверяет опубликованные файлы; ошибка возвращает предыдущий релиз.
 - Инструкция описывает отдельный Linux systemd watcher, nginx, HTTPS и существующее PWA-обновление.

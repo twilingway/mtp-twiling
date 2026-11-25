@@ -93,10 +93,15 @@ async function release(config, sha) {
     await mkdir(buildDir);
     command("git", ["archive", "--format=tar", `--output=${archive}`, sha], repo);
     command("tar", ["-xf", archive, "-C", buildDir], temporary);
-    command("pnpm", ["install", "--frozen-lockfile"], buildDir, true);
-    command("pnpm", ["check"], buildDir, true);
-    command("node", ["--test", "scripts/deploy.test.mjs"], buildDir, true);
-    command("pnpm", ["spec:validate"], buildDir, true);
+    command(
+      "pnpm",
+      ["install", "--frozen-lockfile", "--child-concurrency=1", "--network-concurrency=1"],
+      buildDir,
+      true
+    );
+    // Exact-SHA hosted CI owns all checks. Build the same payload locally on VDS;
+    // the builder prepares version metadata without repeating tsc/lint/tests.
+    command("node", ["scripts/build.mjs"], buildDir, true);
     await rm(staging, { recursive: true, force: true });
     const metadata = await packageRelease(buildDir, staging, sha);
     // A release is immutable once present: never overwrite bytes used by current.

@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdtemp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   activate,
   currentRelease,
@@ -322,5 +323,218 @@ test(
     await activate(root, next, {}, async () => {});
     assert.equal(await currentRelease(root), next);
     await assert.rejects(switchRelease(root, dirname(root)), /managed release/);
+  }
+);
+
+async function controllerFixture(t, options = {}) {
+  const root = await workspace(t);
+  const bin = join(root, "bin");
+  const source = await fixture(root);
+  const eventsFile = join(root, "events.jsonl");
+  const config = join(root, "config.json");
+  await mkdir(bin);
+  await mkdir(join(root, "state"));
+  await mkdir(join(root, "releases"));
+  await mkdir(join(root, "repo"));
+  if (options.previous) {
+    const previous = join(root, "releases", olderSha);
+    await packageRelease(source, previous, olderSha);
+    await switchRelease(root, previous);
+  }
+  await writeFile(eventsFile, "");
+  await writeFile(
+    config,
+    JSON.stringify({
+      repository: repo,
+      branch: "main",
+      root,
+      publicOrigin: "https://example.invalid"
+    })
+  );
+  const setup = { root, source, eventsFile, sha, olderSha, repo, ...options };
+  const fake = `#!${process.execPath}
+const fs = require('node:fs');
+const path = require('node:path');
+const setup = ${JSON.stringify(setup)};
+const program = path.basename(process.argv[1]);
+const args = process.argv.slice(2);
+fs.appendFileSync(setup.eventsFile, JSON.stringify([program, ...args]) + '\\n');
+if (program === 'git') {
+  if (args[0] === 'ls-remote') {
+    const calls = fs.readFileSync(setup.eventsFile, 'utf8').split('\\n').filter(line => line.includes('ls-remote')).length;
+    console.log(setup.advanceMain && calls > 1 ? setup.olderSha : setup.sha);
+  } else if (args[0] === 'rev-parse') console.log(setup.sha);
+} else if (program === 'tar') {
+  fs.cpSync(setup.source, args[args.indexOf('-C') + 1], { recursive: true });
+} else if (program === 'pnpm') {
+  if (setup.failInstall) process.exit(1);
+} else if (program === 'node' && setup.failBuild) process.exit(1);
+`;
+  for (const program of ["git", "tar", "pnpm", "node"])
+    await writeFile(join(bin, program), fake, { mode: 0o755 });
+  const preload = join(root, "fetch.mjs");
+  await writeFile(
+    preload,
+    `
+import { appendFileSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+const setup = ${JSON.stringify(setup)};
+let queries = 0;
+globalThis.fetch = async input => {
+  const url = new URL(input);
+  if (url.hostname === 'api.github.com') {
+    queries++;
+    appendFileSync(setup.eventsFile, JSON.stringify(['ci', queries]) + '\\n');
+    const conclusion = setup.rejectInitial && queries === 1 || setup.rejectFinal && queries === 2 ? 'failure' : 'success';
+    return new Response(JSON.stringify({ workflow_runs: [{ head_sha: setup.sha, head_branch: 'main', event: 'push', repository: { full_name: setup.repo }, path: '.github/workflows/ci.yml', run_number: 1, run_attempt: 1, status: 'completed', conclusion }] }));
+  }
+  appendFileSync(setup.eventsFile, JSON.stringify(['public', url.pathname]) + '\\n');
+  const body = readFileSync(join(setup.root, 'current', url.pathname.slice(1)));
+  return new Response(setup.failHealth && url.pathname === '/app-entry.js' ? 'stale' : body);
+};
+`
+  );
+  const controller = fileURLToPath(new URL("./deploy-static.mjs", import.meta.url));
+  const run = () =>
+    spawnSync(process.execPath, ["--import", preload, controller, "watch"], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: bin + ":" + process.env.PATH,
+        MTP_DEPLOY_ROOT: root,
+        MTP_DEPLOY_CONFIG: config,
+        MTP_DEPLOY_LOCKED: "1"
+      },
+      timeout: 30000
+    });
+  const events = async () =>
+    (await readFile(eventsFile, "utf8"))
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line));
+  return { root, run, events };
+}
+
+test(
+  "controller builds only after green CI and rechecks before activation",
+  { skip: process.platform !== "linux" && "Linux executable fixtures; exercised in hosted CI" },
+  async (t) => {
+    await t.test("green exact CI installs frozen and builds directly on VDS", async (t) => {
+      const scenario = await controllerFixture(t);
+      const result = scenario.run();
+      assert.equal(result.status, 0, result.stderr);
+      const events = await scenario.events();
+      const install = events.findIndex((event) => event[0] === "pnpm");
+      const builder = events.findIndex((event) => event[0] === "node");
+      const gates = events.flatMap((event, index) => (event[0] === "ci" ? [index] : []));
+      assert.equal(gates.length, 2);
+      assert.ok(gates[0] < install && install < builder && builder < gates[1]);
+      assert.ok(events.findIndex((event) => event[0] === "public") > gates[1]);
+      assert.deepEqual(
+        events.filter((event) => event[0] === "pnpm"),
+        [
+          [
+            "pnpm",
+            "install",
+            "--frozen-lockfile",
+            "--child-concurrency=1",
+            "--network-concurrency=1"
+          ]
+        ]
+      );
+      assert.deepEqual(
+        events.filter((event) => event[0] === "node"),
+        [["node", "scripts/build.mjs"]]
+      );
+      assert.equal((await readFile(join(scenario.root, "state/deployed-sha"), "utf8")).trim(), sha);
+      const count = events.length;
+      assert.equal(scenario.run().status, 0);
+      assert.deepEqual(
+        (await scenario.events()).slice(count).map((event) => event[0]),
+        ["git"]
+      );
+    });
+    for (const options of [
+      { rejectInitial: true, previous: true },
+      { rejectFinal: true, previous: true },
+      { advanceMain: true }
+    ]) {
+      await t.test(`gate keeps current absent: ${Object.keys(options)[0]}`, async (t) => {
+        const scenario = await controllerFixture(t, options);
+        assert.equal(scenario.run().status, 0);
+        assert.equal(
+          await currentRelease(scenario.root),
+          options.previous ? join(scenario.root, "releases", olderSha) : null
+        );
+        const events = await scenario.events();
+        assert.equal(
+          events.some((event) => event[0] === "public"),
+          false
+        );
+        if (options.rejectInitial)
+          assert.equal(
+            events.some((event) => event[0] === "pnpm" || event[0] === "node"),
+            false
+          );
+        else
+          assert.equal(
+            events.some((event) => event[0] === "node"),
+            true
+          );
+        await assert.rejects(readFile(join(scenario.root, "state/failed-sha")), { code: "ENOENT" });
+        const count = events.length;
+        assert.equal(scenario.run().status, 0);
+        assert.deepEqual(
+          (await scenario.events()).slice(count).map((event) => event[0]),
+          ["git"]
+        );
+      });
+    }
+    for (const options of [{ failInstall: true }, { failBuild: true }, { failHealth: true }]) {
+      await t.test(`failure blocks SHA: ${Object.keys(options)[0]}`, async (t) => {
+        const scenario = await controllerFixture(t, options);
+        assert.equal(scenario.run().status, 1);
+        assert.equal(await currentRelease(scenario.root), null);
+        assert.equal((await readFile(join(scenario.root, "state/failed-sha"), "utf8")).trim(), sha);
+        assert.equal(
+          (await readdir(scenario.root)).some((name) => name.startsWith("build-")),
+          false
+        );
+        assert.equal(
+          (await readdir(join(scenario.root, "releases"))).some((name) =>
+            name.startsWith(".staging-")
+          ),
+          false
+        );
+        const events = await scenario.events();
+        if (options.failInstall)
+          assert.equal(
+            events.some((event) => event[0] === "node"),
+            false
+          );
+        const count = events.length;
+        assert.equal(scenario.run().status, 0);
+        assert.deepEqual(
+          (await scenario.events()).slice(count).map((event) => event[0]),
+          ["git"]
+        );
+      });
+    }
+    await t.test("immutable release rejects a changed payload", async (t) => {
+      const scenario = await controllerFixture(t);
+      await mkdir(join(scenario.root, "releases", sha));
+      await writeFile(join(scenario.root, "releases", sha, "deployment.json"), "{}");
+      assert.equal(scenario.run().status, 1);
+      assert.equal(await currentRelease(scenario.root), null);
+      assert.equal(
+        await readFile(join(scenario.root, "releases", sha, "deployment.json"), "utf8"),
+        "{}"
+      );
+      assert.equal(
+        (await scenario.events()).some((event) => event[0] === "public"),
+        false
+      );
+    });
   }
 );

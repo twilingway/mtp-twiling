@@ -19,8 +19,14 @@ test остаётся отдельной последующей настройк
   read-only deploy key и локальным Actions-read token. Общий cooldown 300s не зависит от SHA,
   максимум 24 API вызова/час с повторным gate. Rate headers и HTTP 403/429 откладывают публикацию
   без обхода.
-- Контроллер установлен отдельно от checkout. На каждый SHA git archive создаёт чистый build; frozen
-  install и pnpm check/spec:validate выполняются на сервере до публикации.
+- Контроллер установлен отдельно от checkout. После exact-SHA push CI git archive создаёт чистый
+  build; VDS выполняет frozen install с пониженным параллелизмом и прямой builder. Hosted CI
+  оставляет полный check, deploy-тесты и spec:validate обязательными. Повторение этих проверок на
+  VDS исключено из-за малого запаса RAM; перед активацией снова проверяются текущий main и CI того
+  же SHA.
+- Прямой builder сам готовит version metadata и использует тот же esbuild, что pnpm build; tsc имеет
+  noEmit. Эквивалентность проверяется version/buildId и SHA-256 всех allowlist assets на чистой и
+  повторной сборках. Никакой готовый bundle из CI на сервер не переносится.
 - Release manifest сборщика служит allowlist. Пути, symlink и скрытые/секретные файлы отклоняются.
 - Полный каталог releases/SHA переключается rename временного symlink current. Прошлый релиз
   остаётся на диске. Lock через flock принадлежит systemd service; ручные операции используют тот же
@@ -37,6 +43,9 @@ test остаётся отдельной последующей настройк
 - Ошибка public health из-за CDN → откат; шаблон nginx исключает длительное кэширование.
 - Права build-пользователя → отдельный mtp-deploy user, только свой каталог и read-only GitHub.
 - Первый релиз без предыдущего → при ошибке current удаляется, успех не записывается.
+- Пик frozen install и builder под VDS cgroup неизвестен → одна ограниченная попытка после свежего
+  resource snapshot; OOM/timeout не ослабляет CI или health. Снижение параллелизма не доказывает,
+  что установка поместится в выбранный бюджет. Память и swap соседних сервисов не изменяются.
 - Credentials, DNS, TLS и remote пока не настроены → инструкция фиксирует внешние prerequisites;
   локальные проверки не считаются реальным deploy.
 

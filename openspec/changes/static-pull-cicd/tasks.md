@@ -14,6 +14,15 @@
 
 - [x] 3.1 Выполнить deploy-тесты, pnpm check и pnpm spec:validate; зафиксировать ограничения.
 
+## 4. Ограниченная сборка VDS
+
+- [x] 4.1 Сравнить полный pipeline и прямой builder на чистых и повторных generated outputs по
+      version/buildId и hashes каждого manifest asset; зафиксировать метод и результат.
+- [x] 4.2 Заменить повторные проверки VDS на frozen install + прямой builder; Linux black-box
+      тестами проверить оба CI gates, ошибку install/build, cooldown, immutable release и public
+      health.
+- [x] 4.3 Обновить runbook и прогнать полный check, strict spec validation и Linux deploy-тесты.
+
 ## Workflow follow-up
 
 - Создать remote/private GitHub repository и настроить доступ после интеграции.

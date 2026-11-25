@@ -130,11 +130,28 @@ Watcher раз в минуту читает origin/main; новый цикл Git
 глобально, даже если SHA меняется каждую минуту. Публикует только latest successful push run
 `.github/workflows/ci.yml` для exact main SHA. Пропущенный, pending, cancelled или failed CI ничего
 не публикует. При смене main во время сборки активация откладывается. Сервер выполняет frozen
-install, check, deploy-тесты и spec:validate в чистом archive-каталоге; публикуется только manifest
-allowlist из public. Secrets и исходники в release не попадают. Повторная сборка SHA обязана
-совпасть с имеющимся immutable payload.
+install с child/network concurrency1 и `node scripts/build.mjs` в чистом archive-каталоге. Полные
+`pnpm check`, deploy-тесты и `spec:validate` остаются обязательными в hosted CI точного SHA; VDS не
+повторяет lint/typecheck/tests/spec. Builder сам готовит version metadata и использует тот же
+esbuild, что `pnpm build`; tsc имеет noEmit. Публикуется только manifest allowlist из public.
+Secrets и исходники в release не попадают. Повторная сборка SHA обязана совпасть с имеющимся
+immutable payload.
 
 ## Проверка релиза
+
+Перед первым запуском повторно измерить MemAvailable и свободный диск. Пик frozen install и builder
+на VDS не измерен; уменьшенный параллелизм не доказывает достаточность памяти. Предложенный отдельно
+для review профиль MemoryHigh192M/MemoryMax240M/MemorySwapMax0 оставляет минимум64MiB резерва при
+MemAvailable>=304MiB. Он не применяется автоматически этим изменением: существующий unit сохраняет
+240M/320M. Оператор проверяет фактические cgroup properties перед единственной попыткой и фиксирует
+MemoryPeak/Result/OOM; при OOM/timeout не повышает лимит автоматически и не включает timer. Предел
+V8 heap не заменяет суммарный cgroup budget. Соседние процессы, глобальный Node и swap не меняются.
+
+Локальная эквивалентность на исходном `ffc41fe`/0.3.12: полный check364/364 и прямой builder после
+удаления generated outputs, затем повторный builder дали одинаковые version/buildId
+`110e1637e3b5cbe9` и SHA-256 всех51 файлов release allowlist. Это проверка артефактов, а не замер
+памяти или доказательство публичной публикации. Изменение только deploy-контроллера не меняет
+version/buildId приложения.
 
 Public health сравнивает sourceSha/version/buildId и SHA-256 **каждого** manifest-файла через HTTPS.
 Redirect, HTTP error, старый payload или повреждённый asset вызывают откат pointer. Новый
