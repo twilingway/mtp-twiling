@@ -148,8 +148,21 @@ test("expired memory authorization exposes reauthentication and never writes a n
 
 test("automatic debounce coalesces edits and disabled automatic sync retains explicit sync", async t => {
   const f = fixture(); t.after(() => f.coordinator.disconnect()); await f.connect();
+  const synchronized = new Promise((resolve, reject) => {
+    let unsubscribe = () => {};
+    const timer = setTimeout(() => {
+      unsubscribe();
+      reject(new Error("Second automatic snapshot did not complete within 5 seconds"));
+    }, 5000);
+    unsubscribe = f.coordinator.subscribe(() => {
+      if (f.store.count() === 2 && f.coordinator.getSnapshot().phase === "idle") {
+        clearTimeout(timer); unsubscribe(); resolve();
+      }
+    });
+    t.after(() => { clearTimeout(timer); unsubscribe(); });
+  });
   f.edit({ layout: { ...f.local().layout, locale: "ru" } }); f.edit({ layout: { ...f.local().layout, timeZone: "Europe/Moscow" } });
-  await new Promise(resolve => setTimeout(resolve, 1700));
+  await synchronized;
   assert.equal(f.store.count(), 2);
   await f.coordinator.setAutomatic(false); f.edit({ layout: { ...f.local().layout, locale: "en" } });
   await new Promise(resolve => setTimeout(resolve, 1600)); assert.equal(f.store.count(), 2);
