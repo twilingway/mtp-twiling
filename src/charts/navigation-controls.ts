@@ -14,10 +14,17 @@ export function navigationDistance(
   direction: NavigationDirection,
   width: number,
   firstX: number,
-  lastX: number
+  lastX: number,
+  fraction = 1
 ): number {
-  if (![width, firstX, lastX].every(Number.isFinite) || width <= 0 || firstX > lastX) return 0;
-  return Math.max(1 - lastX, Math.min(width - firstX - 1, (-direction * width) / 4));
+  if (
+    ![width, firstX, lastX, fraction].every(Number.isFinite) ||
+    width <= 0 ||
+    firstX > lastX ||
+    fraction <= 0
+  )
+    return 0;
+  return Math.max(1 - lastX, Math.min(width - firstX - 1, (-direction * width * fraction) / 4));
 }
 
 export function navigationCenter(width: number, firstX: number, lastX: number): number {

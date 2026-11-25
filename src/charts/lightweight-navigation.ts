@@ -45,17 +45,19 @@ export function lightweightNavigation(
         rightOffset: anchor - (count() - 1) + (width - x - 1) / spacing - 0.5
       });
     },
-    scroll(direction) {
+    scroll(direction, fraction) {
       const g = geometry();
       if (!g) return;
       const { scale, width, firstX, lastX } = g,
-        distance = navigationDistance(direction, width, firstX, lastX),
+        distance = navigationDistance(direction, width, firstX, lastX, fraction),
         spacing = scale.options().barSpacing,
         priceScale = series.priceScale(),
         range = priceScale.getVisibleRange();
       if (!distance || !range || !Number.isFinite(spacing) || spacing <= 0) return;
-      priceScale.applyOptions({ autoScale: false });
-      priceScale.setVisibleRange(range);
+      if (fraction === undefined) {
+        priceScale.applyOptions({ autoScale: false });
+        priceScale.setVisibleRange(range);
+      }
       scale.scrollToPosition(scale.scrollPosition() - distance / spacing, false);
     },
     resetView() {

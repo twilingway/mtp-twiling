@@ -9,9 +9,9 @@ import * as jsxRuntime from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const root = fileURLToPath(new URL("../src/", import.meta.url));
-function modules(overrides = {}) {
+function modules(overrides = {}, globals = {}) {
   const cache = new Map();
-  const context = vm.createContext({ console, Math, Number, Object });
+  const context = vm.createContext({ console, Math, Number, Object, ...globals });
   function load(name) {
     if (Object.hasOwn(overrides, name)) return overrides[name];
     const candidate = path.resolve(root, name).replace(/\.js$/, ".ts"),
@@ -39,7 +39,7 @@ function lightweight({ length = 1000, space = 8, width = 800, ready = true } = {
   let offset = 8, autoScale = true;
   const candles = Object.freeze(Array.from({ length }, (_, timestamp) =>
     Object.freeze({ timestamp, close: timestamp + 10 })));
-  const writes = [], range = { from: 10, to: 200 };
+  const writes = [], priceWrites = [], range = { from: 10, to: 200 };
   const scale = {
     width: () => width,
     options: () => ({ barSpacing: space, minBarSpacing: 0.5, maxBarSpacing: 0 }),
@@ -53,13 +53,13 @@ function lightweight({ length = 1000, space = 8, width = 800, ready = true } = {
   };
   const price = {
     getVisibleRange: () => range,
-    applyOptions(value) { autoScale = value.autoScale; },
+    applyOptions(value) { autoScale = value.autoScale; priceWrites.push(value); },
     setVisibleRange(value) { assert.equal(value, range); }
   };
   return {
     api: lightweightNavigation({ timeScale: () => scale }, { priceScale: () => price },
       () => candles.length, () => ready),
-    scale, candles, writes, spacing: () => space, autoScale: () => autoScale
+    scale, candles, writes, priceWrites, spacing: () => space, autoScale: () => autoScale
   };
 }
 
@@ -95,6 +95,15 @@ test("LW zoom clamps native bounds, sparse data anchors a real candle, repeated 
   assert.ok(chart.scale.logicalToCoordinate(0) <= 799 + 1e-9);
   assert.ok(chart.writes.filter((value) => typeof value === "object").every((value) =>
     Number.isFinite(value.barSpacing) && Number.isFinite(value.rightOffset)));
+});
+
+test("LW repeat uses fractional nonanimated scroll and never re-freezes the manual price range",()=>{
+  const chart=lightweight();chart.api.scroll(-1);const before=chart.scale.scrollPosition();
+  for(let step=0;step<10;step++)chart.api.scroll(-1,.0123);
+  assert.ok(Math.abs(chart.scale.scrollPosition()-(before-10*200*.0123/8))<1e-9);
+  assert.equal(chart.priceWrites.length,1);assert.equal(chart.autoScale(),false);
+  const stable=chart.scale.scrollPosition();chart.api.scroll(-1,NaN);chart.api.scroll(-1,0);
+  assert.equal(chart.scale.scrollPosition(),stable);
 });
 
 test("LW reset enables price autoscale and returns the time scale to realtime; pending and empty charts do nothing", () => {
@@ -231,6 +240,8 @@ test("KLine navigation uses multiplier, explicit plot center, native bounds and 
   assert.deepEqual(calls.shift(), ["zoom", 1.25, 400, 200, 0]);
   api.scroll(-1); api.scroll(1);
   assert.deepEqual(calls.splice(0), ["freeze", ["pan", 200, 0], "freeze", ["pan", -200, 0]]);
+  api.scroll(-1,.0123);api.scroll(1,.0123);
+  assert.deepEqual(calls.splice(0),[["pan",2.46,0],["pan",-2.46,0]]);
   space = 49; api.zoom(1); assert.equal(space, 50);
   space = 1.1; api.zoom(-1); assert.equal(space, 1);
   calls.length = 0;
@@ -277,7 +288,7 @@ test("five localized buttons expose names, isolate events and revalidate loading
     resetView: () => calls.push(["reset"])
   };
   const controller = { chart, getSnapshot: () => state }, load = modules({
-    react: { useRef: () => ({ current: null }), useEffect() {},
+    react: { useRef: () => ({ current: null }), useEffect() {}, useMemo: (factory) => factory(),
       useState: () => [{ chart, left: 400, top: 500 }, () => {}] },
     "react/jsx-runtime": jsxRuntime,
     "./context.js": { useTerminal: () => ({ state, controller }) },

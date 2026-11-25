@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
-import type { SyntheticEvent } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { SyntheticEvent, PointerEvent, KeyboardEvent } from "react";
 import type { ChartAdapter } from "../../charts/adapter.js";
 import { navigationText } from "../../i18n/messages-navigation.js";
 import { chartNavigationReady } from "./chart-navigation-state.js";
 import { useTerminal } from "./context.js";
 import { userCameraAction } from "./controller-camera-sync.js";
+import { ChartScrollHold } from "./chart-scroll-hold.js";
 
 const buttons = [
   ["zoomOut", "M5 12h14"],
@@ -28,6 +29,22 @@ export function ChartNavigation() {
   const { controller, state } = useTerminal(),
     ref = useRef<HTMLDivElement>(null),
     [position, setPosition] = useState<Position | null>(null);
+  const hold = useMemo(() => new ChartScrollHold(controller), [controller]);
+  useEffect(() => {
+    const cancel = () => hold.cancel(),
+      hidden = () => {
+        if (document.visibilityState !== "visible") cancel();
+      },
+      unsubscribe = controller.subscribe(() => hold.validate());
+    window.addEventListener("blur", cancel);
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("blur", cancel);
+      document.removeEventListener("visibilitychange", hidden);
+      hold.cancel();
+    };
+  }, [controller, hold]);
   useEffect(() => {
     let frame = 0,
       previous = -Infinity;
@@ -82,6 +99,37 @@ export function ChartNavigation() {
       else current.zoom?.(action === "zoomIn" ? 1 : -1);
     });
   }
+  const direction = (action: Action) => (action === "older" ? -1 : action === "newer" ? 1 : null);
+  function down(event: PointerEvent<HTMLButtonElement>, action: Action) {
+    const value = direction(action);
+    if (value === null || !available(action) || event.button !== 0 || event.isPrimary === false)
+      return;
+    event.preventDefault();
+    event.stopPropagation();
+    const target = event.currentTarget,
+      id = event.pointerId;
+    if (
+      !hold.start(value, `pointer:${id}`, () => {
+        if (target.hasPointerCapture(id)) target.releasePointerCapture(id);
+      })
+    )
+      return;
+    try {
+      target.setPointerCapture(id);
+    } catch {
+      hold.cancel(`pointer:${id}`);
+    }
+  }
+  function key(event: KeyboardEvent<HTMLButtonElement>, action: Action, up: boolean) {
+    const value = direction(action);
+    if (value === null || !["Enter", " "].includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const token = `key:${event.key}`;
+    if (up) {
+      if (hold.finish(token) === "short") perform(action);
+    } else if (!event.repeat && available(action)) hold.start(value, token);
+  }
   return (
     <div
       ref={ref}
@@ -108,7 +156,24 @@ export function ChartNavigation() {
           aria-label={navigationText(action, state.preferences.locale)}
           title={navigationText(action, state.preferences.locale)}
           disabled={!available(action)}
-          onClick={() => perform(action)}
+          style={direction(action) !== null ? { touchAction: "none" } : undefined}
+          onPointerDown={(event) => down(event, action)}
+          onPointerUp={(event) => {
+            event.stopPropagation();
+            hold.finish(`pointer:${event.pointerId}`);
+          }}
+          onPointerCancel={(event) => {
+            event.stopPropagation();
+            hold.cancel(`pointer:${event.pointerId}`);
+          }}
+          onLostPointerCapture={(event) => hold.cancel(`pointer:${event.pointerId}`)}
+          onKeyDown={(event) => key(event, action, false)}
+          onKeyUp={(event) => key(event, action, true)}
+          onBlur={() => hold.cancel()}
+          onClick={() => {
+            const value = direction(action);
+            if (value === null || hold.click(value)) perform(action);
+          }}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d={path} />

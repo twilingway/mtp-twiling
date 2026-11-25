@@ -164,6 +164,19 @@ function observerFixture(callbacks = {}) {
   };
 }
 
+test("explicit held interaction keeps one camera baseline and cannot settle before release",()=>{
+  const f=observerFixture();f.adapter.beginViewInteraction(true,true);
+  for(let step=0;step<5;step++){
+    f.view().camera.rightOffsetBars-=.25;f.observer.nativeChanged();f.timing.advance(1000);f.timing.step();
+    f.adapter.endViewInteraction(); // Unrelated input release cannot settle an explicit hold.
+    assert.equal(f.events.filter(value=>typeof value!=="string").length,0);
+  }
+  assert.equal(f.events.filter(value=>value==="intent").length,1);
+  f.adapter.endViewInteraction(true);f.timing.drain();
+  const saves=f.events.filter(value=>typeof value!=="string");assert.equal(saves.length,1);
+  assert.equal(saves[0].camera.rightOffsetBars,-4.25);
+});
+
 test("intent is synchronous before native RAF; settled changes coalesce and start-only click never autosaves", () => {
   const f = observerFixture();
   f.adapter.beginViewInteraction(false);

@@ -14,6 +14,14 @@
 - [x] 2.2 Выполнить pnpm check и pnpm spec:validate в отдельном worktree; записать результат
       интеграции.
 
+## 3. Удержание прокрутки
+
+- [x] 3.1 Реализовать fractional native pan, pointer/touch/keyboard lifecycle и одно held camera
+      intent; проверить release, cancellation, source/import guards и отсутствие повторного Y
+      freeze.
+- [x] 3.2 Выполнить полный конкурентный check: 373 tests pass, format/lint/typecheck/build pass;
+      OpenSpec strict validation 20 items pass. Визуальная проверка остаётся координатору.
+
 ## Workflow follow-up
 
 - Координатор выполняет визуальную проверку обоих движков после интеграции.

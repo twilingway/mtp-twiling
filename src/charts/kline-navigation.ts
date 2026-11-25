@@ -49,12 +49,12 @@ export function klineNavigation(
         0
       );
     },
-    scroll(direction) {
+    scroll(direction, fraction) {
       const g = geometry();
       if (!g) return;
-      const distance = navigationDistance(direction, g.width, g.firstX, g.lastX);
+      const distance = navigationDistance(direction, g.width, g.firstX, g.lastX, fraction);
       if (!distance) return;
-      freezeKlinePriceScale(chart);
+      if (fraction === undefined) freezeKlinePriceScale(chart);
       chart.scrollByDistance(distance, 0);
     },
     resetView() {

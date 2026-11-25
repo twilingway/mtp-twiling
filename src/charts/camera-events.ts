@@ -34,6 +34,7 @@ export class UserCameraEvents {
   private adapter: ChartAdapter | undefined;
   private armed = false;
   private inputChanged = false;
+  private held = false;
   private baseline: string | null = null;
   private muted = 0;
   private disposed = false;
@@ -60,7 +61,7 @@ export class UserCameraEvents {
     this.frame = undefined;
     this.timer = undefined;
   }
-  begin = (changed = false): void => {
+  begin = (changed = false, held = false): void => {
     if (this.disposed || (!this.callbacks.onCameraIntent && !this.callbacks.onCameraChange)) return;
     this.callbacks.onCameraIntent?.(); // Before native input and before any RAF/readback.
     if (!this.armed) {
@@ -68,11 +69,14 @@ export class UserCameraEvents {
       this.armed = true;
     }
     this.inputChanged ||= changed;
+    this.held ||= held;
     if (changed) this.rebasePending = false;
     if (this.inputChanged) this.schedule();
   };
-  end = (): void => {
+  end = (held = false): void => {
     if (this.disposed) return;
+    if (held) this.held = false;
+    if (this.held) return;
     if (this.inputChanged) this.schedule();
     else {
       this.clear();
@@ -99,6 +103,7 @@ export class UserCameraEvents {
   }
   private schedule(): void {
     this.clear();
+    if (this.held) return;
     this.timer = this.scheduler.delay(() => {
       this.timer = undefined;
       this.settle(0);

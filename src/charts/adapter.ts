@@ -23,10 +23,11 @@ export interface ChartAdapter {
   setView(view: ChartView): void;
   fit(): void;
   zoom?(direction: -1 | 1): void;
-  scroll?(direction: -1 | 1): void;
+  /** Fractional repeat follows beginPan; a missing fraction keeps the one-shot Y freeze. */
+  scroll?(direction: -1 | 1, fraction?: number): void;
   resetView?(): void;
-  beginViewInteraction?(changed?: boolean): void;
-  endViewInteraction?(): void;
+  beginViewInteraction?(changed?: boolean, held?: boolean): void;
+  endViewInteraction?(held?: boolean): void;
   beginPan?(start?: PixelPoint): void;
   endPan?(): void;
   focusPoints?(points: readonly DrawingPoint[]): void;
