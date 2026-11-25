@@ -314,7 +314,9 @@ export class DriveCoordinator {
           ? remote.resolve(backup, { deviceId: record.deviceId, parents: heads })
           : remote.publish(backup, { deviceId: record.deviceId, parents: heads }));
         this.check(epoch, revision);
-        heads = result.inspection.heads;
+        // The chosen backup belongs to our node. A newer descendant may already be the
+        // inspected head; acknowledging it here would silently skip its unseen payload.
+        heads = [result.nodeId];
         if (result.inspection.conflict) {
           await this.conflict(result.inspection, local, digest, epoch, revision);
           return;

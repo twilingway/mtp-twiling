@@ -174,3 +174,73 @@ test("portable allowlist preserves all current preferences and validates future 
   }
   assert.throws(() => sanitizeDriveBackup({ ...source, layout: { ...source.layout, watchlistFlagFilter: "orange" } }), error => error.code === "remote-invalid");
 });
+
+async function concurrentRemoteBranches(f) {
+  const parents = (await new DriveSync(f.store).inspect()).heads;
+  const create = f.store.create.bind(f.store), gate = deferred();
+  let waiting = 0;
+  f.store.create = async (...args) => {
+    if (args[0] === "snapshot") {
+      if (++waiting === 2) gate.resolve();
+      await gate.promise;
+    }
+    return create(...args);
+  };
+  const first = backup("light"); first.layout.sidebarWidth = 330;
+  const second = backup("dark"); second.layout.sidebarWidth = 340;
+  try {
+    return await Promise.all([first, second].map(value => new DriveSync(f.store).publish(value, {
+      deviceId: crypto.randomUUID(), parents
+    })));
+  } finally {
+    f.store.create = create;
+  }
+}
+
+for (const choice of ["local", "remote"]) {
+  for (const edit of ["none", "after-choice", "during-write"]) {
+    test(`${choice} resolution accepts only its own node when a newer descendant arrives (${edit})`, async t => {
+      const f = fixture(); t.after(() => f.coordinator.disconnect()); await f.connect();
+      const branches = await concurrentRemoteBranches(f);
+      f.edit({ layout: { ...f.local().layout, locale: "ru" } });
+      await f.coordinator.sync();
+      assert.equal(f.coordinator.getSnapshot().phase, "conflict");
+      const previousHeads = [...f.record().baseHeads];
+      const create = f.store.create.bind(f.store);
+      let inject = true, descendant, resolution;
+      f.store.create = async (...args) => {
+        const result = await create(...args);
+        if (args[0] === "snapshot" && inject) {
+          inject = false;
+          resolution = result.appProperties.mtpKey;
+          const newer = backup("light"); newer.layout.sidebarWidth = 499;
+          descendant = (await f.remote(newer)).nodeId;
+          if (edit === "during-write")
+            f.edit({ layout: { ...f.local().layout, sidebarWidth: 450 } });
+        }
+        return result;
+      };
+      await f.coordinator.choose(choice === "local" ? "local" : branches[0].nodeId);
+      assert.ok(descendant); assert.ok(resolution);
+      assert.deepEqual((await new DriveSync(f.store).inspect()).heads, [descendant]);
+      assert.deepEqual(f.record().baseHeads, edit === "during-write" ? previousHeads : [resolution]);
+      assert.equal(f.imports.length, choice === "remote" && edit !== "during-write" ? 1 : 0);
+      if (edit === "after-choice")
+        f.edit({ layout: { ...f.local().layout, sidebarWidth: 450 } });
+      const importsBefore = f.imports.length;
+      await f.coordinator.sync();
+      assert.equal(f.store.count(), 5, "both branches, resolution and descendant are retained without an echo");
+      if (edit === "none") {
+        assert.equal(f.imports.length, importsBefore + 1);
+        assert.equal(f.local().layout.sidebarWidth, 499);
+        assert.deepEqual(f.record().baseHeads, [descendant]);
+        assert.equal(f.coordinator.getSnapshot().phase, "idle");
+      } else {
+        assert.equal(f.imports.length, importsBefore, "new local edits must not be overwritten");
+        assert.equal(f.local().layout.sidebarWidth, 450);
+        assert.equal(f.coordinator.getSnapshot().phase, "conflict");
+      }
+      assert.equal((await new DriveSync(f.store).download(descendant)).layout.sidebarWidth, 499);
+    });
+  }
+}
