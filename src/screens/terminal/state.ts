@@ -15,6 +15,7 @@ import type {
 import { NATIVE_PERIOD_LABELS } from "../../model/intervals/native-timeframes.js";
 import type { IntervalId } from "../../model/intervals/registry.js";
 import type { DisplayPreferences } from "../../i18n/preferences.js";
+import type { WatchlistFlags, WatchlistFlagFilter } from "../../model/watchlist-flags.js";
 import { formatClock, formatNumber } from "../../i18n/format.js";
 export const DEFAULT_INDICATORS: IndicatorFlags = {
   ma: false,
@@ -51,6 +52,8 @@ export const INDICATOR_NAMES: Record<IndicatorKey, string> = {
 };
 export const PERIOD_LABELS: Record<Timeframe, string> = NATIVE_PERIOD_LABELS;
 export interface TerminalPreferences extends DisplayPreferences {
+  watchlistFlags?: WatchlistFlags;
+  watchlistFlagFilter?: WatchlistFlagFilter;
   indicatorPaneLayout?: IndicatorPaneLayout;
   favoriteIntervals?: IntervalId[];
   rightPanelCollapsed?: boolean;

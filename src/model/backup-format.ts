@@ -4,6 +4,7 @@ import { isDrawingToolbarSettings } from "./drawing-toolbar.js";
 import { isNativeIntervalId } from "./intervals/registry.js";
 import { isIntervalFavorites } from "./intervals/favorites.js";
 import { isIndicatorPaneLayout } from "./indicator-layout.js";
+import { isWatchlistFlags, isWatchlistFlagFilter } from "./watchlist-flags.js";
 import type {
   Backup,
   BackupDrawing,
@@ -226,6 +227,8 @@ export function isProfilePreferences(value: unknown): value is ProfilePreference
   return (
     isRecord(value) &&
     fields(value, {
+      watchlistFlags: isWatchlistFlags,
+      watchlistFlagFilter: isWatchlistFlagFilter,
       locale: isLocale,
       timeZone: isTimeZone,
       rightPanelCollapsed: boolean,
