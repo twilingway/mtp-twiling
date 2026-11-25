@@ -10,6 +10,9 @@ Scoped asynchronous edits уточнены regression-сценариями бе�
    remount, замены свечей, fit или сброса камеры.
 3. Программная переразметка не сохраняет layout. Завершение старой конфигурации либо disposed owner
    не публикует геометрию и не вызывает repaint.
+4. Сохранённые дробные ratios преобразуются в целочисленные KLine pane bounds с сохранением общей
+   высоты. Установленный Canvas воспроизводит stale paint при fractional bounds даже со здоровыми
+   buffers; целочисленные bounds позволяют обычный repaint без viewport resize/fit.
 
 Installed-method source fixture воспроизводит две ошибки на исходном `f639c19` и проходит после
 исправления. Общая browser приёмка и задачи 2.3/5 остаются ответственностью координатора.

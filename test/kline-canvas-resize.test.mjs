@@ -21,7 +21,7 @@ const helperSource = ts.transpileModule(
   { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }
 ).outputText;
 
-async function fixture({ ratio = 1 } = {}) {
+async function fixture({ ratio = 1, heights = [420, 371] } = {}) {
   const frames = new Map(),
     observers = [],
     styleWrites = [],
@@ -77,10 +77,10 @@ async function fixture({ ratio = 1 } = {}) {
       },
       style: {},
       get clientWidth() {
-        return parseFloat(this.style.width) || 0;
+        return Math.round(parseFloat(this.style.width) || 0);
       },
       get clientHeight() {
-        return parseFloat(this.style.height) || 0;
+        return Math.round(parseFloat(this.style.height) || 0);
       },
       getContext: () => context
     };
@@ -99,7 +99,7 @@ async function fixture({ ratio = 1 } = {}) {
   });
   new vm.Script(nativeCanvas + helperSource).runInContext(context);
   const NativeCanvas = vm.runInContext("Canvas", context);
-  for (const height of [420, 371]) {
+  for (const height of heights) {
     const canvas = new NativeCanvas({}, () => {
       draws++;
       canvas.getElement().ink = true;
@@ -173,6 +173,24 @@ async function fixture({ ratio = 1 } = {}) {
     }
   };
 }
+
+test("installed KLine Canvas cannot repaint unchanged fractional pane bounds despite healthy buffers", async () => {
+  const f = await fixture({ heights: [598.5672, 33.4328] });
+  f.emit();
+  f.settled();
+  assert.deepEqual(
+    f.canvases.map((canvas) => canvas.getElement().height),
+    [599, 33]
+  );
+  const count = f.draws();
+  for (const [index, canvas] of f.canvases.entries()) canvas.update(85, [598.5672, 33.4328][index]);
+  f.emit();
+  f.settled();
+  assert.equal(f.draws(), count, "same CSS size emits no RO and native fractional comparison skips paint");
+  for (const [index, canvas] of f.canvases.entries()) canvas.update(85, [599, 33][index]);
+  f.settled();
+  assert.equal(f.draws(), count + 2, "whole pixel native bounds redraw without resize or camera changes");
+});
 
 test("installed KLine Canvas loses pixel resize during pending redraw; public recovery fixes both panes", async () => {
   const f = await fixture();

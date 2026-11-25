@@ -35,6 +35,32 @@ function assertGeometry(f, keys) {
   assert.ok(f.coherence.every(Boolean), "metrics must not mix new bounds and stale DOM paint");
 }
 
+test("fractional saved ratios produce whole pixel panes with a conserved total and no preference writes", async () => {
+  const f = klineAsyncFixture();
+  const geometry = f.load("charts/kline-pane-geometry.ts").klinePaneGeometry;
+  for (const count of [1, 2, 12, 100]) {
+    const groups = Array.from({ length: count }, (_, index) => ({
+      key: `pane:${index}`,
+      preference: { heightRatio: 0.180123, collapsed: index % 7 === 0 }
+    }));
+    const height = Math.max(821, 188 + 31 * (count + 1));
+    const result = geometry(height, groups, { heightRatio: 0.0529 }, 28);
+    assert.ok(result.every((pane) => Number.isInteger(pane.height)));
+    assert.equal(result.reduce((total, pane) => total + pane.height, 0), height - 28 - count - 1);
+    assert.ok(result[0].height >= 160);
+    assert.ok(result.slice(1).every((pane) => pane.height >= 30));
+  }
+  f.adapter.setData(bars);
+  await f.settle();
+  const layout = [{ paneId: "saved", heightRatio: 0.180123, collapsed: false }];
+  f.adapter.updateTechnicalIndicators([create(f, "saved")], layout);
+  await f.settle();
+  assert.ok(f.adapter.technicalPaneMetrics().every((pane) => Number.isInteger(pane.height)));
+  assert.equal(layout[0].heightRatio, 0.180123);
+  assert.equal(f.changes.length, 0);
+  f.adapter.destroy();
+});
+
 test("installed async KLine createIndicator preserves height when a second RSI joins its pane", async () => {
   const f = klineAsyncFixture();
   f.setTimeHeight(23);
@@ -48,7 +74,8 @@ test("installed async KLine createIndicator preserves height when a second RSI j
   const height = f.adapter.technicalPaneMetrics()[1].height,
     camera = f.camera(),
     writes = f.primaryWrites();
-  assert.equal(height, (f.container.clientHeight - 23 - 1) * 0.4);
+  assert.ok(Math.abs(height - (f.container.clientHeight - 23 - 1) * 0.4) <= 1);
+  assert.ok(f.adapter.technicalPaneMetrics().every((pane) => Number.isInteger(pane.height)));
   f.adapter.updateTechnicalIndicators([one, two], layout);
   await f.settle();
   assert.equal(f.adapter.technicalPaneMetrics()[1].height, height);

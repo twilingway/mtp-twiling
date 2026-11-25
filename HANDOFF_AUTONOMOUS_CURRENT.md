@@ -14,7 +14,7 @@ login отложить. Ответы коротко по-русски. Реал�
 - Исправлен SW: только корень приложения возвращает shell; privacy/лицензии сохраняют свой ответ.
   Проверка обычного обновления старого QA-профиля PASS: настройки сохранены, privacy/лицензии
   online/offline имеют правильные MIME/SHA. Отдельный косметический overflow privacy375px исправлен
-  в source0.3.18. Таймер пока выключен до reviewed finalize apply.
+  в source0.3.18. Таймер включён после reviewed finalize apply; same-SHA no-op проверен.
 - VDS root upgrade 0.3.16→0.3.17: все63 публичных хеша проверены, peak201818112B/OOM0,
   service11.978s, PID0/success. Backup `/root/mtp-upgrade-backup-20261125T214346Z-b721744af1b5`.
 - Лимиты192/240MiB/Swap0 не повышались, соседи сохранены. Первые две preflight попытки остановились
@@ -39,6 +39,11 @@ Worktree `vps/artifacts/technical-indicator-integration-worktree`, ветка
 - `b4689e1`: KLine late async height reset и repaint исправлены по installed-native regressions.
   Общая кандидатная сборка: check620/620, strict spec PASS, build `866106385a4c0bf7`. Повторная
   browser QA обоих движков ещё обязательна; старый frozen98ee212 остаётся FAIL.
+- Candidate `5ea3f3b` / build866106385a4c0bf7 — FAIL на прежнем QA-профиле: KLine price/volume
+  застывают, RSI живой. Установлена точная причина: native fractional heights598.5672/33.4328
+  против integer clientHeight599/33; Canvas.update пропускает redraw, ожидая отсутствующий RO.
+  Исправление целочисленных native bounds сохраняет общий размер и ratios. Check622/622,
+  strict spec35/35, build `65fd586523b0a42e`; новый browser gate ещё требуется.
 
 Сохраняются независимые TA instances, параметры, стили, overlay/lower pane, группировка, порядок,
 высоты/collapse. Есть каталог127 +4MTP, поиск RU/EN; доступно21 вычисление +volume, остальные строки
@@ -64,16 +69,18 @@ TA + provider JSON/Drive preparation/storage migration проверены сов
 
 ## Следующие обязательные шаги
 
-1. Завершить public0.3.17 standard PWA browser gate; reviewed timer-finalize: backup, убрать только
-   pin из собственного release-resources.conf, сохранить лимиты, обновить provenance, enable только
-   mtp-deploy.timer. Никаких старых first-release apply scripts.
+1. Public0.3.17 standard PWA gate и timer-finalize завершены. Backup
+   `/root/mtp-watcher-backup-20261125T220317Z-b721744af1b5`; лимиты сохранены, pin убран,
+   provenance содержит настоящий browser proof. Timer enabled/active. Старые first-release apply
+   scripts не запускать.
 2. Включить подтверждённый KLine fix, полный check/spec и новую QA0.3.18 с21 TA/Bybit/рисунками,
    reload, viewport, сохранением камеры, extreme pane overflow и отсутствием click-through.
 3. До публикации0.3.18 отдельно reviewed обновить только свой nginx CSP include: добавить
    https://api.bybit.com и wss://stream.bybit.com. Pull watcher не имеет root и сам nginx не меняет.
    Обязательно nginx-t/reload/публичные headers/соседи. Не забыть этот gate после local browser
    PASS.
-4. Secret audit всей release history; версия0.3.18 уже в package. Затем PR/CI/main и отдельное
+4. PR5 draft уже открыт (head до fractional fix5ea3f3b, CI45710199951 success). Secret audit всей
+   release history; версия0.3.18 уже в package. Затем PR/CI/main и отдельное
    доказательство публичного SHA/build/health/visible behavior. Не смешивать код/merge/deploy/QA.
 5. Реальный Google Drive login/sync/reload/2device, homepage/privacy/terms и Google Production после
    доступного авторизованного входа. Клиентская архитектура без нашего auth backend сохраняется.

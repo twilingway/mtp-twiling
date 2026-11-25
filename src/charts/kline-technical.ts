@@ -15,7 +15,8 @@ import type {
 import type { ChartOptions, TechnicalPaneMetric } from "./adapter.js";
 import { TechnicalRenderData } from "./technical-render-data.js";
 import type { TechnicalRenderOutput } from "./technical-render-data.js";
-import { capturedTechnicalLayout, technicalPaneGeometry } from "./technical-pane-geometry.js";
+import { capturedTechnicalLayout } from "./technical-pane-geometry.js";
+import { klinePaneGeometry } from "./kline-pane-geometry.js";
 import { attachTechnicalPaneEvents } from "./technical-pane-events.js";
 import { lineColor } from "../model/candle-palette.js";
 
@@ -165,7 +166,7 @@ export function klineTechnical(
     }
     applying = true;
     try {
-      const targets = technicalPaneGeometry(
+      const targets = klinePaneGeometry(
         options.container.clientHeight,
         groups,
         options.indicators.volume ? { heightRatio: legacyRatio() } : null,
@@ -174,7 +175,7 @@ export function klineTechnical(
       for (const target of targets) {
         if (target.key === "price") continue;
         const id = target.key === "legacy:volume" ? "volume_pane" : nativeId(target.key);
-        if (Math.abs(height(id) - target.height) >= 1)
+        if (Math.abs(height(id) - target.height) > 1e-6)
           chart.setPaneOptions({ id, height: target.height, minHeight: 30 });
       }
     } finally {
