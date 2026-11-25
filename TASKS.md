@@ -1,5 +1,36 @@
 # Текущая очередь
 
+НОВЕЕ: browser gate0.3.9/f9d698d518582bc7 FAIL на VOL height persistence: настоящий divider95→215,
+prefs/IDB undefined, reload→95. Legend collapse/expand, favorites+keyboard/mobile, update0.3.8→0.3.9
+PASS. Тест был при empty2m history, поэтому fresh `kline_real_drag_fix` проверяет READY daily и
+actual event/guards перед исправлением. Прежний browser закрыт, originals
+layout/drawings/images/14views exact, +5QAkeys сохранены. Следующий выпуск0.3.10 после fix/QA;
+НЕpush/deploy как готовое. Foundation VDS устанавливается отдельно, timer/build/release disabled.
+
+**Актуально: main HEAD64a9a0f, 0.3.9/f9d698d518582bc7.** Check222/222 и strict spec11/11 PASS;
+независимый calendar review PASS. Публичный GitHub с Issues создан:
+https://github.com/twilingway/mtp-twiling . Origin подключён, master переименован в main; исходники
+пока НЕpush. Полный history secret audit на64a9a0f:15commits/654blobs,0findings.
+
+Текущий gate: fresh `release_039_visual` проверяет exactbuild и владеет QA-профилем; НЕ менять
+source/CSS/build до его first restore/close. Update0.3.8→0.3.9 кнопкой уже PASS без потери
+layout/drawings/images/14 исходных views. Итог визуала ещё не получен.
+
+Влито:13nativeTF и реальные календарные линии, toolbar favorites, RU/EN и IANA зоны/clockfooter,
+сетка+подписи на тех же локальных границах (DWM UTC trading date), МТП над сеткой/под свечами,
+полупрозрачные плашки. KLine VOL теперь создаётся один раз, heightRatio per-owner в IDB/backup;
+legendCollapsed отдельно, chevron+normal-flow legend устраняют mobile OHLC overlap. Все эти
+сохранения ещё требуют текущего browser gate.
+
+CI/CD: код и global public API limiter влиты, Linux11/11 и независимое review PASS. Build cold
+checkout исправлен; package semver+content buildId. `cicd_deploy` устанавливает только foundation
+VDS/pnpm/TLS/unit, без start timer/build/release до root разрешения. VDS1GiB, cgroup240M/320M,
+CPU50%; соседние tmeet/meet не менять. Readiness: `vps/artifacts/cicd-install-readiness.md`.
+
+Далее: закончить QA, push exact main/CI, первый bounded VDS build+public SHA/hash/PWA proof, затем
+timer. Остальная очередь: типы графика native integration, identity/Backup2 + раздельные
+exchange/dealer history caches, Bybit/OKX, Drive UI/OAuth. Старые блоки ниже исторические.
+
 Обновление: 0.3.8/6b325f8c3931d68d, commit 6c5d37a — МТП Lightweight над сеткой и под свечами,
 полупрозрачные плашки заголовка/индикаторов; общий check160/160 и strict spec7/7 PASS. Визуальная
 проверка этих двух изменений ещё впереди. QA0.3.7 завершена, браузер закрыт:

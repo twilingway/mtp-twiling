@@ -5,6 +5,69 @@
 
 ## Актуальный этап — читать первым
 
+**НОВЕЕ: 0.3.9 browser gate FAIL — не выпускать.** `vps/artifacts/release-039-qa/report.json`:
+favorites topbuttons/live stars/reload/mobile/keyboard PASS, legend collapse+expand PASS, штатный
+PWA update PASS. Реальный KLine VOL divider95→215 НЕзаписывает indicatorPaneLayout; после смены
+TF/symbol/reload/hide-show снова95. Тест был после favorite2m/range1 с EMPTY realhistory; вероятен
+historyViewReady/persistView guard, надо подтвердить на READY nonempty daily. Не считать paneId
+причиной без runtime: installed newSeparatorPane id'' точно, фильтр'' уже есть.
+
+Fresh `/root/kline_real_drag_fix` владеет QA profile для диагностики stable64a9/.9f9d698d518582bc7,
+его worktree `D:\MySource\ReactJS\vps\artifacts\kline-real-drag-worktree`; canonical не правит. Root
+НЕrebuild/менять source, пока он не вернёт original restore/close. Старый reviewer profile закрыл,
+restore layout/drawings/images/watchlist и14 originalviews exact,5 extra keys сохранены merge. Далее
+0.3.10 bump и fresh QA после fix. Публикации исходников и CI run пока нет.
+
+`cicd_deploy` foundation partly installed: user/dirs/controller64a9/pnpm10.34.5/unit limits, timer
+disabled+inactive/service inactive; nginx backup `/root/mtp-foundation-backup-20261125T162429Z`,
+новый HTTP ACME vhost nginx-t/reload PASS. Certbot status1 расследует с разрешённым bounded retry;
+TLS/current/repo/build/release ещё нет. Соседние сервисы сохранить. MTP build только после root UI
+QA PASS + main push + green CI. Эти trackers dirty только документация, app hash не менялся;
+сохранить docs, rerun secret-audit.py перед первым public push.
+
+**CURRENT main HEAD64a9a0f007effb51e45baecb15ee790597cafb31, package0.3.9, buildf9d698d518582bc7,
+check222/222 + spec11/11 PASS.** Repo теперь PUBLIC по явному запросу пользователя, Issues включены:
+https://github.com/twilingway/mtp-twiling . Origin HTTPS подключён, локальный
+credential.helper=manager (existing GCM работает), branch master→main. ПОКА НЕpush. Secret audit
+exact64a9:15commits/654blobs/4.4MB, actualTBANK_TOKEN0, patterns/forbiddenpaths0. Скрипт для
+финального повторения: `vps/artifacts/cicd-secret-audit.py` (только счётчики, token только memory).
+
+SOURCE/BUILD FROZEN: fresh `/root/release_039_visual` владеет QA profile и проверяет exact0.3.9, не
+менять source/CSS/build до его restore/close. Artifact `vps/artifacts/release-039-qa`. PWA update
+штатной кнопкой0.3.8→0.3.9 уже PASS, layout/drawings/images и14 исходных views прежние. Проверяет
+favorites toolbar/reload, KLine pane ratio+legend collapsed persistence, mobile nooverlap,
+RU/EN/settings, zones/footer, calendargrid+labels bothengines. Итог gate ещё НЕполучен.
+
+Последние commits:185f8e1 intervals;6868f83 favorites toolbar;1e954ba CI+prepare-version; 1a5fcb1
+merged locale+calendaraxis;dba7b37 KLine pane/legend+.9;864762a globalCIlimiter; c37c0f6
+minute-local-calendar/performance;64a9a0f fractional-zone bucket crossing. Независимый calendar
+review64a9PASS: fixed minuteUTCweight gap, lazyformat/UTCfastpath + bounded8192 parts cache,
+before/current local bucket crosses (2m/10m/30mKathmandu nonzero clocks). FIFO>8192 стресс-limit
+описан, nativeKLine minspace1/LW.5; не выдавать его за обычный desktopP2.
+
+KLine сохранения: IndicatorPaneLayout.volume.heightRatio per-owner, backup validator, native
+VOL/MA/etc initialization once peradapter; OnPaneDrag.paneId фактическиempty, capture MAIN после
+microtask; source/owner/revision/import/retired guards проверяются и после await setPreferences.
+LegendCollapsed отдельный persisted flag, chevroncount, flags не меняет; новый IndicatorLegend в
+normal-flow heading после chart-price исправляет375px OHLCwrap. Controller493nonblank.
+
+CI infra code уже в root, cold checkout build realversionmetadata и reproduciblehash исправлены;
+global300s public API limiter+rate headers+failclosed, Linux11/11. `/root/cicd_deploy` сейчас
+устанавливает ТОЛЬКО foundation VDS80.85.246.160: mtp-deploy user/dirs, perappverifiedpnpm,
+rootownedcontroller64a9, separatemtpTLS/nginx/unit+timerDISABLED. Не startbuild/watch/release до
+root UIQA PASS + exactmainpush/CIgreen. VDS1CPU/RAM956MiBavailable367/noSwap/disk2.4GBfree,
+systemdMemoryHigh240M/Max320M CPU50 Nice10 IOWeight10 Tasks64. Не менять foreignapps/Node/swap.
+Readiness `vps/artifacts/cicd-install-readiness.md`, inventory/secret-audit JSON. Реальногоdeploy
+ЕЩЁНЕТ. Послеfoundationreport/sourceQA: pushmain, точныйgreenCI, boundedfirstdeploy, public
+sourceSHA/buildId/checksums/PWA, затемtimer. Не объявлять pipeline работающим пофайлам.
+
+0.3.8calendar-layers-qa завершён: месячные/daygrid+MTPabovegrid+alpha PASS, найденmobileoverlap
+price/volume (исправленdba7, ждётfreshQA). Original8views/drawings/images/layoutexact,6допQAkeys
+сохраненыmerge, не удаляли. Isolationaudit: worker21 custom_tool_call_output imageitems;
+root0toolimageitems (1userinputimage+1mirror), trafficнеизмерялся. Профильтотworkerзакрыл.
+
+Остальные старые статусы ниже читать как историю, не откатывать свежие commits.
+
 После описанной ниже 0.3.7: root commit 6c5d37a, version0.3.8/build6b325f8c3931d68d, check160/160 и
 spec7/7 PASS. Исправлены МТП Lightweight grid→normal background→candles и полупрозрачность chart
 plates (45%, hover65%, custom background). Визуал этих изменений ещё не проверен. QA0.3.7 закончена,
