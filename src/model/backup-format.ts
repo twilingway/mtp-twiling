@@ -3,6 +3,7 @@ import { isLocale, isTimeZone } from "../i18n/preferences.js";
 import { isDrawingToolbarSettings } from "./drawing-toolbar.js";
 import { isNativeIntervalId } from "./intervals/registry.js";
 import { isIntervalFavorites } from "./intervals/favorites.js";
+import { isIndicatorPaneLayout } from "./indicator-layout.js";
 import type {
   Backup,
   BackupDrawing,
@@ -206,6 +207,7 @@ export function isChartSettings(value: unknown): value is ChartSettings {
       background: color,
       scaleFontSize: numberBetween(1, 100),
       showLegend: boolean,
+      legendCollapsed: boolean,
       priceLine: boolean,
       showCandleCountdown: boolean,
       indicatorOptions: isIndicatorOptions,
@@ -232,6 +234,7 @@ export function isProfilePreferences(value: unknown): value is ProfilePreference
       instrumentUid: nullable((value) => string(value) && value.length > 0 && value.length <= 200),
       timeframe: isTimeframe,
       favoriteIntervals: isIntervalFavorites,
+      indicatorPaneLayout: isIndicatorPaneLayout,
       engine: member(["kline", "tradingview"]),
       rangeDays: numberBetween(1, 3650),
       sidebarWidth: numberBetween(240, 720),

@@ -487,6 +487,65 @@ test("selected UID round-trips through profile storage and backup without replac
   await f.client.close();
 });
 
+test("global pane ratio and collapsed legend round-trip through owner preferences and backup without another owner's state leaking", async () => {
+  const f = await fixture([]);
+  for (const ratio of [0.05, 0.37, 0.8]) {
+    const layout = {
+      symbol: "ONE",
+      indicatorPaneLayout: { volume: { heightRatio: ratio } },
+      chartSettings: { legendCollapsed: true },
+      indicators: { volume: true, ma: true }
+    };
+    await f.storage.savePreferences(f.owner, layout);
+    const backup = await f.storage.createBackup(f.owner);
+    assert.deepEqual(json(backup.layout), layout);
+    await f.storage.importBackup("another-profile", json(backup));
+    assert.deepEqual(json(await f.storage.loadPreferences("another-profile")), layout);
+    await f.storage.savePreferences("another-profile", {
+      ...layout,
+      symbol: "TWO",
+      chartSettings: { legendCollapsed: false }
+    });
+    assert.equal((await f.storage.loadPreferences(f.owner)).chartSettings.legendCollapsed, true);
+    assert.equal(
+      (await f.storage.loadPreferences("another-profile")).indicatorPaneLayout.volume.heightRatio,
+      ratio
+    );
+  }
+  const backup = await f.storage.createBackup(f.owner);
+  await f.storage.importBackup("another-profile", { ...json(backup), layout: { symbol: "ONE" } });
+  const legacy = await f.storage.loadPreferences("another-profile");
+  assert.equal(legacy.indicatorPaneLayout, undefined);
+  assert.equal(legacy.chartSettings, undefined);
+  await f.client.close();
+});
+test("invalid pane layouts and collapse flags are rejected before backup writes", async () => {
+  const f = await fixture([]),
+    backup = await f.storage.createBackup(f.owner);
+  await f.storage.savePreferences("another-profile", {
+    indicatorPaneLayout: { volume: { heightRatio: 0.3 } },
+    chartSettings: { legendCollapsed: true }
+  });
+  for (const layout of [
+    ...[0, 0.049, 0.801, -1, ".3", null, NaN, Infinity].map((heightRatio) => ({
+      indicatorPaneLayout: { volume: { heightRatio } }
+    })),
+    ...["false", 0, null].map((legendCollapsed) => ({ chartSettings: { legendCollapsed } }))
+  ]) {
+    const writes = f.database.calls.filter((call) => call.operation === "transaction").length;
+    await assert.rejects(f.storage.importBackup("another-profile", { ...backup, layout }));
+    assert.equal(
+      f.database.calls.filter((call) => call.operation === "transaction").length,
+      writes
+    );
+    assert.equal(
+      (await f.storage.loadPreferences("another-profile")).indicatorPaneLayout.volume.heightRatio,
+      0.3
+    );
+  }
+  await f.client.close();
+});
+
 test("invalid sidebar widths are rejected before import writes and older backups remain valid", async () => {
   const f = await fixture([]);
   const backup = await f.storage.createBackup(f.owner);

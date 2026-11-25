@@ -4,6 +4,7 @@ import type {
   ChartView,
   DrawingPoint,
   IndicatorFlags,
+  IndicatorPaneLayout,
   MarketRow,
   PixelPoint,
   Timeframe
@@ -31,6 +32,8 @@ export interface ChartAdapter {
   destroy(): void;
 }
 export interface ChartOptions extends DisplayPreferences {
+  indicatorPaneLayout?: IndicatorPaneLayout | undefined;
+  onIndicatorLayout?: ((layout: IndicatorPaneLayout) => void) | undefined;
   container: HTMLDivElement;
   row: MarketRow;
   timeframe: Timeframe;

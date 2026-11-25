@@ -8,6 +8,7 @@ import type {
   ImageAsset,
   IndicatorFlags,
   IndicatorKey,
+  IndicatorPaneLayout,
   MarketRow,
   Timeframe
 } from "../../model/types.js";
@@ -50,6 +51,7 @@ export const INDICATOR_NAMES: Record<IndicatorKey, string> = {
 };
 export const PERIOD_LABELS: Record<Timeframe, string> = NATIVE_PERIOD_LABELS;
 export interface TerminalPreferences extends DisplayPreferences {
+  indicatorPaneLayout?: IndicatorPaneLayout;
   favoriteIntervals?: IntervalId[];
   rightPanelCollapsed?: boolean;
   rightPanelTab?: "watchlist" | "objects";

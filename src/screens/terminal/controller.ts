@@ -238,7 +238,8 @@ export class TerminalController {
   };
   setPreferences = async (
     patch: Partial<TerminalPreferences>,
-    forceReload = false
+    forceReload = false,
+    valid: () => boolean = () => true
   ): Promise<void> => {
     const routing =
       forceReload ||
@@ -251,7 +252,8 @@ export class TerminalController {
     if (
       !this.session.matches(client) ||
       owner !== this.state.owner ||
-      (routing && epoch !== this.selectionEpoch)
+      (routing && epoch !== this.selectionEpoch) ||
+      !valid()
     )
       return;
     const previous = this.state.preferences,

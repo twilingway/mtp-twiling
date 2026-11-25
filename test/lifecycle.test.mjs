@@ -97,7 +97,12 @@ test("native timeframe changes preserve history lookback, instrument UID and fav
   t.after(() => controller.dispose());
   await controller.start();
   await controller.login(`t.${"b".repeat(40)}`, "B", false);
-  await controller.setPreferences({ rangeDays: 180, favoriteIntervals: ["1m", "1M"] });
+  await controller.setPreferences({
+    rangeDays: 180,
+    favoriteIntervals: ["1m", "1M"],
+    indicatorPaneLayout: { volume: { heightRatio: 0.35 } },
+    chartSettings: { ...controller.getSnapshot().preferences.chartSettings, legendCollapsed: true }
+  });
   const uid = controller.getSnapshot().preferences.instrumentUid;
   const ids = modules.load("model/intervals/native-timeframes.ts").NATIVE_TIMEFRAMES;
   for (const timeframe of ids) {
@@ -105,6 +110,8 @@ test("native timeframe changes preserve history lookback, instrument UID and fav
     const state = controller.getSnapshot();
     assert.equal(state.preferences.timeframe, timeframe);
     assert.equal(state.preferences.rangeDays, 180);
+    assert.equal(state.preferences.indicatorPaneLayout.volume.heightRatio, 0.35);
+    assert.equal(state.preferences.chartSettings.legendCollapsed, true);
     assert.equal(state.preferences.instrumentUid, uid);
     assert.deepEqual([...state.preferences.favoriteIntervals], ["1m", "1M"]);
   }
@@ -142,6 +149,74 @@ test("latest asynchronous symbol selection wins and concurrent sidebar width doe
   await newest;
   assert.equal(controller.getSnapshot().preferences.symbol, "SBER");
   assert.equal(controller.getSnapshot().preferences.sidebarWidth, 400);
+});
+
+test("indicator preference writes revalidate after await when the same owner imports, revision changes, adapter retires or owner changes", async (t) => {
+  for (const mode of ["import", "revision", "retired", "owner"]) {
+    const { controller, modules } = terminalFixture();
+    t.after(() => controller.dispose());
+    await controller.start();
+    await controller.login(`t.${"b".repeat(40)}`, "B", false);
+    const pending = deferred(),
+      entered = deferred(),
+      initial = controller.getSnapshot();
+    const adapter = { retired: false };
+    controller.chart = adapter;
+    controller.saveView = () => {
+      entered.resolve();
+      return pending.promise;
+    };
+    const valid = () => {
+      const state = controller.getSnapshot();
+      return (
+        state.owner === initial.owner &&
+        state.chartRevision === initial.chartRevision &&
+        !state.importingBackup &&
+        !state.backupBusy &&
+        !state.importRecoveryRequired &&
+        !adapter.retired
+      );
+    };
+    const save = modules.load(
+      "screens/terminal/indicator-preferences.ts"
+    ).persistIndicatorPaneLayout;
+    const writing = save(controller, { volume: { heightRatio: 0.6 } }, valid);
+    await entered.promise;
+    if (mode === "import") controller.update({ importingBackup: true, backupBusy: true });
+    if (mode === "revision") controller.update({ chartRevision: initial.chartRevision + 1 });
+    if (mode === "retired") adapter.retired = true;
+    if (mode === "owner") controller.update({ owner: "another-owner" });
+    pending.resolve();
+    await writing;
+    assert.equal(controller.getSnapshot().preferences.indicatorPaneLayout, undefined, mode);
+    controller.chart = null;
+  }
+});
+test("delayed legend collapse cannot overwrite newer chart settings or imported settings", async (t) => {
+  const { controller, modules } = terminalFixture();
+  t.after(() => controller.dispose());
+  await controller.start();
+  await controller.login(`t.${"b".repeat(40)}`, "B", false);
+  const pending = deferred(),
+    entered = deferred();
+  controller.saveView = () => {
+    entered.resolve();
+    return pending.promise;
+  };
+  const save = modules.load("screens/terminal/indicator-preferences.ts").persistLegendCollapsed;
+  const writing = save(controller, true);
+  await entered.promise;
+  const current = controller.getSnapshot();
+  controller.update({
+    preferences: {
+      ...current.preferences,
+      chartSettings: { ...current.preferences.chartSettings, upColor: "#123456" }
+    }
+  });
+  pending.resolve();
+  await writing;
+  assert.equal(controller.getSnapshot().preferences.chartSettings.upColor, "#123456");
+  assert.equal(controller.getSnapshot().preferences.chartSettings.legendCollapsed, undefined);
 });
 
 test("saveView rejects an adapter from another route, owner, or replaced UID before capturing it", async (t) => {

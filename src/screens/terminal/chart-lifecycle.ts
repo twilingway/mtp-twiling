@@ -10,6 +10,7 @@ import { viewKey } from "./controller-bridge.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { chartRenderConfigFromKey, chartRenderConfigKey } from "../../charts/render-config.js";
 import type { TerminalState } from "./state.js";
+import { persistIndicatorPaneLayout } from "./indicator-preferences.js";
 
 export function useChartCanvas(
   ref: RefObject<HTMLDivElement | null>,
@@ -30,6 +31,7 @@ export function useChartCanvas(
       key = `${p.symbol}:${p.timeframe}:${p.engine}:${p.rangeDays}`;
     if (!container || !uid || !state.authenticated || state.importRecoveryRequired) return;
     let cancelled = false,
+      layoutWrite = 0,
       owned: ChartAdapter | null = null;
     const matches = () => {
       const current = controller.getSnapshot();
@@ -56,6 +58,31 @@ export function useChartCanvas(
         rangeDays: p.rangeDays,
         indicators: renderConfig.indicators,
         settings: renderConfig.settings,
+        indicatorPaneLayout: snapshot.preferences.indicatorPaneLayout,
+        onIndicatorLayout: (layout) => {
+          const write = ++layoutWrite;
+          const valid = () => {
+            const current = controller.getSnapshot();
+            return (
+              matches() &&
+              write === layoutWrite &&
+              owned !== null &&
+              controller.chart === owned &&
+              !owned.retired &&
+              owned.persistView !== false &&
+              current.historyViewReady !== false &&
+              !current.backupBusy &&
+              !current.importingBackup &&
+              !current.importRecoveryRequired
+            );
+          };
+          void persistIndicatorPaneLayout(controller, layout, valid).catch((error: unknown) => {
+            if (valid())
+              controller.notify(
+                error instanceof Error ? error.message : "Не удалось сохранить высоту панели."
+              );
+          });
+        },
         onNearStart: () => {
           if (matches()) controller.scheduleOlderHistory();
         },

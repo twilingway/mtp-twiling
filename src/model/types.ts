@@ -180,6 +180,7 @@ export interface DrawingTemplate {
   visibility?: DrawingVisibility;
 }
 export interface ChartSettings {
+  legendCollapsed?: boolean;
   theme?: "dark" | "light";
   drawingTools?: DrawingToolbarSettings;
   removedIndicators?: IndicatorKey[];
@@ -202,7 +203,11 @@ export interface ChartSettings {
   indicatorOptions?: IndicatorOptions;
   drawingTemplates?: Record<string, DrawingTemplate>;
 }
+export interface IndicatorPaneLayout {
+  volume?: { heightRatio: number };
+}
 export interface ProfilePreferences extends DisplayPreferences {
+  indicatorPaneLayout?: IndicatorPaneLayout;
   favoriteIntervals?: IntervalId[];
   rightPanelCollapsed?: boolean;
   rightPanelTab?: "watchlist" | "objects";

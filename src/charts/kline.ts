@@ -2,7 +2,6 @@ import {
   ActionType,
   DomPosition,
   IndicatorSeries,
-  LineType,
   TooltipShowRule,
   dispose,
   init,
@@ -14,7 +13,6 @@ import { TIMEFRAMES } from "../model/history-codec.js";
 import type { Candle, ChartView, DrawingPoint } from "../model/types.js";
 import { logicalForTime, precision, timeForLogical } from "./adapter.js";
 import type { ChartAdapter, ChartOptions } from "./adapter.js";
-import { lineColor } from "../model/candle-palette.js";
 import { beginKlinePan, freezeKlinePriceScale, resetKlinePriceScale } from "./kline-price-scale.js";
 import { focusRange } from "./navigation.js";
 import { PendingChartView, signedRightOffset } from "./view-camera.js";
@@ -26,6 +24,8 @@ import { klineDateFormatter } from "../i18n/chart-formatters.js";
 import { intlLocale } from "../i18n/preferences.js";
 import { resolveTimeZone } from "../i18n/timezones.js";
 import { calendarAxisDisplay } from "../i18n/calendar-axis.js";
+import { initializeKlineIndicators } from "./kline-indicators.js";
+import { attachVolumePaneLayout } from "./kline-pane-layout.js";
 
 export function makeKline(options: ChartOptions): ChartAdapter {
   const { container, settings, timeframe, indicators } = options;
@@ -167,6 +167,11 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     timeframe,
     calendarAxisDisplay(timeframe, options)
   );
+  const volumeLayout = attachVolumePaneLayout(chart, {
+    enabled: indicators.volume,
+    layout: options.indicatorPaneLayout,
+    onChange: options.onIndicatorLayout
+  });
   chart.setPriceVolumePrecision(precision(options.row), 0);
   const front = document.createElement("canvas");
   front.className = "foreground-canvas";
@@ -217,6 +222,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       chart.setStyles({ yAxis: { size: axisWidth } });
     }
     chart.resize();
+    volumeLayout.apply();
     flushView();
     paintFront();
   });
@@ -264,71 +270,14 @@ export function makeKline(options: ChartOptions): ChartAdapter {
         : -1;
     options.onCrosshair(data[index] ?? null);
   });
+  initializeKlineIndicators(chart, options, volumeLayout.height());
+  volumeLayout.apply();
   return {
     setData(next, fit) {
       dataReady = false;
       data = next;
       model.reset(data, activeMtpPeriods(indicators));
       chart.applyNewData(data);
-      for (const name of ["MA", "EMA", "VOL", "MTP_PERSONAL", "DRAWINGS_PERSONAL"])
-        chart.removeIndicator(name === "VOL" ? "volume_pane" : "candle_pane", name);
-      if (indicators.ma)
-        chart.createIndicator(
-          {
-            name: "MA",
-            calcParams: [20],
-            zLevel: -1,
-            styles: {
-              lines: [
-                {
-                  color: lineColor(
-                    settings.indicatorOptions?.ma?.color ?? "#ddad56",
-                    settings.indicatorOptions?.ma?.opacity
-                  ),
-                  size: settings.indicatorOptions?.ma?.width ?? 1,
-                  style: LineType.Solid,
-                  dashedValue: [],
-                  smooth: false
-                }
-              ]
-            }
-          },
-          true,
-          { id: "candle_pane" }
-        );
-      if (indicators.ema)
-        chart.createIndicator(
-          {
-            name: "EMA",
-            calcParams: [50],
-            zLevel: -1,
-            styles: {
-              lines: [
-                {
-                  color: lineColor(
-                    settings.indicatorOptions?.ema?.color ?? "#7b8fff",
-                    settings.indicatorOptions?.ema?.opacity
-                  ),
-                  size: settings.indicatorOptions?.ema?.width ?? 1,
-                  style: LineType.Solid,
-                  dashedValue: [],
-                  smooth: false
-                }
-              ]
-            }
-          },
-          true,
-          { id: "candle_pane" }
-        );
-      if (indicators.volume)
-        chart.createIndicator("VOL", false, {
-          id: "volume_pane",
-          height: 95,
-          dragEnabled: !drawingToolbarSettings(settings).indicatorsLocked
-        });
-      if (activeMtpPeriods(indicators).length)
-        chart.createIndicator("MTP_PERSONAL", true, { id: "candle_pane" });
-      chart.createIndicator("DRAWINGS_PERSONAL", true, { id: "candle_pane" });
       if (fit) {
         const count = data.filter(
           (bar) => bar.timestamp >= Date.now() - options.rangeDays * 86400000
@@ -423,6 +372,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       paintFront();
     },
     destroy() {
+      volumeLayout.dispose();
       detachCalendarXAxis();
       resize.disconnect();
       front.remove();

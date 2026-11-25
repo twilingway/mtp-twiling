@@ -1,0 +1,42 @@
+/* Keep the legend after the actual wrapping OHLC/price height, including on mobile. */
+.chart-heading .indicator-legend {
+  position: static;
+  top: auto;
+  left: auto;
+  width: max-content;
+  max-width: 100%;
+  margin-top: 6px;
+  pointer-events: auto;
+}
+.chart-heading .indicator-legend[hidden],
+.indicator-legend-list[hidden] {
+  display: none;
+}
+.indicator-legend .legend-collapse {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 30px;
+  min-height: 25px;
+  margin-top: 3px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--chart-text, var(--text, #d1d4dc));
+  background: color-mix(in srgb, var(--chart-background, var(--surface, #131722)) 45%, transparent);
+  pointer-events: auto;
+  font-size: 12px;
+}
+.indicator-legend .legend-collapse:hover:not(:disabled) {
+  background: var(--surface-hover, #2a2e39);
+}
+.indicator-legend .legend-collapse:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+@media (pointer: coarse) {
+  .indicator-legend .legend-collapse {
+    min-height: 36px;
+    min-width: 36px;
+  }
+}

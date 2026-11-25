@@ -37,7 +37,8 @@ function sourceModules(overrides) {
 test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings redraws it and native appearance still updates", async () => {
   const cells = [],
     adapters = [],
-    paints = [];
+    paints = [],
+    layoutWrites = [];
   let cursor = 0,
     effects = [],
     destroyed = 0,
@@ -93,6 +94,12 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
   const controller = {
     chart: null,
     getSnapshot: () => state,
+    setPreferences: async (patch, _reload, valid) => {
+      await Promise.resolve();
+      if (valid && !valid()) return;
+      layoutWrites.push(patch);
+      state = { ...state, preferences: { ...state.preferences, ...patch } };
+    },
     scheduleOlderHistory() {
       nearStarts++;
     },
@@ -184,6 +191,26 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
   await render();
   const original = controller.chart,
     canvas = original.canvas;
+  original.options.onIndicatorLayout({ volume: { heightRatio: 0.33 } });
+  await new Promise(setImmediate);
+  await render();
+  assert.equal(layoutWrites.length, 1);
+  assert.equal(state.preferences.indicatorPaneLayout.volume.heightRatio, 0.33);
+  assert.equal(controller.chart, original, "pane layout cannot remount the native chart");
+  for (const flag of ["backupBusy", "importingBackup", "importRecoveryRequired"]) {
+    const previous = state[flag];
+    state = { ...state, [flag]: true };
+    original.options.onIndicatorLayout({ volume: { heightRatio: 0.7 } });
+    state = { ...state, [flag]: previous };
+  }
+  original.retired = true;
+  original.options.onIndicatorLayout({ volume: { heightRatio: 0.7 } });
+  original.retired = false;
+  original.persistView = false;
+  original.options.onIndicatorLayout({ volume: { heightRatio: 0.7 } });
+  original.persistView = true;
+  await new Promise(setImmediate);
+  assert.equal(layoutWrites.length, 1);
   for (let i = 0; i < 5; i++) {
     await tools({ lastTools: { lines: i % 2 ? "segment" : "rayLine" } });
     await tools({
@@ -206,6 +233,7 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
       chartSettings: {
         ...state.preferences.chartSettings,
         showLegend: false,
+        legendCollapsed: true,
         showCandleCountdown: false,
         drawingTemplates: { default: { settings: { color: "#ff0000" } } }
       }
@@ -233,6 +261,7 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
   };
   await render();
   assert.equal(adapters.length, 2);
+  assert.equal(adapters.at(-1).options.indicatorPaneLayout.volume.heightRatio, 0.33);
   assert.equal(adapters.at(-1).options.settings.upColor, "#123456");
   state = {
     ...state,
@@ -267,6 +296,8 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
   };
   outgoing.options.onNearStart();
   outgoing.options.onCrosshair(candles[0]);
+  outgoing.options.onIndicatorLayout({ volume: { heightRatio: 0.7 } });
+  assert.equal(layoutWrites.length, 1, "old-revision drag callbacks cannot write after import");
   outgoing.options.paint({}, 800, 500, () => null, "back");
   assert.equal(nearStarts, 0);
   assert.equal(crosshairs, 0);

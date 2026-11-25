@@ -1,4 +1,7 @@
 export const intervalMessages = {
+  "Показать названия индикаторов": "Show indicator names",
+  "Свернуть названия индикаторов": "Collapse indicator names",
+  "Не удалось сохранить список индикаторов.": "Could not save the indicator list.",
   "Интервал свечей": "Chart interval",
   "Избранные интервалы свечей": "Favorite chart intervals",
   Избранное: "Favorites",

@@ -1,17 +1,15 @@
 import { t, systemText } from "../../i18n/messages.js";
 import { memo } from "react";
-import type { IndicatorKey } from "../../model/types.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
-import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { precision } from "../../charts/adapter.js";
 import { useTerminal } from "./context.js";
-import { INDICATOR_NAMES, PERIOD_LABELS, number, signClass } from "./state.js";
+import { PERIOD_LABELS, number, signClass } from "./state.js";
 import { InstrumentIcon } from "./Watchlist.js";
 import { ChartCanvas, ChartGestures } from "./ChartSurface.js";
 import { ImageLayer } from "./ImageLayer.js";
 import { DrawingAxisLabels } from "./DrawingAxisLabels.js";
 import { CandleCountdown } from "./CandleCountdown.js";
-import { VisibilityIcon } from "./VisibilityIcon.js";
+import { IndicatorLegend } from "./IndicatorLegend.js";
 import { OhlcLegend } from "./OhlcLegend.js";
 import { ChartRangeControl } from "./intervals/ChartRangeControl.js";
 const Version = memo(function Version() {
@@ -21,62 +19,6 @@ const Version = memo(function Version() {
     </span>
   );
 });
-function IndicatorLegend() {
-  const { controller, state } = useTerminal(),
-    p = state.preferences;
-  return (
-    <div
-      id="indicator-legend"
-      className="indicator-legend"
-      aria-label={t("Индикаторы графика")}
-      hidden={p.chartSettings.showLegend === false}
-    >
-      {(Object.entries(INDICATOR_NAMES) as [IndicatorKey, string][])
-        .filter(
-          ([key]) =>
-            !p.chartSettings.removedIndicators?.includes(key) &&
-            (key.startsWith("mtp") ||
-              key === "volume" ||
-              p.indicators[key] ||
-              p.chartSettings.indicatorOptions?.[key])
-        )
-        .map(([key, name]) => (
-          <div
-            key={key}
-            className={`legend-row ${p.indicators[key] && !drawingToolbarSettings(p.chartSettings).indicatorsHidden ? "" : "legend-hidden"}`}
-            onContextMenu={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              controller.setContext({
-                x: e.clientX,
-                y: e.clientY,
-                target: { kind: "indicator", key }
-              });
-            }}
-          >
-            <button
-              data-legend-indicator={key}
-              onClick={() => {
-                void controller.toggleIndicator(key);
-              }}
-              title={t(p.indicators[key] ? "Скрыть" : "Показать") + " " + t(name)}
-            >
-              {t(name)}
-            </button>
-            <button
-              data-legend-indicator={key}
-              onClick={() => {
-                void controller.toggleIndicator(key);
-              }}
-              aria-label={t(p.indicators[key] ? "Скрыть" : "Показать") + " " + t(name)}
-            >
-              <VisibilityIcon hidden={!p.indicators[key]} />
-            </button>
-          </div>
-        ))}
-    </div>
-  );
-}
 export function ChartPanel() {
   const { controller, state } = useTerminal(),
     p = state.preferences,
@@ -116,10 +58,10 @@ export function ChartPanel() {
               : t("Подключите личный API-ключ")}
           </span>
         </div>
+        <IndicatorLegend />
       </div>
       <ChartGestures>
         <ChartCanvas />
-        <IndicatorLegend />
         <ImageLayer />
         <DrawingAxisLabels />
         <CandleCountdown />
