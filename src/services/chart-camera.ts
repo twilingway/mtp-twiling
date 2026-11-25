@@ -1,13 +1,14 @@
 import type { ChartView, ChartCamera } from "../model/types.js";
+import type { ChartAdapter } from "../charts/adapter.js";
 import { chooseChartView, isChartCamera, parseChartViewKey } from "../charts/view-camera.js";
-import { get, put } from "./storage-db.js";
+import { all, get, put, transaction } from "./storage-db.js";
 import { loadView, saveView } from "./storage.js";
 
 interface SharedView {
   symbol: string;
   camera: ChartCamera;
 }
-const memory = new Map<string, SharedView>();
+const memory = new Map<string, SharedView & { owner: string }>();
 function scope(owner: string, source: { engine: string; timeframe: string }): string {
   return `chart-camera:${owner}:${source.engine}:${source.timeframe}`;
 }
@@ -17,7 +18,7 @@ export async function saveChartView(owner: string, key: string, view: ChartView)
   const { symbol } = source;
   const shared = isChartCamera(view.camera) ? { symbol, camera: view.camera } : undefined;
   const id = scope(owner, source);
-  if (shared) memory.set(id, shared);
+  if (shared) memory.set(id, { ...shared, owner });
   await Promise.all([
     saveView(owner, key, view),
     ...(shared ? [put("preferences", { id, owner, value: shared })] : [])
@@ -39,9 +40,38 @@ export async function loadChartView(owner: string, key: string): Promise<ChartVi
       "camera" in value &&
       isChartCamera(value.camera)
     ) {
-      shared = { symbol: value.symbol, camera: value.camera };
+      shared = { symbol: value.symbol, camera: value.camera, owner };
       memory.set(id, shared);
     }
   }
   return chooseChartView(source.symbol, saved, shared);
+}
+
+export async function saveAdapterView(
+  chart: ChartAdapter | null,
+  owner: string,
+  key: string
+): Promise<void> {
+  if (!chart || chart.persistView === false || owner === "guest") return;
+  const view = chart.getView();
+  if (view) await saveChartView(owner, key, view);
+}
+
+/** A backup's per-symbol views take precedence over outgoing live shared-camera state. */
+export async function resetSharedChartCamera(owner: string): Promise<void> {
+  const records = await all("preferences");
+  const ids = records.flatMap((record) => {
+    if (!record || typeof record !== "object" || !("id" in record) || !("owner" in record))
+      return [];
+    return record.owner === owner &&
+      typeof record.id === "string" &&
+      record.id.startsWith("chart-camera:")
+      ? [record.id]
+      : [];
+  });
+  if (ids.length)
+    await transaction(["preferences"], (tx) => {
+      for (const id of ids) tx.objectStore("preferences").delete(id);
+    });
+  for (const [key, view] of memory) if (view.owner === owner) memory.delete(key);
 }

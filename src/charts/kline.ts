@@ -18,12 +18,21 @@ import { lineColor } from "../model/candle-palette.js";
 import { beginKlinePan, freezeKlinePriceScale, resetKlinePriceScale } from "./kline-price-scale.js";
 import { focusRange } from "./navigation.js";
 import { PendingChartView, signedRightOffset } from "./view-camera.js";
+import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
+import { stablePriceAxisWidth } from "./price-axis-layout.js";
+import { chartPalette } from "../model/theme.js";
 
 export function makeKline(options: ChartOptions): ChartAdapter {
   const { container, settings, timeframe, indicators } = options;
   let data: Candle[] = [],
     dataReady = false;
   const pendingView = new PendingChartView();
+  let axisWidth = stablePriceAxisWidth(
+    options.row,
+    settings.scaleFontSize ?? 11,
+    container.clientWidth
+  );
+  const palette = chartPalette(settings);
   const model = new MtpModel();
   if (settings.indicatorOptions) model.styles = settings.indicatorOptions;
   registerIndicator({
@@ -78,10 +87,21 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     locale: "ru-RU",
     timezone: "Europe/Moscow",
     styles: {
+      crosshair: {
+        show: drawingToolbarSettings(settings).cursor === "crosshair",
+        horizontal: {
+          line: { color: palette.crosshair },
+          text: { color: palette.labelText, backgroundColor: palette.labelBackground }
+        },
+        vertical: {
+          line: { color: palette.crosshair },
+          text: { color: palette.labelText, backgroundColor: palette.labelBackground }
+        }
+      },
       grid: {
         show: settings.grid !== false,
-        horizontal: { color: "#2a2e39" },
-        vertical: { color: "#2a2e39" }
+        horizontal: { color: palette.grid },
+        vertical: { color: palette.grid }
       },
       indicator: { tooltip: { showRule: TooltipShowRule.None } },
       candle: {
@@ -121,14 +141,17 @@ export function makeKline(options: ChartOptions): ChartAdapter {
         }
       },
       xAxis: {
-        axisLine: { color: "#2a2e39" },
-        tickText: { color: "#9598a1", size: settings.scaleFontSize ?? 11 }
+        axisLine: { color: palette.border },
+        tickLine: { color: palette.border },
+        tickText: { color: palette.muted, size: settings.scaleFontSize ?? 11 }
       },
       yAxis: {
-        axisLine: { color: "#2a2e39" },
-        tickText: { color: "#9598a1", size: settings.scaleFontSize ?? 11 }
+        size: axisWidth,
+        axisLine: { color: palette.border },
+        tickLine: { color: palette.border },
+        tickText: { color: palette.muted, size: settings.scaleFontSize ?? 11 }
       },
-      separator: { color: "#2a2e39" }
+      separator: { color: palette.border, fill: true, activeBackgroundColor: palette.grid }
     }
   });
   if (!chart) throw new Error("Не удалось создать KLineChart.");
@@ -172,6 +195,15 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     options.paint(ctx, size.width, size.height, pointToPixel, "front");
   }
   const resize = new ResizeObserver(() => {
+    const width = stablePriceAxisWidth(
+      options.row,
+      settings.scaleFontSize ?? 11,
+      container.clientWidth
+    );
+    if (width !== axisWidth) {
+      axisWidth = width;
+      chart.setStyles({ yAxis: { size: axisWidth } });
+    }
     chart.resize();
     flushView();
     paintFront();
@@ -276,7 +308,12 @@ export function makeKline(options: ChartOptions): ChartAdapter {
           true,
           { id: "candle_pane" }
         );
-      if (indicators.volume) chart.createIndicator("VOL", false, { id: "volume_pane", height: 95 });
+      if (indicators.volume)
+        chart.createIndicator("VOL", false, {
+          id: "volume_pane",
+          height: 95,
+          dragEnabled: !drawingToolbarSettings(settings).indicatorsLocked
+        });
       if (activeMtpPeriods(indicators).length)
         chart.createIndicator("MTP_PERSONAL", true, { id: "candle_pane" });
       chart.createIndicator("DRAWINGS_PERSONAL", true, { id: "candle_pane" });

@@ -1,3 +1,5 @@
+import type { DrawingToolbarSettings } from "./drawing-toolbar.js";
+
 export type Timeframe = "1m" | "5m" | "15m" | "30m" | "1h" | "1d" | "1w";
 export interface Candle {
   timestamp: number;
@@ -176,6 +178,9 @@ export interface DrawingTemplate {
   visibility?: DrawingVisibility;
 }
 export interface ChartSettings {
+  theme?: "dark" | "light";
+  drawingTools?: DrawingToolbarSettings;
+  removedIndicators?: IndicatorKey[];
   showCandleCountdown?: boolean;
   bodyVisible?: boolean;
   wickUpColor?: string;
@@ -196,6 +201,8 @@ export interface ChartSettings {
   drawingTemplates?: Record<string, DrawingTemplate>;
 }
 export interface ProfilePreferences {
+  rightPanelCollapsed?: boolean;
+  rightPanelTab?: "watchlist" | "objects";
   sidebarWidth?: number;
   symbol?: string;
   instrumentUid?: string | null;

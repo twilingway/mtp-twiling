@@ -22,6 +22,8 @@ export interface SessionBridge extends TerminalBridge {
   flush: () => Promise<void>;
 }
 export const defaultPreferences = (): TerminalPreferences => ({
+  rightPanelCollapsed: false,
+  rightPanelTab: "watchlist",
   symbol: "GAZP",
   timeframe: "1d",
   engine: "tradingview",

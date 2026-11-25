@@ -98,13 +98,7 @@ export function ObjectTree() {
           data-object-action="delete"
           title={"blob" in item ? "Удалить изображение" : "Удалить рисунок"}
           aria-label={"blob" in item ? "Удалить изображение" : "Удалить рисунок"}
-          onClick={() =>
-            run(
-              "blob" in item
-                ? controller.deleteImage(item.id)
-                : controller.setDrawings(state.drawings.filter((drawing) => drawing.id !== item.id))
-            )
-          }
+          onClick={() => run(controller.tools.deleteObject(item.id))}
         >
           <DeleteIcon />
         </button>
@@ -124,25 +118,27 @@ export function ObjectTree() {
         <strong className="object-instrument">
           {state.preferences.symbol} · {PERIOD_LABELS[state.preferences.timeframe]}
         </strong>
-        {(Object.keys(INDICATOR_NAMES) as IndicatorKey[]).map((key) => (
-          <div
-            key={key}
-            className={`object-row ${state.preferences.indicators[key] ? "" : "object-hidden"}`}
-            onContextMenu={(event) => context(event, { kind: "indicator", key })}
-          >
-            <span>∿</span>
-            <button onClick={() => controller.editIndicator(key)}>{INDICATOR_NAMES[key]}</button>
-            <button
-              title={state.preferences.indicators[key] ? "Скрыть" : "Показать"}
-              onClick={() => run(controller.toggleIndicator(key))}
+        {(Object.keys(INDICATOR_NAMES) as IndicatorKey[])
+          .filter((key) => !state.preferences.chartSettings.removedIndicators?.includes(key))
+          .map((key) => (
+            <div
+              key={key}
+              className={`object-row ${state.preferences.indicators[key] ? "" : "object-hidden"}`}
+              onContextMenu={(event) => context(event, { kind: "indicator", key })}
             >
-              <VisibilityIcon hidden={!state.preferences.indicators[key]} />
-            </button>
-            <button title="Настройки индикатора" onClick={() => controller.editIndicator(key)}>
-              ⚙
-            </button>
-          </div>
-        ))}
+              <span>∿</span>
+              <button onClick={() => controller.editIndicator(key)}>{INDICATOR_NAMES[key]}</button>
+              <button
+                title={state.preferences.indicators[key] ? "Скрыть" : "Показать"}
+                onClick={() => run(controller.toggleIndicator(key))}
+              >
+                <VisibilityIcon hidden={!state.preferences.indicators[key]} />
+              </button>
+              <button title="Настройки индикатора" onClick={() => controller.editIndicator(key)}>
+                ⚙
+              </button>
+            </div>
+          ))}
         {[...state.drawings].reverse().map((drawing) => (
           <div
             key={drawing.id}

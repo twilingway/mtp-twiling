@@ -21,11 +21,16 @@ import { PERIOD_LABELS } from "./state.js";
 import { TerminalHistory } from "./controller-history.js";
 import { TerminalSession } from "./controller-session.js";
 import { TerminalEditing } from "./controller-editing.js";
+import { TerminalDrawingTools } from "./controller-drawing-tools.js";
+import { TerminalPanel } from "./controller-panel.js";
+import { importTerminalBackup } from "./controller-import.js";
+import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { defaultPreferences } from "./controller-bridge.js";
 import type { ContextMenu, TerminalDialog, TerminalPreferences, TerminalState } from "./state.js";
 
 export class TerminalController {
   private state: TerminalState = {
+    chartRevision: 0,
     ready: false,
     owner: "guest",
     name: "",
@@ -57,6 +62,8 @@ export class TerminalController {
   private readonly session: TerminalSession;
   private selectionEpoch = 0;
   readonly editing: TerminalEditing;
+  readonly tools: TerminalDrawingTools;
+  readonly panel: TerminalPanel;
   constructor() {
     const bridge = {
       getState: () => this.state,
@@ -65,6 +72,8 @@ export class TerminalController {
       notify: (message: string) => this.notify(message)
     };
     this.editing = new TerminalEditing(bridge);
+    this.tools = new TerminalDrawingTools(this);
+    this.panel = new TerminalPanel(this);
     this.history = new TerminalHistory({
       ...bridge,
       getClient: () => this.session.client,
@@ -93,6 +102,8 @@ export class TerminalController {
   update = (patch: Partial<TerminalState>): void => {
     if (this.session.disposed) return;
     const ownerChanged = patch.owner !== undefined && patch.owner !== this.state.owner;
+    if (patch.preferences)
+      patch = { ...patch, objectPanel: patch.preferences.rightPanelTab === "objects" };
     if (ownerChanged || (patch.authenticated === false && this.state.authenticated))
       this.editing.reset();
     else if (
@@ -104,6 +115,8 @@ export class TerminalController {
       this.editing.cancelGesture();
     if (ownerChanged)
       patch = {
+        mobilePanelOpen: false,
+        objectPanel: false,
         drawings: [],
         images: [],
         selectedObject: null,
@@ -129,6 +142,7 @@ export class TerminalController {
       await storage.savePreferences(this.state.owner, this.state.preferences);
   }
   saveView = async (): Promise<void> => {
+    if (this.chart?.persistView === false) return;
     const source = this.chart?.source;
     if (
       source &&
@@ -176,8 +190,13 @@ export class TerminalController {
     const points = drawing?.points ?? (image ? [image.point] : []);
     if (points.length) this.chart?.focusPoints?.(points);
   };
-  toggleObjects = (): void =>
-    this.update({ objectPanel: !this.state.objectPanel, contextMenu: null });
+  toggleObjects = (): void => {
+    void this.panel
+      .select("objects")
+      .catch((error: unknown) =>
+        this.notify(error instanceof Error ? error.message : "Не удалось изменить панель")
+      );
+  };
   setTool = (tool: DrawingTool | null): void => {
     this.editing.cancelGesture();
     this.update({ activeTool: tool, preview: null, selectedObject: null, contextMenu: null });
@@ -268,7 +287,12 @@ export class TerminalController {
       ...this.state.preferences.indicators,
       [key]: !this.state.preferences.indicators[key]
     };
-    this.update({ preferences: { ...this.state.preferences, indicators } });
+    const chartSettings = {
+      ...this.state.preferences.chartSettings,
+      removedIndicators:
+        this.state.preferences.chartSettings.removedIndicators?.filter((item) => item !== key) ?? []
+    };
+    this.update({ preferences: { ...this.state.preferences, indicators, chartSettings } });
     await this.savePreferences();
     if (key.startsWith("mtp") && indicators[key]) await this.loadHistory(true);
   };
@@ -292,15 +316,23 @@ export class TerminalController {
     this.setDrawings(this.state.drawings.map((item) => (item.id === drawing.id ? drawing : item)));
   addDrawing = async (drawing: Drawing): Promise<void> => {
     const owner = this.state.owner,
+      activeTool = this.state.activeTool,
       symbol = this.state.preferences.symbol,
       uid = selectedMarketRow(this.state.rows, this.state.preferences)?.uid;
     await this.setDrawings([...this.state.drawings, drawing]);
     if (
       owner === this.state.owner &&
+      activeTool === this.state.activeTool &&
       symbol === this.state.preferences.symbol &&
       uid === selectedMarketRow(this.state.rows, this.state.preferences)?.uid
     )
-      this.update({ selectedObject: drawing.id, activeTool: null, preview: null });
+      this.update({
+        selectedObject: drawing.id,
+        activeTool: drawingToolbarSettings(this.state.preferences.chartSettings).stayInDrawingMode
+          ? this.state.activeTool
+          : null,
+        preview: null
+      });
   };
   loadHistory = (refresh = false): Promise<void> => this.history.load(refresh);
   loadCandleCalendar = async (
@@ -393,30 +425,19 @@ export class TerminalController {
     await this.flush();
     return storage.createBackup(owner, { includeHistory });
   };
-  importBackup = async (input: unknown): Promise<void> => {
-    const { owner, name } = this.state,
-      client = this.client;
-    const valid = () => this.session.matches(client) && owner === this.state.owner;
-    this.editing.reset();
-    await this.editing.flush();
-    const result = await storage.importBackup(owner, input);
-    if (!valid()) return;
-    this.resetHistory();
-    this.update({ candles: [], loading: false });
-    await this.session.prepareProfile(owner, name, true, valid);
-    if (!valid()) return;
-    const watchlist = await storage.loadWatchlist(owner);
-    if (!valid()) return;
-    if (watchlist !== undefined && client) {
-      client.rows = watchlist;
-      const snapshot = await client.start();
-      if (!valid()) return;
-      this.session.applyBankState(snapshot);
-    }
-    await this.loadHistory();
-    if (valid())
-      this.notify(`Импортировано: ${result.drawings} рисунков, ${result.images} изображений.`);
-  };
+  importBackup = (input: unknown): Promise<void> =>
+    importTerminalBackup(input, {
+      getState: this.getSnapshot,
+      getClient: () => this.client,
+      getChart: () => this.chart,
+      saveView: this.saveView,
+      editing: this.editing,
+      session: this.session,
+      resetHistory: () => this.resetHistory(),
+      update: this.update,
+      loadHistory: this.loadHistory,
+      notify: this.notify
+    });
   saveImage = async (asset: ImageAsset): Promise<void> => {
     if (asset.owner !== this.state.owner || asset.symbol !== this.state.preferences.symbol) return;
     const previous = this.state.images.some((image) => image.id === asset.id);
@@ -427,7 +448,7 @@ export class TerminalController {
     });
   };
   deleteImage = async (id: string): Promise<void> => {
-    await this.editing.change({ images: this.state.images.filter((image) => image.id !== id) });
+    await this.tools.deleteObject(id);
   };
   attachImage = async (file: File): Promise<void> => {
     if (

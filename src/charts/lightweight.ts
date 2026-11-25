@@ -15,35 +15,53 @@ import type { ChartAdapter, ChartOptions } from "./adapter.js";
 import { lineColor } from "../model/candle-palette.js";
 import { focusRange } from "./navigation.js";
 import { PendingChartView } from "./view-camera.js";
+import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
+import { chartPalette } from "../model/theme.js";
 
 export function makeLightweight(options: ChartOptions): ChartAdapter {
   const { container, row, settings, indicators, timeframe } = options;
   let data: Candle[] = [],
-    updateDrawings = () => {};
+    updateDrawings = () => {},
+    settingData = false,
+    viewStaged = false,
+    restoreFrame: number | null = null,
+    settleFrame: number | null = null;
   const pendingView = new PendingChartView();
+  const palette = chartPalette(settings);
   const chart = createChart(container, {
     autoSize: true,
     layout: {
-      background: { type: ColorType.Solid, color: settings.background ?? "#131722" },
-      textColor: "#9598a1",
+      background: { type: ColorType.Solid, color: palette.background },
+      textColor: palette.muted,
       fontFamily: '-apple-system,BlinkMacSystemFont,"Trebuchet MS",Roboto,Ubuntu,sans-serif',
       fontSize: settings.scaleFontSize ?? 11,
       attributionLogo: false
     },
     grid: {
-      vertLines: { color: "#2a2e39", visible: settings.grid !== false },
-      horzLines: { color: "#2a2e39", visible: settings.grid !== false }
+      vertLines: { color: palette.grid, visible: settings.grid !== false },
+      horzLines: { color: palette.grid, visible: settings.grid !== false }
     },
-    rightPriceScale: { borderColor: "#2a2e39", scaleMargins: { top: 0.08, bottom: 0.22 } },
+    rightPriceScale: { borderColor: palette.border, scaleMargins: { top: 0.08, bottom: 0.22 } },
     timeScale: {
-      borderColor: "#2a2e39",
+      borderColor: palette.border,
       timeVisible: !["1d", "1w"].includes(timeframe),
       rightOffset: 8
     },
     crosshair: {
-      mode: CrosshairMode.Normal,
-      vertLine: { color: "#647086", style: 2 },
-      horzLine: { color: "#647086", style: 2 }
+      mode:
+        drawingToolbarSettings(settings).cursor === "crosshair"
+          ? CrosshairMode.Normal
+          : CrosshairMode.Hidden,
+      vertLine: {
+        color: palette.crosshair,
+        style: 2,
+        labelBackgroundColor: palette.labelBackground
+      },
+      horzLine: {
+        color: palette.crosshair,
+        style: 2,
+        labelBackgroundColor: palette.labelBackground
+      }
     },
     localization: { locale: "ru-RU" }
   });
@@ -169,31 +187,43 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     );
   }
   function restoreView() {
+    if (settingData) return;
     const view = pendingView.take(data.length > 0 && chart.timeScale().width() > 0);
     if (!view) return;
+    viewStaged = false;
     const scale = chart.timeScale(),
-      camera = view.camera;
-    if (camera) {
-      scale.applyOptions({ barSpacing: camera.barSpace });
-      scale.scrollToPosition(camera.rightOffsetBars, false);
-    } else if (view.barSpace) scale.applyOptions({ barSpacing: view.barSpace });
-    if (view.anchor) {
-      const index = logicalForTime(data, view.anchor.timestamp, TIMEFRAMES[timeframe].ms),
-        x = scale.logicalToCoordinate(index as Logical);
-      if (x != null)
-        scale.scrollToPosition(
-          scale.scrollPosition() +
-            (x - scale.width() * view.anchor.xFraction) / scale.options().barSpacing,
-          false
-        );
-    } else if (!camera && view.from != null && view.to != null && view.from < view.to) {
+      spacing = view.camera?.barSpace ?? view.barSpace ?? scale.options().barSpacing;
+    if (view.anchor || view.camera || view.barSpace) {
+      // Public scale setters are queued until RAF. Compute the complete camera
+      // from saved values instead of reading old geometry after queued writes.
+      const rightOffset = view.anchor
+        ? logicalForTime(data, view.anchor.timestamp, TIMEFRAMES[timeframe].ms) -
+          (data.length - 1) +
+          (scale.width() * (1 - view.anchor.xFraction) - 1) / spacing -
+          0.5
+        : view.camera?.rightOffsetBars;
+      scale.applyOptions({ barSpacing: spacing, ...(rightOffset != null ? { rightOffset } : {}) });
+    } else if (view.from != null && view.to != null && view.from < view.to) {
       scale.setVisibleRange({ from: view.from as UTCTimestamp, to: view.to as UTCTimestamp });
     }
+    if (settleFrame !== null) cancelAnimationFrame(settleFrame);
+    settleFrame = requestAnimationFrame(() => {
+      settleFrame = null;
+    });
     updateDrawings();
   }
-  chart.timeScale().subscribeSizeChange(restoreView);
+  function scheduleViewRestore() {
+    if (settingData || !viewStaged || restoreFrame !== null) return;
+    // The chart's preceding frame commits the initial fit and price-axis width.
+    restoreFrame = requestAnimationFrame(() => {
+      restoreFrame = null;
+      restoreView();
+    });
+  }
+  chart.timeScale().subscribeSizeChange(scheduleViewRestore);
   return {
     setData(next, fit) {
+      settingData = true;
       data = next;
       model.reset(data, activeMtpPeriods(indicators));
       series.setData(data.map((bar) => ({ ...bar, time: time(bar) })));
@@ -216,7 +246,8 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
           last = data.at(-1)!;
         chart.timeScale().setVisibleRange({ from: time(first), to: time(last) });
       }
-      restoreView();
+      settingData = false;
+      scheduleViewRestore();
     },
     updateBar(bar) {
       const index = data.findIndex((item) => item.timestamp === bar.timestamp);
@@ -234,7 +265,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       mtp.update();
     },
     getView() {
-      if (!data.length) return null;
+      if (!data.length || viewStaged || restoreFrame !== null || settleFrame !== null) return null;
       const scale = chart.timeScale(),
         range = scale.getVisibleLogicalRange();
       if (!range || !scale.width()) return null;
@@ -254,7 +285,8 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     },
     setView(view: ChartView) {
       pendingView.stage(view);
-      restoreView();
+      viewStaged = true;
+      scheduleViewRestore();
     },
     pointToPixel,
     focusPoints(points) {
@@ -300,6 +332,8 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     },
     redrawDrawings: () => updateDrawings(),
     destroy() {
+      if (restoreFrame !== null) cancelAnimationFrame(restoreFrame);
+      if (settleFrame !== null) cancelAnimationFrame(settleFrame);
       mtp.destroy();
       chart.remove();
     }

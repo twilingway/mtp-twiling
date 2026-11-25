@@ -216,7 +216,14 @@ export function Watchlist() {
   const selected = selectedMarketRow(state.rows, state.preferences),
     select = (symbol: string, instrumentUid: string | null) => {
       if (drag.current || Date.now() < suppressClickUntil.current) return;
-      void controller.setPreferences({ symbol, instrumentUid });
+      const owner = state.owner;
+      if (window.matchMedia("(max-width: 800px)").matches) controller.panel.closeMobile();
+      void controller.setPreferences({ symbol, instrumentUid }).catch((error: unknown) => {
+        if (controller.getSnapshot().owner === owner)
+          controller.notify(
+            error instanceof Error ? error.message : "Не удалось открыть инструмент."
+          );
+      });
     };
   return (
     <aside className="watchlist-panel" aria-label="Список котировок">

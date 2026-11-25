@@ -1,0 +1,388 @@
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --surface: #131722;
+  --surface-raised: #1e222d;
+  --surface-input: #171b26;
+  --surface-hover: #2a2e39;
+  --surface-selected: #1e2d4a;
+  --text: #d1d4dc;
+  --muted: #9598a1;
+  --line: #2a2e39;
+  --control-line: #434651;
+  --accent: #8aabff;
+  --accent-surface: #23314c;
+  --danger: #f48a96;
+  --shadow: #0008;
+  --backdrop: #060a12bd;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --surface-input: #f8f9fd;
+  --surface-hover: #f0f3fa;
+  --surface-selected: #e3edff;
+  --text: #131722;
+  --muted: #5d606b;
+  --line: #e0e3eb;
+  --control-line: #b2b5be;
+  --accent: #2456d6;
+  --accent-surface: #e8efff;
+  --danger: #bd2037;
+  --shadow: #13172226;
+  --backdrop: #13172266;
+}
+
+html[data-theme] {
+  background: var(--surface);
+  color: var(--text);
+  --blue: var(--accent);
+}
+
+html[data-theme]
+  :is(
+    .topbar,
+    .drawing-tools,
+    .right-panel,
+    .right-panel-tools,
+    .watchlist-panel,
+    .watchlist-scroll th,
+    .details,
+    .objects-panel,
+    .bottom-status,
+    .chart-footer
+  ) {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--line);
+}
+
+html[data-theme] :is(.chart-panel, .chart-body, .chart-message) {
+  background: var(--chart-background, var(--surface));
+  color: var(--chart-text, var(--text));
+}
+
+html[data-theme] .chart-heading {
+  color: var(--chart-text, var(--text));
+}
+
+html[data-theme]
+  :is(
+    .chart-heading .instrument-title,
+    .chart-heading .ohlc,
+    .chart-heading .chart-price,
+    .legend-row
+  ) {
+  background: var(--chart-background, var(--surface));
+}
+
+html[data-theme] :is(.chart-heading .instrument-title, .chart-heading .ohlc) {
+  width: max-content;
+  max-width: 100%;
+}
+
+html[data-theme]
+  :is(
+    .chart-heading .ohlc,
+    .chart-heading .instrument-title > span:last-child,
+    .chart-heading .chart-price > span,
+    .chart-message p,
+    .legend-hidden
+  ) {
+  color: var(--chart-muted, var(--muted));
+}
+
+html[data-theme] :is(.legend-row, .legend-row > button, .drawing-pointer) {
+  color: var(--chart-text, var(--text));
+}
+
+html[data-theme] .legend-hidden,
+html[data-theme] .legend-hidden > button {
+  color: var(--chart-muted, var(--muted));
+  opacity: 1;
+}
+
+html[data-theme]
+  :is(
+    .brand,
+    .quote-symbol b,
+    .detail-facts b,
+    .drawing-toolbar,
+    .tool,
+    .timeframes button,
+    .right-panel-tools button,
+    .object-row > button,
+    .setting-row,
+    dialog label,
+    .watchlist-search input
+  ) {
+  color: var(--text);
+}
+
+html[data-theme]
+  :is(
+    .rail-label,
+    .engine-credit a,
+    .quote-symbol small,
+    .quote-row.unavailable td,
+    .watchlist-scroll th,
+    .watchlist-meta,
+    .details > p,
+    .detail-facts span,
+    .private-note,
+    .popover label span,
+    .dialog-description,
+    .key-note,
+    .dialog-footer,
+    .application-info,
+    #app-version,
+    .storage-settings small,
+    .storage-settings p,
+    #instrument-results > p,
+    .instrument-result small,
+    #instrument-dialog > small,
+    .add-level,
+    .visibility-row + small,
+    .drawing-menu small,
+    .chart-context-menu strong,
+    .drawing-menu kbd,
+    .chart-context-menu kbd,
+    .drawing-menu-section-title,
+    .drawing-menu-label small,
+    .drawing-menu-action kbd,
+    .drawing-menu-favorite,
+    dialog header > button,
+    .dialog-header button,
+    .transfer-settings p
+  ) {
+  color: var(--muted);
+}
+
+html[data-theme] :is(.object-hidden, .object-hidden > button) {
+  color: var(--muted);
+  opacity: 1;
+}
+
+html[data-theme] .quote-row.unavailable .quote-symbol {
+  opacity: 1;
+}
+
+html[data-theme] :is(a, .application-info a, .message-icon) {
+  color: var(--accent);
+}
+
+html[data-theme] :is(.market-tag, .avatar, .dialog-icon, .watchlist-heading h2 span) {
+  background: var(--accent-surface);
+  color: var(--accent);
+}
+
+html[data-theme]
+  :is(
+    .popover,
+    dialog,
+    #drawing-settings,
+    #instrument-dialog,
+    .drawing-menu,
+    .chart-context-menu,
+    .context-submenu > div,
+    .template-menu,
+    .colour-popover,
+    .drawing-toolbar-popup
+  ) {
+  background: var(--surface-raised);
+  color: var(--text);
+  border-color: var(--control-line);
+  box-shadow: 0 8px 30px var(--shadow);
+}
+
+html[data-theme] dialog::backdrop {
+  background: var(--backdrop);
+}
+
+html[data-theme] #drawing-settings footer {
+  background: var(--surface-raised);
+}
+
+html[data-theme] :is(select, dialog input, .watchlist-search) {
+  background-color: var(--surface-input);
+  color: var(--text);
+  border-color: var(--control-line);
+}
+
+html[data-theme] select option {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+html[data-theme="light"] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='m1 1 5 5 5-5' fill='none' stroke='%235d606b'/%3E%3C/svg%3E");
+}
+
+html[data-theme] input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+html[data-theme]
+  :is(input[type="checkbox"], input[type="range"], #drawing-settings input[type="checkbox"]) {
+  accent-color: #2962ff;
+}
+
+html[data-theme] dialog input[type="range"] {
+  background: transparent;
+}
+
+html[data-theme] :is(.fib-level.disabled input[type="number"], input:disabled, select:disabled) {
+  background-color: var(--surface-hover);
+  color: var(--muted);
+}
+
+html[data-theme]
+  :is(
+    .quote-row,
+    .objects-panel header,
+    .drawing-toolbar-popup-heading,
+    .drawing-menu-section + .drawing-menu-section,
+    .chart-context-menu hr,
+    .storage-settings,
+    .transfer-settings,
+    .storage-settings th,
+    .storage-settings td,
+    .instrument-result,
+    .settings-tabs,
+    .watchlist-search kbd,
+    .line-style-button,
+    .colour-swatch,
+    .storage-settings button,
+    dialog footer button,
+    .fib-level input[data-level-text]
+  ) {
+  border-color: var(--control-line);
+}
+
+html[data-theme] :is(.quote-row, .instrument-result) {
+  border-color: var(--line);
+}
+
+html[data-theme]
+  :is(
+    .watchlist-scroll,
+    .drawing-toolbar,
+    .drawing-toolbar-menu,
+    .objects-list,
+    #instrument-results
+  ) {
+  scrollbar-color: var(--control-line) transparent;
+}
+
+html[data-theme] button:hover:not(:disabled),
+html[data-theme] .quote-row:hover,
+html[data-theme] .right-panel .object-row:hover,
+html[data-theme] .drawing-toolbar button:hover:not(:disabled),
+html[data-theme] .drawing-toolbar-popup button:hover:not([aria-disabled="true"]) {
+  background-color: var(--surface-hover);
+}
+
+html[data-theme]
+  :is(
+    .timeframes button.active,
+    .tool.active,
+    .drawing-tool-split.active,
+    .quote-row.selected,
+    .object-row.selected,
+    .right-panel-tools button[aria-selected="true"]
+  ) {
+  background: var(--surface-selected);
+  color: var(--accent);
+}
+
+html[data-theme]
+  :is(
+    .drawing-menu-action.selected,
+    .drawing-menu-favorite.selected,
+    .settings-tabs button.active
+  ) {
+  color: var(--accent);
+}
+
+html[data-theme] .settings-tabs .active {
+  border-bottom-color: var(--accent);
+  color: var(--accent);
+}
+
+html[data-theme] .settings-tabs button:not(.active) {
+  color: var(--muted);
+}
+
+html[data-theme] .quote-remove,
+html[data-theme] .image-remove {
+  background: var(--surface-raised);
+  color: var(--text);
+  border-color: var(--control-line);
+}
+
+html[data-theme] .install-button {
+  color: var(--accent);
+  border-color: var(--control-line);
+}
+
+html[data-theme] .transfer-settings > div button {
+  background: var(--accent-surface);
+  color: var(--accent);
+  border-color: var(--control-line);
+}
+
+html[data-theme]
+  :is(.primary-button, dialog footer .primary-button, .update-banner button, .close-colour) {
+  background: #2962ff;
+  color: #ffffff;
+  border-color: #2962ff;
+}
+
+html[data-theme]
+  :is(
+    .primary-button,
+    dialog footer .primary-button,
+    .update-banner button,
+    .close-colour
+  ):hover:not(:disabled) {
+  background: #1e53e5;
+}
+
+html[data-theme] :is(#toast, .update-banner) {
+  background: var(--surface-raised);
+  color: var(--text);
+  border-color: var(--control-line);
+  box-shadow: 0 8px 30px var(--shadow);
+}
+
+html[data-theme] .update-banner p {
+  color: var(--muted);
+}
+
+html[data-theme] .update-banner button:last-child {
+  background: transparent;
+  color: var(--text);
+}
+
+html[data-theme] :is(.danger-button, .logout-button, #login-error, .drawing-error) {
+  color: var(--danger);
+}
+
+html[data-theme] .drawing-menu-action[aria-disabled="true"] {
+  color: var(--muted);
+}
+
+html[data-theme] :is(button, a, input, select):focus-visible {
+  outline-color: #2962ff;
+}
+
+html[data-theme] .colour-palette button:hover {
+  outline-color: var(--text);
+}
+
+html[data-theme] .legend-row button:hover:not(:disabled) {
+  background: var(--chart-background, var(--surface));
+  color: var(--chart-text, var(--text));
+}

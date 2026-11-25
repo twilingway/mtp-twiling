@@ -95,9 +95,33 @@ function harness(engine) {
     spacing = 8,
     offset = 8;
   const actions = new Map(),
-    calls = [];
+    calls = [],
+    frames = new Map();
+  let frameId = 0,
+    drawScheduled = false,
+    nativeOperations = [],
+    sizeChanged = () => {};
+  const requestAnimationFrame = (callback) => {
+      frames.set(++frameId, callback);
+      return frameId;
+    },
+    cancelAnimationFrame = (id) => frames.delete(id),
+    queueNative = (operation) => {
+      nativeOperations.push(operation);
+      if (drawScheduled) return;
+      drawScheduled = true;
+      requestAnimationFrame(() => {
+        drawScheduled = false;
+        const operations = nativeOperations;
+        nativeOperations = [];
+        for (const commit of operations) commit();
+      });
+    };
   const size = { width: 800, height: 500 },
-    pixel = (index) => size.width - (data.length - index + offset - 0.5) * spacing;
+    pixel = (index) =>
+      size.width -
+      (data.length - index + offset - 0.5) * spacing -
+      (engine === "lightweight" ? 1 : 0);
   const model = {
     MtpModel: class {
       reset() {}
@@ -124,11 +148,17 @@ function harness(engine) {
       options: () => ({ barSpacing: spacing }),
       scrollPosition: () => offset,
       scrollToPosition(value) {
-        offset = value;
-        calls.push("restore");
+        queueNative(() => {
+          offset = value;
+          calls.push("restore");
+        });
       },
       applyOptions(value) {
-        if (value.barSpacing) spacing = value.barSpacing;
+        queueNative(() => {
+          if (value.barSpacing) spacing = value.barSpacing;
+          if (value.rightOffset != null) offset = value.rightOffset;
+          calls.push("restore");
+        });
       },
       getVisibleLogicalRange: () =>
         data.length
@@ -138,13 +168,17 @@ function harness(engine) {
         data.length ? { from: data[0].timestamp / 1000, to: data.at(-1).timestamp / 1000 } : null,
       setVisibleRange() {
         assert.ok(data.length, "public visible range must never be requested before data");
-        spacing = 2;
-        offset = 8;
-        calls.push("fit");
+        queueNative(() => {
+          spacing = 2;
+          offset = 8;
+          calls.push("fit");
+        });
       },
       logicalToCoordinate: pixel,
       subscribeVisibleLogicalRangeChange() {},
-      subscribeSizeChange() {}
+      subscribeSizeChange(callback) {
+        sizeChanged = callback;
+      }
     };
     let firstSeries = true;
     const chart = {
@@ -155,7 +189,10 @@ function harness(engine) {
         firstSeries = false;
         return {
           setData(next) {
-            if (candles) data = next;
+            if (candles) {
+              data = next;
+              sizeChanged();
+            }
           },
           setSeriesOrder() {},
           attachPrimitive() {},
@@ -163,16 +200,22 @@ function harness(engine) {
         };
       }
     };
-    factory = sources({
-      "lightweight-charts": {
-        createChart: () => chart,
-        ColorType: { Solid: 1 },
-        CrosshairMode: { Normal: 1 }
+    factory = sources(
+      {
+        "lightweight-charts": {
+          createChart: () => {
+            queueNative(() => {});
+            return chart;
+          },
+          ColorType: { Solid: 1 },
+          CrosshairMode: { Normal: 1 }
+        },
+        "model/mtp.ts": model,
+        "model/history-codec.ts": { TIMEFRAMES: { "1d": { ms: 86400000 } } },
+        "model/candle-palette.ts": { lineColor: (value) => value }
       },
-      "model/mtp.ts": model,
-      "model/history-codec.ts": { TIMEFRAMES: { "1d": { ms: 86400000 } } },
-      "model/candle-palette.ts": { lineColor: (value) => value }
-    })("charts/lightweight.ts").makeLightweight;
+      { requestAnimationFrame, cancelAnimationFrame }
+    )("charts/lightweight.ts").makeLightweight;
   } else {
     const chart = {
       setPriceVolumePrecision() {},
@@ -243,7 +286,15 @@ function harness(engine) {
   }
   return {
     adapter: factory(options),
-    ready: () => actions.get("ready")?.(),
+    ready: () => {
+      actions.get("ready")?.();
+      for (let round = 0; frames.size && round < 30; round++) {
+        const pending = [...frames.entries()];
+        frames.clear();
+        for (const [, callback] of pending) callback();
+      }
+      assert.equal(frames.size, 0, "restoration frames must settle");
+    },
     calls,
     camera: () => ({ spacing, offset })
   };
@@ -283,6 +334,28 @@ for (const engine of ["lightweight", "kline"])
       "prepending data retains the same date anchor and signed gap"
     );
   });
+
+test("Lightweight repeated native reconfiguration restores the exact camera with queued public setters", () => {
+  const candles = Array.from({ length: 2600 }, (_, index) => ({
+    timestamp: 1500000000000 + index * 86400000,
+    open: 90,
+    high: 95,
+    low: 85,
+    close: 92,
+    volume: 100
+  }));
+  let view = { camera: { barSpace: 1.0550660792951543, rightOffsetBars: -2 } };
+  for (let cycle = 0; cycle < 6; cycle++) {
+    const { adapter, ready, camera } = harness("lightweight");
+    adapter.setView(view);
+    adapter.setData(candles, true);
+    assert.equal(adapter.getView(), null, "do not persist an unsettled camera");
+    ready();
+    assert.equal(camera().spacing, 1.0550660792951543);
+    assert.ok(Math.abs(camera().offset + 2) < 1e-9, `cycle ${cycle} must retain the right gap`);
+    view = adapter.getView();
+  }
+});
 
 test("history rejects out-of-order symbol results and a changed UID before publishing candles", async () => {
   const requests = new Map();

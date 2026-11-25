@@ -56,12 +56,9 @@ export function ContextMenu() {
       if (event.key !== "Delete") return;
       const id = state.selectedObject;
       if (!id) return;
-      if (state.drawings.some((item) => item.id === id))
-        run(controller.setDrawings(state.drawings.filter((item) => item.id !== id)));
-      else if (state.images.some((item) => item.id === id)) run(controller.deleteImage(id));
-      else return;
+      if (![...state.drawings, ...state.images].some((item) => item.id === id)) return;
+      run(controller.tools.deleteObject(id));
       event.preventDefault();
-      controller.selectObject(null);
       controller.setContext(null);
     };
     document.addEventListener("keydown", key);
@@ -74,8 +71,7 @@ export function ContextMenu() {
   };
   const removeDrawing = (item: Drawing) =>
     act(() => {
-      run(controller.setDrawings(state.drawings.filter((d) => d.id !== item.id)));
-      controller.selectObject(null);
+      run(controller.tools.deleteObject(item.id));
     });
   const cloneDrawing = (item: Drawing) => act(() => run(controller.editing.clone(item)));
   const layerDrawing = (item: Drawing, action: LayerAction) =>
@@ -215,7 +211,7 @@ export function ContextMenu() {
           </button>
           <button
             role="menuitem"
-            onClick={() => act(() => controller.update({ objectPanel: true }))}
+            onClick={() => act(() => run(controller.panel.select("objects", false)))}
           >
             Дерево объектов
           </button>
@@ -258,7 +254,6 @@ export function ContextMenu() {
             onClick={() =>
               act(() => {
                 run(controller.deleteImage(image.id));
-                controller.selectObject(null);
               })
             }
           >
@@ -280,7 +275,7 @@ export function ContextMenu() {
           </button>
           <button
             role="menuitem"
-            onClick={() => act(() => controller.update({ objectPanel: true }))}
+            onClick={() => act(() => run(controller.panel.select("objects", false)))}
           >
             Дерево объектов
           </button>
@@ -296,11 +291,14 @@ export function ContextMenu() {
           </button>
           <button
             role="menuitem"
-            onClick={() => act(() => controller.update({ objectPanel: true }))}
+            onClick={() => act(() => run(controller.panel.select("objects", false)))}
           >
             Дерево объектов
           </button>
-          <button role="menuitem" onClick={() => act(() => run(controller.setDrawings([])))}>
+          <button
+            role="menuitem"
+            onClick={() => act(() => run(controller.tools.requestRemove("drawings")))}
+          >
             Удалить все рисунки
           </button>
         </>

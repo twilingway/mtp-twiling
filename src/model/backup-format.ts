@@ -1,4 +1,5 @@
 import { TOOL_NAMES } from "./drawing-model.js";
+import { isDrawingToolbarSettings } from "./drawing-toolbar.js";
 import type {
   Backup,
   BackupDrawing,
@@ -182,6 +183,12 @@ export function isChartSettings(value: unknown): value is ChartSettings {
   return (
     isRecord(value) &&
     fields(value, {
+      theme: member(["dark", "light"]),
+      drawingTools: isDrawingToolbarSettings,
+      removedIndicators: (value) =>
+        Array.isArray(value) &&
+        value.length <= 6 &&
+        value.every(member(["ma", "ema", "volume", "mtp160", "mtp440", "mtp640"])),
       grid: boolean,
       upColor: color,
       downColor: color,
@@ -214,6 +221,8 @@ export function isProfilePreferences(value: unknown): value is ProfilePreference
   return (
     isRecord(value) &&
     fields(value, {
+      rightPanelCollapsed: boolean,
+      rightPanelTab: member(["watchlist", "objects"]),
       symbol: string,
       instrumentUid: nullable((value) => string(value) && value.length > 0 && value.length <= 200),
       timeframe: isTimeframe,

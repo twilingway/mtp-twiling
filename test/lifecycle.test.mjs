@@ -155,6 +155,10 @@ test("saveView rejects an adapter from another route, owner, or replaced UID bef
     await controller.saveView();
   }
   assert.equal(captures, 1, "stale adapters must not contribute a view to the new selected route");
+  controller.chart.source = source;
+  controller.chart.persistView = false;
+  await controller.saveView();
+  assert.equal(captures, 1, "retired import adapters must not capture a view");
   controller.chart = null;
 });
 
@@ -251,7 +255,10 @@ function terminalFixture({ restore = async () => null, candles, importBackup } =
     },
     {
       "services/storage.ts": storage,
-      "services/chart-camera.ts": { saveChartView: storage.saveView },
+      "services/chart-camera.ts": {
+        saveChartView: storage.saveView,
+        resetSharedChartCamera: async () => {}
+      },
       "services/tbank-client.ts": { TBankClient: BankBoundary }
     }
   );
@@ -326,7 +333,7 @@ test("an invalid backup leaves the current history request alive and able to fin
   assert.equal(controller.getSnapshot().loading, true);
 
   await assert.rejects(controller.importBackup({ application: "unsupported", schemaVersion: 1 }));
-  assert.equal(validationCalls, 1);
+  assert.equal(validationCalls, 0, "invalid input must fail before the storage import boundary");
   assert.equal(historySignal.aborted, false, "validation failure must not cancel active history");
   assert.equal(controller.getSnapshot().loading, true);
 

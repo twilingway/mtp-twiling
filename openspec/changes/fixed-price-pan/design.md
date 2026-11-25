@@ -16,6 +16,29 @@ ChartGestures пропускает нативное перемещение в о
 
 ## Decisions
 
+- Успешный импорт увеличивает отдельную chartRevision ровно один раз. Она входит в lifetime и
+  matches guard canvas независимо от нормализованного renderConfig, поэтому импорт того же layout
+  применяет incoming view после данных. Некорректный/неуспешный импорт и обычные настройки toolbar
+  ревизию не меняют.
+
+- render-config выделяет только нативные settings/effective indicators в детерминированный ключ.
+  useMemo сохраняет конфигурацию при lastTools/favorites/magnet/stay/templates и настройках
+  React-оболочки. drawingsHidden отдельно запускает redraw и использует текущий state из paint
+  callback.
+- Публичные Lightweight applyOptions и scrollToPosition ставят команды в RAF, поэтому сразу читать
+  их геометрию нельзя. Восстановление ждёт первого layout/fit, вычисляет конечный rightOffset из
+  saved spacing/anchor и ставит один applyOptions. Size callback во время setData защищён guard;
+  getView не возвращает ещё не применённую камеру. Regression-модель публичного API теперь также
+  откладывает setters до RAF и вызывает синхронный size callback из setData.
+
+- Импорт валидируется до изменений редактирования/сессии, затем завершается запись прежней разметки
+  и вида. Исходящий адаптер получает persistView:false, который проверяют controller.saveView и
+  общий cleanup helper saveAdapterView. Ошибка storage.importBackup возвращает прежний флаг;
+  успешный commit оставляет старый адаптер исключённым из сохранения.
+- resetSharedChartCamera после commit удаляет только shared records и память с точным owner,
+  сохраняя входящие per-symbol views и другие профили. Оркестрация импорта выделена в
+  controller-import.ts для лимита 500 строк контроллера.
+
 - ChartView.camera хранит CSS-pixel barSpace и знаковый rightOffsetBars. Общий record изолирован
   профилем/движком/таймфреймом и содержит исходный symbol. Между инструментами переносится только
   camera; для повторного открытия того же инструмента сохраняется anchor. Старые from/to,

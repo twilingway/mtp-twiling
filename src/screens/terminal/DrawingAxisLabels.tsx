@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { DrawingPoint, DrawingVisibility, Timeframe } from "../../model/types.js";
+import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { useTerminal } from "./context.js";
 
 interface AxisLabel {
@@ -29,6 +30,7 @@ export function DrawingAxisLabels() {
   const [labels, setLabels] = useState<AxisLabel[]>([]);
   const selected = state.preview ?? state.drawings.find((item) => item.id === state.selectedObject);
   const points =
+    drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden ||
     selected?.visible === false ||
     !visibleOnTimeframe(selected?.visibility, state.preferences.timeframe)
       ? undefined

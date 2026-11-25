@@ -31,7 +31,6 @@ export const DEFAULT_CHART_SETTINGS: ChartSettings = {
   bodyVisible: true,
   wickVisible: true,
   candlePaletteVersion: 1,
-  background: "#131722",
   scaleFontSize: 11,
   showLegend: true,
   priceLine: true,
@@ -55,6 +54,8 @@ export const PERIOD_LABELS: Record<Timeframe, string> = {
   "1w": "1Н"
 };
 export interface TerminalPreferences {
+  rightPanelCollapsed?: boolean;
+  rightPanelTab?: "watchlist" | "objects";
   sidebarWidth?: number;
   symbol: string;
   instrumentUid?: string | null;
@@ -65,7 +66,13 @@ export interface TerminalPreferences {
   chartSettings: ChartSettings;
 }
 export type TerminalDialog =
-  null | "account" | "instruments" | "chart-settings" | "drawing-settings" | "indicator-settings";
+  | null
+  | "delete-object"
+  | "account"
+  | "instruments"
+  | "chart-settings"
+  | "drawing-settings"
+  | "indicator-settings";
 export type ContextTarget =
   | { kind: "drawing"; id: string }
   | { kind: "image"; id: string }
@@ -77,6 +84,8 @@ export interface ContextMenu {
   target: ContextTarget;
 }
 export interface TerminalState {
+  mobilePanelOpen?: boolean;
+  chartRevision: number;
   ready: boolean;
   owner: string;
   name: string;

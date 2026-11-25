@@ -2,6 +2,9 @@ import { useEffect, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { DEFAULT_FIB_LEVELS, drawingStyle, hitDrawing } from "../../model/drawing-model.js";
 import { isDrawing } from "../../model/backup-format.js";
+import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
+import { snapDrawingPoint } from "../../model/drawing-magnet.js";
+import { chartBackground } from "../../model/theme.js";
 import type { Drawing, DrawingPoint, PixelPoint } from "../../model/types.js";
 import type { ChartAdapter } from "../../charts/adapter.js";
 import { isPanMovement } from "../../charts/navigation.js";
@@ -10,6 +13,7 @@ import { useTerminal } from "./context.js";
 import type { TerminalState } from "./state.js";
 
 export function visibleDrawings(state: TerminalState): Drawing[] {
+  if (drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden) return [];
   const tf = state.preferences.timeframe,
     n = Number.parseInt(tf),
     group = tf.endsWith("m")
@@ -32,7 +36,7 @@ export function ChartCanvas() {
     <div
       id="chart"
       ref={ref}
-      style={{ background: state.preferences.chartSettings.background ?? "#131722" }}
+      style={{ background: chartBackground(state.preferences.chartSettings) }}
     />
   );
 }
@@ -65,6 +69,7 @@ function finishNativePan(pan: { current: NativePan | null }) {
 export function ChartGestures({ children }: { children: ReactNode }) {
   const { controller, state } = useTerminal(),
     draft = useRef<DrawingPoint[]>([]),
+    pointer = useRef<HTMLSpanElement>(null),
     drag = useRef<Drag | null>(null),
     pan = useRef<NativePan | null>(null);
   useEffect(() => {
@@ -128,6 +133,34 @@ export function ChartGestures({ children }: { children: ReactNode }) {
       element.style.removeProperty("--drawing-cursor");
     }
   };
+  const cursorKind = () => {
+    const mode = drawingToolbarSettings(controller.getSnapshot().preferences.chartSettings).cursor;
+    return mode === "arrow"
+      ? "default"
+      : mode === "eraser"
+        ? "cell"
+        : mode === "dot" || mode === "demonstration"
+          ? "none"
+          : "crosshair";
+  };
+  const drawingPoint = (p: PixelPoint, temporary: boolean) => {
+    const chart = controller.chart;
+    const raw = chart?.pixelToPoint(p.x, p.y);
+    if (!chart || !raw) return null;
+    const current = controller.getSnapshot(),
+      options = drawingToolbarSettings(current.preferences.chartSettings);
+    const mode = temporary ? (options.magnet === "off" ? "weak" : "off") : options.magnet;
+    return snapDrawingPoint(
+      raw,
+      p,
+      current.candles,
+      (point) => chart.pointToPixel(point),
+      mode,
+      options.snapIndicators && !options.indicatorsHidden
+        ? current.preferences.indicators
+        : undefined
+    );
+  };
   function down(event: ReactPointerEvent<HTMLDivElement>) {
     if (
       event.button !== 0 ||
@@ -143,7 +176,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
     const tool = controller.getSnapshot().activeTool;
     if (tool) {
       stop(event);
-      const point = chart.pixelToPoint(p.x, p.y);
+      const point = drawingPoint(p, event.ctrlKey || event.metaKey);
       if (!point) return;
       draft.current.push(point);
       const required = [
@@ -172,6 +205,16 @@ export function ChartGestures({ children }: { children: ReactNode }) {
       return;
     }
     const hit = find(p);
+    const tools = drawingToolbarSettings(controller.getSnapshot().preferences.chartSettings);
+    if (tools.cursor === "eraser") {
+      stop(event);
+      const drawing = controller.getSnapshot().drawings.find((item) => item.id === hit?.id);
+      if (drawing && !drawing.lock && !tools.drawingsLocked)
+        void controller.setDrawings(
+          controller.getSnapshot().drawings.filter((item) => item.id !== drawing.id)
+        );
+      return;
+    }
     controller.selectObject(hit?.id ?? null);
     if (!hit) {
       pan.current = {
@@ -186,7 +229,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
       return;
     }
     const drawing = controller.getSnapshot().drawings.find((item) => item.id === hit.id);
-    if (!drawing || drawing.lock) return;
+    if (!drawing || drawing.lock || tools.drawingsLocked) return;
     stop(event);
     drag.current = {
       id: drawing.id,
@@ -206,6 +249,21 @@ export function ChartGestures({ children }: { children: ReactNode }) {
     if (!chart) return;
     const p = pixel(event),
       current = controller.getSnapshot();
+    if (pointer.current) {
+      const size = chart.plotSize(),
+        mode = drawingToolbarSettings(current.preferences.chartSettings).cursor;
+      const visible =
+        !current.activeTool &&
+        !pan.current &&
+        !drag.current &&
+        (mode === "dot" || mode === "demonstration") &&
+        p.x >= 0 &&
+        p.y >= 0 &&
+        p.x <= size.width &&
+        p.y <= size.height;
+      pointer.current.style.display = visible ? "block" : "none";
+      pointer.current.style.transform = `translate(${p.x}px,${p.y}px)`;
+    }
     if (pan.current) {
       const native = pan.current;
       if (!native.started && isPanMovement(native.start, p)) {
@@ -215,7 +273,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
       return;
     }
     if (current.activeTool && draft.current.length) {
-      const point = chart.pixelToPoint(p.x, p.y);
+      const point = drawingPoint(p, event.ctrlKey || event.metaKey);
       if (point)
         controller.setPreview({
           id: "preview",
@@ -231,7 +289,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
         inPlot = p.x >= 0 && p.y >= 0 && p.x <= size.width && p.y <= size.height;
       cursor(
         event.currentTarget,
-        inPlot ? (current.activeTool ? "crosshair" : find(p) ? "pointer" : "crosshair") : ""
+        inPlot ? (current.activeTool ? "crosshair" : find(p) ? "pointer" : cursorKind()) : ""
       );
       return;
     }
@@ -245,7 +303,12 @@ export function ChartGestures({ children }: { children: ReactNode }) {
       if (!active.clone && active.handle >= 0 && active.handle !== i) return point;
       const start = active.pixels[i];
       return start
-        ? (chart.pixelToPoint(start.x + p.x - active.start.x, start.y + p.y - active.start.y) ??
+        ? ((!active.clone && active.handle >= 0
+            ? drawingPoint(
+                { x: start.x + p.x - active.start.x, y: start.y + p.y - active.start.y },
+                false
+              )
+            : chart.pixelToPoint(start.x + p.x - active.start.x, start.y + p.y - active.start.y)) ??
             point)
         : point;
     });
@@ -263,7 +326,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
   function up(event: ReactPointerEvent<HTMLDivElement>) {
     if (event.pointerId === pan.current?.pointerId) {
       finishNativePan(pan);
-      cursor(event.currentTarget, "crosshair");
+      cursor(event.currentTarget, cursorKind());
     }
     if (!drag.current) return;
     stop(event);
@@ -271,7 +334,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
     drag.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId))
       event.currentTarget.releasePointerCapture(event.pointerId);
-    cursor(event.currentTarget, find(pixel(event)) ? "pointer" : "crosshair");
+    cursor(event.currentTarget, find(pixel(event)) ? "pointer" : cursorKind());
     void controller.editing
       .finishGesture(token)
       .catch((error: unknown) =>
@@ -296,6 +359,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
       onPointerCancelCapture={cancel}
       onLostPointerCapture={cancel}
       onPointerLeave={(event) => {
+        if (pointer.current) pointer.current.style.display = "none";
         controller.setCrosshair(null);
         if (!drag.current && !pan.current) cursor(event.currentTarget, "");
       }}
@@ -331,6 +395,11 @@ export function ChartGestures({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <span
+        ref={pointer}
+        className="drawing-pointer"
+        data-cursor={drawingToolbarSettings(state.preferences.chartSettings).cursor}
+      />
     </div>
   );
 }

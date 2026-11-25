@@ -1,150 +1,481 @@
-import { useRef, useState } from "react";
-import type { DrawingTool } from "../../model/types.js";
-import { TOOL_NAMES } from "../../model/drawing-model.js";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { drawingToolbarSettings, type DrawingTarget } from "../../model/drawing-toolbar.js";
 import { useTerminal } from "./context.js";
+import { DrawingToolIcon, type DrawingIconName } from "./DrawingToolIcon.js";
+import {
+  DrawingToolbarMenu,
+  DrawingToolbarSplit,
+  type ToolbarMenuItem,
+  type ToolbarMenuSection
+} from "./DrawingToolbarMenu.js";
+import {
+  TOOLBAR_GROUPS,
+  PALETTE_CATEGORIES,
+  TOOLBAR_TARGETS as targets,
+  TARGET_NAMES as targetNames,
+  rememberedToolbarTool,
+  toolbarToolAvailable,
+  type ToolbarGroup,
+  type ToolbarTool
+} from "./toolbar-registry.js";
+
+interface OpenMenu {
+  key: string;
+  anchor: HTMLElement;
+  owner: string;
+  scope: string;
+}
+const disabledReason = "Пока не реализовано";
+
 export function DrawingToolbar() {
-  const { controller, state } = useTerminal(),
-    [menu, setMenu] = useState<"lines" | "fib" | null>(null),
-    [clear, setClear] = useState(false),
-    file = useRef<HTMLInputElement>(null);
-  const choose = (tool: DrawingTool | null) => {
-    controller.setTool(tool);
+  const { controller, state } = useTerminal();
+  const settings = drawingToolbarSettings(state.preferences.chartSettings);
+  const [menu, setMenu] = useState<OpenMenu | null>(null);
+  const [confirmation, setConfirmation] = useState<{
+    target: DrawingTarget;
+    owner: string;
+    scope: string;
+  } | null>(null);
+  const file = useRef<HTMLInputElement>(null);
+  const rail = useRef<HTMLElement>(null);
+  const trigger = useRef<HTMLElement | null>(null);
+  const closeMenu = useCallback((restoreFocus = false) => {
     setMenu(null);
+    setConfirmation(null);
+    if (restoreFocus) trigger.current?.focus();
+  }, []);
+  useEffect(() => {
+    closeMenu();
+  }, [
+    state.owner,
+    state.authenticated,
+    state.dialog,
+    state.preferences.symbol,
+    state.preferences.instrumentUid,
+    closeMenu
+  ]);
+  const run = (action: () => Promise<unknown>, close = true) => {
+    if (close) closeMenu();
+    void action().catch((error: unknown) =>
+      controller.notify(error instanceof Error ? error.message : "Не удалось выполнить действие")
+    );
   };
-  const choices: DrawingTool[] =
-    menu === "fib"
-      ? ["fibonacciLine", "fibonacciExtension"]
-      : [
-          "segment",
-          "rayLine",
-          "straightLine",
-          "horizontalStraightLine",
-          "horizontalRayLine",
-          "verticalStraightLine"
-        ];
+  const openMenu = (key: string, anchor: HTMLElement) => {
+    trigger.current = anchor;
+    setConfirmation(null);
+    setMenu((current) =>
+      current?.key === key
+        ? null
+        : { key, anchor, owner: state.owner, scope: controller.tools.scopeKey() }
+    );
+  };
+  const choose = (group: ToolbarGroup, item: ToolbarTool) => {
+    if (!toolbarToolAvailable(item)) return;
+    if (item.image && !controller.chart) {
+      controller.notify("Сначала откройте график.");
+      return;
+    }
+    const owner = state.owner;
+    if (item.image) file.current?.click();
+    run(async () => {
+      if (item.tool) await controller.tools.choose(item.tool);
+      else if (item.cursor) await controller.tools.setCursor(item.cursor);
+      if (!item.image || controller.getSnapshot().owner !== owner) return;
+      const current = drawingToolbarSettings(controller.getSnapshot().preferences.chartSettings);
+      await controller.tools.setOptions({
+        lastTools: { ...current.lastTools, [group.id]: item.id }
+      });
+    });
+  };
+  const selected = (item: ToolbarTool): boolean =>
+    item.tool
+      ? state.activeTool === item.tool
+      : Boolean(item.cursor && state.activeTool === null && settings.cursor === item.cursor);
+  const toolRow = (group: ToolbarGroup, item: ToolbarTool): ToolbarMenuItem => ({
+    id: item.id,
+    label: item.label,
+    icon: item.icon,
+    disabled: !toolbarToolAvailable(item),
+    checked: selected(item),
+    kind: "radio",
+    ...(item.shortcut ? { shortcut: item.shortcut } : {}),
+    favorite: settings.favorites.includes(item.id),
+    onFavorite: () => run(() => controller.tools.toggleFavorite(item.id), false),
+    action: () => choose(group, item)
+  });
+  const remove = (
+    target: DrawingTarget,
+    forceLocked = false,
+    expectedScope = menu?.scope ?? controller.tools.scopeKey()
+  ) => {
+    if (controller.tools.scopeKey() !== expectedScope) {
+      closeMenu();
+      return;
+    }
+    const owner = state.owner;
+    run(async () => {
+      const removed = await controller.tools.remove(target, forceLocked, expectedScope);
+      if (controller.getSnapshot().owner !== owner || controller.tools.scopeKey() !== expectedScope)
+        return;
+      if (removed) closeMenu(true);
+      else setConfirmation({ target, owner, scope: expectedScope });
+    }, false);
+  };
+  const scopeActive = (kind: "lock" | "hide", target: DrawingTarget): boolean => {
+    const drawings = kind === "lock" ? settings.drawingsLocked : settings.drawingsHidden;
+    const indicators = kind === "lock" ? settings.indicatorsLocked : settings.indicatorsHidden;
+    return target === "drawings"
+      ? drawings
+      : target === "indicators"
+        ? indicators
+        : drawings && indicators;
+  };
+  const scopeRows = (kind: "lock" | "hide"): ToolbarMenuItem[] =>
+    targets.map((target) => ({
+      id: `${kind}-${target}`,
+      label: `${kind === "lock" ? "Закрепить" : "Скрыть"} ${targetNames[target]}`,
+      icon: kind === "lock" ? "lock" : "show",
+      kind: "radio",
+      checked: scopeActive(kind, target),
+      action: () =>
+        run(() =>
+          kind === "lock"
+            ? controller.tools.toggleLock(target)
+            : controller.tools.toggleHide(target)
+        )
+    }));
+  const group = TOOLBAR_GROUPS.find((item) => item.id === menu?.key);
+  let title = group?.title ?? "Инструменты";
+  let sections: ToolbarMenuSection[] =
+    group?.sections.map((part) => ({
+      title: part.title,
+      items: part.items.map((item) => toolRow(group, item))
+    })) ?? [];
+  if (group?.id === "cursors")
+    sections.push({
+      title: null,
+      items: [
+        {
+          id: "values-tooltip-on-long-press",
+          label: "Подсказывать значения при долгом нажатии",
+          disabled: true
+        }
+      ]
+    });
+  if (group?.id === "symbols")
+    sections = [
+      {
+        title: "Палитра пока недоступна",
+        items: PALETTE_CATEGORIES.map(([label, ...categories], index) => ({
+          id: `palette-${index}`,
+          label: label!,
+          icon: "symbols",
+          children: [
+            {
+              title: label!,
+              items: categories.map((category, categoryIndex) => ({
+                id: `palette-${index}-${categoryIndex}`,
+                label: category,
+                disabled: true,
+                reason: "Размещение знаков пока не реализовано"
+              }))
+            }
+          ]
+        }))
+      }
+    ];
+  if (menu?.key === "magnet") {
+    title = "Магнит";
+    sections = [
+      {
+        title: null,
+        items: [
+          {
+            id: "weakMagnet",
+            label: "Слабый магнит",
+            icon: "magnet",
+            kind: "radio",
+            checked: settings.magnet === "weak",
+            action: () => run(() => controller.tools.setOptions({ magnet: "weak" }))
+          },
+          {
+            id: "strongMagnet",
+            label: "Сильный магнит",
+            icon: "strongMagnet",
+            kind: "radio",
+            checked: settings.magnet === "strong",
+            action: () => run(() => controller.tools.setOptions({ magnet: "strong" }))
+          }
+        ]
+      },
+      {
+        title: null,
+        items: [
+          {
+            id: "snapToIndicatorsSwitcher",
+            label: "Прикрепить к индикаторам",
+            kind: "checkbox",
+            checked: settings.snapIndicators,
+            disabled: settings.magnet === "off",
+            reason: "Сначала включите магнит",
+            action: () => run(() => controller.tools.toggleOption("snapIndicators"), false)
+          }
+        ]
+      }
+    ];
+  } else if (menu?.key === "lock") {
+    title = "Блокировка объектов";
+    sections = [{ title: null, items: scopeRows("lock") }];
+  } else if (menu?.key === "hide") {
+    title = "Видимость объектов";
+    const rows = scopeRows("hide");
+    rows.splice(2, 0, {
+      id: "hide-positions-and-orders",
+      label: "Скрыть позиции и заявки",
+      disabled: true,
+      reason: "Торговые операции не входят в терминал"
+    });
+    sections = [{ title: null, items: rows }];
+  } else if (menu?.key === "trash") {
+    const counts = {
+      drawings: state.drawings.length + state.images.length,
+      indicators: Object.values(state.preferences.indicators).filter(Boolean).length
+    };
+    title = "Удалить объекты";
+    sections = [
+      {
+        title: "Текущий инструмент",
+        items: targets.map((target) => ({
+          id: `remove-${target}`,
+          label: `Удалить ${targetNames[target]} (${target === "all" ? counts.drawings + counts.indicators : counts[target]})`,
+          icon: "trash",
+          action: () => remove(target)
+        }))
+      },
+      {
+        title: null,
+        items: [
+          {
+            id: "alwaysRemoveLockedDrawingsSwitcher",
+            label: "Всегда удалять зафиксированные объекты",
+            kind: "checkbox",
+            checked: settings.deleteLocked,
+            action: () => run(() => controller.tools.toggleOption("deleteLocked"), false)
+          }
+        ]
+      }
+    ];
+  } else if (menu?.key === "favorites") {
+    title = "Избранные инструменты";
+    const favoriteRows = TOOLBAR_GROUPS.flatMap((part) =>
+      part.sections.flatMap((section) =>
+        section.items
+          .filter((item) => settings.favorites.includes(item.id))
+          .map((item) => toolRow(part, item))
+      )
+    );
+    sections = [
+      {
+        title: null,
+        items: favoriteRows.length
+          ? favoriteRows
+          : [
+              {
+                id: "no-favorites",
+                label: "Добавьте инструменты звёздочкой в меню",
+                disabled: true,
+                reason: "Стрелка вправо переводит фокус на звёздочку"
+              }
+            ]
+      }
+    ];
+  }
+  if (confirmation?.owner === state.owner && confirmation.scope === controller.tools.scopeKey()) {
+    const target = confirmation.target;
+    title = "Удалить зафиксированные объекты?";
+    sections = [
+      {
+        title: `Будут удалены ${targetNames[target]}, включая зафиксированные`,
+        items: [
+          { id: "cancel-delete", label: "Отмена", action: () => closeMenu(true) },
+          {
+            id: "confirm-delete",
+            label: "Удалить, включая зафиксированные",
+            icon: "trash",
+            action: () => remove(target, true, confirmation.scope)
+          }
+        ]
+      }
+    ];
+  }
+  const button = (
+    id: string,
+    label: string,
+    icon: DrawingIconName,
+    action: () => void,
+    active = false,
+    disabled = false
+  ) => (
+    <button
+      type="button"
+      key={id}
+      id={id}
+      className={`tool ${active ? "active" : ""}`}
+      title={disabled ? `${label} — ${disabledReason}` : label}
+      aria-label={disabled ? `${label} — ${disabledReason}` : label}
+      aria-pressed={active}
+      disabled={disabled}
+      onClick={action}
+    >
+      <DrawingToolIcon name={icon} />
+    </button>
+  );
+  const utility = (
+    key: string,
+    label: string,
+    icon: DrawingIconName,
+    action: () => void,
+    active: boolean
+  ) => (
+    <DrawingToolbarSplit
+      key={key}
+      id={key}
+      toolId={key}
+      label={label}
+      menuLabel={label}
+      icon={icon}
+      active={active}
+      expanded={menu?.key === key}
+      onChoose={() => {
+        closeMenu();
+        action();
+      }}
+      onMenu={(anchor) => openMenu(key, anchor)}
+    />
+  );
   return (
-    <aside className="drawing-tools" aria-label="Инструменты рисования">
-      <button
-        className={`tool ${state.activeTool == null ? "active" : ""}`}
-        data-tool="cursor"
-        title="Курсор"
-        aria-label="Курсор"
-        onClick={() => choose(null)}
-      >
-        ＋
-      </button>
+    <aside
+      ref={rail}
+      className="drawing-tools drawing-toolbar"
+      aria-label="Инструменты рисования"
+      onKeyDown={(event) => {
+        if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key) || menu) return;
+        const buttons = Array.from(
+          rail.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? []
+        );
+        const index = buttons.indexOf(event.target as HTMLButtonElement);
+        if (index < 0) return;
+        event.preventDefault();
+        buttons[
+          event.key === "Home"
+            ? 0
+            : event.key === "End"
+              ? buttons.length - 1
+              : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length
+        ]?.focus();
+      }}
+    >
+      {TOOLBAR_GROUPS.map((part) => {
+        const last = rememberedToolbarTool(part, settings.lastTools);
+        const active = part.sections.some((section) => section.items.some(selected));
+        return (
+          <DrawingToolbarSplit
+            key={part.id}
+            id={part.id}
+            toolId={last.id}
+            label={`${part.title}: ${last.label}`}
+            menuLabel={part.title}
+            icon={last.icon}
+            active={active}
+            disabled={!toolbarToolAvailable(last)}
+            expanded={menu?.key === part.id}
+            onChoose={() => choose(part, last)}
+            onMenu={(anchor) => openMenu(part.id, anchor)}
+          />
+        );
+      })}
+      <span className="tool-divider" />
+      {button("measure", "Линейка", "ruler", () => {}, false, true)}
+      {button("zoom", "Увеличить масштаб", "zoom", () => {}, false, true)}
+      {button("zoom-out", "Уменьшить масштаб", "zoomOut", () => {}, false, true)}
+      <span className="tool-divider" />
+      {utility(
+        "magnet",
+        settings.magnet === "strong" ? "Сильный магнит" : "Магнит",
+        settings.magnet === "strong" ? "strongMagnet" : "magnet",
+        () => run(() => controller.tools.toggleMagnet()),
+        settings.magnet !== "off"
+      )}
+      {button(
+        "stay-in-drawing-mode",
+        "Продолжить в режиме рисования",
+        "keepDrawing",
+        () => run(() => controller.tools.toggleOption("stayInDrawingMode")),
+        settings.stayInDrawingMode
+      )}
+      {utility(
+        "lock",
+        `${scopeActive("lock", settings.lockTarget) ? "Открепить" : "Закрепить"} ${targetNames[settings.lockTarget]}`,
+        "lock",
+        () => run(() => controller.tools.toggleLock()),
+        scopeActive("lock", settings.lockTarget)
+      )}
+      {utility(
+        "hide",
+        `${scopeActive("hide", settings.hideTarget) ? "Показать" : "Скрыть"} ${targetNames[settings.hideTarget]}`,
+        settings.drawingsHidden || settings.indicatorsHidden ? "hideOff" : "show",
+        () => run(() => controller.tools.toggleHide()),
+        scopeActive("hide", settings.hideTarget)
+      )}
       <span className="tool-divider" />
       <button
+        type="button"
+        id="delete-drawings"
         className="tool"
-        data-tool-group="lines"
-        title="Линии"
-        aria-label="Линии"
-        onClick={() => setMenu(menu === "lines" ? null : "lines")}
+        title="Удалить объекты"
+        aria-label="Удалить объекты"
+        aria-haspopup="menu"
+        aria-expanded={menu?.key === "trash"}
+        onClick={(event) => openMenu("trash", event.currentTarget)}
       >
-        ╱
+        <DrawingToolIcon name="trash" />
       </button>
-      <button
-        className={`tool ${state.activeTool === "horizontalStraightLine" ? "active" : ""}`}
-        data-tool="horizontalStraightLine"
-        title="Горизонтальная линия"
-        aria-label="Горизонтальная линия"
-        onClick={() => choose("horizontalStraightLine")}
-      >
-        ━
-      </button>
-      <button
-        className="tool"
-        data-tool-group="fib"
-        title="Инструменты Фибоначчи"
-        aria-label="Фибоначчи"
-        onClick={() => setMenu(menu === "fib" ? null : "fib")}
-      >
-        ☷
-      </button>
-      <button
-        className="tool"
-        id="attach-image"
-        title="Добавить изображение"
-        aria-label="Добавить изображение"
-        onClick={() => {
-          if (!controller.chart) controller.notify("Сначала откройте график.");
-          else file.current?.click();
-        }}
-      >
-        ▧
-      </button>
+      <div className="rail-spacer" />
+      {button("fit-chart", "Показать весь график", "fit", () => controller.chart?.fit())}
+      {button(
+        "favorite-drawings",
+        "Избранные инструменты",
+        "star",
+        () => {
+          const anchor = rail.current?.querySelector<HTMLElement>("#favorite-drawings");
+          if (anchor) openMenu("favorites", anchor);
+        },
+        menu?.key === "favorites"
+      )}
+      {button("chart-settings-button", "Настройки графика", "settings", () =>
+        controller.setDialog("chart-settings")
+      )}
       <input
         ref={file}
         id="image-file"
         type="file"
         accept="image/png,image/jpeg,image/webp,image/gif"
         hidden
-        onChange={(e) => {
-          const image = e.target.files?.[0];
-          e.target.value = "";
-          if (image)
-            void controller
-              .attachImage(image)
-              .catch((error: unknown) =>
-                controller.notify(error instanceof Error ? error.message : "Изображение недоступно")
-              );
+        onChange={(event) => {
+          const image = event.target.files?.[0];
+          event.target.value = "";
+          if (image) run(() => controller.attachImage(image));
         }}
       />
-      <span className="tool-divider" />
-      <button
-        className="tool"
-        id="fit-chart"
-        title="Показать весь график"
-        aria-label="Показать весь график"
-        onClick={() => controller.chart?.fit()}
-      >
-        ⛶
-      </button>
-      <button
-        className="tool"
-        id="delete-drawings"
-        title="Удалить рисунки"
-        aria-label="Удалить рисунки"
-        onClick={() => setClear(!clear)}
-      >
-        ♜
-      </button>
-      <button
-        className="tool"
-        id="chart-settings-button"
-        title="Настройки графика"
-        aria-label="Настройки графика"
-        onClick={() => controller.setDialog("chart-settings")}
-      >
-        ⚙
-      </button>
-      <div className="rail-spacer" />
-      <span className="rail-label">РФ</span>
-      {menu && (
-        <div className="drawing-menu" style={{ left: 54, top: menu === "fib" ? 155 : 90 }}>
-          <small>{menu === "fib" ? "ФИБОНАЧЧИ" : "ЛИНИИ"}</small>
-          {choices.map((tool) => (
-            <button key={tool} data-drawing-tool={tool} onClick={() => choose(tool)}>
-              <span>{tool.startsWith("fibonacci") ? "☷" : "╱"}</span>
-              {TOOL_NAMES[tool]}
-              {tool === "fibonacciLine" && <kbd>Alt + F</kbd>}
-            </button>
-          ))}
-        </div>
-      )}
-      {clear && (
-        <div className="drawing-menu" style={{ left: 54, top: 290 }}>
-          <small>Рисунки текущего инструмента</small>
-          <button
-            onClick={() => {
-              void controller.setDrawings([]);
-              setClear(false);
-            }}
-          >
-            Удалить все рисунки
-          </button>
-          <button onClick={() => setClear(false)}>Отмена</button>
-        </div>
+      {menu?.owner === state.owner && menu.scope === controller.tools.scopeKey() && (
+        <DrawingToolbarMenu
+          key={`${menu.key}:${menu.owner}`}
+          id="drawing-toolbar-menu"
+          title={title}
+          anchor={menu.anchor}
+          sections={sections}
+          onClose={closeMenu}
+        />
       )}
     </aside>
   );

@@ -1,6 +1,7 @@
 import { memo } from "react";
 import type { IndicatorKey } from "../../model/types.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
+import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { precision } from "../../charts/adapter.js";
 import { useTerminal } from "./context.js";
 import { INDICATOR_NAMES, PERIOD_LABELS, number, signClass } from "./state.js";
@@ -30,15 +31,16 @@ function IndicatorLegend() {
       {(Object.entries(INDICATOR_NAMES) as [IndicatorKey, string][])
         .filter(
           ([key]) =>
-            key.startsWith("mtp") ||
-            key === "volume" ||
-            p.indicators[key] ||
-            p.chartSettings.indicatorOptions?.[key]
+            !p.chartSettings.removedIndicators?.includes(key) &&
+            (key.startsWith("mtp") ||
+              key === "volume" ||
+              p.indicators[key] ||
+              p.chartSettings.indicatorOptions?.[key])
         )
         .map(([key, name]) => (
           <div
             key={key}
-            className={`legend-row ${p.indicators[key] ? "" : "legend-hidden"}`}
+            className={`legend-row ${p.indicators[key] && !drawingToolbarSettings(p.chartSettings).indicatorsHidden ? "" : "legend-hidden"}`}
             onContextMenu={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -82,7 +84,13 @@ export function ChartPanel() {
       : state.candles.at(-1),
     digits = row ? precision(row) : 2;
   return (
-    <section className="chart-panel" aria-label="График инструмента">
+    <section
+      id="chart-panel"
+      className="chart-panel"
+      aria-label="График инструмента"
+      aria-busy={state.authenticated && state.loading}
+      data-history-loading={(state.authenticated && state.loading) || undefined}
+    >
       <div className="chart-heading">
         <div className="instrument-title">
           {row && <InstrumentIcon key={row.uid ?? row.symbol} row={row} id="chart-icon" />}
@@ -109,7 +117,7 @@ export function ChartPanel() {
         <ImageLayer />
         <DrawingAxisLabels />
         <CandleCountdown />
-        {(!state.authenticated || !state.candles.length) && (
+        {(!state.authenticated || (!state.candles.length && !state.loading)) && (
           <div className="chart-message" id="chart-message">
             <span className="message-icon">⌃</span>
             <h2>
@@ -117,9 +125,7 @@ export function ChartPanel() {
                 ? "Ваш рынок. Ваш график."
                 : !state.rows.length
                   ? "Добавьте инструмент"
-                  : state.loading
-                    ? "Загружаем историю"
-                    : "История недоступна"}
+                  : "История недоступна"}
             </h2>
             <p>
               {!state.authenticated

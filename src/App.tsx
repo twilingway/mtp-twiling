@@ -6,6 +6,7 @@ import { RightPanel } from "./screens/terminal/RightPanel.js";
 import { ChartPanel } from "./screens/terminal/ChartPanel.js";
 import { DrawingToolbar } from "./screens/terminal/DrawingToolbar.js";
 import { AccountDialog } from "./screens/terminal/AccountDialog.js";
+import { DeleteObjectDialog } from "./screens/terminal/DeleteObjectDialog.js";
 import { InstrumentSearch } from "./screens/terminal/InstrumentSearch.js";
 import {
   ChartSettingsDialog,
@@ -14,12 +15,18 @@ import {
 import { DrawingSettingsDialog } from "./screens/terminal/drawings/DrawingSettingsDialog.js";
 import { ContextMenu } from "./screens/terminal/drawings/ContextMenu.js";
 import { TerminalLifecycle, UpdateBanner } from "./screens/terminal/TerminalLifecycle.js";
+import { ThemeEffect } from "./screens/terminal/ThemeEffect.js";
 function Terminal() {
   const { state } = useTerminal();
   return (
     <>
+      <ThemeEffect />
       <Toolbar />
-      <main className="workspace">
+      <main
+        className="workspace"
+        data-right-panel-collapsed={!!state.preferences.rightPanelCollapsed}
+        data-mobile-panel-open={!!state.mobilePanelOpen && !state.preferences.rightPanelCollapsed}
+      >
         <DrawingToolbar />
         <ChartPanel />
         <RightPanel />
@@ -29,6 +36,7 @@ function Terminal() {
       {state.dialog === "chart-settings" && <ChartSettingsDialog />}
       {state.dialog === "indicator-settings" && <IndicatorSettingsDialog />}
       <DrawingSettingsDialog />
+      <DeleteObjectDialog />
       <ContextMenu />
       {state.toast && (
         <div id="toast" role="status">

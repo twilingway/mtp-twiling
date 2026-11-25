@@ -1,0 +1,5106 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-11-25T13:22:45.664Z",
+  "scope": "all built-ins currently present in already-open selector data, not a worldwide/permanent TradingView catalog",
+  "counts": {
+    "indicators": 127,
+    "strategies": 23,
+    "patterns": 64,
+    "profiles": 8,
+    "options": 2
+  },
+  "inputDefaults": null,
+  "algorithmSourcesAcquired": 0,
+  "items": [
+    {
+      "id": "STD;Bollinger_Bands_B",
+      "nameRu": "%B Полос Боллинджера",
+      "nameEn": "Bollinger Bands %b",
+      "shortTitle": "BB %b",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Bollinger_Bands_B",
+        "pineVersion": "36.0"
+      },
+      "tags": [
+        "BBB"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;24h%Volume",
+      "nameRu": "24-hour volume",
+      "nameEn": "24-hour volume",
+      "shortTitle": "24H vol",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "9.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;24h%Volume",
+        "pineVersion": "9.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Accumulation_Distribution",
+      "nameRu": "Accumulation/distribution",
+      "nameEn": "Accumulation/distribution",
+      "shortTitle": "Accum/dist",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Accumulation_Distribution",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Advance%1Decline%1Line",
+      "nameRu": "Advance-decline line",
+      "nameEn": "Advance-decline line",
+      "shortTitle": "ADL",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Advance%1Decline%1Line",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Advance%1Decline%1Ratio",
+      "nameRu": "Advance-decline ratio",
+      "nameEn": "Advance-decline ratio",
+      "shortTitle": "ADR",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Advance%1Decline%1Ratio",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Advance_Decline_Ratio_Bars",
+      "nameRu": "Advance-decline ratio (bars)",
+      "nameEn": "Advance-decline ratio (bars)",
+      "shortTitle": "ADR (bars)",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Advance_Decline_Ratio_Bars",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Arnaud%1Legoux%1Moving%1Average",
+      "nameRu": "Arnaud Legoux moving average",
+      "nameEn": "Arnaud Legoux moving average",
+      "shortTitle": "ALMA",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Arnaud%1Legoux%1Moving%1Average",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Aroon_Oscillator",
+      "nameRu": "Aroon oscillator",
+      "nameEn": "Aroon oscillator",
+      "shortTitle": "Aroon osc",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "4.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Aroon_Oscillator",
+        "pineVersion": "4.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Auto%1Fib%1Extension%1",
+      "nameRu": "Auto fib extension",
+      "nameEn": "Auto fib extension",
+      "shortTitle": "Auto fib extension",
+      "category": "indicators",
+      "packageName": "auto-standard",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Auto%1Fib%1Extension%1",
+        "pineVersion": "31.0"
+      },
+      "tags": [
+        "Fibonacci"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Auto%1Fib%1Retracement%1",
+      "nameRu": "Auto fib retracement",
+      "nameEn": "Auto fib retracement",
+      "shortTitle": "Auto fib retracement",
+      "category": "indicators",
+      "packageName": "auto-standard",
+      "version": "41.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Auto%1Fib%1Retracement%1",
+        "pineVersion": "41.0"
+      },
+      "tags": [
+        "Fibonacci"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Auto_Key_Levels",
+      "nameRu": "Auto key levels",
+      "nameEn": "Auto key levels",
+      "shortTitle": "Auto key levels",
+      "category": "indicators",
+      "packageName": "auto-standard",
+      "version": "4.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Auto_Key_Levels",
+        "pineVersion": "4.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Auto%1Pitchfork",
+      "nameRu": "Auto pitchfork",
+      "nameEn": "Auto pitchfork",
+      "shortTitle": "Auto pitchfork",
+      "category": "indicators",
+      "packageName": "auto-standard",
+      "version": "13.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Auto%1Pitchfork",
+        "pineVersion": "13.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "AutoTrendlinesCP@tv-chart_patterns",
+      "nameRu": "Auto trendlines",
+      "nameEn": "Auto trendlines",
+      "shortTitle": "Auto trendlines",
+      "category": "indicators",
+      "packageName": "auto-standard",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "AutoTrendlinesCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": true,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Average%1Directional%1Index",
+      "nameRu": "Average directional index",
+      "nameEn": "Average directional index",
+      "shortTitle": "ADX",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Average%1Directional%1Index",
+        "pineVersion": "32.0"
+      },
+      "tags": [
+        "Directional Moving Index",
+        "dmi"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Awesome_Oscillator",
+      "nameRu": "Awesome oscillator",
+      "nameEn": "Awesome oscillator",
+      "shortTitle": "AO",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Awesome_Oscillator",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Balance%1of%1Power",
+      "nameRu": "Balance of power",
+      "nameEn": "Balance of power",
+      "shortTitle": "Balance of power",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Balance%1of%1Power",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;BBTrend",
+      "nameRu": "BBTrend",
+      "nameEn": "BBTrend",
+      "shortTitle": "BBTrend",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "5.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;BBTrend",
+        "pineVersion": "5.0"
+      },
+      "tags": [
+        "Bollinger",
+        "BB trend"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Bollinger_Bands_Width",
+      "nameRu": "Bollinger BandWidth",
+      "nameEn": "Bollinger BandWidth",
+      "shortTitle": "BBW",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Bollinger_Bands_Width",
+        "pineVersion": "34.0"
+      },
+      "tags": [
+        "Bollinger Bands Width"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Chaikin_Money_Flow",
+      "nameRu": "Chaikin money flow",
+      "nameEn": "Chaikin money flow",
+      "shortTitle": "CMF",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Chaikin_Money_Flow",
+        "pineVersion": "32.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Chaikin_Oscillator",
+      "nameRu": "Chaikin oscillator",
+      "nameEn": "Chaikin oscillator",
+      "shortTitle": "Chaikin osc",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Chaikin_Oscillator",
+        "pineVersion": "32.0"
+      },
+      "tags": [
+        "co"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Chande%1Kroll%1Stop",
+      "nameRu": "Chande Kroll stop",
+      "nameEn": "Chande Kroll stop",
+      "shortTitle": "Chande Kroll stop",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Chande%1Kroll%1Stop",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Chande_Momentum_Oscillator",
+      "nameRu": "Chande momentum oscillator",
+      "nameEn": "Chande momentum oscillator",
+      "shortTitle": "ChandeMO",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Chande_Momentum_Oscillator",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Chandelier_Exit",
+      "nameRu": "Chandelier exit",
+      "nameEn": "Chandelier exit",
+      "shortTitle": "Chandelier",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "4.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Chandelier_Exit",
+        "pineVersion": "4.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Chop%1Zone",
+      "nameRu": "Chop zone",
+      "nameEn": "Chop zone",
+      "shortTitle": "Chop zone",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Chop%1Zone",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Choppiness_Index",
+      "nameRu": "Choppiness index",
+      "nameEn": "Choppiness index",
+      "shortTitle": "CHOP",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Choppiness_Index",
+        "pineVersion": "32.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;CCI",
+      "nameRu": "Commodity channel index",
+      "nameEn": "Commodity channel index",
+      "shortTitle": "CCI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "40.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;CCI",
+        "pineVersion": "40.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Coppock%1Curve",
+      "nameRu": "Coppock curve",
+      "nameEn": "Coppock curve",
+      "shortTitle": "Coppock curve",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Coppock%1Curve",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Correlation_Coeff",
+      "nameRu": "Correlation coefficient",
+      "nameEn": "Correlation coefficient",
+      "shortTitle": "CC",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Correlation_Coeff",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "CumulativeVolumeDelta@tv-basicstudies",
+      "nameRu": "Cumulative volume delta",
+      "nameEn": "CVD",
+      "shortTitle": "CVD",
+      "category": "indicators",
+      "packageName": "tv-basicstudies",
+      "version": 285,
+      "descriptor": {
+        "type": "java",
+        "studyId": "CumulativeVolumeDelta@tv-basicstudies"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Cumulative%1Volume%1Index",
+      "nameRu": "Cumulative volume index",
+      "nameEn": "Cumulative volume index",
+      "shortTitle": "CVI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Cumulative%1Volume%1Index",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;DPO",
+      "nameRu": "Detrended price oscillator",
+      "nameEn": "Detrended price oscillator",
+      "shortTitle": "DPO",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;DPO",
+        "pineVersion": "32.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Donchian_Channels",
+      "nameRu": "Donchian channels",
+      "nameEn": "Donchian channels",
+      "shortTitle": "DC",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Donchian_Channels",
+        "pineVersion": "32.0"
+      },
+      "tags": [
+        "Price channels"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;DEMA",
+      "nameRu": "Double exponential moving average",
+      "nameEn": "Double exponential moving average",
+      "shortTitle": "DEMA",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "33.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;DEMA",
+        "pineVersion": "33.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;EOM",
+      "nameRu": "Ease of movement",
+      "nameEn": "Ease of movement",
+      "shortTitle": "EOM",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;EOM",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;EFI",
+      "nameRu": "Elder&#039;s force index",
+      "nameEn": "Elder&#039;s force index",
+      "shortTitle": "EFI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;EFI",
+        "pineVersion": "32.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;EMA",
+      "nameRu": "Exponential moving average",
+      "nameEn": "Exponential moving average",
+      "shortTitle": "EMA",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "38.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;EMA",
+        "pineVersion": "38.0"
+      },
+      "tags": [
+        "MA"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Fisher_Transform",
+      "nameRu": "Fisher transform",
+      "nameEn": "Fisher transform",
+      "shortTitle": "Fisher",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Fisher_Transform",
+        "pineVersion": "32.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Historical_Volatility",
+      "nameRu": "Historical volatility",
+      "nameEn": "Historical volatility",
+      "shortTitle": "HV",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Historical_Volatility",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Hull%1MA",
+      "nameRu": "Hull moving average",
+      "nameEn": "Hull moving average",
+      "shortTitle": "HMA",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "28.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Hull%1MA",
+        "pineVersion": "28.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Kaufmans_Adaptive_Moving_Average",
+      "nameRu": "Kaufman&#039;s adaptive moving average",
+      "nameEn": "Kaufman&#039;s adaptive moving average",
+      "shortTitle": "KAMA",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "4.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Kaufmans_Adaptive_Moving_Average",
+        "pineVersion": "4.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Keltner_Channels",
+      "nameRu": "Keltner channels",
+      "nameEn": "Keltner channels",
+      "shortTitle": "KC",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "35.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Keltner_Channels",
+        "pineVersion": "35.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Klinger%1Oscillator",
+      "nameRu": "Klinger oscillator",
+      "nameEn": "Klinger oscillator",
+      "shortTitle": "Klinger oscillator",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Klinger%1Oscillator",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Know_Sure_Thing",
+      "nameRu": "Know sure thing",
+      "nameEn": "Know sure thing",
+      "shortTitle": "KST",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Know_Sure_Thing",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Least%1Squares%1Moving%1Average",
+      "nameRu": "Least squares moving average",
+      "nameEn": "Least squares moving average",
+      "shortTitle": "LSMA",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Least%1Squares%1Moving%1Average",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Linear_Regression",
+      "nameRu": "Linear regression channel",
+      "nameEn": "Linear regression channel",
+      "shortTitle": "Lin reg channel",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Linear_Regression",
+        "pineVersion": "32.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Mass%1Index",
+      "nameRu": "Mass index",
+      "nameEn": "Mass index",
+      "shortTitle": "Mass index",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Mass%1Index",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;McGinley%1Dynamic",
+      "nameRu": "McGinley dynamic",
+      "nameEn": "McGinley dynamic",
+      "shortTitle": "McGinley dynamic",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;McGinley%1Dynamic",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Money_Flow",
+      "nameRu": "Money flow index",
+      "nameEn": "Money flow index",
+      "shortTitle": "MFI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "33.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Money_Flow",
+        "pineVersion": "33.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Moon%1Phases",
+      "nameRu": "Moon phases",
+      "nameEn": "Moon phases",
+      "shortTitle": "Moon phases",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "5.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Moon%1Phases",
+        "pineVersion": "5.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;MA%1Cross",
+      "nameRu": "Moving average crossover",
+      "nameEn": "Moving average crossover",
+      "shortTitle": "Moving average crossover",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "33.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;MA%1Cross",
+        "pineVersion": "33.0"
+      },
+      "tags": [
+        "Moving Average Cross"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;MA%Ribbon",
+      "nameRu": "Moving average ribbon",
+      "nameEn": "Moving average ribbon",
+      "shortTitle": "MA ribbon",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "16.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;MA%Ribbon",
+        "pineVersion": "16.0"
+      },
+      "tags": [
+        "EMA",
+        "EMA Ribbon",
+        "Exponential Moving Average",
+        "SMA",
+        "SMA Ribbon",
+        "Simple Moving Average"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Multi-Time%Period%Charts",
+      "nameRu": "Multi-time period charts",
+      "nameEn": "Multi-time period charts",
+      "shortTitle": "MTPC",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "17.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Multi-Time%Period%Charts",
+        "pineVersion": "17.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Negative_Volume_Index",
+      "nameRu": "Negative volume index",
+      "nameEn": "Negative volume index",
+      "shortTitle": "NVI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "4.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Negative_Volume_Index",
+        "pineVersion": "4.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Net%1Volume",
+      "nameRu": "Net volume",
+      "nameEn": "Net volume",
+      "shortTitle": "Net volume",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "33.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Net%1Volume",
+        "pineVersion": "33.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;On_Balance_Volume",
+      "nameRu": "On-balance volume",
+      "nameEn": "On-balance volume",
+      "shortTitle": "OBV",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "39.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;On_Balance_Volume",
+        "pineVersion": "39.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Open%Interest",
+      "nameRu": "Open interest",
+      "nameEn": "Open interest",
+      "shortTitle": "OI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "9.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Open%Interest",
+        "pineVersion": "9.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Volume%1Oscillator",
+      "nameRu": "Percentage volume oscillator",
+      "nameEn": "Percentage volume oscillator",
+      "shortTitle": "PVO",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "33.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Volume%1Oscillator",
+        "pineVersion": "33.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Pivot%1Points%1High%1Low",
+      "nameRu": "Pivot points high low",
+      "nameEn": "Pivot points high low",
+      "shortTitle": "Pivots HL",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "13.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Pivot%1Points%1High%1Low",
+        "pineVersion": "13.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Pivot%1Points%1Standard",
+      "nameRu": "Pivot points standard",
+      "nameEn": "Pivot points standard",
+      "shortTitle": "Pivots",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "24.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Pivot%1Points%1Standard",
+        "pineVersion": "24.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Positive_Volume_Index",
+      "nameRu": "Positive volume index",
+      "nameEn": "Positive volume index",
+      "shortTitle": "PVI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "4.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Positive_Volume_Index",
+        "pineVersion": "4.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Price_Momentum_Oscillator",
+      "nameRu": "Price momentum oscillator",
+      "nameEn": "Price momentum oscillator",
+      "shortTitle": "PMO",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "4.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Price_Momentum_Oscillator",
+        "pineVersion": "4.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Price_Oscillator",
+      "nameRu": "Price oscillator",
+      "nameEn": "Price oscillator",
+      "shortTitle": "PPO",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "35.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Price_Oscillator",
+        "pineVersion": "35.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Price%1Target",
+      "nameRu": "Price target",
+      "nameEn": "Price target",
+      "shortTitle": "Price target",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "5.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Price%1Target",
+        "pineVersion": "5.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Price_Volume_Trend",
+      "nameRu": "Price-volume trend",
+      "nameEn": "Price-volume trend",
+      "shortTitle": "PVT",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Price_Volume_Trend",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Prings_Special_K",
+      "nameRu": "Pring&#039;s special K",
+      "nameEn": "Pring&#039;s special K",
+      "shortTitle": "Special K",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "4.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Prings_Special_K",
+        "pineVersion": "4.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Rank_Correlation_Index",
+      "nameRu": "Rank correlation index",
+      "nameEn": "Rank correlation index",
+      "shortTitle": "RCI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "6.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Rank_Correlation_Index",
+        "pineVersion": "6.0"
+      },
+      "tags": [
+        "Spearman",
+        "Spearman's rank correlation coeffecient"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;ROC",
+      "nameRu": "Rate of change",
+      "nameEn": "Rate of change",
+      "shortTitle": "ROC",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;ROC",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;RCI_Ribbon",
+      "nameRu": "RCI ribbon",
+      "nameEn": "RCI ribbon",
+      "shortTitle": "RCI ribbon",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "4.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;RCI_Ribbon",
+        "pineVersion": "4.0"
+      },
+      "tags": [
+        "Rank Correlation Index",
+        "Spearman",
+        "Spearman's rank correlation coeffecient",
+        "RCI3lines"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;RSI",
+      "nameRu": "Relative strength index",
+      "nameEn": "Relative strength index",
+      "shortTitle": "RSI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "47.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;RSI",
+        "pineVersion": "47.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Relative_Vigor_Index",
+      "nameRu": "Relative vigor index",
+      "nameEn": "Relative vigor index",
+      "shortTitle": "RVGI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Relative_Vigor_Index",
+        "pineVersion": "32.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Relative_Volatility_Index",
+      "nameRu": "Relative volatility index",
+      "nameEn": "Relative volatility index",
+      "shortTitle": "Rel volatility idx",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "37.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Relative_Volatility_Index",
+        "pineVersion": "37.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Relative%1Volume%1at%1Time",
+      "nameRu": "Relative volume at time",
+      "nameEn": "Relative volume at time",
+      "shortTitle": "Rel vol",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "7.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Relative%1Volume%1at%1Time",
+        "pineVersion": "7.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "BookerIntradayPivots@tv-basicstudies",
+      "nameRu": "Rob Booker - intraday pivot points",
+      "nameEn": "RB IPP",
+      "shortTitle": "RB IPP",
+      "category": "indicators",
+      "packageName": "tv-basicstudies",
+      "version": 285,
+      "descriptor": {
+        "type": "java",
+        "studyId": "BookerIntradayPivots@tv-basicstudies"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "BookerKnoxvilleDivergence@tv-basicstudies",
+      "nameRu": "Rob Booker - Knoxville divergence",
+      "nameEn": "RB Knox div",
+      "shortTitle": "RB Knox div",
+      "category": "indicators",
+      "packageName": "tv-basicstudies",
+      "version": 285,
+      "descriptor": {
+        "type": "java",
+        "studyId": "BookerKnoxvilleDivergence@tv-basicstudies"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "BookerMissedPivots@tv-basicstudies",
+      "nameRu": "Rob Booker - missed pivot points",
+      "nameEn": "RB MPP",
+      "shortTitle": "RB MPP",
+      "category": "indicators",
+      "packageName": "tv-basicstudies",
+      "version": 285,
+      "descriptor": {
+        "type": "java",
+        "studyId": "BookerMissedPivots@tv-basicstudies"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "BookerReversal@tv-basicstudies",
+      "nameRu": "Rob Booker - reversal",
+      "nameEn": "RB rev",
+      "shortTitle": "RB rev",
+      "category": "indicators",
+      "packageName": "tv-basicstudies",
+      "version": 285,
+      "descriptor": {
+        "type": "java",
+        "studyId": "BookerReversal@tv-basicstudies"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Rob%1Booker%1Ghost%1Pivots%1v2",
+      "nameRu": "Rob Booker — Ziv ghost pivots",
+      "nameEn": "Rob Booker — Ziv ghost pivots",
+      "shortTitle": "RB Ghost pivots",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Rob%1Booker%1Ghost%1Pivots%1v2",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Divergence%1Indicator",
+      "nameRu": "RSI divergence indicator",
+      "nameEn": "RSI divergence indicator",
+      "shortTitle": "RSI divergence",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "37.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Divergence%1Indicator",
+        "pineVersion": "37.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Connors_RSI",
+      "nameRu": "RSI Коннора",
+      "nameEn": "Connors RSI",
+      "shortTitle": "CRSI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "33.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Connors_RSI",
+        "pineVersion": "33.0"
+      },
+      "tags": [
+        "Connors Relative Strength Index"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;SMA",
+      "nameRu": "Simple moving average",
+      "nameEn": "Simple moving average",
+      "shortTitle": "SMA",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "41.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;SMA",
+        "pineVersion": "41.0"
+      },
+      "tags": [
+        "SMA",
+        "MA"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;SMI_Ergodic_Indicator_Oscillator",
+      "nameRu": "SMI ergodic indicator",
+      "nameEn": "SMI ergodic indicator",
+      "shortTitle": "SMII",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;SMI_Ergodic_Indicator_Oscillator",
+        "pineVersion": "32.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;SMI_Ergodic_Oscillator",
+      "nameRu": "SMI ergodic oscillator",
+      "nameEn": "SMI ergodic oscillator",
+      "shortTitle": "SMIO",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "28.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;SMI_Ergodic_Oscillator",
+        "pineVersion": "28.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Smoothed%1Moving%1Average",
+      "nameRu": "Smoothed moving average",
+      "nameEn": "Smoothed moving average",
+      "shortTitle": "Smoothed MA",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Smoothed%1Moving%1Average",
+        "pineVersion": "32.0"
+      },
+      "tags": [
+        "MA"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;SMI",
+      "nameRu": "Stochastic momentum index",
+      "nameEn": "Stochastic momentum index",
+      "shortTitle": "Stoch MI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "6.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;SMI",
+        "pineVersion": "6.0"
+      },
+      "tags": [
+        "Stochastic Momentum Indicator"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Technical%1Ratings",
+      "nameRu": "Technical ratings",
+      "nameEn": "Technical ratings",
+      "shortTitle": "Technicals",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "18.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Technical%1Ratings",
+        "pineVersion": "18.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Time%1Weighted%1Average%1Price",
+      "nameRu": "Time-weighted average price",
+      "nameEn": "Time-weighted average price",
+      "shortTitle": "TWAP",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "7.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Time%1Weighted%1Average%1Price",
+        "pineVersion": "7.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Trading%1Sessions",
+      "nameRu": "Trading sessions",
+      "nameEn": "Trading sessions",
+      "shortTitle": "Trading sessions",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "7.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Trading%1Sessions",
+        "pineVersion": "7.0"
+      },
+      "tags": [
+        "Forex",
+        "FX",
+        "Asian",
+        "European",
+        "American",
+        "Session",
+        "Trading Sessions",
+        "Trading"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Trend%1Strength%1Index",
+      "nameRu": "Trend strength index",
+      "nameEn": "Trend strength index",
+      "shortTitle": "TSI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "4.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Trend%1Strength%1Index",
+        "pineVersion": "4.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;TEMA",
+      "nameRu": "Triple exponential moving average",
+      "nameEn": "Triple exponential moving average",
+      "shortTitle": "TEMA",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "33.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;TEMA",
+        "pineVersion": "33.0"
+      },
+      "tags": [
+        "MA"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;True%1Strength%1Indicator",
+      "nameRu": "True strength index",
+      "nameEn": "True strength index",
+      "shortTitle": "TSI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;True%1Strength%1Indicator",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Ulcer_Index",
+      "nameRu": "Ulcer index",
+      "nameEn": "Ulcer index",
+      "shortTitle": "Ulcer index",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "4.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Ulcer_Index",
+        "pineVersion": "4.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Ultimate_Oscillator",
+      "nameRu": "Ultimate oscillator",
+      "nameEn": "Ultimate oscillator",
+      "shortTitle": "UO",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Ultimate_Oscillator",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;UP_DOWN_Volume",
+      "nameRu": "Up/down volume",
+      "nameEn": "Up/down volume",
+      "shortTitle": "Up/dn vol",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "10.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;UP_DOWN_Volume",
+        "pineVersion": "10.0"
+      },
+      "tags": [
+        "upvol",
+        "dnvol",
+        "updn vol"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Visible%1Average%1Price",
+      "nameRu": "Visible average price",
+      "nameEn": "Visible average price",
+      "shortTitle": "Avg price",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "5.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Visible%1Average%1Price",
+        "pineVersion": "5.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Volatility_Stop",
+      "nameRu": "Volatility stop",
+      "nameEn": "Volatility stop",
+      "shortTitle": "VStop",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "21.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Volatility_Stop",
+        "pineVersion": "21.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "VolumeDelta@tv-basicstudies",
+      "nameRu": "Volume delta",
+      "nameEn": "Volume delta",
+      "shortTitle": "Volume delta",
+      "category": "indicators",
+      "packageName": "tv-basicstudies",
+      "version": 285,
+      "descriptor": {
+        "type": "java",
+        "studyId": "VolumeDelta@tv-basicstudies"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Vortex%1Indicator",
+      "nameRu": "Vortex indicator",
+      "nameEn": "Vortex indicator",
+      "shortTitle": "VI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Vortex%1Indicator",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "VWAPAA@tv-basicstudies",
+      "nameRu": "VWAP auto-anchored",
+      "nameEn": "VWAP AA",
+      "shortTitle": "VWAP AA",
+      "category": "indicators",
+      "packageName": "auto-standard",
+      "version": 285,
+      "descriptor": {
+        "type": "java",
+        "studyId": "VWAPAA@tv-basicstudies"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;WMA",
+      "nameRu": "Weighted moving average",
+      "nameEn": "Weighted moving average",
+      "shortTitle": "WMA",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;WMA",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Williams_Alligator",
+      "nameRu": "Williams alligator",
+      "nameEn": "Williams alligator",
+      "shortTitle": "Alligator",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Williams_Alligator",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Whilliams_Fractals",
+      "nameRu": "Williams fractal",
+      "nameEn": "Williams fractal",
+      "shortTitle": "Fractal",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Whilliams_Fractals",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Zig_Zag",
+      "nameRu": "Zigzag",
+      "nameEn": "Zigzag",
+      "shortTitle": "Zigzag",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "44.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Zig_Zag",
+        "pineVersion": "44.0"
+      },
+      "tags": [
+        "ZigZag"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Bull%Bear%Power",
+      "nameRu": "«Сила быков» и «Сила медведей»",
+      "nameEn": "Bull bear power",
+      "shortTitle": "BBP",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "7.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Bull%Bear%Power",
+        "pineVersion": "7.0"
+      },
+      "tags": [
+        "Elder-Ray Index",
+        "Elder Ray Index"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Aroon",
+      "nameRu": "Арун",
+      "nameEn": "Aroon",
+      "shortTitle": "Aroon",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "33.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Aroon",
+        "pineVersion": "33.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Bollinger%1Bars",
+      "nameRu": "Бары Боллинджера",
+      "nameEn": "Bollinger Bars",
+      "shortTitle": "Bollinger bars",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "4.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Bollinger%1Bars",
+        "pineVersion": "4.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;VWAP",
+      "nameRu": "Взвешенная по объёму средняя цена",
+      "nameEn": "Volume-weighted average price",
+      "shortTitle": "VWAP",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "48.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;VWAP",
+        "pineVersion": "48.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Woodies%1CCI",
+      "nameRu": "Вуди CCI",
+      "nameEn": "Woodies CCI",
+      "shortTitle": "Woodies CCI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Woodies%1CCI",
+        "pineVersion": "32.0"
+      },
+      "tags": [
+        "Woodies Commodity Channel Index"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Gaps",
+      "nameRu": "Гэпы",
+      "nameEn": "Gaps",
+      "shortTitle": "Gaps",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "9.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Gaps",
+        "pineVersion": "9.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Performance",
+      "nameRu": "Динамика",
+      "nameEn": "Performance",
+      "shortTitle": "Performance",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "8.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Performance",
+        "pineVersion": "8.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;DMI",
+      "nameRu": "Индекс направленного движения (DMI)",
+      "nameEn": "Directional movement index",
+      "shortTitle": "DMI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;DMI",
+        "pineVersion": "34.0"
+      },
+      "tags": [
+        "adx",
+        "average directional index"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;ENV",
+      "nameRu": "Конверт",
+      "nameEn": "Envelope",
+      "shortTitle": "Env",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;ENV",
+        "pineVersion": "32.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Momentum",
+      "nameRu": "Моментум (Momentum)",
+      "nameEn": "Momentum",
+      "shortTitle": "Mom",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Momentum",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Ichimoku%1Cloud",
+      "nameRu": "Облако Ишимоку",
+      "nameEn": "Ichimoku cloud",
+      "shortTitle": "Ichimoku",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "35.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Ichimoku%1Cloud",
+        "pineVersion": "35.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "Volume@tv-basicstudies",
+      "nameRu": "Объём",
+      "nameEn": "Vol",
+      "shortTitle": "Vol",
+      "category": "indicators",
+      "packageName": "tv-basicstudies",
+      "version": 285,
+      "descriptor": {
+        "type": "java",
+        "studyId": "Volume@tv-basicstudies"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;VWMA",
+      "nameRu": "Объёмно-взвешенное скользящее среднее",
+      "nameEn": "Volume-weighted moving average",
+      "shortTitle": "VWMA",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;VWMA",
+        "pineVersion": "32.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;PSAR",
+      "nameRu": "Параболическая система времени/цены",
+      "nameEn": "Parabolic SAR",
+      "shortTitle": "SAR",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "33.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;PSAR",
+        "pineVersion": "33.0"
+      },
+      "tags": [
+        "psar",
+        "parabolic stop and reverse"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Bollinger_Bands",
+      "nameRu": "Полосы Боллинджера",
+      "nameEn": "Bollinger Bands",
+      "shortTitle": "BB",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "35.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Bollinger_Bands",
+        "pineVersion": "35.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Willams_R",
+      "nameRu": "Процентный диапазон Вильямса",
+      "nameEn": "Williams percent range",
+      "shortTitle": "Williams %R",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Willams_R",
+        "pineVersion": "34.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Seasonality",
+      "nameRu": "Сезонный анализ",
+      "nameEn": "Seasonality",
+      "shortTitle": "Seasonality",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "10.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Seasonality",
+        "pineVersion": "10.0"
+      },
+      "tags": [
+        "Seasonals"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;TRIX",
+      "nameRu": "Скользящее среднее (тройное эксп. сглаженное)",
+      "nameEn": "TRIX",
+      "shortTitle": "TRIX",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;TRIX",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Average%Day%Range",
+      "nameRu": "Средний дневной диапазон",
+      "nameEn": "Average daily range",
+      "shortTitle": "ADR",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "9.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Average%Day%Range",
+        "pineVersion": "9.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Average_True_Range",
+      "nameRu": "Средний истинный диапазон",
+      "nameEn": "Average true range",
+      "shortTitle": "ATR",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Average_True_Range",
+        "pineVersion": "32.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Median",
+      "nameRu": "Средняя линия",
+      "nameEn": "Median",
+      "shortTitle": "Median",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "10.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Median",
+        "pineVersion": "10.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Stochastic_RSI",
+      "nameRu": "Стохастический индекс относительной силы",
+      "nameEn": "Stochastic RSI",
+      "shortTitle": "Stoch RSI",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "33.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Stochastic_RSI",
+        "pineVersion": "33.0"
+      },
+      "tags": [
+        "Stochastic Relative Strength Index"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Stochastic",
+      "nameRu": "Стохастический осциллятор",
+      "nameEn": "Stochastic",
+      "shortTitle": "Stoch",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "33.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Stochastic",
+        "pineVersion": "33.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Supertrend",
+      "nameRu": "Супертренд",
+      "nameEn": "Supertrend",
+      "shortTitle": "Supertrend",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "12.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Supertrend",
+        "pineVersion": "12.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;MACD",
+      "nameRu": "Схождение/расхождение скользящих средних",
+      "nameEn": "Moving average convergence divergence",
+      "shortTitle": "MACD",
+      "category": "indicators",
+      "packageName": "Script$STD",
+      "version": "43.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;MACD",
+        "pineVersion": "43.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": false
+      }
+    },
+    {
+      "id": "STD;Bars%1Up%1Dn%1Strategy",
+      "nameRu": "Bar up/down strategy",
+      "nameEn": "Bar up/down strategy",
+      "shortTitle": "Bar up/dn str",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Bars%1Up%1Dn%1Strategy",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Bollinger%1Bands%1Strategy",
+      "nameRu": "Bollinger Bands strategy",
+      "nameEn": "Bollinger Bands strategy",
+      "shortTitle": "Bollinger Bands str",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "29.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Bollinger%1Bands%1Strategy",
+        "pineVersion": "29.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Bollinger%1Band%1Directed%1Strategy",
+      "nameRu": "Bollinger Bands strategy directed",
+      "nameEn": "Bollinger Bands strategy directed",
+      "shortTitle": "Bollinger Bands str directed",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "29.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Bollinger%1Band%1Directed%1Strategy",
+        "pineVersion": "29.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Channel%1BreakOut%1Strategy",
+      "nameRu": "Channel breakout strategy",
+      "nameEn": "Channel breakout strategy",
+      "shortTitle": "Channel break str",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "29.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Channel%1BreakOut%1Strategy",
+        "pineVersion": "29.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Consecutive%1Ups%1Downs%1Strategy",
+      "nameRu": "Consecutive up/down strategy",
+      "nameEn": "Consecutive up/down strategy",
+      "shortTitle": "Consecutive up/dn str",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Consecutive%1Ups%1Downs%1Strategy",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Greedy%1Strategy",
+      "nameRu": "Greedy strategy",
+      "nameEn": "Greedy strategy",
+      "shortTitle": "Greedy str",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Greedy%1Strategy",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;InSide%1Bar%1Strategy",
+      "nameRu": "Inside bar strategy",
+      "nameEn": "Inside bar strategy",
+      "shortTitle": "Inside bar strategy",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;InSide%1Bar%1Strategy",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Keltner%1Channel%1Strategy",
+      "nameRu": "Keltner channels strategy",
+      "nameEn": "Keltner channels strategy",
+      "shortTitle": "Keltner channels strategy",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Keltner%1Channel%1Strategy",
+        "pineVersion": "32.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;MACD%1Strategy",
+      "nameRu": "MACD strategy",
+      "nameEn": "MACD strategy",
+      "shortTitle": "MACD strategy",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;MACD%1Strategy",
+        "pineVersion": "32.0"
+      },
+      "tags": [
+        "Moving Average Convergence Divergence"
+      ],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Momentum%1Strategy",
+      "nameRu": "Momentum strategy",
+      "nameEn": "Momentum strategy",
+      "shortTitle": "Momentum strategy",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "29.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Momentum%1Strategy",
+        "pineVersion": "29.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;MovingAvg%1Cross%1Strategy",
+      "nameRu": "Moving average crossover",
+      "nameEn": "Moving average crossover",
+      "shortTitle": "Moving average crossover",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;MovingAvg%1Cross%1Strategy",
+        "pineVersion": "31.0"
+      },
+      "tags": [
+        "Moving Average Cross"
+      ],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;OutSide%1Bar%1Strategy",
+      "nameRu": "Outside bar strategy",
+      "nameEn": "Outside bar strategy",
+      "shortTitle": "Outside bar strategy",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "29.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;OutSide%1Bar%1Strategy",
+        "pineVersion": "29.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Parabolic%1SAR%1Strategy",
+      "nameRu": "Parabolic SAR strategy",
+      "nameEn": "Parabolic SAR strategy",
+      "shortTitle": "Parabolic SAR strategy",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "33.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Parabolic%1SAR%1Strategy",
+        "pineVersion": "33.0"
+      },
+      "tags": [
+        "psar",
+        "parabolic stop and reverse"
+      ],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Pivot%1Extension%1Strategy",
+      "nameRu": "Pivot extension strategy",
+      "nameEn": "Pivot extension strategy",
+      "shortTitle": "Pivot extension strategy",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Pivot%1Extension%1Strategy",
+        "pineVersion": "34.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Pivot%1Reversal%1Strategy",
+      "nameRu": "Pivot reversal strategy",
+      "nameEn": "Pivot reversal strategy",
+      "shortTitle": "Pivot reversal strategy",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "33.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Pivot%1Reversal%1Strategy",
+        "pineVersion": "33.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Price%1Channel%1Strategy",
+      "nameRu": "Price channel strategy",
+      "nameEn": "Price channel strategy",
+      "shortTitle": "Price channel strategy",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "29.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Price%1Channel%1Strategy",
+        "pineVersion": "29.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Rob%1Booker%1ADX%1Breakout%1Strategy",
+      "nameRu": "Rob Booker — ADX breakout",
+      "nameEn": "Rob Booker — ADX breakout",
+      "shortTitle": "RB ADX breakout",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "24.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Rob%1Booker%1ADX%1Breakout%1Strategy",
+        "pineVersion": "24.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;RSI%1Strategy",
+      "nameRu": "RSI strategy",
+      "nameEn": "RSI strategy",
+      "shortTitle": "RSI str",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "32.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;RSI%1Strategy",
+        "pineVersion": "32.0"
+      },
+      "tags": [
+        "Relative Strength Index Strategy"
+      ],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Stochastic%1Slow%1Strategy",
+      "nameRu": "Stochastic slow strategy",
+      "nameEn": "Stochastic slow strategy",
+      "shortTitle": "Stoch slow str",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Stochastic%1Slow%1Strategy",
+        "pineVersion": "31.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Supertrend%Strategy",
+      "nameRu": "Supertrend strategy",
+      "nameEn": "Supertrend strategy",
+      "shortTitle": "Supertrend str",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "9.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Supertrend%Strategy",
+        "pineVersion": "9.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Technical%1Ratings%1Strategy",
+      "nameRu": "Technical ratings strategy",
+      "nameEn": "Technical ratings strategy",
+      "shortTitle": "Technicals str",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "14.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Technical%1Ratings%1Strategy",
+        "pineVersion": "14.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;MovingAvg%1Cross2%1Strategy",
+      "nameRu": "Two moving averages crossover",
+      "nameEn": "Two moving averages crossover",
+      "shortTitle": "2MA cross",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "31.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;MovingAvg%1Cross2%1Strategy",
+        "pineVersion": "31.0"
+      },
+      "tags": [
+        "Moving Average Cross"
+      ],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Volty%1Expan%1Close%1Strategy",
+      "nameRu": "Volatility expansion-close strategy",
+      "nameEn": "Volatility expansion-close strategy",
+      "shortTitle": "Volatility exp-close str",
+      "category": "strategies",
+      "packageName": "Script$STD",
+      "version": "30.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Volty%1Expan%1Close%1Strategy",
+        "pineVersion": "30.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": true,
+        "isLibrary": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "AllInOneCP@tv-chart_patterns",
+      "nameRu": "All chart patterns",
+      "nameEn": "All chart patterns",
+      "shortTitle": "All chart patterns",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "AllInOneCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "BearishFlagCP@tv-chart_patterns",
+      "nameRu": "Bearish flag chart pattern",
+      "nameEn": "Bearish flag",
+      "shortTitle": "Bearish flag",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "BearishFlagCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "BullishFlagCP@tv-chart_patterns",
+      "nameRu": "Bullish flag chart pattern",
+      "nameEn": "Bullish flag",
+      "shortTitle": "Bullish flag",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "BullishFlagCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "CupAndHandleCP@tv-chart_patterns",
+      "nameRu": "Cup and handle chart pattern",
+      "nameEn": "Cup and handle",
+      "shortTitle": "Cup and handle",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "CupAndHandleCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "CupAndHandleInverseCP@tv-chart_patterns",
+      "nameRu": "Inverted cup and handle chart pattern",
+      "nameEn": "Inverted cup and handle",
+      "shortTitle": "Inverted cup and handle",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "CupAndHandleInverseCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "DoubleBottomCP@tv-chart_patterns",
+      "nameRu": "Double bottom chart pattern",
+      "nameEn": "Double bottom",
+      "shortTitle": "Double bottom",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "DoubleBottomCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "DoubleTopCP@tv-chart_patterns",
+      "nameRu": "Double top chart pattern",
+      "nameEn": "Double top",
+      "shortTitle": "Double top",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "DoubleTopCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "ElliottWaveCP@tv-chart_patterns",
+      "nameRu": "Elliott wave chart pattern",
+      "nameEn": "Elliott wave",
+      "shortTitle": "Elliott wave",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "ElliottWaveCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "HeadAndShouldersCP@tv-chart_patterns",
+      "nameRu": "Head and shoulders chart pattern",
+      "nameEn": "Head and shoulders",
+      "shortTitle": "Head and shoulders",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "HeadAndShouldersCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "HeadAndShouldersInverseCP@tv-chart_patterns",
+      "nameRu": "Inverted head and shoulders chart pattern",
+      "nameEn": "Inverted head and shoulders",
+      "shortTitle": "Inverted head and shoulders",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "HeadAndShouldersInverseCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "PennantBearishCP@tv-chart_patterns",
+      "nameRu": "Bearish pennant chart pattern",
+      "nameEn": "Bearish pennant",
+      "shortTitle": "Bearish pennant",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "PennantBearishCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "PennantBullishCP@tv-chart_patterns",
+      "nameRu": "Bullish pennant chart pattern",
+      "nameEn": "Bullish pennant",
+      "shortTitle": "Bullish pennant",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "PennantBullishCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "RectangleCP@tv-chart_patterns",
+      "nameRu": "Rectangle chart pattern",
+      "nameEn": "Rectangle",
+      "shortTitle": "Rectangle",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "RectangleCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "TriangleCP@tv-chart_patterns",
+      "nameRu": "Triangle chart pattern",
+      "nameEn": "Triangle",
+      "shortTitle": "Triangle",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "TriangleCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "TripleBottomCP@tv-chart_patterns",
+      "nameRu": "Triple bottom chart pattern",
+      "nameEn": "Triple bottom",
+      "shortTitle": "Triple bottom",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "TripleBottomCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "TripleTopCP@tv-chart_patterns",
+      "nameRu": "Triple top chart pattern",
+      "nameEn": "Triple top",
+      "shortTitle": "Triple top",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "TripleTopCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "WedgeFallingCP@tv-chart_patterns",
+      "nameRu": "Falling wedge chart pattern",
+      "nameEn": "Falling wedge",
+      "shortTitle": "Falling wedge",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "WedgeFallingCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "WedgeRisingCP@tv-chart_patterns",
+      "nameRu": "Rising wedge chart pattern",
+      "nameEn": "Rising wedge",
+      "shortTitle": "Rising wedge",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": 51,
+      "descriptor": {
+        "type": "java",
+        "studyId": "WedgeRisingCP@tv-chart_patterns"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Auto_Trend_Detector",
+      "nameRu": "Auto trend detector",
+      "nameEn": "Auto trend detector",
+      "shortTitle": "ATD",
+      "category": "patterns",
+      "packageName": "tv-chart_patterns",
+      "version": "4.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Auto_Trend_Detector",
+        "pineVersion": "4.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isBeta": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Abandoned%1Baby",
+      "nameRu": "Abandoned baby (bearish)",
+      "nameEn": "Abandoned baby (bearish)",
+      "shortTitle": "Abandoned baby (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Abandoned%1Baby",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Abandoned%1Baby",
+      "nameRu": "Abandoned baby (bullish)",
+      "nameEn": "Abandoned baby (bullish)",
+      "shortTitle": "Abandoned baby (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Abandoned%1Baby",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1All%1Candlestick%1Patterns",
+      "nameRu": "All candlestick patterns",
+      "nameEn": "All candlestick patterns",
+      "shortTitle": "All candlestick patterns",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "38.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1All%1Candlestick%1Patterns",
+        "pineVersion": "38.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Dark%1Cloud%1Cover",
+      "nameRu": "Dark cloud cover (bearish)",
+      "nameEn": "Dark cloud cover (bearish)",
+      "shortTitle": "Dark cloud cover (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "22.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Dark%1Cloud%1Cover",
+        "pineVersion": "22.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Doji",
+      "nameRu": "Doji (neutral)",
+      "nameEn": "Doji (neutral)",
+      "shortTitle": "Doji",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Doji",
+        "pineVersion": "34.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Doji%1Star",
+      "nameRu": "Doji star (bearish)",
+      "nameEn": "Doji star (bearish)",
+      "shortTitle": "Doji star (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "22.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Doji%1Star",
+        "pineVersion": "22.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Doji%1Star",
+      "nameRu": "Doji star (bullish)",
+      "nameEn": "Doji star (bullish)",
+      "shortTitle": "Doji star (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "22.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Doji%1Star",
+        "pineVersion": "22.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Downside%1Tasuki%1Gap",
+      "nameRu": "Downside Tasuki gap (bearish)",
+      "nameEn": "Downside Tasuki gap (bearish)",
+      "shortTitle": "Downside Tasuki gap (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "22.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Downside%1Tasuki%1Gap",
+        "pineVersion": "22.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Dragonfly%1Doji",
+      "nameRu": "Dragonfly Doji (bullish)",
+      "nameEn": "Dragonfly Doji (bullish)",
+      "shortTitle": "Dragonfly Doji (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Dragonfly%1Doji",
+        "pineVersion": "34.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Engulfing",
+      "nameRu": "Engulfing (bearish)",
+      "nameEn": "Engulfing (bearish)",
+      "shortTitle": "Engulfing (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Engulfing",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Engulfing",
+      "nameRu": "Engulfing (bullish)",
+      "nameEn": "Engulfing (bullish)",
+      "shortTitle": "Engulfing (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Engulfing",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Evening%1Doji%1Star",
+      "nameRu": "Evening Doji star (bearish)",
+      "nameEn": "Evening Doji star (bearish)",
+      "shortTitle": "Evening Doji star (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "23.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Evening%1Doji%1Star",
+        "pineVersion": "23.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Evening%1Star",
+      "nameRu": "Evening star (bearish)",
+      "nameEn": "Evening star (bearish)",
+      "shortTitle": "Evening star (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Evening%1Star",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Falling%1Three%1Methods",
+      "nameRu": "Falling three methods (bearish)",
+      "nameEn": "Falling three methods (bearish)",
+      "shortTitle": "Falling three methods (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "22.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Falling%1Three%1Methods",
+        "pineVersion": "22.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Falling%1Window",
+      "nameRu": "Falling window (bearish)",
+      "nameEn": "Falling window (bearish)",
+      "shortTitle": "Falling window (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "22.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Falling%1Window",
+        "pineVersion": "22.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Gravestone%1Doji",
+      "nameRu": "Gravestone Doji (bearish)",
+      "nameEn": "Gravestone Doji (bearish)",
+      "shortTitle": "Gravestone Doji (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Gravestone%1Doji",
+        "pineVersion": "34.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Hammer",
+      "nameRu": "Hammer (bullish)",
+      "nameEn": "Hammer (bullish)",
+      "shortTitle": "Hammer (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Hammer",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Hanging%1Man",
+      "nameRu": "Hanging man (bearish)",
+      "nameEn": "Hanging man (bearish)",
+      "shortTitle": "Hanging man (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Hanging%1Man",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Harami",
+      "nameRu": "Harami (bearish)",
+      "nameEn": "Harami (bearish)",
+      "shortTitle": "Harami (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Harami",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Harami",
+      "nameRu": "Harami (bullish)",
+      "nameEn": "Harami (bullish)",
+      "shortTitle": "Harami (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Harami",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Harami%1Cross",
+      "nameRu": "Harami cross (bearish)",
+      "nameEn": "Harami cross (bearish)",
+      "shortTitle": "Harami cross (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "23.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Harami%1Cross",
+        "pineVersion": "23.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Harami%1Cross",
+      "nameRu": "Harami cross (bullish)",
+      "nameEn": "Harami cross (bullish)",
+      "shortTitle": "Harami cross (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "23.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Harami%1Cross",
+        "pineVersion": "23.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Inverted%1Hammer",
+      "nameRu": "Inverted hammer (bullish)",
+      "nameEn": "Inverted hammer (bullish)",
+      "shortTitle": "Inverted hammer (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Inverted%1Hammer",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Kicking",
+      "nameRu": "Kicking (bearish)",
+      "nameEn": "Kicking (bearish)",
+      "shortTitle": "Kicking (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Kicking",
+        "pineVersion": "34.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Kicking",
+      "nameRu": "Kicking (bullish)",
+      "nameEn": "Kicking (bullish)",
+      "shortTitle": "Kicking (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Kicking",
+        "pineVersion": "34.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Long%1Lower%1Shadow",
+      "nameRu": "Long lower shadow (bullish)",
+      "nameEn": "Long lower shadow (bullish)",
+      "shortTitle": "Long lower shadow (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Long%1Lower%1Shadow",
+        "pineVersion": "34.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Long%1Upper%1Shadow",
+      "nameRu": "Long upper shadow (bearish)",
+      "nameEn": "Long upper shadow (bearish)",
+      "shortTitle": "Long upper shadow (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Long%1Upper%1Shadow",
+        "pineVersion": "34.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Marubozu%1Black",
+      "nameRu": "Marubozu black (bearish)",
+      "nameEn": "Marubozu black (bearish)",
+      "shortTitle": "Marubozu black (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "35.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Marubozu%1Black",
+        "pineVersion": "35.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Marubozu%1White",
+      "nameRu": "Marubozu white (bullish)",
+      "nameEn": "Marubozu white (bullish)",
+      "shortTitle": "Marubozu white (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "35.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Marubozu%1White",
+        "pineVersion": "35.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Morning%1Doji%1Star",
+      "nameRu": "Morning Doji star (bullish)",
+      "nameEn": "Morning Doji star (bullish)",
+      "shortTitle": "Morning Doji star (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "23.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Morning%1Doji%1Star",
+        "pineVersion": "23.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Morning%1Star",
+      "nameRu": "Morning star (bullish)",
+      "nameEn": "Morning star (bullish)",
+      "shortTitle": "Morning star (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Morning%1Star",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1On%1Neck",
+      "nameRu": "On-neck (bearish)",
+      "nameEn": "On-neck (bearish)",
+      "shortTitle": "On-neck (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "22.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1On%1Neck",
+        "pineVersion": "22.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Piercing",
+      "nameRu": "Piercing (bullish)",
+      "nameEn": "Piercing (bullish)",
+      "shortTitle": "Piercing (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "25.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Piercing",
+        "pineVersion": "25.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Rising%1Three%1Methods",
+      "nameRu": "Rising three methods (bullish)",
+      "nameEn": "Rising three methods (bullish)",
+      "shortTitle": "Rising three methods (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "22.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Rising%1Three%1Methods",
+        "pineVersion": "22.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Rising%1Window",
+      "nameRu": "Rising window (bullish)",
+      "nameEn": "Rising window (bullish)",
+      "shortTitle": "Rising window (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "22.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Rising%1Window",
+        "pineVersion": "22.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Shooting%1Star",
+      "nameRu": "Shooting star (bearish)",
+      "nameEn": "Shooting star (bearish)",
+      "shortTitle": "Shooting star (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Shooting%1Star",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Spinning%1Top%1Black",
+      "nameRu": "Spinning top black (neutral)",
+      "nameEn": "Spinning top black (neutral)",
+      "shortTitle": "Spinning top black",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Spinning%1Top%1Black",
+        "pineVersion": "34.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Spinning%1Top%1White",
+      "nameRu": "Spinning top white (neutral)",
+      "nameEn": "Spinning top white (neutral)",
+      "shortTitle": "Spinning top white",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Spinning%1Top%1White",
+        "pineVersion": "34.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Three%1Black%1Crows",
+      "nameRu": "Three black crows (bearish)",
+      "nameEn": "Three black crows (bearish)",
+      "shortTitle": "Three black crows (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Three%1Black%1Crows",
+        "pineVersion": "34.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Three%1White%1Soldiers",
+      "nameRu": "Three white soldiers (bullish)",
+      "nameEn": "Three white soldiers (bullish)",
+      "shortTitle": "Three white soldiers (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "34.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Three%1White%1Soldiers",
+        "pineVersion": "34.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Tri-Star",
+      "nameRu": "Tri-star (bearish)",
+      "nameEn": "Tri-star (bearish)",
+      "shortTitle": "Tri-star (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Tri-Star",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Tri-Star",
+      "nameRu": "Tri-star (bullish)",
+      "nameEn": "Tri-star (bullish)",
+      "shortTitle": "Tri-star (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "36.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Tri-Star",
+        "pineVersion": "36.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Tweezer%1Bottom",
+      "nameRu": "Tweezer bottom (bullish)",
+      "nameEn": "Tweezer bottom (bullish)",
+      "shortTitle": "Tweezer bottom (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "23.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Tweezer%1Bottom",
+        "pineVersion": "23.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bearish%1Tweezer%1Top",
+      "nameRu": "Tweezer top (bearish)",
+      "nameEn": "Tweezer top (bearish)",
+      "shortTitle": "Tweezer top (bear)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "22.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bearish%1Tweezer%1Top",
+        "pineVersion": "22.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "STD;Candlestick%1Pattern%1Bullish%1Upside%1Tasuki%1Gap",
+      "nameRu": "Upside Tasuki gap (bullish)",
+      "nameEn": "Upside Tasuki gap (bullish)",
+      "shortTitle": "Upside Tasuki gap (bull)",
+      "category": "patterns",
+      "packageName": "candlestick-patterns",
+      "version": "22.0",
+      "descriptor": {
+        "type": "pine",
+        "pineId": "STD;Candlestick%1Pattern%1Bullish%1Upside%1Tasuki%1Gap",
+        "pineVersion": "22.0"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "TPOPeriodic@tv-volumebyprice",
+      "nameRu": "Time price opportunity",
+      "nameEn": "TPO",
+      "shortTitle": "TPO",
+      "category": "profiles",
+      "packageName": "tv-volumebyprice",
+      "version": 194,
+      "descriptor": {
+        "type": "java",
+        "studyId": "TPOPeriodic@tv-volumebyprice"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "TPOSessions@tv-volumebyprice",
+      "nameRu": "Session time price opportunity",
+      "nameEn": "STPO",
+      "shortTitle": "STPO",
+      "category": "profiles",
+      "packageName": "tv-volumebyprice",
+      "version": 194,
+      "descriptor": {
+        "type": "java",
+        "studyId": "TPOSessions@tv-volumebyprice"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": false,
+        "isUpdated": false,
+        "isBeta": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "VbPAutoAnchored@tv-volumebyprice",
+      "nameRu": "Auto anchored volume profile",
+      "nameEn": "AAVP",
+      "shortTitle": "AAVP",
+      "category": "profiles",
+      "packageName": "tv-volumebyprice",
+      "version": 194,
+      "descriptor": {
+        "type": "java",
+        "studyId": "VbPAutoAnchored@tv-volumebyprice"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "VbPFixed@tv-volumebyprice",
+      "nameRu": "Fixed range volume profile",
+      "nameEn": "FRVP",
+      "shortTitle": "FRVP",
+      "category": "profiles",
+      "packageName": "tv-volumebyprice",
+      "version": 194,
+      "descriptor": {
+        "type": "java",
+        "studyId": "VbPFixed@tv-volumebyprice"
+      },
+      "tags": [
+        "VbP"
+      ],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "VbPPeriodic@tv-volumebyprice",
+      "nameRu": "Periodic volume profile",
+      "nameEn": "PVP",
+      "shortTitle": "PVP",
+      "category": "profiles",
+      "packageName": "tv-volumebyprice",
+      "version": 194,
+      "descriptor": {
+        "type": "java",
+        "studyId": "VbPPeriodic@tv-volumebyprice"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "VbPSessions@tv-volumebyprice",
+      "nameRu": "Session volume profile",
+      "nameEn": "SVP",
+      "shortTitle": "SVP",
+      "category": "profiles",
+      "packageName": "tv-volumebyprice",
+      "version": 194,
+      "descriptor": {
+        "type": "java",
+        "studyId": "VbPSessions@tv-volumebyprice"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "VbPSessionsRoughDetailed@tv-volumebyprice",
+      "nameRu": "Session volume profile HD",
+      "nameEn": "SVP HD",
+      "shortTitle": "SVP HD",
+      "category": "profiles",
+      "packageName": "tv-volumebyprice",
+      "version": 194,
+      "descriptor": {
+        "type": "java",
+        "studyId": "VbPSessionsRoughDetailed@tv-volumebyprice"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "VbPVisible@tv-volumebyprice",
+      "nameRu": "Visible range volume profile",
+      "nameEn": "VRVP",
+      "shortTitle": "VRVP",
+      "category": "profiles",
+      "packageName": "tv-volumebyprice",
+      "version": 194,
+      "descriptor": {
+        "type": "java",
+        "studyId": "VbPVisible@tv-volumebyprice"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isPro": true,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "OptionsExpectedMove@tv-optionstudies",
+      "nameRu": "Options expected move",
+      "nameEn": "OEM",
+      "shortTitle": "OEM",
+      "category": "options",
+      "packageName": "tv-optionstudies",
+      "version": 4,
+      "descriptor": {
+        "type": "java",
+        "studyId": "OptionsExpectedMove@tv-optionstudies"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": true,
+        "isUpdated": false,
+        "isBeta": true,
+        "isPro": false,
+        "isOverlay": true
+      }
+    },
+    {
+      "id": "OptionsVolumeProfile@tv-optionstudies",
+      "nameRu": "Options volume profile",
+      "nameEn": "OVP",
+      "shortTitle": "OVP",
+      "category": "options",
+      "packageName": "tv-optionstudies",
+      "version": 4,
+      "descriptor": {
+        "type": "java",
+        "studyId": "OptionsVolumeProfile@tv-optionstudies"
+      },
+      "tags": [],
+      "flags": {
+        "isStrategy": false,
+        "isLibrary": false,
+        "isHidden": false,
+        "isNew": true,
+        "isUpdated": false,
+        "isBeta": true,
+        "isPro": false,
+        "isOverlay": true
+      }
+    }
+  ]
+}

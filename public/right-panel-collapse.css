@@ -1,0 +1,92 @@
+.workspace[data-right-panel-collapsed="true"] {
+  grid-template-columns: 48px minmax(0, 1fr) 38px;
+}
+.workspace[data-right-panel-collapsed="true"] .right-panel {
+  grid-template-columns: 38px;
+}
+.workspace[data-right-panel-collapsed="true"] .right-panel-tools {
+  grid-column: 1;
+}
+@media (min-width: 1700px) {
+  .workspace[data-right-panel-collapsed="true"] {
+    grid-template-columns: 50px minmax(0, 1fr) 38px;
+  }
+}
+@media (min-width: 801px) and (max-width: 1200px) {
+  .workspace[data-right-panel-collapsed="true"] {
+    grid-template-columns: 44px minmax(0, 1fr) 38px;
+  }
+}
+@media (max-width: 800px) {
+  .workspace,
+  .workspace[data-right-panel-collapsed="true"] {
+    height: calc(100dvh - 88px);
+    grid-template-columns: 38px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 44px;
+    min-height: 0;
+  }
+  .workspace .right-panel,
+  html[data-theme] .workspace .right-panel,
+  .workspace[data-right-panel-collapsed="true"] .right-panel {
+    position: absolute;
+    inset: 0;
+    z-index: 45;
+    grid-column: 1 / -1;
+    grid-row: 1 / -1;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) 44px;
+    pointer-events: none;
+    background: transparent;
+  }
+  html[data-theme] .workspace[data-mobile-panel-open="true"] .right-panel {
+    pointer-events: auto;
+    background: var(--surface, #131722);
+  }
+  .workspace[data-mobile-panel-open="true"] > :is(.chart-panel, .drawing-tools) {
+    visibility: hidden;
+  }
+  .workspace .right-panel-tools,
+  .workspace[data-right-panel-collapsed="true"] .right-panel-tools {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: row;
+    justify-content: flex-end;
+    padding: 3px 4px;
+    border-left: 0;
+    border-top: 1px solid var(--line, #2a2e39);
+    background: var(--surface, #131722);
+    pointer-events: auto;
+  }
+  .workspace .right-panel-tools button,
+  .workspace[data-right-panel-collapsed="true"] .right-panel-tools button {
+    flex-shrink: 0;
+  }
+  .workspace .right-panel-tools .mobile-panel-back {
+    width: auto;
+    display: flex;
+    gap: 7px;
+    margin-right: auto;
+    padding: 0 10px;
+    font-size: 12px;
+  }
+  .workspace .right-panel-view {
+    pointer-events: auto;
+    overflow: hidden;
+  }
+  .workspace .right-panel-view > .objects-panel {
+    max-width: none;
+  }
+  .workspace .watchlist-panel .details,
+  .workspace .watchlist-panel .private-note {
+    display: none;
+  }
+  .workspace .quote-row {
+    height: 44px;
+  }
+  .workspace .quote-row:not(.selected) .quote-remove {
+    display: none;
+  }
+  .workspace .quote-row .quote-percent {
+    max-width: none;
+  }
+}

@@ -4,6 +4,7 @@ import { useTerminal } from "./context.js";
 import { INDICATOR_NAMES } from "./state.js";
 import { Modal } from "./Modal.js";
 import { TRADINGVIEW_CANDLE_STYLE } from "../../model/candle-palette.js";
+import { chartBackground, terminalTheme, withTheme } from "../../model/theme.js";
 
 const CANDLE_PARTS = [
   ["bodyVisible", "Тело свечи", "upColor", "downColor"],
@@ -64,11 +65,26 @@ export function ChartSettingsDialog() {
         </button>
         <h3>Оформление</h3>
         <label>
+          Тема интерфейса
+          <select
+            name="theme"
+            value={terminalTheme(settings)}
+            onChange={(e) =>
+              setSettings((previous) =>
+                withTheme(previous, e.target.value === "light" ? "light" : "dark")
+              )
+            }
+          >
+            <option value="dark">Тёмная</option>
+            <option value="light">Светлая</option>
+          </select>
+        </label>
+        <label>
           Фон
           <input
             type="color"
             name="background"
-            value={settings.background ?? "#131722"}
+            value={chartBackground(settings)}
             onChange={(e) => update({ background: e.target.value })}
           />
         </label>

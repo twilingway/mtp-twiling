@@ -1,0 +1,417 @@
+.chart-panel[data-history-loading="true"] > .chart-heading,
+.chart-panel[data-history-loading="true"] > .chart-body {
+  opacity: 0.35;
+}
+.chart-panel > .chart-heading,
+.chart-panel > .chart-body {
+  transition: opacity 120ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-panel > .chart-heading,
+  .chart-panel > .chart-body {
+    transition: none;
+  }
+}
+.drawing-toolbar {
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 7px 4px;
+  gap: 2px;
+  color: #d1d4dc;
+}
+#delete-object-dialog {
+  width: min(420px, calc(100vw - 24px));
+}
+.drawing-toolbar > .tool,
+.drawing-tool-split {
+  flex: 0 0 36px;
+  width: 42px;
+  min-height: 36px;
+}
+.drawing-toolbar .tool,
+.drawing-tool-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  color: inherit;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+}
+.drawing-tool-split {
+  position: relative;
+  display: flex;
+  border-radius: 4px;
+}
+.drawing-tool-split .drawing-tool-main {
+  width: 42px;
+  height: 36px;
+  flex: 0 0 42px;
+  border-radius: 4px 0 0 4px;
+}
+.drawing-tool-arrow {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 10px;
+  flex: 0 0 10px;
+  min-height: 36px;
+  border-radius: 0 4px 4px 0;
+}
+.drawing-tool-arrow svg {
+  width: 9px;
+  height: 16px;
+}
+.drawing-toolbar .tool.active,
+.drawing-tool-split.active {
+  color: #2962ff;
+  background: transparent;
+}
+.drawing-toolbar button:hover:not(:disabled),
+.drawing-toolbar-popup button:hover:not([aria-disabled="true"]) {
+  background: #2a2e39;
+}
+.drawing-toolbar button:focus-visible,
+.drawing-toolbar-popup button:focus-visible {
+  outline: 2px solid #5685ff;
+  outline-offset: -2px;
+}
+.drawing-toolbar button:disabled {
+  opacity: 0.36;
+  cursor: not-allowed;
+}
+.drawing-toolbar .tool-divider {
+  flex: 0 0 1px;
+  width: 30px;
+  margin: 5px 0;
+}
+.drawing-toolbar .rail-spacer {
+  min-height: 8px;
+  flex: 1 0 8px;
+}
+.drawing-toolbar-popup {
+  position: fixed;
+  z-index: 180;
+  display: flex;
+  flex-direction: column;
+  width: max-content;
+  min-width: 290px;
+  max-width: min(470px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  overflow: hidden;
+  border: 1px solid #363a45;
+  border-radius: 6px;
+  background: #1e222d;
+  color: #d1d4dc;
+  box-shadow: 0 8px 30px #0009;
+  font-size: 14px;
+}
+.drawing-toolbar-popup-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 6px 4px 14px;
+  border-bottom: 1px solid #363a45;
+  font-size: 13px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.drawing-toolbar-popup-heading > span {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.drawing-menu-close,
+.drawing-menu-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  padding: 4px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+}
+.drawing-menu-close svg,
+.drawing-menu-back svg {
+  width: 20px;
+  height: 20px;
+}
+.drawing-menu-back svg {
+  transform: rotate(180deg);
+}
+.drawing-toolbar-menu {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 4px 0;
+}
+.drawing-menu-section + .drawing-menu-section {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #363a45;
+}
+.drawing-menu-section-title {
+  padding: 9px 14px 7px;
+  color: #9598a1;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.drawing-menu-row {
+  display: flex;
+  align-items: stretch;
+}
+.drawing-menu-action {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  min-height: 38px;
+  gap: 12px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 0;
+  text-align: left;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+}
+.drawing-menu-icon {
+  display: flex;
+  align-items: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+}
+.drawing-menu-label {
+  flex: 1;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+.drawing-menu-label small {
+  display: block;
+  color: #9598a1;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.drawing-menu-action[aria-disabled="true"] {
+  color: #787b86;
+  cursor: not-allowed;
+}
+.drawing-menu-action.selected,
+.drawing-menu-favorite.selected {
+  color: #5685ff;
+}
+.drawing-menu-action kbd {
+  flex-shrink: 0;
+  color: #9598a1;
+  font-family: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.drawing-menu-check,
+.drawing-menu-next {
+  display: flex;
+  flex: 0 0 16px;
+}
+.drawing-menu-check svg,
+.drawing-menu-next svg {
+  width: 16px;
+  height: 16px;
+}
+.drawing-menu-favorite {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 32px;
+  padding: 4px;
+  border: 0;
+  border-radius: 0;
+  color: #787b86;
+  background: transparent;
+}
+.drawing-menu-favorite svg {
+  width: 18px;
+  height: 18px;
+}
+.drawing-menu-favorite.selected svg {
+  fill: currentColor;
+}
+.drawing-pointer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 10;
+  display: none;
+  pointer-events: none;
+  color: #d1d4dc;
+}
+.drawing-pointer::before {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translate(-50%, -50%);
+}
+.drawing-pointer[data-cursor="demonstration"]::before {
+  width: 32px;
+  height: 32px;
+  background: #f2364540;
+  border: 1px solid #f2364580;
+  box-shadow: inset 0 0 0 12px #f2364510;
+}
+.drawing-pointer[data-cursor="demonstration"]::after {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #f23645;
+  transform: translate(-50%, -50%);
+}
+.drawing-pointer[hidden] {
+  display: none !important;
+}
+@media (max-width: 800px) {
+  .topbar {
+    display: grid;
+    grid-template-columns: 26px minmax(52px, 1fr) minmax(110px, 150px) 32px 32px;
+    grid-template-rows: 32px 34px;
+    height: 88px;
+    padding: 6px 8px;
+    gap: 4px;
+    align-content: center;
+    align-items: center;
+  }
+  .topbar .brand {
+    grid-row: 1;
+    grid-column: 1;
+  }
+  .topbar .symbol-button {
+    grid-row: 1;
+    grid-column: 2;
+    min-width: 0;
+    overflow: hidden;
+    padding: 0;
+  }
+  .topbar .symbol-button b {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .topbar #engine {
+    grid-row: 1;
+    grid-column: 3;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+  .topbar .indicator-control {
+    grid-row: 1;
+    grid-column: 4;
+    min-width: 0;
+  }
+  .topbar #indicators-button {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+  .topbar #indicators-button span {
+    display: none;
+  }
+  .topbar .account-button {
+    grid-row: 1;
+    grid-column: 5;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+  }
+  .topbar .top-spacer,
+  .topbar .divider,
+  .topbar .engine-label {
+    display: none;
+  }
+  .topbar .timeframes {
+    grid-row: 2;
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: nowrap;
+    min-width: 0;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+    gap: 2px;
+  }
+  .topbar .timeframes > * {
+    flex-shrink: 0;
+  }
+  .topbar #install-app:not([hidden]) {
+    grid-row: 2;
+    grid-column: 4 / -1;
+    width: 100%;
+    padding: 0;
+    font-size: 10px;
+  }
+  .topbar:has(#install-app:not([hidden])) .timeframes {
+    grid-column: 1 / 4;
+  }
+  .topbar .indicator-control .popover {
+    left: auto;
+    right: 0;
+  }
+  .drawing-toolbar {
+    padding: 5px 0;
+    gap: 2px;
+  }
+  .drawing-toolbar > .tool,
+  .drawing-tool-split {
+    width: 36px;
+    min-height: 34px;
+    flex-basis: 34px;
+  }
+  .drawing-tool-split .drawing-tool-main {
+    width: 36px;
+    height: 34px;
+    flex-basis: 36px;
+  }
+  .drawing-tool-main svg {
+    width: 26px;
+    height: 26px;
+  }
+  .drawing-tool-arrow {
+    min-height: 34px;
+  }
+  .drawing-toolbar .rail-spacer {
+    display: block;
+  }
+}
+@media (max-width: 600px) {
+  .drawing-toolbar-popup {
+    width: calc(100vw - 16px);
+    min-width: 0;
+    max-width: none;
+    border-radius: 10px;
+  }
+  .drawing-menu-action {
+    min-height: 44px;
+    gap: 10px;
+    padding: 7px 10px;
+  }
+  .drawing-menu-favorite {
+    flex-basis: 42px;
+  }
+  .drawing-menu-action kbd {
+    display: none;
+  }
+}

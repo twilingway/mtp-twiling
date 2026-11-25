@@ -71,6 +71,7 @@ export function Toolbar() {
       <div className="indicator-control">
         <button
           id="indicators-button"
+          aria-label="Индикаторы"
           className="text-button"
           onClick={() => setIndicatorsOpen(!indicatorsOpen)}
         >

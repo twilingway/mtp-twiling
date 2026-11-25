@@ -1,12 +1,14 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { RefObject } from "react";
 import type { Candle, Drawing } from "../../model/types.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import type { ChartAdapter, ChartOptions } from "../../charts/adapter.js";
 import { paintDrawings } from "../../model/drawing-model.js";
-import { loadChartView, saveChartView } from "../../services/chart-camera.js";
+import { loadChartView, saveAdapterView } from "../../services/chart-camera.js";
 import { useTerminal } from "./context.js";
 import { viewKey } from "./controller-bridge.js";
+import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
+import { chartRenderConfigFromKey, chartRenderConfigKey } from "../../charts/render-config.js";
 import type { TerminalState } from "./state.js";
 
 export function useChartCanvas(
@@ -17,10 +19,14 @@ export function useChartCanvas(
     dataRef = useRef<Candle[]>([]),
     adapterRef = useRef<ChartAdapter | null>(null);
   const p = state.preferences,
-    uid = selectedMarketRow(state.rows, p)?.uid;
+    uid = selectedMarketRow(state.rows, p)?.uid,
+    renderKey = chartRenderConfigKey(p.chartSettings, p.indicators),
+    renderConfig = useMemo(() => chartRenderConfigFromKey(renderKey), [renderKey]),
+    drawingsHidden = drawingToolbarSettings(p.chartSettings).drawingsHidden;
   useEffect(() => {
     const container = ref.current,
       owner = state.owner,
+      revision = state.chartRevision,
       key = `${p.symbol}:${p.timeframe}:${p.engine}:${p.rangeDays}`;
     if (!container || !uid || !state.authenticated) return;
     let cancelled = false,
@@ -31,6 +37,7 @@ export function useChartCanvas(
         !cancelled &&
         current.authenticated &&
         current.owner === owner &&
+        current.chartRevision === revision &&
         viewKey(current.preferences) === key &&
         selectedMarketRow(current.rows, current.preferences)?.uid === uid
       );
@@ -44,8 +51,8 @@ export function useChartCanvas(
         row: instrument,
         timeframe: p.timeframe,
         rangeDays: p.rangeDays,
-        indicators: p.indicators,
-        settings: p.chartSettings,
+        indicators: renderConfig.indicators,
+        settings: renderConfig.settings,
         onNearStart: () => {
           if (matches()) controller.scheduleOlderHistory();
         },
@@ -89,8 +96,7 @@ export function useChartCanvas(
     });
     return () => {
       cancelled = true;
-      const view = owned?.getView();
-      if (view && owner !== "guest") void saveChartView(owner, key, view).catch(() => {});
+      void saveAdapterView(owned, owner, key).catch(() => {});
       owned?.destroy();
       if (controller.chart === owned) controller.chart = null;
       adapterRef.current = null;
@@ -103,12 +109,12 @@ export function useChartCanvas(
     uid,
     state.owner,
     state.authenticated,
+    state.chartRevision,
     p.engine,
     p.symbol,
     p.timeframe,
     p.rangeDays,
-    p.indicators,
-    p.chartSettings
+    renderConfig
   ]);
   useEffect(() => {
     const adapter = adapterRef.current,
@@ -132,5 +138,5 @@ export function useChartCanvas(
   }, [state.candles]);
   useEffect(() => {
     adapterRef.current?.redrawDrawings();
-  }, [state.drawings, state.preview, state.selectedObject]);
+  }, [state.drawings, state.preview, state.selectedObject, drawingsHidden]);
 }

@@ -1,0 +1,63 @@
+html[data-theme="dark"] {
+  --drawing-active-group: #2a2e39;
+  --drawing-active-group-text: #f0f3fa;
+  --drawing-active-toggle: #f0f3fa;
+  --drawing-active-toggle-text: #131722;
+  --drawing-selected-row: #f0f3fa;
+  --drawing-selected-row-text: #131722;
+}
+html[data-theme="light"] {
+  --drawing-active-group: #e0e3eb;
+  --drawing-active-group-text: #131722;
+  --drawing-active-toggle: #131722;
+  --drawing-active-toggle-text: #ffffff;
+  --drawing-selected-row: #131722;
+  --drawing-selected-row-text: #ffffff;
+}
+html[data-theme] .drawing-toolbar .drawing-tool-split.active,
+html[data-theme]
+  .drawing-toolbar
+  .drawing-tool-split:has(.drawing-tool-arrow[aria-expanded="true"]),
+html[data-theme] .right-panel-tools button[aria-selected="true"] {
+  background: var(--drawing-active-group);
+  color: var(--drawing-active-group-text);
+}
+html[data-theme] .drawing-toolbar .drawing-tool-split.active :is(.tool, .drawing-tool-arrow),
+html[data-theme]
+  .drawing-toolbar
+  .drawing-tool-split:has(.drawing-tool-arrow[aria-expanded="true"])
+  :is(.tool, .drawing-tool-arrow) {
+  background: transparent;
+  color: inherit;
+}
+html[data-theme] .drawing-toolbar > .tool.active,
+html[data-theme]
+  .drawing-toolbar
+  .drawing-tool-split.active:is(
+    [data-tool-group="magnet"],
+    [data-tool-group="lock"],
+    [data-tool-group="hide"]
+  ) {
+  background: var(--drawing-active-toggle);
+  color: var(--drawing-active-toggle-text);
+}
+html[data-theme] .drawing-toolbar-popup .drawing-menu-row[data-selected="true"] {
+  background: var(--drawing-selected-row);
+  color: var(--drawing-selected-row-text);
+  border-radius: 4px;
+}
+html[data-theme]
+  .drawing-toolbar-popup
+  .drawing-menu-row[data-selected="true"]
+  :is(.drawing-menu-action, .drawing-menu-favorite),
+html[data-theme]
+  .drawing-toolbar-popup
+  .drawing-menu-row[data-selected="true"]
+  .drawing-menu-action.selected {
+  background: transparent;
+  color: inherit;
+}
+html[data-theme] .drawing-toolbar-popup .drawing-menu-row[data-selected="true"] kbd {
+  color: inherit;
+  opacity: 0.65;
+}

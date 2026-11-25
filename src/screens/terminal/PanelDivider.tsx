@@ -13,6 +13,7 @@ interface ResizeGesture {
 export function PanelDivider() {
   const { controller, state } = useTerminal();
   const preferred = state.preferences.sidebarWidth;
+  const collapsed = !!state.preferences.rightPanelCollapsed;
   const [width, setWidth] = useState(() => panelWidth(preferred, window.innerWidth));
   const gesture = useRef<ResizeGesture | null>(null);
   const frame = useRef<number | null>(null);
@@ -29,10 +30,15 @@ export function PanelDivider() {
     }
   };
   useEffect(() => {
+    const active = gesture.current;
     gesture.current = null;
+    if (frame.current !== null) cancelAnimationFrame(frame.current);
+    frame.current = null;
+    if (active?.element.hasPointerCapture(active.pointer))
+      active.element.releasePointerCapture(active.pointer);
     document.documentElement.classList.remove("resizing-panels");
     setWidth(panelWidth(preferred, window.innerWidth));
-  }, [preferred, state.owner]);
+  }, [preferred, state.owner, collapsed]);
   useEffect(() => {
     document.documentElement.style.setProperty("--right-panel-width", `${width}px`);
   }, [width]);
@@ -65,8 +71,9 @@ export function PanelDivider() {
   return (
     <div
       className="panel-divider"
+      hidden={collapsed}
       role="separator"
-      tabIndex={0}
+      tabIndex={collapsed ? -1 : 0}
       aria-label="Ширина правой панели"
       aria-orientation="vertical"
       aria-valuemin={240}
@@ -74,7 +81,7 @@ export function PanelDivider() {
       aria-valuenow={width}
       title="Перетащите, чтобы изменить ширину панели"
       onPointerDown={(event) => {
-        if (event.button !== 0) return;
+        if (collapsed || event.button !== 0) return;
         event.preventDefault();
         event.currentTarget.focus();
         gesture.current = {
@@ -91,7 +98,8 @@ export function PanelDivider() {
       onPointerMove={(event) => {
         const active = gesture.current;
         if (!active || active.pointer !== event.pointerId) return;
-        if (active.owner !== controller.getSnapshot().owner) {
+        const current = controller.getSnapshot();
+        if (active.owner !== current.owner || current.preferences.rightPanelCollapsed) {
           cancel();
           return;
         }
@@ -117,6 +125,7 @@ export function PanelDivider() {
         if (gesture.current) cancel();
       }}
       onKeyDown={(event) => {
+        if (collapsed) return;
         if (event.key === "Escape" && gesture.current) {
           event.preventDefault();
           event.stopPropagation();

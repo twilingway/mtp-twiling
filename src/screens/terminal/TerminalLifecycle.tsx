@@ -85,11 +85,11 @@ export function TerminalLifecycle() {
       }
       if (e.altKey && e.code === "KeyF") {
         e.preventDefault();
-        controller.setTool("fibonacciLine");
+        run(controller.tools.choose("fibonacciLine"));
       }
       if (e.altKey && e.code === "KeyT") {
         e.preventDefault();
-        controller.setTool("segment");
+        run(controller.tools.choose("segment"));
       }
     };
     document.addEventListener("keydown", keydown);

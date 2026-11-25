@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { ImageAsset, PixelPoint } from "../../model/types.js";
+import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { useTerminal } from "./context.js";
 function ImageAnnotation({ asset }: { asset: ImageAsset }) {
   const { controller } = useTerminal(),
@@ -74,7 +75,12 @@ function ImageAnnotation({ asset }: { asset: ImageAsset }) {
         event.preventDefault();
         event.stopPropagation();
         controller.selectObject(asset.id);
-        if (!point || value.lock) return;
+        const tools = drawingToolbarSettings(controller.getSnapshot().preferences.chartSettings);
+        if (tools.cursor === "eraser") {
+          if (!value.lock && !tools.drawingsLocked) void controller.deleteImage(asset.id);
+          return;
+        }
+        if (!point || value.lock || tools.drawingsLocked) return;
         drag.current = {
           x: event.clientX,
           y: event.clientY,
@@ -169,7 +175,11 @@ function ImageAnnotation({ asset }: { asset: ImageAsset }) {
 export function ImageLayer() {
   const { state } = useTerminal();
   return (
-    <div id="image-layer" aria-label="Изображения на графике">
+    <div
+      id="image-layer"
+      aria-label="Изображения на графике"
+      hidden={drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden}
+    >
       {[...state.images]
         .sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0))
         .map((image) => (

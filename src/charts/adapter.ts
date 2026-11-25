@@ -11,6 +11,7 @@ import type {
 
 export interface ChartAdapter {
   source?: { owner: string; viewKey: string; uid: string };
+  persistView?: boolean;
   setData(data: Candle[], fit: boolean): void;
   updateBar(bar: Candle): void;
   getView(): ChartView | null;
