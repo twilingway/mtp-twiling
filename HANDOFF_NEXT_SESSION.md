@@ -3,7 +3,21 @@
 Обновлено 25.11.2026. Это актуальный вход для нового чата; исторические статусы в CONTINUE.md читать
 после этого файла. Пользователь хочет короткие ответы по-русски и параллельную работу.
 
-## Актуальный этап 0.3.7 — читать первым
+## Актуальный этап — читать первым
+
+После описанной ниже 0.3.7: root commit 6c5d37a, version0.3.8/build6b325f8c3931d68d, check160/160 и
+spec7/7 PASS. Исправлены МТП Lightweight grid→normal background→candles и полупрозрачность chart
+plates (45%, hover65%, custom background). Визуал этих изменений ещё не проверен. QA0.3.7 закончена,
+original restore exact для layout/views8/drawings/images, профиль свободен, браузер закрыт. Evidence
+black-ohlc-transfer-qa/report.json; KLine cold held request timeout не выдавать за успешный короткий
+cold restore.
+
+Intervals worker rebase в своей ветке от2ab4dc3: новые history-view-range/calendar1M tests,
+13native, реальные month/day ticks; доделывает LW grid primitive, поскольку formatter пустой не
+удаляет nativegrid. Ещё НЕвлито. Locale/timezone worker ещё работает отдельно. CI/CD worker в
+cicd-worktree готовит CI+pullwatcher Linux systemd по towerdefander; remoteнет/gh authневалиден, не
+deployed. Контракт версий: ручной package semver bump, content buildId, exactsourceSHA metadata.
+Новая очередь KLinepaneheight: setData recreates VOLheight95; настройки панелей ещё не сохраняются.
 
 Canonical HEAD ещё24bf6de, текущие изменения НЕоткатывать: build0.3.7/cb508bf9d82d2abf,
 `pnpm check`159/159 PASS, strict spec7/7 PASS. Независимое review восстановления истории PASS

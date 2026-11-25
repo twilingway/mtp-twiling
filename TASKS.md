@@ -1,5 +1,22 @@
 # Текущая очередь
 
+Обновление: 0.3.8/6b325f8c3931d68d, commit 6c5d37a — МТП Lightweight над сеткой и под свечами,
+полупрозрачные плашки заголовка/индикаторов; общий check160/160 и strict spec7/7 PASS. Визуальная
+проверка этих двух изменений ещё впереди. QA0.3.7 завершена, браузер закрыт:
+`vps/artifacts/black-ohlc-transfer-qa/report.json`. Чёрная тема/OHLC/оригинальный restore PASS;
+KLine успешный короткий холодный import отдельно не подтверждён (длительный дал timeout).
+
+Новые независимые задачи:
+
+- CI/CD по образцу towerdefander: merge main, CI gate, pull watcher, сборка и atomic static deploy,
+  rollback и provenance; package semver повышается вручную, content buildId отдельно. Агент работает
+  в `vps/artifacts/cicd-worktree`; GitHub remote пока отсутствует, gh auth невалиден.
+- KLine не сохраняет высоту/положение панелей индикаторов: `setData` удаляет VOL и заново создаёт с
+  height95. Нужны сохранение per-owner и повторное применение без сброса при подгрузке, смене
+  инструмента и перезагрузке; не считать реализованным.
+- Месячная/дневная сетка требует реальных boundary ticks: один `tickMarkFormatter=""` скрывает
+  подпись, но оставляет линии LW. Intervals worker исправляет это перед интеграцией.
+
 Актуально0.3.7/cb508bf9d82d2abf: общийcheck159/159 и независимые history/transfer reviews PASS.
 Логотип теперь только цветные МТП, тёмнаяпалитра#000000, OHLCцветной, импортполного окна и быстрый
 import/export защищены очередью/retired/barrier/recovery. Fresh visual gate идёт в
