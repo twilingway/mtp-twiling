@@ -15,7 +15,10 @@ test остаётся отдельной последующей настройк
 ## Decisions
 
 - GitHub запускает CI на hosted runner; VDS сам читает main и GitHub Actions API. Серверных SSH
-  секретов в GitHub нет; private repo требует read-only deploy key и локальный Actions-read token.
+  секретов в GitHub нет. Публичный repo не требует credentials; private остаётся optional с
+  read-only deploy key и локальным Actions-read token. Общий cooldown 300s не зависит от SHA,
+  максимум 24 API вызова/час с повторным gate. Rate headers и HTTP 403/429 откладывают публикацию
+  без обхода.
 - Контроллер установлен отдельно от checkout. На каждый SHA git archive создаёт чистый build; frozen
   install и pnpm check/spec:validate выполняются на сервере до публикации.
 - Release manifest сборщика служит allowlist. Пути, symlink и скрытые/секретные файлы отклоняются.
@@ -39,7 +42,7 @@ test остаётся отдельной последующей настройк
 
 ## Migration Plan
 
-Интегрировать и проверить ветку, создать private repository и main, дождаться GitHub CI. На VDS
-проверить существующие nginx routes, сделать backup, добавить отдельный vhost и HTTPS, выполнить
-nginx -t и reload. Установить отдельный controller, config и systemd timer. Первый deploy делать
-явно, затем проверить public SHA/version/buildId и сценарий PWA через отдельного reviewer.
+Интегрировать и проверить ветку, опубликовать main в созданном public repository, дождаться GitHub
+CI. На VDS проверить существующие nginx routes, сделать backup, добавить отдельный vhost и HTTPS,
+выполнить nginx -t и reload. Установить отдельный controller, config и systemd timer. Первый deploy
+делать явно, затем проверить public SHA/version/buildId и сценарий PWA через отдельного reviewer.

@@ -9,7 +9,7 @@ User=mtp-deploy
 Group=mtp-deploy
 Environment=MTP_DEPLOY_ROOT=/srv/mtp
 Environment=MTP_DEPLOY_CONFIG=/etc/mtp-deploy/config.json
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=PATH=/opt/mtp-deploy/bin:/usr/local/bin:/usr/bin:/bin
 # Optional GH_TOKEN with fine-grained Contents/Actions read on this repo only.
 EnvironmentFile=-/etc/mtp-deploy/credentials
 ExecStart=/bin/bash /opt/mtp-deploy/controller/scripts/deploy-static.sh watch

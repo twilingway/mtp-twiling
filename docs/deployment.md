@@ -6,11 +6,10 @@
 
 ## Состояние подготовки
 
-Этот change содержит pipeline и шаблоны. Реальный GitHub remote, CI run, установка watcher, DNS/TLS
-и публичный deploy должны быть подтверждены отдельно. Наличие файлов не доказывает выполненную
-публикацию. Целевой private repository: `twilingway/mtp-twiling`; release branch: `main`. Primary
-origin: `https://mtp.twiling.ru` на существующем VDS. Настройка `mtp-test.twiling.ru` на Mac —
-отдельный target, не часть Linux service.
+Публичный repository `https://github.com/twilingway/mtp-twiling` создан, Issues включены. CI run,
+установка watcher, TLS и публичный deploy подтверждаются отдельно. Наличие файлов не доказывает
+выполненную публикацию. Release branch: `main`. Primary origin: `https://mtp.twiling.ru` на
+существующем VDS. Настройка `mtp-test.twiling.ru` на Mac — отдельный target, не часть Linux service.
 
 ## Версии и CI
 
@@ -45,9 +44,11 @@ version metadata, поэтому проходят в чистом checkout бе�
 резервную копию действующей nginx-конфигурации. Не копировать конфигурацию всего чужого vhost, не
 менять tmeet routes/upstream и не перезапускать соседние процессы.
 
-Предварительно нужны Node 24, pnpm версии из packageManager, git, tar, util-linux flock, nginx и
-HTTPS certificate для домена. Пользователь `mtp-deploy` имеет отдельный home `/srv/mtp`, без sudo.
-Node/pnpm должны быть доступны через PATH systemd: `/usr/local/bin:/usr/bin:/bin`.
+Предварительно нужны Node >=22.21.0 (CI использует 24), pnpm версии из packageManager, git, tar,
+util-linux flock, nginx и HTTPS certificate для домена. Пользователь `mtp-deploy` имеет отдельный
+home `/srv/mtp`, без sudo. Node/pnpm должны быть доступны через PATH systemd:
+`/opt/mtp-deploy/bin:/usr/local/bin:/usr/bin:/bin`. Существующий поддерживаемый Node сохранять; pnpm
+можно установить отдельным wrapper через corepack, не меняя глобальные пакеты соседних apps.
 
 Структура:
 
@@ -66,7 +67,15 @@ Node/pnpm должны быть доступны через PATH systemd: `/usr/
 unit-файлы устанавливает оператор из конкретного проверенного commit. Не запускать production
 controller из изменяемого рабочего дерева.
 
-Для private GitHub repository добавить отдельный read-only deploy SSH key на этот repo. Закрепить
+Публичный repository клонируется по HTTPS без credentials; GitHub Actions API опрашивается без PAT.
+Не переносить личный GCM token на VDS. Watcher имеет общий cooldown 300 секунд независимо от смены
+SHA: максимум 12 initial CI запросов и 12 повторных проверок перед активацией в час. Для уже
+опубликованного неизменного SHA — ноль API запросов. Это максимум 24/час на watcher при
+unauthenticated GitHub лимите 60/час на IP; другие клиенты IP расходуют общий остаток. HTTP 403/429,
+Retry-After и X-RateLimit-Reset откладывают публикацию; remaining=0 блокирует следующий запрос.
+Повторный exact-SHA gate перед активацией обязателен. `resume` не сбрасывает rate cooldown.
+
+При будущем переводе в private repository добавить отдельный read-only deploy SSH key. Закрепить
 проверенный GitHub host key в отдельном known_hosts; не использовать StrictHostKeyChecking=no. Ключ
 и SSH config хранить вне repo, например `/srv/mtp/.ssh`. `ProtectHome=true` исключает ключи в чужом
 `/home`/`root`. Локальный credentials может задать
@@ -77,9 +86,9 @@ key или credentials. GitHub workflow не получает эти credentials
 Пример non-secret операций после подготовки пользователя и доступа:
 
 ```bash
-sudo -u mtp-deploy git clone --no-checkout git@github.com:twilingway/mtp-twiling.git /srv/mtp/repo
+sudo -u mtp-deploy git clone --no-checkout https://github.com/twilingway/mtp-twiling.git /srv/mtp/repo
 sudo install -d -m 0755 /opt/mtp-deploy/controller/scripts /etc/mtp-deploy
-sudo install -m 0644 scripts/deploy-lib.mjs scripts/deploy-static.mjs scripts/deploy-version.mjs \
+sudo install -m 0644 scripts/deploy-lib.mjs scripts/deploy-rate.mjs scripts/deploy-static.mjs scripts/deploy-version.mjs \
   /opt/mtp-deploy/controller/scripts/
 sudo install -m 0755 scripts/deploy-static.sh /opt/mtp-deploy/controller/scripts/
 sudo install -m 0644 deploy/static/config.example.json /etc/mtp-deploy/config.json
@@ -113,12 +122,13 @@ sudo systemctl enable --now mtp-deploy.timer
 sudo systemctl list-timers mtp-deploy.timer
 ```
 
-Watcher раз в минуту читает origin/main; GitHub CI запрашивает не чаще раза в пять минут на SHA.
-Публикует только latest successful push run `.github/workflows/ci.yml` для exact main SHA.
-Пропущенный, pending, cancelled или failed CI ничего не публикует. При смене main во время сборки
-активация откладывается. Сервер выполняет frozen install, check, deploy-тесты и spec:validate в
-чистом archive-каталоге; публикуется только manifest allowlist из public. Secrets и исходники в
-release не попадают. Повторная сборка SHA обязана совпасть с имеющимся immutable payload.
+Watcher раз в минуту читает origin/main; новый цикл GitHub CI начинается не чаще раза в пять минут
+глобально, даже если SHA меняется каждую минуту. Публикует только latest successful push run
+`.github/workflows/ci.yml` для exact main SHA. Пропущенный, pending, cancelled или failed CI ничего
+не публикует. При смене main во время сборки активация откладывается. Сервер выполняет frozen
+install, check, deploy-тесты и spec:validate в чистом archive-каталоге; публикуется только manifest
+allowlist из public. Secrets и исходники в release не попадают. Повторная сборка SHA обязана
+совпасть с имеющимся immutable payload.
 
 ## Проверка релиза
 

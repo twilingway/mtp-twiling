@@ -11,6 +11,7 @@ import {
   successfulRun,
   verifyPublic
 } from "./deploy-lib.mjs";
+import { githubRequest, reserveQuery, WaitForCi } from "./deploy-rate.mjs";
 
 const exists = async (path) =>
   access(path).then(
@@ -73,9 +74,8 @@ async function green(config, sha) {
     head_sha: sha,
     per_page: "100"
   });
-  const response = await fetch(url, { headers, signal: AbortSignal.timeout(20000) });
-  if (!response.ok) throw new Error(`GitHub CI unavailable: HTTP ${response.status}`);
-  return successfulRun(await response.json(), sha, config.repository);
+  const body = await githubRequest(url, headers, join(config.root, "state", "last-query.json"));
+  return successfulRun(body, sha, config.repository);
 }
 
 async function release(config, sha) {
@@ -83,7 +83,7 @@ async function release(config, sha) {
   const repo = join(root, "repo");
   command("git", ["fetch", "--no-tags", "origin", "refs/heads/main"], repo);
   if (command("git", ["rev-parse", "FETCH_HEAD"], repo) !== sha)
-    throw new Error("main advanced while preparing; wait for its exact CI");
+    throw new WaitForCi("main advanced while preparing; wait for its exact CI");
   const temporary = await mkdtemp(join(root, "build-"));
   const archive = join(temporary, "source.tar");
   const buildDir = join(temporary, "source");
@@ -107,7 +107,7 @@ async function release(config, sha) {
       await rm(staging, { recursive: true });
     } else await rename(staging, target);
     if ((await latestMain(repo)) !== sha || !(await green(config, sha)))
-      throw new Error("main or CI changed before activation; keeping current release");
+      throw new WaitForCi("main or CI changed before activation; keeping current release");
     await activate(root, target, metadata, verifyPublic, config.publicOrigin);
     await writeFile(join(root, "state", "deployed-sha"), sha + "\n");
     log(`Released ${sha} v${metadata.version} build ${metadata.buildId}`);
@@ -128,14 +128,15 @@ async function watch(config) {
       return log(`SHA ${sha} previously failed; use resume after diagnosis`);
   }
   const queryFile = join(state, "last-query.json");
-  const last = (await exists(queryFile)) ? await json(queryFile) : {};
-  if (last.sha === sha && Date.now() - last.at < 300000) return;
-  await writeFile(queryFile, JSON.stringify({ sha, at: Date.now() }));
+  // Global cooldown survives changing main SHAs. One cycle makes at most two
+  // requests (initial CI and the exact-SHA check immediately before activation).
+  if (!(await reserveQuery(queryFile, sha))) return;
   if (!(await green(config, sha))) return log(`Waiting for successful main push CI at ${sha}`);
   try {
     await release(config, sha);
     await rm(join(state, "failed-sha"), { force: true });
   } catch (error) {
+    if (error instanceof WaitForCi) return log(error.message);
     await writeFile(join(state, "failed-sha"), sha + "\n");
     throw error;
   }
@@ -151,8 +152,7 @@ export async function main(args = process.argv.slice(2)) {
   const state = join(config.root, "state");
   if (mode === "watch") return watch(config);
   if (mode === "resume") {
-    for (const file of ["paused", "failed-sha", "last-query.json"])
-      await rm(join(state, file), { force: true });
+    for (const file of ["paused", "failed-sha"]) await rm(join(state, file), { force: true });
     return log("Automatic releases resumed; next timer run checks main CI");
   }
   if (mode === "pause") {

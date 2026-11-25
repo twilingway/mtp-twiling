@@ -16,6 +16,13 @@ import {
 } from "./deploy-lib.mjs";
 import { isReleaseInput, requireVersion, versionIncreased } from "./deploy-version.mjs";
 import { prepareVersion } from "./prepare-version.mjs";
+import {
+  githubRequest,
+  queryState,
+  reserveQuery,
+  responseNotBefore,
+  WaitForCi
+} from "./deploy-rate.mjs";
 
 const sha = "a".repeat(40);
 const olderSha = "b".repeat(40);
@@ -146,6 +153,82 @@ test("CI accepts only latest successful push run for exact main SHA/repo/workflo
   ])
     assert.equal(verdict({ ...run, ...replacement }), false);
   assert.equal(verdict(run, { ...run, run_attempt: 2, conclusion: "failure" }), false);
+});
+
+test("GitHub query cooldown is global across several changing main SHAs", async (t) => {
+  const root = await workspace(t);
+  const file = join(root, "query.json");
+  const start = 1000000;
+  assert.equal(await reserveQuery(file, sha, start), true);
+  for (const [nextSha, elapsed] of [
+    [olderSha, 60000],
+    ["c".repeat(40), 120000],
+    ["d".repeat(40), 299999]
+  ])
+    assert.equal(await reserveQuery(file, nextSha, start + elapsed), false);
+  assert.equal((await queryState(file)).sha, sha);
+  assert.equal(await reserveQuery(file, olderSha, start + 300000), true);
+});
+
+test("GitHub 403/429 and network failures fail closed and preserve retry deadlines", async (t) => {
+  const root = await workspace(t);
+  const file = join(root, "query.json");
+  let now = 2000000;
+  await reserveQuery(file, sha, now);
+  let calls = 0;
+  const reset = now + 900000;
+  const fetcher = async () => {
+    calls++;
+    return new Response("{}", {
+      status: 403,
+      headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(reset / 1000) }
+    });
+  };
+  await assert.rejects(
+    githubRequest("https://api.github.com/", {}, file, fetcher, () => now),
+    WaitForCi
+  );
+  now += 300001;
+  assert.equal(await reserveQuery(file, olderSha, now), false);
+  await assert.rejects(
+    githubRequest("https://api.github.com/", {}, file, fetcher, () => now),
+    WaitForCi
+  );
+  assert.equal(calls, 1);
+  now = reset + 1;
+  assert.equal(await reserveQuery(file, olderSha, now), true);
+  const throttled = new Response("{}", { status: 429, headers: { "retry-after": "600" } });
+  assert.equal(responseNotBefore(throttled, now), now + 600000);
+  const dateRetry = new Response("{}", {
+    status: 429,
+    headers: { "retry-after": new Date(now + 1200000).toUTCString() }
+  });
+  assert.ok(responseNotBefore(dateRetry, now) >= now + 1199000);
+  const exhausted = new Response("{}", {
+    status: 200,
+    headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String((now + 900000) / 1000) }
+  });
+  assert.equal(responseNotBefore(exhausted, now), now + 900000);
+  await assert.rejects(
+    githubRequest(
+      "https://api.github.com/",
+      {},
+      file,
+      async () => {
+        throw new Error("network");
+      },
+      () => now
+    ),
+    WaitForCi
+  );
+  const allowed = await githubRequest(
+    "https://api.github.com/",
+    {},
+    file,
+    async () => new Response('{"workflow_runs":[]}'),
+    () => now
+  );
+  assert.equal(successfulRun(allowed, sha, repo), false);
 });
 
 test("allowlist blocks secret files, traversal and path escapes", () => {
