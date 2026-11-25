@@ -22,6 +22,10 @@ scrollByDistance и setBarSpace; его границы ширины свечи 1
   фиксируется тем же существующим мостом, что при перемещении мышью.
 - LW применяет ширину свечи и rightOffset вместе, сохраняя центр без чтения ещё не применённых
   RAF-записей. KLine вызывает zoomAtCoordinate с явным центром.
+- LW reset явно применяет barSpacing 6/rightOffset 8 и scrollToPosition(8,false), включая autoScale
+  Y. Установленный 5.0.9 restoreDefault читает текущие mutable options после zoom/setView, а
+  scrollToRealTime анимирует текущий options.rightOffset; эти методы не возвращают initial camera.
+  Reset проверяет ready/nonempty независимо от координат; geometry guard остаётся у zoom/scroll.
 - Панель — сосед ChartGestures. События указателя, клика и колеса останавливаются; обычная
   фокусировка кнопок сохраняется.
 - Локализация находится в отдельном модуле, чтобы независимые изменения общего каталога не

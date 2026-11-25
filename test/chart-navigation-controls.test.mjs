@@ -104,12 +104,103 @@ test("LW reset enables price autoscale and returns the time scale to realtime; p
   chart.api.resetView();
   assert.equal(chart.autoScale(), true);
   assert.equal(chart.spacing(), 6);
-  assert.deepEqual(chart.writes.slice(-2), ["reset", "realtime"]);
+  assert.deepEqual(JSON.parse(JSON.stringify(chart.writes.at(-1))), { barSpacing: 6, rightOffset: 8 });
+  assert.equal(chart.scale.scrollPosition(), 8);
   for (const dormant of [lightweight({ ready: false }), lightweight({ length: 0 })]) {
     dormant.api.zoom(1); dormant.api.scroll(-1); dormant.api.resetView();
     assert.deepEqual(dormant.writes, []);
     assert.equal(dormant.autoScale(), true);
   }
+});
+
+const lwSource = readFileSync(new URL("../node_modules/lightweight-charts/dist/lightweight-charts.development.mjs",import.meta.url),"utf8");
+function nativeBlock(className, method) {
+  const classStart=lwSource.indexOf(`class ${className} {`);
+  assert.ok(classStart>=0,`installed native class ${className}`);
+  const start=method?lwSource.indexOf(`\n    ${method}(`,classStart)+5:classStart;
+  assert.ok(start>=classStart);
+  const open=lwSource.indexOf("{",start);let depth=1,end=open+1;
+  for(;depth&&end<lwSource.length;end++){
+    if(lwSource[end]==="{")depth++;else if(lwSource[end]==="}")depth--;
+  }
+  assert.equal(depth,0);
+  return lwSource.slice(start,end);
+}
+function nativeLightweight({missingGeometry=false}={}) {
+  let clock=0,autoScale=false,animation=null;
+  const globals={Number,Math,isFinite,RangeError,performance:{now:()=>clock},
+    merge:Object.assign,clone:structuredClone};
+  const method=(className,name)=>vm.runInNewContext(`({${nativeBlock(className,name)}})[${JSON.stringify(name)}]`,globals);
+  const Mask=vm.runInNewContext(`(${nativeBlock("InvalidateMask")})`,globals);
+  globals.InvalidateMask=Mask;
+  let pending=Mask._internal_light();
+  const native={_private__options:{barSpacing:6,rightOffset:8,minBarSpacing:.5,maxBarSpacing:0},
+    _private__barSpacing:6,_private__rightOffset:8,
+    _private__checkRightOffsetPixels(){},_private__invalidateTickMarks(){},_private__updateDateTimeFormatter(){},
+    _private__optionsApplied:{_internal_fire(){}},
+    _internal_setBarSpacing(value){this._private__barSpacing=value;},
+    _internal_setRightOffset(value){this._private__rightOffset=value;}}
+  const model={_private__invalidate(mask){pending._internal_merge(mask);}};
+  for(const name of ["_internal_setBarSpacing","_internal_setRightOffset","_internal_resetTimeScale","_internal_setTimeScaleAnimation"])
+    model[name]=method("ChartModel",name);
+  native._private__model=model;
+  for(const name of ["_internal_options","_internal_applyOptions","_internal_restoreDefault","_internal_scrollToRealTime","_internal_scrollToOffsetAnimated","_internal_barSpacing","_internal_rightOffset"])
+    native[name]=method("TimeScale",name);
+  const scale={_private__timeScale:native,_private__model:model,width:()=>800,
+    logicalToCoordinate:index=>missingGeometry?null:799-(999+native._private__rightOffset-index+.5)*native._private__barSpacing,
+    coordinateToLogical:x=>999+native._private__rightOffset+.5-(799-x)/native._private__barSpacing};
+  for(const name of ["options","applyOptions","scrollPosition","scrollToPosition","resetTimeScale","scrollToRealTime"])
+    scale[name]=method("TimeScaleApi",name);
+  const api=lightweightNavigation({timeScale:()=>scale},{priceScale:()=>({
+    applyOptions:value=>{autoScale=value.autoScale;},getVisibleRange:()=>({from:1,to:10}),setVisibleRange(){}
+  })},()=>1000,()=>true);
+  const camera=()=>({spacing:native._private__barSpacing,offset:native._private__rightOffset});
+  return {api,scale,camera,autoScale:()=>autoScale,frame(time){
+    clock=time;const commands=pending._internal_timeScaleInvalidations();pending=Mask._internal_light();
+    for(const command of commands){
+      switch(command._internal_type){
+        case 2:native._internal_setBarSpacing(command._internal_value);break;
+        case 3:native._internal_setRightOffset(command._internal_value);break;
+        case 4:native._internal_restoreDefault();break;
+        case 5:animation=command._internal_value;break;
+        case 6:animation=null;break;
+        default:assert.fail("reset must not fit the data range");
+      }
+    }
+    if(animation){native._internal_setRightOffset(animation._internal_getPosition(time));
+      if(animation._internal_finished(time))animation=null;}
+  }};
+}
+
+test("installed LW 5.0.9 restoreDefault restores changed options, proving resetTimeScale is not an initial-camera reset",()=>{
+  const chart=nativeLightweight();
+  chart.scale.applyOptions({barSpacing:17,rightOffset:-240});chart.frame(0);
+  chart.scale.resetTimeScale();chart.scale.scrollToRealTime();chart.frame(16);chart.frame(600);
+  assert.deepEqual(chart.camera(),{spacing:17,offset:-240});
+});
+
+test("LW public reset overrides saved/zoomed mutable options and stops native animation without outgoing drift",()=>{
+  const chart=nativeLightweight();
+  chart.scale.applyOptions({barSpacing:13,rightOffset:-240});chart.frame(0);
+  chart.api.zoom(1);chart.frame(16);chart.api.scroll(-1);chart.frame(32);
+  assert.equal(chart.autoScale(),false);
+  // Queue old native animated scrolling, then reset before its next frame.
+  chart.scale.scrollToPosition(-400,true);chart.api.resetView();
+  assert.equal(chart.autoScale(),true);
+  for(const time of [48,64,80,600,1600]){
+    chart.frame(time);assert.deepEqual(chart.camera(),{spacing:6,offset:8});
+  }
+  chart.api.zoom(-1);chart.frame(1700);assert.notEqual(chart.camera().spacing,6);
+  chart.api.resetView();chart.frame(1716);assert.deepEqual(chart.camera(),{spacing:6,offset:8});
+});
+
+test("LW ready nonempty reset works with null/offscreen geometry while zoom and pan keep their geometry guard",()=>{
+  const chart=nativeLightweight({missingGeometry:true});
+  chart.scale.applyOptions({barSpacing:20,rightOffset:-900});chart.frame(0);
+  chart.api.zoom(1);chart.api.scroll(-1);chart.frame(16);
+  assert.deepEqual(chart.camera(),{spacing:20,offset:-900});
+  chart.api.resetView();chart.frame(32);assert.deepEqual(chart.camera(),{spacing:6,offset:8});
+  assert.equal(chart.autoScale(),true);
 });
 
 test("KLine navigation uses multiplier, explicit plot center, native bounds and signed pixel pan without changing data", () => {

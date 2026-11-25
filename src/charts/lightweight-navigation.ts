@@ -59,11 +59,12 @@ export function lightweightNavigation(
       scale.scrollToPosition(scale.scrollPosition() - distance / spacing, false);
     },
     resetView() {
-      const g = geometry();
-      if (!g) return;
+      if (!ready() || !count()) return;
+      const scale = chart.timeScale();
       series.priceScale().applyOptions({ autoScale: true });
-      g.scale.resetTimeScale();
-      g.scale.scrollToRealTime();
+      // LW resetTimeScale restores mutable options, not the chart's initial camera.
+      scale.applyOptions({ barSpacing: 6, rightOffset: 8 });
+      scale.scrollToPosition(8, false);
     }
   };
 }
