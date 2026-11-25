@@ -5,6 +5,34 @@
 
 ## Актуальный этап — читать первым
 
+**Новейший этап: canonical mainc1029e0; served0.3.11/b4d4504fe304b7a0 (build0440153),
+check312/spec17.** Freshpreview_0311_ui_alignment:33скрина просмотрены, лупа/righticonsцентр0px,
+leftrailбезhorizontalbar, verticalwheel/Tabдостигаютнастроек, Nav5bothengine, flags7/filterreload,
+Welcomehide/reopen, Storagepreview/cancel, MTP151 иKLineD/W/M/DfitresizePASS.
+Profileвосстановлен:layout/watchlist/ drawings/images+37views exact, Welcomefalse; closed. Артефакт
+preview-0311-ui-alignment/report.json. P2arrowrepeatlight исправлен c1029e0 (background-color
+вместоshorthand, rightpadding26).
+
+После0440153 SOURCE-ONLY влиты: depth89cfa38 (сохранёнimportWritable), quote15b838e (UIперенесён
+вWatchlistQuoteRow, flagsнепотеряны), DriveDAGhead6c387bf, QuoteRowformat88098ed, groupedStorage
+09eb991 (name→nestedTF/search/wholeinstrumentselect;315tests own), MTPgroupd4d7105 (master0–640,
+children0–160/160–440/440–640, indeterminate, снятиеодногоизполногооставляетостальные;228tests own).
+Исходные151SMA/min4 сохранены. Welcome теперь «Установленное приложение хранит данные на вашем
+устройстве…», безIndexedDB. Свечи всегдаисключены изDrive. Запрошенная futureочистка: per-device
+cache vs separateconfirmed all-device delete сотметкамиудаления; новойall-device командыНЕТ.
+
+Активны: google_drive_ui (cameraintent+pending доnativeRAF/settledcopiedviewautosave,
+captureView:falseDriveexport противquote-onlypoll/echo), quotes_daily_change_audit (AbortSignal
+через4файладоportableTX, beforecommitabort/cleanup; actualnativecommitrollbackнеобещать),
+chart_navigation_controls (толькоконтрактныйпланcustom4/6/7/8/9m/45m/3hбезcoreedits). Послеcommit
+Abortагентпрекращаетработу, нуженслотfreshQA. DAGreviewP1 ужеисправлен77154fb→6c387bf;
+nativeAborttiming не измерялся. Точныеworktreeпути уточнитьчерезgitworktreelist.
+
+Далее: интегрировать2Drivefix, bump0.3.12/check/spec, freshQA процентов14/depth5↔365,
+новыхMTPgroup/Storagegroup/search/copy/arrowfix+cameraintent/quote-noecho. Потом realOAuth,
+two-device, publichomepageprivacy/первыйpush/CI/VDS. Goal ACTIVE; полнойTVparityещёнет. Ниже
+исторические статусы, они могутпротиворечитьновомуэтапу.
+
 **Обновление после b24c818: сервер пока0.3.10/5219f27b5345f071; новые исходники ещё НЕ собраны.** В
 main влиты KLine canvas-resize1bce24a, navigation32f8181, цветные отметки2254434, Drive
 core/atomic/UI ca96b51+2620eb1+d63fb90, единый MTP151 SMA4–640f80ade1, Drive allowlist5f513fd,
