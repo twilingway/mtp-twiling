@@ -3,6 +3,7 @@ import type {
   TechnicalIndicatorId,
   UnsupportedIndicatorDefinition
 } from "./types.js";
+import { movingAveragePresets } from "./averages/metadata.js";
 
 const reference = (name: string) =>
   `https://www.tradingview.com/pine-script-reference/v6/#fun_ta.${name}`;
@@ -51,6 +52,17 @@ const definition = (
 
 /** Data only: renderer/catalog consumers never deserialize executable calculations. */
 export const technicalIndicatorDefinitions: readonly TechnicalIndicatorDefinition[] = freezeData([
+  ...movingAveragePresets.map((preset) =>
+    definition(
+      preset.id,
+      preset.title,
+      preset.shortTitle,
+      preset.defaultPane,
+      [{ ...length("length", preset.defaultLength), min: preset.minLength }, source],
+      [line("value", preset.shortTitle)],
+      [preset.reference]
+    )
+  ),
   definition(
     "sma",
     "Simple Moving Average",

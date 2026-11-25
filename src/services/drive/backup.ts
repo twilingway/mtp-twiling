@@ -50,7 +50,7 @@ const backupShape: Shape = {
           "length source fastLength slowLength signalLength multiplier smoothK smoothD"
         ),
         pane: scalars("kind id"),
-        styles: { $: scalars("color width visible") }
+        styles: { $: scalars("color width visible opacity lineStyle") }
       }
     ],
     technicalPaneLayout: [scalars("paneId heightRatio collapsed")],

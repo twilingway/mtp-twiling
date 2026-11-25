@@ -1,7 +1,19 @@
 export type NumericValue = number | null;
 export type NumericSeries = readonly NumericValue[];
 export type TechnicalIndicatorId =
-  "sma" | "ema" | "rsi" | "macd" | "bollinger-bands" | "atr" | "stochastic";
+  | "sma"
+  | "ema"
+  | "rsi"
+  | "macd"
+  | "bollinger-bands"
+  | "atr"
+  | "stochastic"
+  | "wma"
+  | "vwma"
+  | "dema"
+  | "tema"
+  | "hma"
+  | "smma";
 export type PriceSource = "open" | "high" | "low" | "close" | "hl2" | "hlc3" | "ohlc4" | "volume";
 export interface TechnicalBar {
   readonly timestamp: number;
@@ -12,6 +24,12 @@ export interface TechnicalBar {
   readonly volume: NumericValue;
 }
 export interface TechnicalParameters {
+  wma: { length: number; source: PriceSource };
+  vwma: { length: number; source: PriceSource };
+  dema: { length: number; source: PriceSource };
+  tema: { length: number; source: PriceSource };
+  hma: { length: number; source: PriceSource };
+  smma: { length: number; source: PriceSource };
   sma: { length: number; source: PriceSource };
   ema: { length: number; source: PriceSource };
   rsi: { length: number; source: PriceSource };
@@ -24,6 +42,8 @@ export interface OutputStyle {
   color: string;
   width: number;
   visible: boolean;
+  opacity?: number;
+  lineStyle?: "solid" | "dashed" | "dotted";
 }
 export type IndicatorPane = { kind: "overlay" } | { kind: "pane"; id: string };
 export type TechnicalIndicatorInstance = {

@@ -3,6 +3,7 @@ import { assertTechnicalBars, priceSource } from "./data.js";
 import { getTechnicalIndicatorDefinition } from "./definitions.js";
 import { isTechnicalIndicatorInstance } from "./instances.js";
 import { assertLength, ema, sma } from "./primitives.js";
+import { wma, vwma, dema, tema, hma, smma, movingAverageMetadata } from "./averages/index.js";
 import type {
   NumericSeries,
   TechnicalBar,
@@ -13,6 +14,13 @@ import type {
 
 export function technicalIndicatorWarmup(instance: TechnicalIndicatorInstance): number {
   switch (instance.definitionId) {
+    case "wma":
+    case "vwma":
+    case "dema":
+    case "tema":
+    case "hma":
+    case "smma":
+      return movingAverageMetadata(instance.definitionId, instance.params.length).warmupBars;
     case "rsi":
       return instance.params.length + 1;
     case "sma":
@@ -47,6 +55,14 @@ export function technicalIndicatorHistoryRequirement(
     convergence: "full-input-dependent"
   });
   switch (instance.definitionId) {
+    case "wma":
+    case "vwma":
+    case "dema":
+    case "tema":
+    case "hma":
+    case "smma":
+      return movingAverageMetadata(instance.definitionId, instance.params.length)
+        .historyRequirement;
     case "sma":
     case "bollinger-bands":
       return finite(instance.params.length);
@@ -107,6 +123,31 @@ export function calculateTechnicalIndicator(
     const source = priceSource(bars, instance.params.source);
     present = source.map((value) => value !== null);
     switch (instance.definitionId) {
+      case "wma":
+        series = { value: wma(source, instance.params.length) };
+        break;
+      case "vwma":
+        series = {
+          value: vwma(
+            source,
+            bars.map((bar) => bar.volume),
+            instance.params.length
+          )
+        };
+        present = bars.map((bar, index) => source[index] !== null && bar.volume !== null);
+        break;
+      case "dema":
+        series = { value: dema(source, instance.params.length) };
+        break;
+      case "tema":
+        series = { value: tema(source, instance.params.length) };
+        break;
+      case "hma":
+        series = { value: hma(source, instance.params.length) };
+        break;
+      case "smma":
+        series = { value: smma(source, instance.params.length) };
+        break;
       case "sma":
         series = { value: sma(source, instance.params.length) };
         break;
