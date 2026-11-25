@@ -5,7 +5,16 @@ import { DeleteIcon } from "./VisibilityIcon.js";
 
 export function SectionIcon({ action }: { action: "add" | "collapse" | "expand" | "up" | "down" }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      aria-hidden="true"
+      focusable="false"
+    >
       <path
         d={
           {
