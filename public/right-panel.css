@@ -70,6 +70,7 @@
 .right-panel-tools button {
   width: 34px;
   height: 36px;
+  padding: 0;
   display: grid;
   place-items: center;
   border-radius: 5px;
@@ -81,6 +82,7 @@
   background: #2a2e39;
 }
 .right-panel-tools svg {
+  display: block;
   width: 24px;
   height: 24px;
   fill: none;
