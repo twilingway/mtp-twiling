@@ -309,7 +309,9 @@ export class TerminalController {
     const chartSettings = {
       ...this.state.preferences.chartSettings,
       removedIndicators:
-        this.state.preferences.chartSettings.removedIndicators?.filter((item) => item !== key) ?? []
+        this.state.preferences.chartSettings.removedIndicators?.filter(
+          (item) => item !== key && !indicators[item]
+        ) ?? []
     };
     this.update({ preferences: { ...this.state.preferences, indicators, chartSettings } });
     await this.savePreferences();
