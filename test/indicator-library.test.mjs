@@ -396,7 +396,7 @@ test("pending menu writes reject owner/import/revision changes including a bound
     }
 });
 
-test("terminal library exposes only real native-ready entries and maps SMA to its legacy flag", async () => {
+test("terminal library exposes the searchable catalog and creates real TA instances without changing legacy presets", async () => {
   const f = terminalFixture(),
     load = modules({
       "screens/terminal/context.js": {
@@ -409,16 +409,18 @@ test("terminal library exposes only real native-ready entries and maps SMA to it
   const { TerminalIndicatorLibrary } = load("screens/terminal/TerminalIndicatorLibrary.js"),
     dialog = TerminalIndicatorLibrary();
   assert.deepEqual(
-    dialog.props.entries.map((entry) => entry.id),
-    ["mtpAll", "mtp160", "mtp440", "mtp640", "volume", "sma", "ema"]
+    dialog.props.entries.slice(0, 4).map((entry) => entry.id),
+    ["mtpAll", "mtp160", "mtp440", "mtp640"]
   );
-  assert.equal(
-    dialog.props.entries.every((entry) => entry.available),
-    true
+  assert.equal(dialog.props.entries.length, 131);
+  assert.equal(dialog.props.entries.filter((entry) => entry.available).length, 18);
+  assert.ok(
+    dialog.props.entries.filter((entry) => !entry.available).every((entry) => entry.reason)
   );
-  dialog.props.onAdd("sma");
+  dialog.props.onAdd("STD;SMA");
   await new Promise(setImmediate);
-  assert.equal(f.controller.getSnapshot().preferences.indicators.ma, true);
+  assert.equal(f.controller.getSnapshot().preferences.indicators.ma, false);
+  assert.equal(f.controller.getSnapshot().preferences.technicalIndicators[0].definitionId, "sma");
   f.controller.update({ importingBackup: true });
   assert.equal(
     TerminalIndicatorLibrary().props.entries.every((entry) => !entry.available && entry.reason),
@@ -479,9 +481,13 @@ test("split controls route main click to library, chevron to quick panel, and di
 });
 
 test("quick menu Escape still dismisses after an async disabled control moves focus outside", (t) => {
-  const originalWindow = globalThis.window, originalDocument = globalThis.document;
-  const listeners = new Map(), cleanups = [];
-  let open = true, focused = 0, refIndex = 0;
+  const originalWindow = globalThis.window,
+    originalDocument = globalThis.document;
+  const listeners = new Map(),
+    cleanups = [];
+  let open = true,
+    focused = 0,
+    refIndex = 0;
   const refs = [{ current: { focus: () => focused++ } }, { current: null }];
   const target = {
     addEventListener: (name, callback, capture) => listeners.set(name, { callback, capture }),
@@ -495,22 +501,47 @@ test("quick menu Escape still dismisses after an async disabled control moves fo
     globalThis.document = originalDocument;
   });
   const load = modules({
-    react: { ...react,
-      useEffect: (callback) => { const cleanup = callback(); if (cleanup) cleanups.push(cleanup); },
-      useState: () => [open, (next) => { open = next; }],
+    react: {
+      ...react,
+      useEffect: (callback) => {
+        const cleanup = callback();
+        if (cleanup) cleanups.push(cleanup);
+      },
+      useState: () => [
+        open,
+        (next) => {
+          open = next;
+        }
+      ],
       useRef: () => refs[refIndex++]
     },
-    "screens/terminal/context.js": { useTerminal: () => ({ state: {
-      preferences: { indicators: {}, chartSettings: {} }
-    }, controller: {} }) },
-    "screens/terminal/useIndicatorMenuAction.js": { useIndicatorMenuAction: () => ({ pending: true }) }
+    "screens/terminal/context.js": {
+      useTerminal: () => ({
+        state: {
+          preferences: { indicators: {}, chartSettings: {} }
+        },
+        controller: {}
+      })
+    },
+    "screens/terminal/useIndicatorMenuAction.js": {
+      useIndicatorMenuAction: () => ({ pending: true })
+    }
   });
   load("screens/terminal/TerminalIndicatorControls.js").TerminalIndicatorControls();
   const handler = listeners.get("keydown");
   assert.equal(handler.capture, true);
-  let prevented = false, stopped = false;
-  handler.callback({ key: "Escape", target: { tagName: "BODY" },
-    preventDefault: () => { prevented = true; }, stopPropagation: () => { stopped = true; } });
+  let prevented = false,
+    stopped = false;
+  handler.callback({
+    key: "Escape",
+    target: { tagName: "BODY" },
+    preventDefault: () => {
+      prevented = true;
+    },
+    stopPropagation: () => {
+      stopped = true;
+    }
+  });
   assert.equal(open, false);
   assert.equal(focused, 1);
   assert.equal(prevented && stopped, true);

@@ -103,7 +103,9 @@ export function updateTechnicalIndicator(
   return changeTechnicalPreferences(controller, (preferences) => {
     const instances = preferences.technicalIndicators ?? [];
     const original = instances.find((item) => item.id === id);
-    if (!original || (expected && original !== expected)) return null;
+    if (expected && original !== expected)
+      throw new Error("Индикатор изменился. Откройте настройки заново.");
+    if (!original) return null;
     const changed = transform(original);
     if (changed === original) return null;
     const next = instances.flatMap((item) =>

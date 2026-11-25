@@ -214,6 +214,32 @@ export function TechnicalPriceLegend() {
   return group ? <TechnicalRows group={group} /> : null;
 }
 
+export function TechnicalObjectTree() {
+  const { state } = useTerminal();
+  const groups = technicalIndicatorGroups(
+    state.preferences.technicalIndicators ?? [],
+    state.preferences.technicalPaneLayout
+  );
+  return (
+    <>
+      {groups.map((group, index) => (
+        <section key={group.key} className="technical-object-group">
+          <h4>
+            {state.preferences.locale === "en"
+              ? group.key === "price"
+                ? "Price chart"
+                : `Pane ${index + 1}`
+              : group.key === "price"
+                ? "На графике цены"
+                : `Панель ${index + 1}`}
+          </h4>
+          <TechnicalRows group={group} />
+        </section>
+      ))}
+    </>
+  );
+}
+
 export function TechnicalIndicatorPanels() {
   const { controller, state } = useTerminal();
   const [metrics, setMetrics] = useState<readonly TechnicalPaneMetric[]>([]);

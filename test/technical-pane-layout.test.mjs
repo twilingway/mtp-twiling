@@ -136,7 +136,7 @@ test("layout validation bounds ratios, IDs, duplicates and unsafe object shapes 
     [{ ...layout()[0], extra: true }],
     [{ ...layout()[0], paneId: "__proto__" }],
     [{ ...layout()[0], collapsed: 1 }],
-    Array.from({ length: 33 }, (_, i) => ({ ...layout()[0], paneId: `pane-${i}` }))
+    Array.from({ length: 101 }, (_, i) => ({ ...layout()[0], paneId: `pane-${i}` }))
   ])
     assert.equal(model.isTechnicalPaneLayout(value), false);
   let calls = 0;

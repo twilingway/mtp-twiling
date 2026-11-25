@@ -404,7 +404,7 @@ test("KLine 9 custom axis installs calendar tick selection and releases its data
   };
   assert.deepEqual(plain(template.createTicks(params).map((t) => t.text)), ["2024", "фев", "мар"]);
   dispose();
-  assert.deepEqual(plain(template.createTicks(params)), []);
+  assert.deepEqual(plain(template.createTicks(params)), params.defaultTicks);
 });
 test("monthly drawing visibility never inherits a disabled weekly rule", () => {
   const visible = model.load("model/intervals/drawing-visibility.ts").drawingVisibleOnInterval;
@@ -484,5 +484,8 @@ test("Lightweight calendar grid draws only actual monthly/day boundaries, indepe
     }),
     7
   );
-  assert.deepEqual(starts.map((point) => point.x), [0.5, 90.5, 180.5, 270.5, 360.5, 450.5, 540.5]);
+  assert.deepEqual(
+    starts.map((point) => point.x),
+    [0.5, 90.5, 180.5, 270.5, 360.5, 450.5, 540.5]
+  );
 });

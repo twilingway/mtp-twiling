@@ -14,6 +14,14 @@ import { persistIndicatorPaneLayout } from "./indicator-preferences.js";
 import { cameraCallbacks } from "./controller-camera-sync.js";
 import { watchChartPriceMetadata } from "./chart-price-metadata.js";
 import { persistTechnicalPaneLayout } from "./technical-indicator-actions.js";
+import type { TerminalPreferences } from "./state.js";
+
+function technicalInputs(preferences: TerminalPreferences) {
+  const instances = preferences.technicalIndicators ?? [];
+  return drawingToolbarSettings(preferences.chartSettings).indicatorsHidden
+    ? instances.map((item) => ({ ...item, visible: false }))
+    : instances;
+}
 
 export function useChartCanvas(
   ref: RefObject<HTMLDivElement | null>,
@@ -66,7 +74,7 @@ export function useChartCanvas(
         indicators: renderConfig.indicators,
         settings: renderConfig.settings,
         indicatorPaneLayout: snapshot.preferences.indicatorPaneLayout,
-        technicalIndicators: snapshot.preferences.technicalIndicators ?? [],
+        technicalIndicators: technicalInputs(snapshot.preferences),
         technicalPaneLayout: snapshot.preferences.technicalPaneLayout ?? [],
         onTechnicalPaneLayout: (layout) => {
           const valid = () =>
@@ -142,7 +150,7 @@ export function useChartCanvas(
       controller.chart = owned;
       const currentPreferences = controller.getSnapshot().preferences;
       owned.updateTechnicalIndicators?.(
-        currentPreferences.technicalIndicators ?? [],
+        technicalInputs(currentPreferences),
         currentPreferences.technicalPaneLayout ?? []
       );
       stopPriceMetadata = watchChartPriceMetadata(controller, owned, matches);
@@ -220,13 +228,8 @@ export function useChartCanvas(
     const adapter = adapterRef.current;
     if (!adapter || adapter.retired || state.importingBackup || state.importRecoveryRequired)
       return;
-    adapter.updateTechnicalIndicators?.(p.technicalIndicators ?? [], p.technicalPaneLayout ?? []);
-  }, [
-    p.technicalIndicators,
-    p.technicalPaneLayout,
-    state.importingBackup,
-    state.importRecoveryRequired
-  ]);
+    adapter.updateTechnicalIndicators?.(technicalInputs(p), p.technicalPaneLayout ?? []);
+  }, [p, state.importingBackup, state.importRecoveryRequired]);
   useEffect(() => {
     adapterRef.current?.redrawDrawings();
   }, [
