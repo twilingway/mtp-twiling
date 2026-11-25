@@ -84,6 +84,7 @@ export type TerminalDialog =
   | "chart-settings"
   | "drawing-settings"
   | "indicator-library"
+  | "technical-settings"
   | "indicator-settings";
 export type ContextTarget =
   | { kind: "drawing"; id: string }
@@ -96,6 +97,7 @@ export interface ContextMenu {
   target: ContextTarget;
 }
 export interface TerminalState {
+  editingTechnicalIndicator?: string;
   drawingSettingsPreview?: DrawingSettingsPreview | null;
   importingBackup?: boolean;
   importRecoveryRequired?: boolean;

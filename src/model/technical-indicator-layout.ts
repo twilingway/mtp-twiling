@@ -20,7 +20,7 @@ const plain = (value: unknown): value is Record<string, unknown> => {
 };
 
 export function isTechnicalPaneLayout(value: unknown): value is TechnicalPaneLayout {
-  if (!Array.isArray(value) || value.length > 32) return false;
+  if (!Array.isArray(value) || value.length > 100) return false;
   const ids = new Set<string>();
   for (const item of value as unknown[]) {
     if (

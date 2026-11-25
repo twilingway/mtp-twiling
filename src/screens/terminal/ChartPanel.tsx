@@ -13,6 +13,7 @@ import { IndicatorLegend } from "./IndicatorLegend.js";
 import { OhlcLegend } from "./OhlcLegend.js";
 import { ChartRangeControl } from "./intervals/ChartRangeControl.js";
 import { ChartNavigation } from "./ChartNavigation.js";
+import { TechnicalIndicatorPanels } from "./TechnicalIndicatorPanels.js";
 const Version = memo(function Version() {
   return (
     <span id="app-version" hidden>
@@ -78,71 +79,76 @@ export function ChartPanel() {
         </div>
         <IndicatorLegend />
       </div>
-      <ChartGestures>
-        <ChartCanvas />
-        <ImageLayer />
-        <DrawingAxisLabels />
-        <CandleCountdown />
-        {(!state.authenticated ||
-          ((!state.candles.length || state.historyViewReady === false) && !state.loading)) && (
-          <div className="chart-message" id="chart-message">
-            <span className="message-icon">⌃</span>
-            <h2>
-              {!state.authenticated
-                ? t("Ваш рынок. Ваш график.")
-                : !state.rows.length
-                  ? t("Добавьте инструмент")
-                  : state.historyViewReady === false
-                    ? t("Не удалось восстановить окно графика")
-                    : t("История недоступна")}
-            </h2>
-            <p>
-              {!state.authenticated
-                ? t("Подключите Т‑Инвестиции, чтобы увидеть реальные котировки и историю.")
-                : !state.rows.length
-                  ? t("Нажмите + в списке котировок, чтобы открыть график.")
-                  : systemText(state.historyHelp)}
-            </p>
-            {!state.authenticated && (
-              <button
-                id="connect-chart"
-                className="primary-button"
-                onClick={() => controller.setDialog("account")}
-              >
-                {t("Подключить API")}
-              </button>
-            )}
-            {state.authenticated && !state.rows.length && (
-              <button
-                className="primary-button"
-                onClick={() => controller.setDialog("instruments")}
-              >
-                {t("Добавить инструмент")}
-              </button>
-            )}
-            {state.authenticated && state.rows.length > 0 && (
-              <button
-                className="primary-button"
-                onClick={() => {
-                  void (
-                    state.importRecoveryRequired
-                      ? controller.recoverBackup()
-                      : controller.loadHistory()
-                  ).catch((error: unknown) =>
-                    controller.notify(
-                      error instanceof Error ? error.message : t("Не удалось восстановить график.")
-                    )
-                  );
-                }}
-              >
-                {state.importRecoveryRequired
-                  ? t("Повторить восстановление")
-                  : t("Повторить загрузку")}
-              </button>
-            )}
-          </div>
-        )}
-      </ChartGestures>
+      <div className="chart-scroll-host">
+        <ChartGestures>
+          <ChartCanvas />
+          <ImageLayer />
+          <DrawingAxisLabels />
+          <CandleCountdown />
+          <TechnicalIndicatorPanels />
+          {(!state.authenticated ||
+            ((!state.candles.length || state.historyViewReady === false) && !state.loading)) && (
+            <div className="chart-message" id="chart-message">
+              <span className="message-icon">⌃</span>
+              <h2>
+                {!state.authenticated
+                  ? t("Ваш рынок. Ваш график.")
+                  : !state.rows.length
+                    ? t("Добавьте инструмент")
+                    : state.historyViewReady === false
+                      ? t("Не удалось восстановить окно графика")
+                      : t("История недоступна")}
+              </h2>
+              <p>
+                {!state.authenticated
+                  ? t("Подключите Т‑Инвестиции, чтобы увидеть реальные котировки и историю.")
+                  : !state.rows.length
+                    ? t("Нажмите + в списке котировок, чтобы открыть график.")
+                    : systemText(state.historyHelp)}
+              </p>
+              {!state.authenticated && (
+                <button
+                  id="connect-chart"
+                  className="primary-button"
+                  onClick={() => controller.setDialog("account")}
+                >
+                  {t("Подключить API")}
+                </button>
+              )}
+              {state.authenticated && !state.rows.length && (
+                <button
+                  className="primary-button"
+                  onClick={() => controller.setDialog("instruments")}
+                >
+                  {t("Добавить инструмент")}
+                </button>
+              )}
+              {state.authenticated && state.rows.length > 0 && (
+                <button
+                  className="primary-button"
+                  onClick={() => {
+                    void (
+                      state.importRecoveryRequired
+                        ? controller.recoverBackup()
+                        : controller.loadHistory()
+                    ).catch((error: unknown) =>
+                      controller.notify(
+                        error instanceof Error
+                          ? error.message
+                          : t("Не удалось восстановить график.")
+                      )
+                    );
+                  }}
+                >
+                  {state.importRecoveryRequired
+                    ? t("Повторить восстановление")
+                    : t("Повторить загрузку")}
+                </button>
+              )}
+            </div>
+          )}
+        </ChartGestures>
+      </div>
       <ChartNavigation />
       <ChartRangeControl />
       <Version />

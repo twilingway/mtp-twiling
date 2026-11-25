@@ -12,7 +12,7 @@ export function createCameraInput(controller: TerminalController) {
       typeof Element !== "undefined" &&
       event.target instanceof Element &&
       event.target.closest(
-        ".chart-navigation,[data-image-id],.indicator-legend,button,input,select,textarea,a"
+        ".chart-navigation,[data-image-id],.indicator-legend,.technical-pane-legends,button,input,select,textarea,a"
       )
     );
   const blocked = (event: SyntheticEvent): boolean => {

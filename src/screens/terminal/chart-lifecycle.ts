@@ -13,6 +13,7 @@ import type { TerminalState } from "./state.js";
 import { persistIndicatorPaneLayout } from "./indicator-preferences.js";
 import { cameraCallbacks } from "./controller-camera-sync.js";
 import { watchChartPriceMetadata } from "./chart-price-metadata.js";
+import { persistTechnicalPaneLayout } from "./technical-indicator-actions.js";
 
 export function useChartCanvas(
   ref: RefObject<HTMLDivElement | null>,
@@ -65,6 +66,23 @@ export function useChartCanvas(
         indicators: renderConfig.indicators,
         settings: renderConfig.settings,
         indicatorPaneLayout: snapshot.preferences.indicatorPaneLayout,
+        technicalIndicators: snapshot.preferences.technicalIndicators ?? [],
+        technicalPaneLayout: snapshot.preferences.technicalPaneLayout ?? [],
+        onTechnicalPaneLayout: (layout) => {
+          const valid = () =>
+            matches() &&
+            owned !== null &&
+            controller.chart === owned &&
+            !owned.retired &&
+            !controller.getSnapshot().backupBusy &&
+            !controller.getSnapshot().importingBackup;
+          void persistTechnicalPaneLayout(controller, layout, valid).catch((error: unknown) => {
+            if (valid())
+              controller.notify(
+                error instanceof Error ? error.message : "Не удалось сохранить панель индикатора."
+              );
+          });
+        },
         onIndicatorLayout: (layout) => {
           const write = ++layoutWrite;
           const valid = () => {
@@ -122,6 +140,11 @@ export function useChartCanvas(
         controller.getSnapshot().historyViewReady !== false;
       adapterRef.current = owned;
       controller.chart = owned;
+      const currentPreferences = controller.getSnapshot().preferences;
+      owned.updateTechnicalIndicators?.(
+        currentPreferences.technicalIndicators ?? [],
+        currentPreferences.technicalPaneLayout ?? []
+      );
       stopPriceMetadata = watchChartPriceMetadata(controller, owned, matches);
       // Adapters retain this request until nonempty data has completed its initial fit.
       if (view) owned.setView(view);
@@ -193,6 +216,17 @@ export function useChartCanvas(
     }
     dataRef.current = next;
   }, [state.candles, state.historyViewReady, state.importingBackup, state.importRecoveryRequired]);
+  useEffect(() => {
+    const adapter = adapterRef.current;
+    if (!adapter || adapter.retired || state.importingBackup || state.importRecoveryRequired)
+      return;
+    adapter.updateTechnicalIndicators?.(p.technicalIndicators ?? [], p.technicalPaneLayout ?? []);
+  }, [
+    p.technicalIndicators,
+    p.technicalPaneLayout,
+    state.importingBackup,
+    state.importRecoveryRequired
+  ]);
   useEffect(() => {
     adapterRef.current?.redrawDrawings();
   }, [
