@@ -240,9 +240,9 @@ export function volumeFlowMetadata(id: VolumeFlowId, options: VolumeFlowOptions 
       histogram: warmupBars
     });
     kind = "smoothing-composition";
-    seedPolicy = "first-non-null";
     if (values.oscillatorAverage === "EMA") emaLengths.push(fast, slow);
     if (values.signalAverage === "EMA") emaLengths.push(signal);
+    seedPolicy = emaLengths.length === 0 ? "window" : "first-non-null";
     missingPolicy = "na-skipping-averages-zero-slow-denominator-null";
   } else {
     warmupBars = 1;

@@ -189,7 +189,7 @@ EMA сокращается, но обрезание входа меняет smoo
 
 ## Проверки и последующая регистрация
 
-Результат: 15/15 focused tests, typecheck, scoped ESLint/Prettier и `git diff --check` прошли;
+Результат: 16/16 focused tests, typecheck, scoped ESLint/Prettier и `git diff --check` прошли;
 strict OpenSpec — 41/41.
 
 Команды выполняются из отдельного worktree с junction на canonical node_modules; version preparation

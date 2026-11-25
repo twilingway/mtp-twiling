@@ -325,6 +325,34 @@ test("History metadata separates output warmup, windows, cumulative seeds and co
   assert.throws(() => volumeFlowMetadata("nvi", { length: 2 }), RangeError);
 });
 
+test("PVO window seeding applies only when both smoothing stages are SMA", () => {
+  for (const oscillatorAverage of ["SMA", "EMA"]) {
+    for (const signalAverage of ["SMA", "EMA"]) {
+      const metadata = volumeFlowMetadata("volume-oscillator", {
+        fastLength: 2,
+        slowLength: 4,
+        signalLength: 3,
+        oscillatorAverage,
+        signalAverage
+      });
+      const allSma = oscillatorAverage === "SMA" && signalAverage === "SMA";
+      assert.equal(metadata.historyRequirement.seedPolicy, allSma ? "window" : "first-non-null");
+      assert.equal(
+        metadata.historyRequirement.convergence,
+        allSma ? "exact-after-valid-observations" : "full-input-dependent"
+      );
+      assert.deepEqual(metadata.historyRequirement.emaLengths, [
+        ...(oscillatorAverage === "EMA" ? [2, 4] : []),
+        ...(signalAverage === "EMA" ? [3] : [])
+      ]);
+      if (allSma) {
+        assert.equal(metadata.historyRequirement.seedBars, 6);
+        assert.deepEqual(metadata.outputWarmupBars, { oscillator: 4, signal: 6, histogram: 6 });
+      }
+    }
+  }
+});
+
 test("Default calculations agree with verified current preset parameters", () => {
   const input = Array.from({ length: 270 }, (_, i) =>
     bar(10 + (i % 7), 10 + (i % 6), 18 + (i % 7), 2 + (i % 7))
