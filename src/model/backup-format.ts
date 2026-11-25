@@ -6,6 +6,8 @@ import { isNativeIntervalId } from "./intervals/registry.js";
 import { isIntervalFavorites } from "./intervals/favorites.js";
 import { isIndicatorPaneLayout } from "./indicator-layout.js";
 import { isWatchlistFlags, isWatchlistFlagFilter } from "./watchlist-flags.js";
+import { isTechnicalIndicatorInstanceList } from "./technical-indicators/instances.js";
+import { isTechnicalPaneLayout } from "./technical-indicator-layout.js";
 import type {
   Backup,
   BackupDrawing,
@@ -228,6 +230,8 @@ export function isProfilePreferences(value: unknown): value is ProfilePreference
   return (
     isRecord(value) &&
     fields(value, {
+      technicalIndicators: isTechnicalIndicatorInstanceList,
+      technicalPaneLayout: isTechnicalPaneLayout,
       watchlistFlags: isWatchlistFlags,
       watchlistFlagFilter: isWatchlistFlagFilter,
       locale: isLocale,

@@ -13,6 +13,19 @@ export { logicalForTime, timeForLogical } from "../model/intervals/projected-tim
 import type { DisplayPreferences } from "../i18n/preferences.js";
 import { chartPriceFormat } from "./price-format.js";
 import type { PriceMetadata } from "./price-format.js";
+import type { TechnicalIndicatorInstance } from "../model/technical-indicators/types.js";
+import type {
+  TechnicalPaneLayout,
+  TechnicalPanePreference
+} from "../model/technical-indicator-layout.js";
+
+export interface TechnicalPaneMetric {
+  /** price, legacy:volume or the key returned by technicalPaneKey. */
+  key: string;
+  top: number;
+  height: number;
+  width: number;
+}
 
 export interface ChartAdapter {
   source?: { owner: string; viewKey: string; uid: string };
@@ -22,6 +35,13 @@ export interface ChartAdapter {
   setData(data: Candle[], fit: boolean): void;
   updateBar(bar: Candle): void;
   updatePriceFormat?(metadata: PriceMetadata): void;
+  updateTechnicalIndicators?(
+    instances: readonly TechnicalIndicatorInstance[],
+    layout?: readonly TechnicalPanePreference[]
+  ): void;
+  technicalPaneMetrics?(): readonly TechnicalPaneMetric[];
+  /** Global X-axis location can differ from the price-pane bottom. */
+  timeAxisTop?(): number;
   getView(): ChartView | null;
   setView(view: ChartView): void;
   fit(): void;
@@ -41,6 +61,10 @@ export interface ChartAdapter {
   destroy(): void;
 }
 export interface ChartOptions extends DisplayPreferences {
+  technicalIndicators?: readonly TechnicalIndicatorInstance[];
+  technicalPaneLayout?: readonly TechnicalPanePreference[];
+  onTechnicalPaneLayout?: ((layout: TechnicalPaneLayout) => void) | undefined;
+  onTechnicalPaneMetrics?: ((metrics: readonly TechnicalPaneMetric[]) => void) | undefined;
   onCameraIntent?: (() => void) | undefined;
   onCameraChange?: ((view: ChartView) => void) | undefined;
   onCameraIdle?: ((reason: "unchanged" | "cancelled" | "unavailable") => void) | undefined;

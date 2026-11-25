@@ -43,6 +43,17 @@ const backupShape: Shape = {
       "locale timeZone rightPanelCollapsed rightPanelTab sidebarWidth rightDetailsHeightRatio symbol instrumentUid timeframe engine rangeDays watchlistFlagFilter"
     ),
     favoriteIntervals: [true],
+    technicalIndicators: [
+      {
+        ...scalars("schemaVersion id definitionId visible order"),
+        params: scalars(
+          "length source fastLength slowLength signalLength multiplier smoothK smoothD"
+        ),
+        pane: scalars("kind id"),
+        styles: { $: scalars("color width visible") }
+      }
+    ],
+    technicalPaneLayout: [scalars("paneId heightRatio collapsed")],
     indicatorPaneLayout: { volume: scalars("heightRatio") },
     watchlistFlags: { $: true },
     chartSettings,

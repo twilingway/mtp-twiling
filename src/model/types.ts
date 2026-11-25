@@ -2,6 +2,8 @@ import type { DrawingToolbarSettings } from "./drawing-toolbar.js";
 import type { IntervalId, NativeIntervalId } from "./intervals/registry.js";
 import type { DisplayPreferences } from "../i18n/preferences.js";
 import type { WatchlistFlags, WatchlistFlagFilter } from "./watchlist-flags.js";
+import type { TechnicalIndicatorInstance } from "./technical-indicators/types.js";
+import type { TechnicalPaneLayout } from "./technical-indicator-layout.js";
 
 export type Timeframe = NativeIntervalId;
 export interface Candle {
@@ -222,6 +224,8 @@ export interface IndicatorPaneLayout {
   volume?: { heightRatio: number };
 }
 export interface ProfilePreferences extends DisplayPreferences {
+  technicalIndicators?: TechnicalIndicatorInstance[];
+  technicalPaneLayout?: TechnicalPaneLayout;
   watchlistFlags?: WatchlistFlags;
   watchlistFlagFilter?: WatchlistFlagFilter;
   indicatorPaneLayout?: IndicatorPaneLayout;
