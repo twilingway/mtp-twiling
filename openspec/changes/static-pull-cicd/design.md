@@ -39,6 +39,12 @@ test остаётся отдельной последующей настройк
 
 ## Risks / Trade-offs
 
+Для разовой reviewed попытки watcher один раз читает optional `MTP_DEPLOY_EXPECTED_SHA`, проверяет
+полный lowercase 40-hex и сравнивает с первым latest main до query/cooldown/build. Перед activate
+сверка повторяется для выбранного SHA; существующий повторный main/CI gate также сохраняется.
+Обычный timer без pin работает прежним образом. Оператор задаёт pin только в MTP drop-in и убирает
+его после public/browser gate до включения timer, сохраняя resource profile.
+
 - Недоступный GitHub или сеть → отказ от новой публикации, старая статика продолжает работать.
 - Ошибка public health из-за CDN → откат; шаблон nginx исключает длительное кэширование.
 - Права build-пользователя → отдельный mtp-deploy user, только свой каталог и read-only GitHub.
