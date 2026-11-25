@@ -114,7 +114,9 @@ export const QuoteRow = memo(function QuoteRow({
         </span>
       </td>
       <td className={direction}>{number(row.price, digits)}</td>
-      <td className={signClass(row.change)} title={changeTitle}>{number(row.change, digits, true)}</td>
+      <td className={signClass(row.change)} title={changeTitle}>
+        {number(row.change, digits, true)}
+      </td>
       <td className={signClass(row.changePercent)} title={changeTitle}>
         <span className="quote-percent">
           {number(row.changePercent, 2, true)}
