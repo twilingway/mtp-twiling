@@ -1,3 +1,4 @@
+import { t } from "../../../i18n/messages.js";
 import { useState } from "react";
 import type { MouseEvent } from "react";
 import type { Drawing, ImageAsset, IndicatorKey } from "../../../model/types.js";
@@ -13,7 +14,7 @@ export function ObjectTree() {
   const [name, setName] = useState("");
   const run = (action: Promise<void>) => {
     void action.catch((error) =>
-      controller.notify(error instanceof Error ? error.message : "Не удалось сохранить объект.")
+      controller.notify(error instanceof Error ? error.message : t("Не удалось сохранить объект."))
     );
   };
   const context = (event: MouseEvent, target: ContextTarget) => {
@@ -45,7 +46,7 @@ export function ObjectTree() {
         }}
       >
         <input
-          aria-label="Новое название объекта"
+          aria-label={t("Новое название объекта")}
           value={name}
           maxLength={300}
           autoFocus
@@ -55,7 +56,7 @@ export function ObjectTree() {
             if (event.key === "Escape") setRenaming(null);
           }}
         />
-        <button type="submit" aria-label="Сохранить название">
+        <button type="submit" aria-label={t("Сохранить название")}>
           ✓
         </button>
       </form>
@@ -65,7 +66,7 @@ export function ObjectTree() {
         onClick={() => controller.focusObject(item.id)}
         onDoubleClick={() => beginRename(item)}
       >
-        {"blob" in item ? item.name : item.title || TOOL_NAMES[item.name]}
+        {"blob" in item ? item.name : item.title || t(TOOL_NAMES[item.name])}
       </button>
     );
   const actions = (item: Drawing | ImageAsset) => {
@@ -79,8 +80,8 @@ export function ObjectTree() {
       <>
         <button
           data-object-action="lock"
-          title={item.lock ? "Разблокировать" : "Заблокировать"}
-          aria-label={item.lock ? "Разблокировать" : "Заблокировать"}
+          title={item.lock ? t("Разблокировать") : t("Заблокировать")}
+          aria-label={item.lock ? t("Разблокировать") : t("Заблокировать")}
           aria-pressed={!!item.lock}
           onClick={() => save({ lock: !item.lock })}
         >
@@ -88,16 +89,16 @@ export function ObjectTree() {
         </button>
         <button
           data-object-action="visibility"
-          title={item.visible === false ? "Показать" : "Скрыть"}
-          aria-label={item.visible === false ? "Показать" : "Скрыть"}
+          title={item.visible === false ? t("Показать") : t("Скрыть")}
+          aria-label={item.visible === false ? t("Показать") : t("Скрыть")}
           onClick={() => save({ visible: item.visible === false })}
         >
           <VisibilityIcon hidden={item.visible === false} />
         </button>
         <button
           data-object-action="delete"
-          title={"blob" in item ? "Удалить изображение" : "Удалить рисунок"}
-          aria-label={"blob" in item ? "Удалить изображение" : "Удалить рисунок"}
+          title={"blob" in item ? t("Удалить изображение") : t("Удалить рисунок")}
+          aria-label={"blob" in item ? t("Удалить изображение") : t("Удалить рисунок")}
           onClick={() => run(controller.tools.deleteObject(item.id))}
         >
           <DeleteIcon />
@@ -107,16 +108,16 @@ export function ObjectTree() {
   };
   if (!state.objectPanel) return null;
   return (
-    <aside className="objects-panel" aria-label="Дерево объектов">
+    <aside className="objects-panel" aria-label={t("Дерево объектов")}>
       <header>
-        <strong>Дерево объектов</strong>
-        <button aria-label="Закрыть дерево объектов" onClick={controller.toggleObjects}>
+        <strong>{t("Дерево объектов")}</strong>
+        <button aria-label={t("Закрыть дерево объектов")} onClick={controller.toggleObjects}>
           ×
         </button>
       </header>
       <div className="objects-list">
         <strong className="object-instrument">
-          {state.preferences.symbol} · {PERIOD_LABELS[state.preferences.timeframe]}
+          {state.preferences.symbol} · {t(PERIOD_LABELS[state.preferences.timeframe])}
         </strong>
         {(Object.keys(INDICATOR_NAMES) as IndicatorKey[])
           .filter((key) => !state.preferences.chartSettings.removedIndicators?.includes(key))
@@ -127,14 +128,19 @@ export function ObjectTree() {
               onContextMenu={(event) => context(event, { kind: "indicator", key })}
             >
               <span>∿</span>
-              <button onClick={() => controller.editIndicator(key)}>{INDICATOR_NAMES[key]}</button>
+              <button onClick={() => controller.editIndicator(key)}>
+                {t(INDICATOR_NAMES[key])}
+              </button>
               <button
-                title={state.preferences.indicators[key] ? "Скрыть" : "Показать"}
+                title={state.preferences.indicators[key] ? t("Скрыть") : t("Показать")}
                 onClick={() => run(controller.toggleIndicator(key))}
               >
                 <VisibilityIcon hidden={!state.preferences.indicators[key]} />
               </button>
-              <button title="Настройки индикатора" onClick={() => controller.editIndicator(key)}>
+              <button
+                title={t("Настройки индикатора")}
+                onClick={() => controller.editIndicator(key)}
+              >
                 ⚙
               </button>
             </div>

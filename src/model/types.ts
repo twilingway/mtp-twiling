@@ -1,5 +1,6 @@
 import type { DrawingToolbarSettings } from "./drawing-toolbar.js";
 import type { IntervalId, NativeIntervalId } from "./intervals/registry.js";
+import type { DisplayPreferences } from "../i18n/preferences.js";
 
 export type Timeframe = NativeIntervalId;
 export interface Candle {
@@ -201,7 +202,7 @@ export interface ChartSettings {
   indicatorOptions?: IndicatorOptions;
   drawingTemplates?: Record<string, DrawingTemplate>;
 }
-export interface ProfilePreferences {
+export interface ProfilePreferences extends DisplayPreferences {
   favoriteIntervals?: IntervalId[];
   rightPanelCollapsed?: boolean;
   rightPanelTab?: "watchlist" | "objects";

@@ -1,3 +1,4 @@
+import { intlLocale } from "../i18n/preferences.js";
 import type {
   DrawingDraft,
   DrawingPoint,
@@ -281,7 +282,7 @@ export function paintDrawings(
       ctx.globalAlpha = g.style.lineOpacity;
       const joined = new Set<FibGeometry["levels"][number]>();
       for (const l of g.levels) {
-        let text = `${g.style.labels ? (g.style.labelFormat === "percent" ? new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 }).format(l.ratio * 100) + "%" : String(l.ratio).replace(".", ",")) : ""}${g.style.prices ? " (" + new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 5 }).format(l.value) + ")" : ""}`;
+        let text = `${g.style.labels ? (g.style.labelFormat === "percent" ? new Intl.NumberFormat(intlLocale(), { maximumFractionDigits: 2 }).format(l.ratio * 100) + "%" : new Intl.NumberFormat(intlLocale(), { maximumFractionDigits: 5 }).format(l.ratio)) : ""}${g.style.prices ? " (" + new Intl.NumberFormat(intlLocale(), { maximumFractionDigits: 5 }).format(l.value) + ")" : ""}`;
         const { x: labelX, align: labelAlign } = fibLabelPosition(g, g.style.labelSide, width);
         const custom = fibLabelPosition(g, g.style.textAlign, width);
         if (

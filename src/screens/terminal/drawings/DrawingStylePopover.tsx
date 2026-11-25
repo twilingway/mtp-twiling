@@ -1,3 +1,4 @@
+import { t } from "../../../i18n/messages.js";
 import type { CSSProperties } from "react";
 import type { ResolvedDrawingStyle } from "../../../model/drawing-model.js";
 import type { DrawingSettings, FibLevelStyle } from "../../../model/types.js";
@@ -21,7 +22,7 @@ export function Swatch({
     <button
       type="button"
       className="colour-swatch"
-      aria-label={label}
+      aria-label={t(label)}
       style={style}
       onClick={onClick}
     >
@@ -61,7 +62,7 @@ export function DrawingStylePopover({ target, settings, onColor, onChange, onClo
         ))}
       </div>
       <label className="custom-colour">
-        Другой цвет
+        {t("Другой цвет")}
         <input
           type="color"
           value={color}
@@ -71,7 +72,7 @@ export function DrawingStylePopover({ target, settings, onColor, onChange, onClo
       {target.kind !== "level" && (
         <>
           <label>
-            Непрозрачность
+            {t("Непрозрачность")}
             <input
               type="range"
               min="0"
@@ -85,7 +86,7 @@ export function DrawingStylePopover({ target, settings, onColor, onChange, onClo
             />
           </label>
           <label className="setting-row">
-            Толщина
+            {t("Толщина")}
             <select
               value={width}
               onChange={(event) => {
@@ -101,7 +102,7 @@ export function DrawingStylePopover({ target, settings, onColor, onChange, onClo
             </select>
           </label>
           <label className="setting-row">
-            Стиль линии
+            {t("Стиль линии")}
             <select
               value={lineStyle}
               onChange={(event) => {
@@ -110,15 +111,15 @@ export function DrawingStylePopover({ target, settings, onColor, onChange, onClo
                   onChange(trend ? { trendStyle: value } : { lineStyle: value });
               }}
             >
-              <option value="solid">Линия</option>
-              <option value="dashed">Штриховой пунктир</option>
-              <option value="dotted">Точечный пунктир</option>
+              <option value="solid">{t("Линия")}</option>
+              <option value="dashed">{t("Штриховой пунктир")}</option>
+              <option value="dotted">{t("Точечный пунктир")}</option>
             </select>
           </label>
         </>
       )}
       <button type="button" className="close-colour" onClick={onClose}>
-        Готово
+        {t("Готово")}
       </button>
     </div>
   );

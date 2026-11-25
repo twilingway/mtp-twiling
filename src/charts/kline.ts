@@ -22,6 +22,10 @@ import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { stablePriceAxisWidth } from "./price-axis-layout.js";
 import { chartPalette } from "../model/theme.js";
 import { attachCalendarXAxis } from "./kline-calendar-axis.js";
+import { klineDateFormatter } from "../i18n/chart-formatters.js";
+import { intlLocale } from "../i18n/preferences.js";
+import { resolveTimeZone } from "../i18n/timezones.js";
+import { calendarAxisDisplay } from "../i18n/calendar-axis.js";
 
 export function makeKline(options: ChartOptions): ChartAdapter {
   const { container, settings, timeframe, indicators } = options;
@@ -85,8 +89,9 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     draw: drawObjects
   });
   const chart = init(container, {
-    locale: "ru-RU",
-    timezone: "Europe/Moscow",
+    locale: intlLocale(options.locale),
+    timezone: resolveTimeZone(options.timeZone),
+    customApi: { formatDate: klineDateFormatter(timeframe, options) },
     styles: {
       crosshair: {
         show: drawingToolbarSettings(settings).cursor === "crosshair",
@@ -156,7 +161,12 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     }
   });
   if (!chart) throw new Error("Не удалось создать KLineChart.");
-  const detachCalendarXAxis = attachCalendarXAxis(chart, () => data, timeframe);
+  const detachCalendarXAxis = attachCalendarXAxis(
+    chart,
+    () => data,
+    timeframe,
+    calendarAxisDisplay(timeframe, options)
+  );
   chart.setPriceVolumePrecision(precision(options.row), 0);
   const front = document.createElement("canvas");
   front.className = "foreground-canvas";

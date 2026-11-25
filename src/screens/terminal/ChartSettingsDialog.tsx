@@ -1,3 +1,4 @@
+import { t } from "../../i18n/messages.js";
 import { useState } from "react";
 import type { ChartSettings } from "../../model/types.js";
 import { useTerminal } from "./context.js";
@@ -5,6 +6,8 @@ import { INDICATOR_NAMES } from "./state.js";
 import { Modal } from "./Modal.js";
 import { TRADINGVIEW_CANDLE_STYLE } from "../../model/candle-palette.js";
 import { chartBackground, terminalTheme, withTheme } from "../../model/theme.js";
+import { TimeZonePicker } from "./ClockZoneControl.js";
+import type { Locale } from "../../i18n/preferences.js";
 
 const CANDLE_PARTS = [
   ["bodyVisible", "Тело свечи", "upColor", "downColor"],
@@ -14,21 +17,45 @@ const CANDLE_PARTS = [
 export function ChartSettingsDialog() {
   const { controller, state } = useTerminal(),
     [settings, setSettings] = useState<ChartSettings>({ ...state.preferences.chartSettings });
+  const [locale, setLocale] = useState<Locale>(state.preferences.locale ?? "ru");
+  const [timeZone, setTimeZone] = useState(state.preferences.timeZone ?? "Europe/Moscow");
   const update = (patch: ChartSettings) => setSettings((previous) => ({ ...previous, ...patch }));
   return (
     <Modal
       id="chart-settings-dialog"
-      title="Настройки графика"
+      title={t("Настройки графика")}
       onClose={() => controller.setDialog(null)}
     >
       <form
         id="chart-settings-form"
         onSubmit={(e) => {
           e.preventDefault();
-          void controller.setChartSettings(settings).then(() => controller.setDialog(null));
+          void controller
+            .setPreferences({ locale, timeZone, chartSettings: settings })
+            .then(() => controller.setDialog(null));
         }}
       >
-        <h3>Инструмент</h3>
+        <div className="display-preferences">
+          <label>
+            {t("Язык")}
+            <select
+              name="locale"
+              value={locale}
+              onChange={(event) => setLocale(event.target.value === "en" ? "en" : "ru")}
+            >
+              <option value="ru">{t("Русский")}</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+          <label>{t("Часовой пояс")}</label>
+          <TimeZonePicker
+            value={timeZone}
+            locale={locale}
+            now={controller.marketNow()}
+            onChange={setTimeZone}
+          />
+        </div>
+        <h3>{t("Инструмент")}</h3>
         {CANDLE_PARTS.map(([visible, label, up, down]) => (
           <div className="drawing-style-row" key={visible}>
             <label className="checkbox-label">
@@ -38,10 +65,10 @@ export function ChartSettingsDialog() {
                 checked={settings[visible] !== false}
                 onChange={(e) => update({ [visible]: e.target.checked })}
               />
-              {label}
+              {t(label)}
             </label>
             <label>
-              Рост
+              {t("Рост")}
               <input
                 type="color"
                 name={up}
@@ -50,7 +77,7 @@ export function ChartSettingsDialog() {
               />
             </label>
             <label>
-              Падение
+              {t("Падение")}
               <input
                 type="color"
                 name={down}
@@ -61,11 +88,11 @@ export function ChartSettingsDialog() {
           </div>
         ))}
         <button type="button" onClick={() => update(TRADINGVIEW_CANDLE_STYLE)}>
-          Цвета как в вашем TradingView
+          {t("Цвета как в вашем TradingView")}
         </button>
-        <h3>Оформление</h3>
+        <h3>{t("Оформление")}</h3>
         <label>
-          Тема интерфейса
+          {t("Тема интерфейса")}
           <select
             name="theme"
             value={terminalTheme(settings)}
@@ -75,12 +102,12 @@ export function ChartSettingsDialog() {
               )
             }
           >
-            <option value="dark">Тёмная</option>
-            <option value="light">Светлая</option>
+            <option value="dark">{t("Тёмная")}</option>
+            <option value="light">{t("Светлая")}</option>
           </select>
         </label>
         <label>
-          Фон
+          {t("Фон")}
           <input
             type="color"
             name="background"
@@ -90,10 +117,10 @@ export function ChartSettingsDialog() {
         </label>
         {(
           [
-            ["grid", "Линии сетки"],
-            ["showLegend", "Названия индикаторов"],
-            ["priceLine", "Линия последней цены"],
-            ["showCandleCountdown", "Отсчёт до закрытия свечи"]
+            ["grid", t("Линии сетки")],
+            ["showLegend", t("Названия индикаторов")],
+            ["priceLine", t("Линия последней цены")],
+            ["showCandleCountdown", t("Отсчёт до закрытия свечи")]
           ] as const
         ).map(([key, label]) => (
           <label className="checkbox-label" key={key}>
@@ -103,11 +130,11 @@ export function ChartSettingsDialog() {
               checked={settings[key] !== false}
               onChange={(e) => update({ [key]: e.target.checked })}
             />
-            {label}
+            {t(label)}
           </label>
         ))}
         <label>
-          Размер шрифта шкал
+          {t("Размер шрифта шкал")}
           <select
             name="scaleFontSize"
             value={settings.scaleFontSize ?? 11}
@@ -120,9 +147,9 @@ export function ChartSettingsDialog() {
         </label>
         <footer>
           <button type="button" onClick={() => controller.setDialog(null)}>
-            Отмена
+            {t("Отмена")}
           </button>
-          <button className="primary-button">Ок</button>
+          <button className="primary-button">{t("Ок")}</button>
         </footer>
       </form>
     </Modal>
@@ -140,7 +167,7 @@ export function IndicatorSettingsDialog() {
   return (
     <Modal
       id="indicator-settings-dialog"
-      title={INDICATOR_NAMES[key]}
+      title={t(INDICATOR_NAMES[key])}
       onClose={() => controller.setDialog(null)}
     >
       <form
@@ -156,9 +183,9 @@ export function IndicatorSettingsDialog() {
             .then(() => controller.setDialog(null));
         }}
       >
-        <p>Источник: закрытие свечи (Close)</p>
+        <p>{t("Источник: закрытие свечи (Close)")}</p>
         <label>
-          Цвет линии
+          {t("Цвет линии")}
           <input
             name="color"
             type="color"
@@ -167,7 +194,7 @@ export function IndicatorSettingsDialog() {
           />
         </label>
         <label>
-          Толщина
+          {t("Толщина")}
           <select name="width" value={width} onChange={(e) => setWidth(Number(e.target.value))}>
             {[1, 2, 3, 4].map((n) => (
               <option key={n}>{n}</option>
@@ -175,7 +202,8 @@ export function IndicatorSettingsDialog() {
           </select>
         </label>
         <label>
-          Прозрачность: {Math.round((1 - opacity) * 100)}%
+          {t("Прозрачность:")}
+          {Math.round((1 - opacity) * 100)}%
           <input
             name="transparency"
             type="range"
@@ -187,9 +215,9 @@ export function IndicatorSettingsDialog() {
         </label>
         <footer>
           <button type="button" onClick={() => controller.setDialog(null)}>
-            Отмена
+            {t("Отмена")}
           </button>
-          <button className="primary-button">Ок</button>
+          <button className="primary-button">{t("Ок")}</button>
         </footer>
       </form>
     </Modal>

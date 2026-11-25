@@ -9,6 +9,7 @@ import type {
   Timeframe
 } from "../model/types.js";
 import { monthPosition, shiftUtcMonths } from "../model/intervals/calendar.js";
+import type { DisplayPreferences } from "../i18n/preferences.js";
 
 export interface ChartAdapter {
   source?: { owner: string; viewKey: string; uid: string };
@@ -29,7 +30,7 @@ export interface ChartAdapter {
   plotSize(): { width: number; height: number };
   destroy(): void;
 }
-export interface ChartOptions {
+export interface ChartOptions extends DisplayPreferences {
   container: HTMLDivElement;
   row: MarketRow;
   timeframe: Timeframe;

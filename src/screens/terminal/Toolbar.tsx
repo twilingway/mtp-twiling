@@ -1,3 +1,4 @@
+import { t } from "../../i18n/messages.js";
 import { memo, useState } from "react";
 import type { ChartEngine, IndicatorKey } from "../../model/types.js";
 import { useTerminal } from "./context.js";
@@ -10,9 +11,10 @@ import {
   toggleIntervalFavorite
 } from "../../model/intervals/favorites.js";
 const InstallButton = memo(function InstallButton() {
+  useTerminal();
   return (
     <button id="install-app" className="install-button" hidden>
-      Установить
+      {t("Установить")}
     </button>
   );
 });
@@ -33,12 +35,12 @@ export function Toolbar() {
         className="symbol-button"
         id="symbol-button"
         onClick={() => controller.setDialog(state.authenticated ? "instruments" : "account")}
-        title="Найти инструмент"
+        title={t("Найти инструмент")}
       >
         <span className="tiny-search">⌕</span>
-        <b id="top-symbol">{p.symbol || "Инструмент"}</b>
+        <b id="top-symbol">{p.symbol || t("Инструмент")}</b>
       </button>
-      <nav className="timeframes" aria-label="Таймфрейм">
+      <nav className="timeframes" aria-label={t("Таймфрейм")}>
         <TimeframeMenu
           value={p.timeframe}
           favorites={p.favoriteIntervals ?? DEFAULT_INTERVAL_FAVORITES}
@@ -60,15 +62,15 @@ export function Toolbar() {
       <div className="indicator-control">
         <button
           id="indicators-button"
-          aria-label="Индикаторы"
+          aria-label={t("Индикаторы")}
           className="text-button"
           onClick={() => setIndicatorsOpen(!indicatorsOpen)}
         >
-          ⌃ <span>Индикаторы</span>
+          ⌃ <span>{t("Индикаторы")}</span>
         </button>
         {indicatorsOpen && (
           <div className="popover" id="indicators-panel">
-            <strong>Индикаторы</strong>
+            <strong>{t("Индикаторы")}</strong>
             {(Object.entries(INDICATOR_NAMES) as [IndicatorKey, string][]).map(([key, name]) => (
               <label key={key}>
                 <input
@@ -79,7 +81,7 @@ export function Toolbar() {
                     void controller.toggleIndicator(key);
                   }}
                 />
-                {name}
+                {t(name)}
               </label>
             ))}
           </div>
@@ -88,11 +90,11 @@ export function Toolbar() {
       <div className="top-spacer" />
       <InstallButton />
       <label className="engine-label" htmlFor="engine">
-        График
+        {t("График")}
       </label>
       <select
         id="engine"
-        aria-label="Библиотека графика"
+        aria-label={t("Библиотека графика")}
         value={p.engine}
         onChange={(e) => {
           void controller.setPreferences({ engine: e.target.value as ChartEngine });
@@ -104,15 +106,17 @@ export function Toolbar() {
       <button
         id="account-button"
         className="account-button"
-        title="Аккаунт и настройки"
+        title={t("Аккаунт и настройки")}
         onClick={() => controller.setDialog("account")}
       >
-        <span className="avatar">Я</span>
+        <span className="avatar">{t("Я")}</span>
         <i
           className={`account-connection ${state.status}`}
-          aria-label={state.status === "connected" ? "Т-Банк подключён" : "Т-Банк не подключён"}
+          aria-label={
+            state.status === "connected" ? t("Т-Банк подключён") : t("Т-Банк не подключён")
+          }
         />
-        <span id="account-name">{state.name || "Подключить API"}</span>
+        <span id="account-name">{state.name || t("Подключить API")}</span>
       </button>
     </header>
   );

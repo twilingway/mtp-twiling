@@ -1,0 +1,82 @@
+.clock-zone-control {
+  position: relative;
+  color: var(--text);
+  font-size: 12px;
+}
+.chart-range-control > .clock-zone-control {
+  margin-inline-start: auto;
+}
+@media (max-width: 600px) {
+  .chart-range-note {
+    display: none;
+  }
+  .chart-range-control {
+    gap: 4px;
+    padding-inline: 6px;
+  }
+  .chart-range-control > .clock-zone-control {
+    min-width: 0;
+  }
+}
+.clock-zone-trigger {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  white-space: nowrap;
+  background: transparent;
+  font-variant-numeric: tabular-nums;
+}
+.clock-zone-popover {
+  position: absolute;
+  z-index: 70;
+  right: 0;
+  bottom: calc(100% + 6px);
+  width: min(360px, 80vw);
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  box-shadow: 0 6px 25px #0006;
+}
+.clock-zone-popover > label {
+  display: block;
+  margin-bottom: 6px;
+}
+.clock-zone-popover > input {
+  width: 100%;
+  margin-bottom: 6px;
+}
+.clock-zone-list {
+  overflow-y: auto;
+  max-height: min(340px, 40vh);
+  overscroll-behavior: contain;
+}
+.clock-zone-option {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  padding: 7px;
+}
+.clock-zone-option strong,
+.clock-zone-option small {
+  display: block;
+}
+.clock-zone-option small {
+  opacity: 0.65;
+  font-size: 10px;
+}
+.clock-zone-option[data-active="true"],
+.clock-zone-option[aria-selected="true"] {
+  background: var(--surface-hover);
+}
+.display-preferences {
+  margin-bottom: 14px;
+  display: grid;
+  gap: 10px;
+}
+.display-preferences .clock-zone-popover {
+  bottom: auto;
+  top: calc(100% + 6px);
+}

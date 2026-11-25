@@ -1,8 +1,10 @@
+import { t } from "../../i18n/messages.js";
 import { useEffect, useState } from "react";
 import type { DrawingPoint } from "../../model/types.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { useTerminal } from "./context.js";
 import { drawingVisibleOnInterval } from "../../model/intervals/drawing-visibility.js";
+import { chartDateFormat } from "../../i18n/format.js";
 
 interface AxisLabel {
   timestamp: number;
@@ -60,17 +62,9 @@ export function DrawingAxisLabels() {
     frame = requestAnimationFrame(update);
     return () => cancelAnimationFrame(frame);
   }, [controller, points]);
-  const intraday =
-    state.preferences.timeframe.endsWith("m") || state.preferences.timeframe.endsWith("h");
-  const format = new Intl.DateTimeFormat("ru-RU", {
-    timeZone: "Europe/Moscow",
-    day: "2-digit",
-    month: "short",
-    year: "2-digit",
-    ...(intraday ? ({ hour: "2-digit", minute: "2-digit" } as const) : {})
-  });
+  const format = chartDateFormat(state.preferences.timeframe, state.preferences);
   return (
-    <div className="drawing-axis-labels" aria-label="Даты точек рисунка">
+    <div className="drawing-axis-labels" aria-label={t("Даты точек рисунка")}>
       {labels.map((label, index) => (
         <time
           className="drawing-axis-label"

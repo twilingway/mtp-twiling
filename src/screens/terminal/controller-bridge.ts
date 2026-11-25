@@ -1,7 +1,8 @@
 import type { ChartAdapter } from "../../charts/adapter.js";
 import type { Candle } from "../../model/types.js";
 import type { TBankClient } from "../../services/tbank-client.js";
-import { DEFAULT_CHART_SETTINGS, DEFAULT_INDICATORS } from "./state.js";
+import { DEFAULT_CHART_SETTINGS, DEFAULT_INDICATORS, PERIOD_LABELS } from "./state.js";
+import { t } from "../../i18n/messages.js";
 import type { TerminalPreferences, TerminalState } from "./state.js";
 
 export interface TerminalBridge {
@@ -22,6 +23,8 @@ export interface SessionBridge extends TerminalBridge {
   flush: () => Promise<void>;
 }
 export const defaultPreferences = (): TerminalPreferences => ({
+  locale: "ru",
+  timeZone: "Europe/Moscow",
   rightPanelCollapsed: false,
   rightPanelTab: "watchlist",
   symbol: "GAZP",
@@ -37,4 +40,7 @@ export const isAbort = (error: unknown): boolean =>
   error instanceof Error && error.name === "AbortError";
 export function viewKey(preferences: TerminalPreferences): string {
   return `${preferences.symbol}:${preferences.timeframe}:${preferences.engine}:${preferences.rangeDays}`;
+}
+export function terminalHistoryLabel(state: TerminalState): string {
+  return `${state.preferences.symbol} · ${t(PERIOD_LABELS[state.preferences.timeframe])}`;
 }

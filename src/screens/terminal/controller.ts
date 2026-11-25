@@ -1,4 +1,5 @@
 import * as storage from "../../services/storage.js";
+import { setDisplayPreferences } from "../../i18n/preferences.js";
 import type { TBankClient } from "../../services/tbank-client.js";
 import { moveWatchlistRow, type WatchlistMove } from "../../services/watchlist-order.js";
 import { loadCandleCalendar } from "../../services/tbank-calendar.js";
@@ -17,7 +18,6 @@ import type {
   Timeframe
 } from "../../model/types.js";
 import type { ChartAdapter } from "../../charts/adapter.js";
-import { PERIOD_LABELS } from "./state.js";
 import { TerminalHistory } from "./controller-history.js";
 import { TerminalSession } from "./controller-session.js";
 import { TerminalEditing } from "./controller-editing.js";
@@ -25,7 +25,7 @@ import { TerminalDrawingTools } from "./controller-drawing-tools.js";
 import { TerminalPanel } from "./controller-panel.js";
 import { TerminalBackups } from "./controller-backups.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
-import { defaultPreferences } from "./controller-bridge.js";
+import { defaultPreferences, terminalHistoryLabel } from "./controller-bridge.js";
 import { nativeTimeframe } from "../../model/intervals/native-timeframes.js";
 import type { ContextMenu, TerminalDialog, TerminalPreferences, TerminalState } from "./state.js";
 
@@ -67,6 +67,7 @@ export class TerminalController {
   readonly panel: TerminalPanel;
   private readonly backups: TerminalBackups;
   constructor() {
+    setDisplayPreferences(this.state.preferences);
     const bridge = {
       getState: () => this.state,
       getChart: () => this.chart,
@@ -144,6 +145,7 @@ export class TerminalController {
         ...patch
       };
     this.state = { ...this.state, ...patch };
+    if (patch.preferences) setDisplayPreferences(patch.preferences);
     this.listeners.forEach((listener) => listener());
   };
   notify = (message: string): void => {
@@ -157,8 +159,7 @@ export class TerminalController {
     return `${p.symbol}:${p.timeframe}:${p.engine}:${p.rangeDays}`;
   }
   private async savePreferences(): Promise<void> {
-    if (this.state.owner !== "guest")
-      await storage.savePreferences(this.state.owner, this.state.preferences);
+    await storage.savePreferences(this.state.owner, this.state.preferences);
   }
   saveView = async (): Promise<void> => {
     if (
@@ -487,6 +488,5 @@ export class TerminalController {
     if (this.state.crosshairBar?.timestamp !== crosshairBar?.timestamp)
       this.update({ crosshairBar });
   };
-  historyLabel = (): string =>
-    `${this.state.preferences.symbol} · ${PERIOD_LABELS[this.state.preferences.timeframe]}`;
+  historyLabel = (): string => terminalHistoryLabel(this.state);
 }

@@ -1,3 +1,4 @@
+import { t } from "../../../i18n/messages.js";
 import { useState } from "react";
 import type { Drawing, DrawingTemplate } from "../../../model/types.js";
 import { useTerminal } from "../context.js";
@@ -19,7 +20,7 @@ export function DrawingTemplateMenu({
     if (!item?.settings) return;
     const key = asDefault ? "default:" + item.name : name.trim().slice(0, 80);
     if (!key || ["__proto__", "prototype", "constructor"].includes(key)) {
-      controller.notify("Укажите другое название шаблона.");
+      controller.notify(t("Укажите другое название шаблона."));
       return;
     }
     const template: DrawingTemplate = {
@@ -30,27 +31,27 @@ export function DrawingTemplateMenu({
       await controller.setChartSettings({ drawingTemplates: { ...templates, [key]: template } });
       setOpen(false);
     } catch (error) {
-      controller.notify(error instanceof Error ? error.message : "Не удалось сохранить шаблон.");
+      controller.notify(error instanceof Error ? error.message : t("Не удалось сохранить шаблон."));
     }
   };
   return (
     <div className="template-control">
       <button type="button" id="drawing-template-button" onClick={() => setOpen(!open)}>
-        Шаблон ⌄
+        {t("Шаблон ⌄")}
       </button>
       <div className="template-menu" hidden={!open}>
         <input
-          aria-label="Название шаблона"
-          placeholder="Название шаблона"
+          aria-label={t("Название шаблона")}
+          placeholder={t("Название шаблона")}
           maxLength={80}
           value={name}
           onChange={(event) => setName(event.currentTarget.value)}
         />
         <button type="button" onClick={() => void save()}>
-          Сохранить как…
+          {t("Сохранить как…")}
         </button>
         <button type="button" onClick={() => void save(true)}>
-          Применить по умолчанию
+          {t("Применить по умолчанию")}
         </button>
         <button
           type="button"
@@ -59,7 +60,7 @@ export function DrawingTemplateMenu({
             setOpen(false);
           }}
         >
-          Сбросить стиль
+          {t("Сбросить стиль")}
         </button>
         {Object.entries(templates)
           .filter(([key]) => !key.startsWith("default:"))

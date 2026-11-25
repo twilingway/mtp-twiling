@@ -48,6 +48,8 @@ export function useChartCanvas(
         instrument = selectedMarketRow(snapshot.rows, snapshot.preferences);
       if (!instrument || !matches()) return;
       const options: ChartOptions = {
+        ...(p.locale ? { locale: p.locale } : {}),
+        ...(p.timeZone ? { timeZone: p.timeZone } : {}),
         container,
         row: instrument,
         timeframe: p.timeframe,
@@ -129,6 +131,8 @@ export function useChartCanvas(
     p.symbol,
     p.timeframe,
     p.rangeDays,
+    p.locale,
+    p.timeZone,
     renderConfig
   ]);
   useEffect(() => {

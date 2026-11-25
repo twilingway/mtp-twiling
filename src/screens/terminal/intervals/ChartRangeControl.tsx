@@ -1,4 +1,6 @@
 import { useTerminal } from "../context.js";
+import { ClockZoneControl } from "../ClockZoneControl.js";
+import { t } from "../../../i18n/messages.js";
 const RANGE_OPTIONS = [
   [1, "1 день"],
   [5, "5 дней"],
@@ -15,25 +17,28 @@ export function ChartRangeControl() {
   const days = state.preferences.rangeDays;
   return (
     <div className="chart-range-control">
-      <label htmlFor="range">История</label>
+      <label htmlFor="range">{t("История")}</label>
       <select
         id="range"
-        aria-label="Период истории"
+        aria-label={t("Период истории")}
         value={days}
         onChange={(event) => {
           void controller.setPreferences({ rangeDays: Number(event.target.value) });
         }}
       >
         {!RANGE_OPTIONS.some(([value]) => value === days) ? (
-          <option value={days}>{days} дн.</option>
+          <option value={days}>
+            {days} {t("дн.")}
+          </option>
         ) : null}
         {RANGE_OPTIONS.map(([value, label]) => (
           <option key={value} value={value}>
-            {label}
+            {t(label)}
           </option>
         ))}
       </select>
-      <span className="chart-range-note">Глубина загрузки</span>
+      <span className="chart-range-note">{t("Глубина загрузки")}</span>
+      <ClockZoneControl />
     </div>
   );
 }

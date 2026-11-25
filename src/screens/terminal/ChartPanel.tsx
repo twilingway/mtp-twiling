@@ -1,3 +1,4 @@
+import { t, systemText } from "../../i18n/messages.js";
 import { memo } from "react";
 import type { IndicatorKey } from "../../model/types.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
@@ -27,7 +28,7 @@ function IndicatorLegend() {
     <div
       id="indicator-legend"
       className="indicator-legend"
-      aria-label="Индикаторы графика"
+      aria-label={t("Индикаторы графика")}
       hidden={p.chartSettings.showLegend === false}
     >
       {(Object.entries(INDICATOR_NAMES) as [IndicatorKey, string][])
@@ -58,16 +59,16 @@ function IndicatorLegend() {
               onClick={() => {
                 void controller.toggleIndicator(key);
               }}
-              title={`${p.indicators[key] ? "Скрыть" : "Показать"} ${name}`}
+              title={t(p.indicators[key] ? "Скрыть" : "Показать") + " " + t(name)}
             >
-              {name}
+              {t(name)}
             </button>
             <button
               data-legend-indicator={key}
               onClick={() => {
                 void controller.toggleIndicator(key);
               }}
-              aria-label={`${p.indicators[key] ? "Скрыть" : "Показать"} ${name}`}
+              aria-label={t(p.indicators[key] ? "Скрыть" : "Показать") + " " + t(name)}
             >
               <VisibilityIcon hidden={!p.indicators[key]} />
             </button>
@@ -90,16 +91,16 @@ export function ChartPanel() {
     <section
       id="chart-panel"
       className="chart-panel"
-      aria-label="График инструмента"
+      aria-label={t("График инструмента")}
       aria-busy={busy}
       data-history-loading={busy || undefined}
     >
       <div className="chart-heading">
         <div className="instrument-title">
           {row && <InstrumentIcon key={row.uid ?? row.symbol} row={row} id="chart-icon" />}
-          <h1 id="instrument-name">{row?.name ?? (p.symbol || "Выберите инструмент")}</h1>
+          <h1 id="instrument-name">{row?.name ?? (p.symbol || t("Выберите инструмент"))}</h1>
           <span className="market-tag">MOEX</span>
-          <span id="chart-period">{PERIOD_LABELS[p.timeframe]}</span>
+          <span id="chart-period">{t(PERIOD_LABELS[p.timeframe])}</span>
         </div>
         <OhlcLegend
           bar={bar}
@@ -112,7 +113,7 @@ export function ChartPanel() {
           <span id="chart-change" className={signClass(row?.change)}>
             {state.authenticated
               ? `${number(row?.change, digits, true)} (${number(row?.changePercent, 2, true)}%)`
-              : "Подключите личный API-ключ"}
+              : t("Подключите личный API-ключ")}
           </span>
         </div>
       </div>
@@ -128,19 +129,19 @@ export function ChartPanel() {
             <span className="message-icon">⌃</span>
             <h2>
               {!state.authenticated
-                ? "Ваш рынок. Ваш график."
+                ? t("Ваш рынок. Ваш график.")
                 : !state.rows.length
-                  ? "Добавьте инструмент"
+                  ? t("Добавьте инструмент")
                   : state.historyViewReady === false
-                    ? "Не удалось восстановить окно графика"
-                    : "История недоступна"}
+                    ? t("Не удалось восстановить окно графика")
+                    : t("История недоступна")}
             </h2>
             <p>
               {!state.authenticated
-                ? "Подключите Т‑Инвестиции, чтобы увидеть реальные котировки и историю."
+                ? t("Подключите Т‑Инвестиции, чтобы увидеть реальные котировки и историю.")
                 : !state.rows.length
-                  ? "Нажмите + в списке котировок, чтобы открыть график."
-                  : state.historyHelp}
+                  ? t("Нажмите + в списке котировок, чтобы открыть график.")
+                  : systemText(state.historyHelp)}
             </p>
             {!state.authenticated && (
               <button
@@ -148,7 +149,7 @@ export function ChartPanel() {
                 className="primary-button"
                 onClick={() => controller.setDialog("account")}
               >
-                Подключить API
+                {t("Подключить API")}
               </button>
             )}
             {state.authenticated && !state.rows.length && (
@@ -156,7 +157,7 @@ export function ChartPanel() {
                 className="primary-button"
                 onClick={() => controller.setDialog("instruments")}
               >
-                Добавить инструмент
+                {t("Добавить инструмент")}
               </button>
             )}
             {state.authenticated && state.rows.length > 0 && (
@@ -169,12 +170,14 @@ export function ChartPanel() {
                       : controller.loadHistory()
                   ).catch((error: unknown) =>
                     controller.notify(
-                      error instanceof Error ? error.message : "Не удалось восстановить график."
+                      error instanceof Error ? error.message : t("Не удалось восстановить график.")
                     )
                   );
                 }}
               >
-                {state.importRecoveryRequired ? "Повторить восстановление" : "Повторить загрузку"}
+                {state.importRecoveryRequired
+                  ? t("Повторить восстановление")
+                  : t("Повторить загрузку")}
               </button>
             )}
           </div>

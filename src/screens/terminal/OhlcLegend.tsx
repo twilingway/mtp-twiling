@@ -1,3 +1,4 @@
+import { t } from "../../i18n/messages.js";
 import type { CSSProperties } from "react";
 import type { Candle, ChartSettings } from "../../model/types.js";
 import { createOhlcLegend, formatOhlcValue } from "../../model/ohlc-legend.js";
@@ -28,20 +29,20 @@ export function OhlcLegend({ bar, previousClose, digits, settings }: OhlcLegendP
       id="ohlc"
       className="ohlc ohlc-legend"
       role="group"
-      aria-label="Выбранная свеча"
+      aria-label={t("Выбранная свеча")}
       data-direction={legend.direction}
       style={style}
     >
       {FIELDS.map(({ key, label, title }) => (
-        <span key={key} className="ohlc-field" title={title}>
-          <span className="ohlc-label">{label}</span>
+        <span key={key} className="ohlc-field" title={t(title)}>
+          <span className="ohlc-label">{t(label)}</span>
           <span className="ohlc-value" data-missing={legend.values[key] === null || undefined}>
             {formatOhlcValue(legend.values[key], digits)}
           </span>
         </span>
       ))}
       {legend.change !== null && (
-        <span className="ohlc-change" aria-label={`Изменение: ${change}${percent}`}>
+        <span className="ohlc-change" aria-label={t("Изменение: ") + change + percent}>
           {change}
           {percent}
         </span>

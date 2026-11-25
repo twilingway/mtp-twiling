@@ -1,3 +1,4 @@
+import { t } from "../../i18n/messages.js";
 import { useEffect, useState } from "react";
 import { candleCloseAt, formatCountdown } from "../../model/candle-clock.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
@@ -104,12 +105,13 @@ export function CandleCountdown() {
     bar.close >= bar.open
       ? (chartSettings.upColor ?? "#53b987")
       : (chartSettings.downColor ?? "#eb4d5c");
+  const countdown = formatCountdown(closesAt - now).replace("д", t("д"));
   return (
     <time
       className="candle-countdown"
       role="timer"
       aria-live="off"
-      aria-label={`До закрытия свечи: ${formatCountdown(closesAt - now)}`}
+      aria-label={t("До закрытия свечи: ") + countdown}
       dateTime={new Date(closesAt).toISOString()}
       style={{
         top: position.top,
@@ -118,7 +120,7 @@ export function CandleCountdown() {
         color: textColor(color)
       }}
     >
-      {formatCountdown(closesAt - now)}
+      {countdown}
     </time>
   );
 }

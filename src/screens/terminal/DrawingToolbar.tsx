@@ -1,3 +1,4 @@
+import { t } from "../../i18n/messages.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { drawingToolbarSettings, type DrawingTarget } from "../../model/drawing-toolbar.js";
 import { useTerminal } from "./context.js";
@@ -57,7 +58,7 @@ export function DrawingToolbar() {
   const run = (action: () => Promise<unknown>, close = true) => {
     if (close) closeMenu();
     void action().catch((error: unknown) =>
-      controller.notify(error instanceof Error ? error.message : "Не удалось выполнить действие")
+      controller.notify(error instanceof Error ? error.message : t("Не удалось выполнить действие"))
     );
   };
   const openMenu = (key: string, anchor: HTMLElement) => {
@@ -72,7 +73,7 @@ export function DrawingToolbar() {
   const choose = (group: ToolbarGroup, item: ToolbarTool) => {
     if (!toolbarToolAvailable(item)) return;
     if (item.image && !controller.chart) {
-      controller.notify("Сначала откройте график.");
+      controller.notify(t("Сначала откройте график."));
       return;
     }
     const owner = state.owner;
@@ -133,7 +134,7 @@ export function DrawingToolbar() {
   const scopeRows = (kind: "lock" | "hide"): ToolbarMenuItem[] =>
     targets.map((target) => ({
       id: `${kind}-${target}`,
-      label: `${kind === "lock" ? "Закрепить" : "Скрыть"} ${targetNames[target]}`,
+      label: t(kind === "lock" ? "Закрепить" : "Скрыть") + " " + t(targetNames[target]),
       icon: kind === "lock" ? "lock" : "show",
       kind: "radio",
       checked: scopeActive(kind, target),
@@ -145,7 +146,7 @@ export function DrawingToolbar() {
         )
     }));
   const group = TOOLBAR_GROUPS.find((item) => item.id === menu?.key);
-  let title = group?.title ?? "Инструменты";
+  let title = group?.title ?? t("Инструменты");
   let sections: ToolbarMenuSection[] =
     group?.sections.map((part) => ({
       title: part.title,
@@ -157,7 +158,7 @@ export function DrawingToolbar() {
       items: [
         {
           id: "values-tooltip-on-long-press",
-          label: "Подсказывать значения при долгом нажатии",
+          label: t("Подсказывать значения при долгом нажатии"),
           disabled: true
         }
       ]
@@ -165,7 +166,7 @@ export function DrawingToolbar() {
   if (group?.id === "symbols")
     sections = [
       {
-        title: "Палитра пока недоступна",
+        title: t("Палитра пока недоступна"),
         items: PALETTE_CATEGORIES.map(([label, ...categories], index) => ({
           id: `palette-${index}`,
           label: label!,
@@ -177,7 +178,7 @@ export function DrawingToolbar() {
                 id: `palette-${index}-${categoryIndex}`,
                 label: category,
                 disabled: true,
-                reason: "Размещение знаков пока не реализовано"
+                reason: t("Размещение знаков пока не реализовано")
               }))
             }
           ]
@@ -185,14 +186,14 @@ export function DrawingToolbar() {
       }
     ];
   if (menu?.key === "magnet") {
-    title = "Магнит";
+    title = t("Магнит");
     sections = [
       {
         title: null,
         items: [
           {
             id: "weakMagnet",
-            label: "Слабый магнит",
+            label: t("Слабый магнит"),
             icon: "magnet",
             kind: "radio",
             checked: settings.magnet === "weak",
@@ -200,7 +201,7 @@ export function DrawingToolbar() {
           },
           {
             id: "strongMagnet",
-            label: "Сильный магнит",
+            label: t("Сильный магнит"),
             icon: "strongMagnet",
             kind: "radio",
             checked: settings.magnet === "strong",
@@ -213,27 +214,27 @@ export function DrawingToolbar() {
         items: [
           {
             id: "snapToIndicatorsSwitcher",
-            label: "Прикрепить к индикаторам",
+            label: t("Прикрепить к индикаторам"),
             kind: "checkbox",
             checked: settings.snapIndicators,
             disabled: settings.magnet === "off",
-            reason: "Сначала включите магнит",
+            reason: t("Сначала включите магнит"),
             action: () => run(() => controller.tools.toggleOption("snapIndicators"), false)
           }
         ]
       }
     ];
   } else if (menu?.key === "lock") {
-    title = "Блокировка объектов";
+    title = t("Блокировка объектов");
     sections = [{ title: null, items: scopeRows("lock") }];
   } else if (menu?.key === "hide") {
-    title = "Видимость объектов";
+    title = t("Видимость объектов");
     const rows = scopeRows("hide");
     rows.splice(2, 0, {
       id: "hide-positions-and-orders",
-      label: "Скрыть позиции и заявки",
+      label: t("Скрыть позиции и заявки"),
       disabled: true,
-      reason: "Торговые операции не входят в терминал"
+      reason: t("Торговые операции не входят в терминал")
     });
     sections = [{ title: null, items: rows }];
   } else if (menu?.key === "trash") {
@@ -241,13 +242,18 @@ export function DrawingToolbar() {
       drawings: state.drawings.length + state.images.length,
       indicators: Object.values(state.preferences.indicators).filter(Boolean).length
     };
-    title = "Удалить объекты";
+    title = t("Удалить объекты");
     sections = [
       {
-        title: "Текущий инструмент",
+        title: t("Текущий инструмент"),
         items: targets.map((target) => ({
           id: `remove-${target}`,
-          label: `Удалить ${targetNames[target]} (${target === "all" ? counts.drawings + counts.indicators : counts[target]})`,
+          label:
+            t("Удалить ") +
+            t(targetNames[target]) +
+            t(" (") +
+            (target === "all" ? counts.drawings + counts.indicators : counts[target]) +
+            t(")"),
           icon: "trash",
           action: () => remove(target)
         }))
@@ -257,7 +263,7 @@ export function DrawingToolbar() {
         items: [
           {
             id: "alwaysRemoveLockedDrawingsSwitcher",
-            label: "Всегда удалять зафиксированные объекты",
+            label: t("Всегда удалять зафиксированные объекты"),
             kind: "checkbox",
             checked: settings.deleteLocked,
             action: () => run(() => controller.tools.toggleOption("deleteLocked"), false)
@@ -266,7 +272,7 @@ export function DrawingToolbar() {
       }
     ];
   } else if (menu?.key === "favorites") {
-    title = "Избранные инструменты";
+    title = t("Избранные инструменты");
     const favoriteRows = TOOLBAR_GROUPS.flatMap((part) =>
       part.sections.flatMap((section) =>
         section.items
@@ -282,9 +288,9 @@ export function DrawingToolbar() {
           : [
               {
                 id: "no-favorites",
-                label: "Добавьте инструменты звёздочкой в меню",
+                label: t("Добавьте инструменты звёздочкой в меню"),
                 disabled: true,
-                reason: "Стрелка вправо переводит фокус на звёздочку"
+                reason: t("Стрелка вправо переводит фокус на звёздочку")
               }
             ]
       }
@@ -292,15 +298,15 @@ export function DrawingToolbar() {
   }
   if (confirmation?.owner === state.owner && confirmation.scope === controller.tools.scopeKey()) {
     const target = confirmation.target;
-    title = "Удалить зафиксированные объекты?";
+    title = t("Удалить зафиксированные объекты?");
     sections = [
       {
-        title: `Будут удалены ${targetNames[target]}, включая зафиксированные`,
+        title: t("Будут удалены ") + t(targetNames[target]) + t(", включая зафиксированные"),
         items: [
-          { id: "cancel-delete", label: "Отмена", action: () => closeMenu(true) },
+          { id: "cancel-delete", label: t("Отмена"), action: () => closeMenu(true) },
           {
             id: "confirm-delete",
-            label: "Удалить, включая зафиксированные",
+            label: t("Удалить, включая зафиксированные"),
             icon: "trash",
             action: () => remove(target, true, confirmation.scope)
           }
@@ -321,8 +327,8 @@ export function DrawingToolbar() {
       key={id}
       id={id}
       className={`tool ${active ? "active" : ""}`}
-      title={disabled ? `${label} — ${disabledReason}` : label}
-      aria-label={disabled ? `${label} — ${disabledReason}` : label}
+      title={disabled ? `${t(label)} — ${t(disabledReason)}` : t(label)}
+      aria-label={disabled ? `${t(label)} — ${t(disabledReason)}` : t(label)}
       aria-pressed={active}
       disabled={disabled}
       onClick={action}
@@ -341,8 +347,8 @@ export function DrawingToolbar() {
       key={key}
       id={key}
       toolId={key}
-      label={label}
-      menuLabel={label}
+      label={t(label)}
+      menuLabel={t(label)}
       icon={icon}
       active={active}
       expanded={menu?.key === key}
@@ -357,7 +363,7 @@ export function DrawingToolbar() {
     <aside
       ref={rail}
       className="drawing-tools drawing-toolbar"
-      aria-label="Инструменты рисования"
+      aria-label={t("Инструменты рисования")}
       onKeyDown={(event) => {
         if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key) || menu) return;
         const buttons = Array.from(
@@ -383,8 +389,8 @@ export function DrawingToolbar() {
             key={part.id}
             id={part.id}
             toolId={last.id}
-            label={`${part.title}: ${last.label}`}
-            menuLabel={part.title}
+            label={`${t(part.title)}: ${t(last.label)}`}
+            menuLabel={t(part.title)}
             icon={last.icon}
             active={active}
             disabled={!toolbarToolAvailable(last)}
@@ -395,34 +401,38 @@ export function DrawingToolbar() {
         );
       })}
       <span className="tool-divider" />
-      {button("measure", "Линейка", "ruler", () => {}, false, true)}
-      {button("zoom", "Увеличить масштаб", "zoom", () => {}, false, true)}
-      {button("zoom-out", "Уменьшить масштаб", "zoomOut", () => {}, false, true)}
+      {button("measure", t("Линейка"), "ruler", () => {}, false, true)}
+      {button("zoom", t("Увеличить масштаб"), "zoom", () => {}, false, true)}
+      {button("zoom-out", t("Уменьшить масштаб"), "zoomOut", () => {}, false, true)}
       <span className="tool-divider" />
       {utility(
         "magnet",
-        settings.magnet === "strong" ? "Сильный магнит" : "Магнит",
+        settings.magnet === "strong" ? t("Сильный магнит") : t("Магнит"),
         settings.magnet === "strong" ? "strongMagnet" : "magnet",
         () => run(() => controller.tools.toggleMagnet()),
         settings.magnet !== "off"
       )}
       {button(
         "stay-in-drawing-mode",
-        "Продолжить в режиме рисования",
+        t("Продолжить в режиме рисования"),
         "keepDrawing",
         () => run(() => controller.tools.toggleOption("stayInDrawingMode")),
         settings.stayInDrawingMode
       )}
       {utility(
         "lock",
-        `${scopeActive("lock", settings.lockTarget) ? "Открепить" : "Закрепить"} ${targetNames[settings.lockTarget]}`,
+        t(scopeActive("lock", settings.lockTarget) ? "Открепить" : "Закрепить") +
+          " " +
+          t(targetNames[settings.lockTarget]),
         "lock",
         () => run(() => controller.tools.toggleLock()),
         scopeActive("lock", settings.lockTarget)
       )}
       {utility(
         "hide",
-        `${scopeActive("hide", settings.hideTarget) ? "Показать" : "Скрыть"} ${targetNames[settings.hideTarget]}`,
+        t(scopeActive("hide", settings.hideTarget) ? "Показать" : "Скрыть") +
+          " " +
+          t(targetNames[settings.hideTarget]),
         settings.drawingsHidden || settings.indicatorsHidden ? "hideOff" : "show",
         () => run(() => controller.tools.toggleHide()),
         scopeActive("hide", settings.hideTarget)
@@ -432,8 +442,8 @@ export function DrawingToolbar() {
         type="button"
         id="delete-drawings"
         className="tool"
-        title="Удалить объекты"
-        aria-label="Удалить объекты"
+        title={t("Удалить объекты")}
+        aria-label={t("Удалить объекты")}
         aria-haspopup="menu"
         aria-expanded={menu?.key === "trash"}
         onClick={(event) => openMenu("trash", event.currentTarget)}
@@ -441,10 +451,10 @@ export function DrawingToolbar() {
         <DrawingToolIcon name="trash" />
       </button>
       <div className="rail-spacer" />
-      {button("fit-chart", "Показать весь график", "fit", () => controller.chart?.fit())}
+      {button("fit-chart", t("Показать весь график"), "fit", () => controller.chart?.fit())}
       {button(
         "favorite-drawings",
-        "Избранные инструменты",
+        t("Избранные инструменты"),
         "star",
         () => {
           const anchor = rail.current?.querySelector<HTMLElement>("#favorite-drawings");
@@ -452,7 +462,7 @@ export function DrawingToolbar() {
         },
         menu?.key === "favorites"
       )}
-      {button("chart-settings-button", "Настройки графика", "settings", () =>
+      {button("chart-settings-button", t("Настройки графика"), "settings", () =>
         controller.setDialog("chart-settings")
       )}
       <input
@@ -471,7 +481,7 @@ export function DrawingToolbar() {
         <DrawingToolbarMenu
           key={`${menu.key}:${menu.owner}`}
           id="drawing-toolbar-menu"
-          title={title}
+          title={t(title)}
           anchor={menu.anchor}
           sections={sections}
           onClose={closeMenu}

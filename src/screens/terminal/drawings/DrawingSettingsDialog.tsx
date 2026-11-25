@@ -1,3 +1,4 @@
+import { t, systemText } from "../../../i18n/messages.js";
 import { useEffect, useRef, useState } from "react";
 import { logicalForTime, timeForLogical } from "../../../charts/adapter.js";
 import { isDrawing } from "../../../model/backup-format.js";
@@ -16,7 +17,10 @@ import { useTerminal } from "../context.js";
 import { DrawingTemplateMenu } from "./DrawingTemplateMenu.js";
 import { DrawingStylePopover, Swatch } from "./DrawingStylePopover.js";
 import type { ColorTarget } from "./DrawingStylePopover.js";
-import { defaultVisibility, initialSettings, formatDate } from "./drawing-settings-model.js";
+import { defaultVisibility, initialSettings } from "./drawing-settings-model.js";
+import { dateTimeInput, parseDateTimeInput } from "../../../i18n/datetime-input.js";
+import { intradayTimeframe } from "../../../i18n/format.js";
+import { resolveTimeZone } from "../../../i18n/timezones.js";
 import type { DraftSettings } from "./drawing-settings-model.js";
 const GROUPS = [
   ["minutes", "Минуты", 59],
@@ -79,7 +83,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
         checked={settings[key]}
         onChange={(event) => change(key, event.currentTarget.checked)}
       />
-      {label}
+      {t(label)}
     </label>
   );
   const choiceValue = (value: unknown) =>
@@ -90,7 +94,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
     options: readonly (readonly [DraftSettings[K], string])[]
   ) => (
     <label className="setting-row">
-      <span>{label}</span>
+      <span>{t(label)}</span>
       <select
         name={key}
         value={choiceValue(settings[key])}
@@ -103,7 +107,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
       >
         {options.map(([value, title]) => (
           <option key={choiceValue(value)} value={choiceValue(value)}>
-            {title}
+            {t(title)}
           </option>
         ))}
       </select>
@@ -113,13 +117,13 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
     <>
       <Swatch
         color={trend ? settings.trendColor : settings.color}
-        label={trend ? "Цвет линии тренда" : "Цвет линий"}
+        label={trend ? t("Цвет линии тренда") : t("Цвет линий")}
         onClick={() => setColorTarget({ kind: trend ? "trend" : "line" })}
       />
       <button
         type="button"
         className="line-style-button"
-        aria-label={trend ? "Стиль линии тренда" : "Стиль линий"}
+        aria-label={trend ? t("Стиль линии тренда") : t("Стиль линий")}
         onClick={() => setColorTarget({ kind: trend ? "trend" : "line" })}
       >
         {trend ? "╌╌╌" : "━━"}
@@ -128,7 +132,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
   );
   const candidate = (): Drawing | null => {
     if (GROUPS.some(([group, , max]) => draft.visibility[group].to > max)) {
-      setError("Проверьте допустимые диапазоны видимости.");
+      setError(t("Проверьте допустимые диапазоны видимости."));
       return null;
     }
     const item = {
@@ -142,7 +146,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
       }
     };
     if (!isDrawing(item)) {
-      setError("Проверьте координаты, уровни (от −100 до 100) и диапазоны видимости.");
+      setError(t("Проверьте координаты, уровни (от −100 до 100) и диапазоны видимости."));
       return null;
     }
     setError("");
@@ -155,7 +159,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
       await controller.updateDrawing(item);
       close();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Не удалось сохранить рисунок.");
+      setError(reason instanceof Error ? reason.message : t("Не удалось сохранить рисунок."));
     }
   };
   const applyTemplate = (template: DrawingTemplate) =>
@@ -169,14 +173,19 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
     else change(colorTarget?.kind === "trend" ? "trendColor" : "color", color);
   };
   const interval = TIMEFRAMES[state.preferences.timeframe].ms;
+  const inputZone = intradayTimeframe(state.preferences.timeframe)
+    ? resolveTimeZone(state.preferences.timeZone)
+    : "UTC";
   const coordinate = (p: DrawingPoint, index: number) => (
     <div className="coordinate-row" key={index}>
-      <span>#{index + 1} (цена, бар)</span>
+      <span>
+        #{index + 1} {t("(цена, бар)")}
+      </span>
       <input
         type="number"
         step="any"
         data-coordinate-value={index}
-        aria-label={`Точка ${index + 1}: цена`}
+        aria-label={t("Точка координат") + " " + (index + 1) + t(": цена")}
         value={Number.isFinite(p.value) ? p.value : ""}
         onChange={(event) => point(index, { value: Number(event.currentTarget.value) })}
       />
@@ -184,7 +193,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
         type="number"
         step="1"
         data-coordinate-bar={index}
-        aria-label={`Точка ${index + 1}: бар`}
+        aria-label={t("Точка координат") + " " + (index + 1) + t(": бар")}
         value={
           Number.isFinite(p.timestamp)
             ? Math.round(logicalForTime(state.candles, p.timestamp, interval))
@@ -203,11 +212,18 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
         type="datetime-local"
         step="60"
         data-coordinate-time={index}
-        aria-label={`Точка ${index + 1}: дата UTC`}
-        value={formatDate(p.timestamp)}
-        onChange={(event) =>
-          point(index, { timestamp: Date.parse(event.currentTarget.value + "Z") })
+        aria-label={
+          t("Точка координат") + " " + (index + 1) + t(": дата и время") + " " + inputZone
         }
+        title={inputZone}
+        value={dateTimeInput(p.timestamp, inputZone)}
+        onChange={(event) => {
+          const timestamp = parseDateTimeInput(event.currentTarget.value, inputZone, p.timestamp);
+          if (Number.isFinite(timestamp)) {
+            point(index, { timestamp });
+            setError("");
+          } else setError(t("Такого местного времени не существует (переход часов)."));
+        }}
       />
     </div>
   );
@@ -221,22 +237,22 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
         }}
       >
         <header>
-          <h2>{TOOL_NAMES[draft.name]}</h2>
-          <button type="button" aria-label="Закрыть настройки" onClick={close}>
+          <h2>{t(TOOL_NAMES[draft.name])}</h2>
+          <button type="button" aria-label={t("Закрыть настройки")} onClick={close}>
             ×
           </button>
         </header>
         <label className="drawing-title">
           <input
             name="title"
-            aria-label="Название объекта"
-            placeholder="Название объекта"
+            aria-label={t("Название объекта")}
+            placeholder={t("Название объекта")}
             value={draft.title ?? ""}
             maxLength={300}
             onChange={(event) => setDraft({ ...draft, title: event.currentTarget.value })}
           />
         </label>
-        <nav className="settings-tabs" aria-label="Разделы настроек">
+        <nav className="settings-tabs" aria-label={t("Разделы настроек")}>
           {(["style", "coordinates", "visibility"] as const).map((key) => (
             <button
               type="button"
@@ -248,7 +264,11 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
                 setColorTarget(null);
               }}
             >
-              {key === "style" ? "Стиль" : key === "coordinates" ? "Координаты" : "Видимость"}
+              {key === "style"
+                ? t("Стиль")
+                : key === "coordinates"
+                  ? t("Координаты")
+                  : t("Видимость")}
             </button>
           ))}
         </nav>
@@ -256,18 +276,18 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
           {fib ? (
             <>
               <div className="setting-row">
-                {checked("trendLine", "Линия тренда")}
+                {checked("trendLine", t("Линия тренда"))}
                 {colorControl(true)}
               </div>
               <div className="setting-row">
-                <span>Линии уровня</span>
+                <span>{t("Линии уровня")}</span>
                 {colorControl()}
               </div>
-              {choice("extend", "Продолжить", [
-                ["none", "Не продолжать"],
-                ["right", "Вправо"],
-                ["left", "Влево"],
-                ["both", "В обе стороны"]
+              {choice("extend", t("Продолжить"), [
+                ["none", t("Не продолжать")],
+                ["right", t("Вправо")],
+                ["left", t("Влево")],
+                ["both", t("В обе стороны")]
               ])}
               <div className="fib-levels">
                 {settings.levelStyles.map((l, index) => (
@@ -275,7 +295,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
                     <input
                       type="checkbox"
                       data-level-enabled={index}
-                      aria-label={`Включить уровень ${l.value}`}
+                      aria-label={t("Включить уровень ") + l.value}
                       checked={l.enabled}
                       onChange={(event) => level(index, { enabled: event.currentTarget.checked })}
                     />
@@ -285,7 +305,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
                       min={-100}
                       max={100}
                       data-level-value={index}
-                      aria-label={`Значение уровня ${index + 1}`}
+                      aria-label={t("Значение уровня ") + (index + 1)}
                       value={l.value}
                       onChange={(event) =>
                         level(index, { value: Number(event.currentTarget.value) })
@@ -293,15 +313,15 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
                     />
                     <Swatch
                       color={l.color}
-                      label={`Цвет уровня ${l.value}`}
+                      label={t("Цвет уровня ") + l.value}
                       onClick={() => setColorTarget({ kind: "level", index })}
                     />
                     {settings.textEnabled && (
                       <input
                         type="text"
                         data-level-text={index}
-                        aria-label={`Текст уровня ${l.value}`}
-                        placeholder="Текст уровня"
+                        aria-label={t("Текст уровня ") + l.value}
+                        placeholder={t("Текст уровня")}
                         maxLength={150}
                         value={l.text ?? ""}
                         onChange={(event) => level(index, { text: event.currentTarget.value })}
@@ -321,56 +341,56 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
                   ])
                 }
               >
-                ＋ Добавить уровень
+                {t("＋ Добавить уровень")}
               </button>
               <div className="setting-row">
-                {checked("oneColor", "Использовать один цвет")}
+                {checked("oneColor", t("Использовать один цвет"))}
                 <Swatch
                   color={settings.color}
-                  label="Общий цвет уровней"
+                  label={t("Общий цвет уровней")}
                   onClick={() => setColorTarget({ kind: "line" })}
                 />
               </div>
               <div className="setting-row">
-                {checked("fill", "Фон")}
+                {checked("fill", t("Фон"))}
                 <input
                   type="range"
                   name="opacity"
                   min="0"
                   max="1"
                   step=".01"
-                  aria-label="Непрозрачность фона"
+                  aria-label={t("Непрозрачность фона")}
                   value={settings.opacity}
                   onChange={(event) => change("opacity", Number(event.currentTarget.value))}
                 />
               </div>
-              {checked("reverse", "Переворот")}
-              {checked("prices", "Цены")}
+              {checked("reverse", t("Переворот"))}
+              {checked("prices", t("Цены"))}
               <div className="setting-row">
-                {checked("labels", "Уровни")}
+                {checked("labels", t("Уровни"))}
                 {choice("labelFormat", "", [
-                  ["value", "Значения"],
-                  ["percent", "Проценты"]
+                  ["value", t("Значения")],
+                  ["percent", t("Проценты")]
                 ])}
               </div>
               <div className="setting-row">
-                {choice("labelSide", "Метки", [
-                  ["left", "Слева"],
-                  ["center", "По центру"],
-                  ["right", "Справа"]
+                {choice("labelSide", t("Метки"), [
+                  ["left", t("Слева")],
+                  ["center", t("По центру")],
+                  ["right", t("Справа")]
                 ])}
                 {choice("labelVertical", "", [
-                  ["top", "Сверху"],
-                  ["middle", "По центру"],
-                  ["bottom", "Снизу"]
+                  ["top", t("Сверху")],
+                  ["middle", t("По центру")],
+                  ["bottom", t("Снизу")]
                 ])}
               </div>
               <div className="setting-row">
-                {checked("textEnabled", "Текст")}
+                {checked("textEnabled", t("Текст"))}
                 <input
                   name="text"
-                  placeholder="Текст"
-                  aria-label="Текст рисунка"
+                  placeholder={t("Текст")}
+                  aria-label={t("Текст рисунка")}
                   maxLength={300}
                   value={settings.text}
                   onChange={(event) => change("text", event.currentTarget.value)}
@@ -378,25 +398,25 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
               </div>
               <div className="setting-row">
                 {choice("textAlign", "", [
-                  ["left", "Слева"],
-                  ["center", "По центру"],
-                  ["right", "Справа"]
+                  ["left", t("Слева")],
+                  ["center", t("По центру")],
+                  ["right", t("Справа")]
                 ])}
                 {choice("textVertical", "", [
-                  ["top", "Сверху"],
-                  ["center", "По центру"],
-                  ["bottom", "Снизу"]
+                  ["top", t("Сверху")],
+                  ["center", t("По центру")],
+                  ["bottom", t("Снизу")]
                 ])}
               </div>
               {choice(
                 "fontSize",
-                "Размер шрифта",
+                t("Размер шрифта"),
                 [10, 11, 12, 13, 14, 16, 18, 20, 24].map((size) => [size, String(size)])
               )}
             </>
           ) : (
             <div className="setting-row">
-              <span>Линия</span>
+              <span>{t("Линия")}</span>
               {colorControl()}
             </div>
           )}
@@ -405,7 +425,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
           {draft.points.map(coordinate)}
         </section>
         <section data-settings-page="visibility" hidden={tab !== "visibility"}>
-          <p>Показывать на интервалах</p>
+          <p>{t("Показывать на интервалах")}</p>
           {GROUPS.map(([group, label, max]) => (
             <div className="visibility-row" key={group}>
               <label className="checkbox-label">
@@ -415,14 +435,14 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
                   checked={draft.visibility[group].enabled}
                   onChange={(event) => visibility(group, { enabled: event.currentTarget.checked })}
                 />
-                {label}
+                {t(label)}
               </label>
               <input
                 type="number"
                 min="1"
                 max={max}
                 data-visible-from={group}
-                aria-label={`${label} от`}
+                aria-label={t(label) + t(" от")}
                 value={draft.visibility[group].from}
                 onChange={(event) => visibility(group, { from: Number(event.currentTarget.value) })}
               />
@@ -432,16 +452,18 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
                 min="1"
                 max={max}
                 data-visible-to={group}
-                aria-label={`${label} до`}
+                aria-label={t(label) + t(" до")}
                 value={draft.visibility[group].to}
                 onChange={(event) => visibility(group, { to: Number(event.currentTarget.value) })}
               />
             </div>
           ))}
-          <small>Применяется к таймфреймам: 1, 5, 15, 30 минут, 1 час, 1 день и 1 неделя.</small>
+          <small>
+            {t("Применяется к таймфреймам: 1, 5, 15, 30 минут, 1 час, 1 день и 1 неделя.")}
+          </small>
         </section>
         <p className="drawing-error" role="alert" hidden={!error}>
-          {error}
+          {systemText(error)}
         </p>
         <footer>
           <DrawingTemplateMenu
@@ -451,10 +473,10 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
           />
           <span />
           <button type="button" onClick={close}>
-            Отмена
+            {t("Отмена")}
           </button>
           <button type="submit" className="primary-button">
-            Ок
+            {t("Ок")}
           </button>
         </footer>
         {colorTarget && (

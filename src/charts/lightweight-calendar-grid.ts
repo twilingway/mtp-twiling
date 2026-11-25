@@ -1,5 +1,6 @@
 import { calendarAxisTicks } from "../model/intervals/axis-ticks.js";
 import type { Candle, Timeframe } from "../model/types.js";
+import type { CalendarAxisDisplay } from "../i18n/calendar-axis.js";
 
 /** LW's empty tick labels still produce grid lines. Draw calendar lines as an actual bottom layer. */
 export function paintCalendarGrid(
@@ -14,6 +15,7 @@ export function paintCalendarGrid(
     coordinate: (index: number) => number;
     color: string;
     pixelRatio?: number;
+    display?: CalendarAxisDisplay;
   }
 ): number {
   const ticks = calendarAxisTicks(data, timeframe, options);
@@ -32,4 +34,36 @@ export function paintCalendarGrid(
   context.stroke();
   context.restore();
   return ticks.length;
+}
+
+/** The same ticks own grid lines and labels, including local day boundaries at DST changes. */
+export function paintCalendarAxis(
+  context: CanvasRenderingContext2D,
+  data: readonly Candle[],
+  timeframe: Timeframe,
+  options: {
+    from: number;
+    to: number;
+    width: number;
+    height: number;
+    coordinate: (index: number) => number;
+    color: string;
+    fontSize: number;
+    fontFamily: string;
+    display: CalendarAxisDisplay;
+  }
+): void {
+  const ticks = calendarAxisTicks(data, timeframe, options);
+  if (!ticks?.length) return;
+  context.save();
+  context.fillStyle = options.color;
+  context.font = `${options.fontSize}px ${options.fontFamily}`;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  for (const tick of ticks) {
+    const halfWidth = context.measureText(tick.text).width / 2;
+    const x = Math.max(halfWidth + 2, Math.min(options.width - halfWidth - 2, tick.coord));
+    context.fillText(tick.text, x, options.height / 2);
+  }
+  context.restore();
 }

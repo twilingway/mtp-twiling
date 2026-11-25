@@ -1,4 +1,5 @@
 import { TOOL_NAMES } from "./drawing-model.js";
+import { isLocale, isTimeZone } from "../i18n/preferences.js";
 import { isDrawingToolbarSettings } from "./drawing-toolbar.js";
 import { isNativeIntervalId } from "./intervals/registry.js";
 import { isIntervalFavorites } from "./intervals/favorites.js";
@@ -223,6 +224,8 @@ export function isProfilePreferences(value: unknown): value is ProfilePreference
   return (
     isRecord(value) &&
     fields(value, {
+      locale: isLocale,
+      timeZone: isTimeZone,
       rightPanelCollapsed: boolean,
       rightPanelTab: member(["watchlist", "objects"]),
       symbol: string,

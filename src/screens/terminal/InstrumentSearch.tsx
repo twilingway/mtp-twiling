@@ -1,7 +1,9 @@
+import { t, systemText } from "../../i18n/messages.js";
 import { useEffect, useState } from "react";
 import type { CatalogInstrument, MarketRow } from "../../model/types.js";
 import { useTerminal } from "./context.js";
 import { Modal } from "./Modal.js";
+import { intlLocale } from "../../i18n/preferences.js";
 type Kind = "all" | "share" | "future" | "index";
 const KINDS: { kind: Kind; label: string }[] = [
   { kind: "all", label: "Все" },
@@ -40,19 +42,19 @@ function CatalogLogo({ item }: { item: CatalogInstrument }) {
 function kindLabel(item: CatalogInstrument): string {
   const kind = item.kind ?? item.instrumentType;
   return kind === "future"
-    ? "Фьючерс"
+    ? t("Фьючерс")
     : kind === "index"
-      ? "Индекс"
+      ? t("Индекс")
       : kind === "share"
-        ? "Акция"
-        : "Инструмент";
+        ? t("Акция")
+        : t("Инструмент");
 }
 function metadata(item: CatalogInstrument): string {
   const fields = [item.classCode, item.currency?.toUpperCase()].filter(Boolean);
   if (item.expirationDate) {
     const expiration = new Date(item.expirationDate);
     if (Number.isFinite(expiration.getTime()))
-      fields.push("до " + expiration.toLocaleDateString("ru-RU"));
+      fields.push(t("до ") + expiration.toLocaleDateString(intlLocale(), { timeZone: "UTC" }));
   }
   return fields.join(" · ");
 }
@@ -110,7 +112,7 @@ export function InstrumentSearch() {
               revision,
               owner,
               items: [],
-              error: error instanceof Error ? error.message : "Поиск недоступен"
+              error: error instanceof Error ? error.message : t("Поиск недоступен")
             });
         });
     }, 350);
@@ -122,17 +124,17 @@ export function InstrumentSearch() {
   return (
     <Modal
       id="instrument-dialog"
-      title="Поиск инструментов"
+      title={t("Поиск инструментов")}
       onClose={() => controller.setDialog(null)}
     >
       <div className="instrument-search-input">
         <input
           id="instrument-query"
           type="search"
-          aria-label="Тикер или название"
+          aria-label={t("Тикер или название")}
           aria-controls="instrument-results"
           aria-describedby="instrument-search-help"
-          placeholder="Тикер или часть названия"
+          placeholder={t("Тикер или часть названия")}
           autoComplete="off"
           autoCapitalize="off"
           spellCheck={false}
@@ -151,7 +153,7 @@ export function InstrumentSearch() {
         id="instrument-kind"
         className="instrument-search-kinds"
         role="group"
-        aria-label="Тип инструмента"
+        aria-label={t("Тип инструмента")}
         hidden={!cleanQuery}
       >
         {KINDS.map((item) => (
@@ -168,20 +170,20 @@ export function InstrumentSearch() {
                 }));
             }}
           >
-            {item.label}
+            {t(item.label)}
           </button>
         ))}
       </div>
       <div id="instrument-results" aria-busy={busy}>
         {cleanQuery && error ? (
-          <p role="alert">{error}</p>
+          <p role="alert">{systemText(error)}</p>
         ) : busy ? (
-          <p role="status">Поиск…</p>
+          <p role="status">{t("Поиск…")}</p>
         ) : !results.length ? (
           <p role="status">
             {cleanQuery
-              ? "Инструменты не найдены."
-              : "Введите часть тикера или названия, например NG или газ."}
+              ? t("Инструменты не найдены.")
+              : t("Введите часть тикера или названия, например NG или газ.")}
           </p>
         ) : (
           results.map((item, index) => {
@@ -213,7 +215,7 @@ export function InstrumentSearch() {
                     .catch((error: unknown) => {
                       if (controller.getSnapshot().owner === owner)
                         controller.notify(
-                          error instanceof Error ? error.message : "Не удалось добавить"
+                          error instanceof Error ? error.message : t("Не удалось добавить")
                         );
                     })
                     .finally(() => setAdding(null));
@@ -230,9 +232,11 @@ export function InstrumentSearch() {
                 </span>
                 <span
                   className="instrument-result-action"
-                  aria-label={adding === key ? "Добавление" : added ? "Открыть" : "Добавить"}
+                  aria-label={
+                    adding === key ? t("Добавление") : added ? t("Открыть") : t("Добавить")
+                  }
                 >
-                  {adding === key ? "…" : added ? "Открыть" : "＋"}
+                  {adding === key ? "…" : added ? t("Открыть") : "＋"}
                 </span>
               </button>
             );
@@ -240,7 +244,7 @@ export function InstrumentSearch() {
         )}
       </div>
       <small id="instrument-search-help">
-        Каталог Т‑Банка · для фьючерса выбирайте срок контракта.
+        {t("Каталог Т‑Банка · для фьючерса выбирайте срок контракта.")}
       </small>
     </Modal>
   );

@@ -1,3 +1,4 @@
+import { systemText } from "./i18n/messages.js";
 import { useState } from "react";
 import { TerminalContext, useTerminal } from "./screens/terminal/context.js";
 import { TerminalController } from "./screens/terminal/controller.js";
@@ -16,11 +17,13 @@ import { DrawingSettingsDialog } from "./screens/terminal/drawings/DrawingSettin
 import { ContextMenu } from "./screens/terminal/drawings/ContextMenu.js";
 import { TerminalLifecycle, UpdateBanner } from "./screens/terminal/TerminalLifecycle.js";
 import { ThemeEffect } from "./screens/terminal/ThemeEffect.js";
+import { LocaleEffect } from "./screens/terminal/LocaleEffect.js";
 function Terminal() {
   const { state } = useTerminal();
   return (
     <>
       <ThemeEffect />
+      <LocaleEffect />
       <Toolbar />
       <main
         className="workspace"
@@ -40,7 +43,7 @@ function Terminal() {
       <ContextMenu />
       {state.toast && (
         <div id="toast" role="status">
-          {state.toast}
+          {systemText(state.toast)}
         </div>
       )}
       <UpdateBanner />

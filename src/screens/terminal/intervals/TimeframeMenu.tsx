@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { t } from "../../../i18n/messages.js";
 import {
   getInterval,
   INTERVALS,
@@ -93,25 +94,26 @@ export function TimeframeMenu({
           data-selected={value === item.id}
           disabled={Boolean(reason)}
           title={
-            reason ??
-            (item.kind === "derived"
-              ? `Агрегация из ${getInterval(item.source).label.toLocaleLowerCase("ru")}`
-              : item.label)
+            reason
+              ? t(reason)
+              : item.kind === "derived"
+                ? `Агрегация из ${getInterval(item.source).label.toLocaleLowerCase("ru")}`
+                : t(item.label)
           }
           onClick={() => {
             onSelect(item.id);
             close(true);
           }}
         >
-          <span>{item.label}</span>
-          {reason ? <small>{reason}</small> : null}
+          <span>{t(item.label)}</span>
+          {reason ? <small>{t(reason)}</small> : null}
         </button>
         <button
           type="button"
           className={`interval-menu-star${favorite ? " is-favorite" : ""}`}
-          aria-label={`${favorite ? "Удалить" : "Добавить"} ${item.label} ${favorite ? "из избранного" : "в избранное"}`}
+          aria-label={`${t(favorite ? "Удалить" : "Добавить")} ${t(item.label)} ${t(favorite ? "из избранного" : "в избранное")}`}
           aria-pressed={favorite}
-          title={favorite ? "Удалить из избранного" : "Добавить в избранное"}
+          title={t(favorite ? "Удалить из избранного" : "Добавить в избранное")}
           onClick={() => onToggleFavorite(item.id)}
         >
           <span aria-hidden="true">{favorite ? "★" : "☆"}</span>
@@ -123,23 +125,27 @@ export function TimeframeMenu({
   return (
     <span className={`interval-menu ${className}`}>
       {favoriteItems.length ? (
-        <span className="interval-favorites" role="group" aria-label="Избранные интервалы свечей">
+        <span
+          className="interval-favorites"
+          role="group"
+          aria-label={t("Избранные интервалы свечей")}
+        >
           {favoriteItems.map((item) => (
             <button
               key={item.id}
               type="button"
               className={`interval-favorite${value === item.id ? " is-selected" : ""}`}
               data-interval-favorite={item.id}
-              aria-label={item.label}
+              aria-label={t(item.label)}
               aria-pressed={value === item.id}
               disabled={Boolean(availability[item.id])}
-              title={availability[item.id] ?? item.label}
+              title={t(availability[item.id] ?? item.label)}
               onClick={() => {
                 onSelect(item.id);
                 close(false);
               }}
             >
-              {item.shortLabel}
+              {t(item.shortLabel)}
             </button>
           ))}
         </span>
@@ -151,7 +157,7 @@ export function TimeframeMenu({
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
-        aria-label={`Интервал свечей: ${selected.label}`}
+        aria-label={`${t("Интервал свечей")}: ${t(selected.label)}`}
         onClick={() => (open ? close(false) : show())}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -160,7 +166,7 @@ export function TimeframeMenu({
           }
         }}
       >
-        <span>{selected.shortLabel}</span>
+        <span>{t(selected.shortLabel)}</span>
         <span className="interval-menu-chevron" aria-hidden="true">
           ⌄
         </span>
@@ -172,7 +178,7 @@ export function TimeframeMenu({
               ref={panelRef}
               className="interval-menu-panel"
               role="dialog"
-              aria-label="Интервал свечей"
+              aria-label={t("Интервал свечей")}
               style={position}
               onBlur={(event) => {
                 if (
@@ -207,29 +213,36 @@ export function TimeframeMenu({
                 buttons[next]?.focus();
               }}
             >
-              <div className="interval-menu-heading">Интервал свечей</div>
+              <div className="interval-menu-heading">{t("Интервал свечей")}</div>
               <button
                 type="button"
                 className="interval-menu-add"
                 disabled
-                title="Произвольные интервалы пока недоступны: нужны источник и правила агрегации."
+                title={t(
+                  "Произвольные интервалы пока недоступны: нужны источник и правила агрегации."
+                )}
               >
-                ＋ Добавить интервал…<small>Пока недоступно</small>
+                {t("＋ Добавить интервал…")}
+                <small>{t("Пока недоступно")}</small>
               </button>
               {favoriteItems.length ? (
-                <section className="interval-menu-section" aria-label="Избранное">
-                  <div className="interval-menu-caption">Избранное</div>
+                <section className="interval-menu-section" aria-label={t("Избранное")}>
+                  <div className="interval-menu-caption">{t("Избранное")}</div>
                   {favoriteItems.map((item) => row(item, "favorite"))}
                 </section>
               ) : null}
               {UNAVAILABLE_INTERVAL_GROUPS.slice(0, 2).map((group) => (
-                <div key={group.id} className="interval-menu-unavailable" title={group.reason}>
-                  <span>{group.label}</span>
-                  <small>{group.reason}</small>
+                <div key={group.id} className="interval-menu-unavailable" title={t(group.reason)}>
+                  <span>{t(group.label)}</span>
+                  <small>{t(group.reason)}</small>
                 </div>
               ))}
               {INTERVAL_GROUPS.map((group) => (
-                <section key={group.id} className="interval-menu-section" aria-label={group.label}>
+                <section
+                  key={group.id}
+                  className="interval-menu-section"
+                  aria-label={t(group.label)}
+                >
                   <button
                     type="button"
                     className="interval-menu-category"
@@ -239,7 +252,7 @@ export function TimeframeMenu({
                       setCollapsed((current) => ({ ...current, [group.id]: !current[group.id] }))
                     }
                   >
-                    <span>{group.label}</span>
+                    <span>{t(group.label)}</span>
                     <span aria-hidden="true">{collapsed[group.id] ? "›" : "⌄"}</span>
                   </button>
                   <div id={`${panelId}-${group.id}`} hidden={Boolean(collapsed[group.id])}>
@@ -252,9 +265,9 @@ export function TimeframeMenu({
                 </section>
               ))}
               {UNAVAILABLE_INTERVAL_GROUPS.slice(2).map((group) => (
-                <div key={group.id} className="interval-menu-unavailable" title={group.reason}>
-                  <span>{group.label}</span>
-                  <small>{group.reason}</small>
+                <div key={group.id} className="interval-menu-unavailable" title={t(group.reason)}>
+                  <span>{t(group.label)}</span>
+                  <small>{t(group.reason)}</small>
                 </div>
               ))}
             </div>,

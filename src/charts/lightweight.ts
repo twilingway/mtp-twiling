@@ -17,8 +17,11 @@ import { focusRange } from "./navigation.js";
 import { PendingChartView } from "./view-camera.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { chartPalette } from "../model/theme.js";
-import { hasCalendarAxis, lightweightCalendarLabel } from "../model/intervals/axis-ticks.js";
-import { paintCalendarGrid } from "./lightweight-calendar-grid.js";
+import { hasCalendarAxis } from "../model/intervals/axis-ticks.js";
+import { paintCalendarAxis, paintCalendarGrid } from "./lightweight-calendar-grid.js";
+import { lightweightDateFormatters } from "../i18n/chart-formatters.js";
+import { intlLocale } from "../i18n/preferences.js";
+import { calendarAxisDisplay } from "../i18n/calendar-axis.js";
 
 export function makeLightweight(options: ChartOptions): ChartAdapter {
   const { container, row, settings, indicators, timeframe } = options;
@@ -29,17 +32,11 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     restoreFrame: number | null = null,
     settleFrame: number | null = null;
   const pendingView = new PendingChartView();
-  let detailedTimeAxis = false;
-  const formatTick = (time: Time, type: number): string | null => {
-    const timestamp =
-      typeof time === "number"
-        ? time * 1000
-        : typeof time === "string"
-          ? Date.parse(time)
-          : Date.UTC(time.year, time.month - 1, time.day);
-    return lightweightCalendarLabel(timestamp, timeframe, type, detailedTimeAxis);
-  };
   const palette = chartPalette(settings);
+  const dateFormatters = lightweightDateFormatters(timeframe, options);
+  const display = calendarAxisDisplay(timeframe, options);
+  const formatTick = (time: Time, type: number) =>
+    hasCalendarAxis(timeframe) ? "" : dateFormatters.tickMarkFormatter(time, type);
   const chart = createChart(container, {
     autoSize: true,
     layout: {
@@ -79,7 +76,10 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
         labelBackgroundColor: palette.labelBackground
       }
     },
-    localization: { locale: "ru-RU" }
+    localization: {
+      locale: intlLocale(options.locale),
+      timeFormatter: dateFormatters.timeFormatter
+    }
   });
   const series = chart.addSeries(CandlestickSeries, {
     upColor: settings.bodyVisible === false ? "transparent" : (settings.upColor ?? "#53b987"),
@@ -165,7 +165,8 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
                   coordinate: (index) =>
                     chart.timeScale().logicalToCoordinate(index as Logical) ?? NaN,
                   color: palette.grid,
-                  pixelRatio: x
+                  pixelRatio: x,
+                  display
                 });
               options.paint(
                 context,
@@ -178,15 +179,47 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
             });
           }
         })
-      }))
+      })),
+    timeAxisPaneViews: () =>
+      hasCalendarAxis(timeframe)
+        ? [
+            {
+              zOrder: () => "normal" as const,
+              renderer: () => ({
+                draw: (target) =>
+                  target.useBitmapCoordinateSpace((scope) => {
+                    const range = chart.timeScale().getVisibleLogicalRange();
+                    if (!range) return;
+                    const {
+                      context,
+                      horizontalPixelRatio: x,
+                      verticalPixelRatio: y,
+                      bitmapSize
+                    } = scope;
+                    context.save();
+                    context.scale(x, y);
+                    paintCalendarAxis(context, data, timeframe, {
+                      from: range.from,
+                      to: range.to,
+                      width: bitmapSize.width / x,
+                      height: bitmapSize.height / y,
+                      coordinate: (index) =>
+                        chart.timeScale().logicalToCoordinate(index as Logical) ?? NaN,
+                      color: palette.muted,
+                      fontSize: settings.scaleFontSize ?? 11,
+                      fontFamily:
+                        '-apple-system,BlinkMacSystemFont,"Trebuchet MS",Roboto,Ubuntu,sans-serif',
+                      display
+                    });
+                    context.restore();
+                  })
+              })
+            }
+          ]
+        : []
   };
   series.attachPrimitive(primitive);
   chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-    const detailed = chart.timeScale().options().barSpacing >= 24;
-    if (detailed !== detailedTimeAxis) {
-      detailedTimeAxis = detailed;
-      chart.applyOptions({ timeScale: { tickMarkFormatter: formatTick } });
-    }
     if (range && range.from < 80) options.onNearStart();
   });
   chart.subscribeCrosshairMove((event) => {

@@ -1,3 +1,4 @@
+import { t } from "../../i18n/messages.js";
 import { useTerminal } from "./context.js";
 import { Watchlist } from "./Watchlist.js";
 import { ObjectTree } from "./drawings/ObjectTree.js";
@@ -12,11 +13,11 @@ export function RightPanel() {
     const owner = state.owner;
     void controller.panel.select(tab, true, mobile).catch((error: unknown) => {
       if (controller.getSnapshot().owner !== owner) return;
-      controller.notify(error instanceof Error ? error.message : "Не удалось изменить панель.");
+      controller.notify(error instanceof Error ? error.message : t("Не удалось изменить панель."));
     });
   };
   return (
-    <aside className="right-panel" aria-label="Правая панель">
+    <aside className="right-panel" aria-label={t("Правая панель")}>
       <PanelDivider />
       <div
         id="watchlist-view"
@@ -39,14 +40,14 @@ export function RightPanel() {
       <nav
         className="right-panel-tools"
         role="tablist"
-        aria-label="Разделы правой панели"
+        aria-label={t("Разделы правой панели")}
         aria-orientation={mobile ? "horizontal" : "vertical"}
       >
         {mobile && (
           <button
             className="mobile-panel-back"
             role="tab"
-            aria-label="Вернуться к графику"
+            aria-label={t("Вернуться к графику")}
             aria-selected={collapsed}
             aria-controls="chart-panel"
             onClick={() => controller.panel.closeMobile()}
@@ -54,7 +55,7 @@ export function RightPanel() {
             <svg viewBox="0 0 24 24" aria-hidden="true">
               <path d="M5 4v16M2 8h6v7H2Zm12-6v20m-3-17h6v9h-6m8-5v11" />
             </svg>
-            <span>График</span>
+            <span>{t("График")}</span>
           </button>
         )}
         <button
@@ -63,8 +64,8 @@ export function RightPanel() {
           aria-selected={!collapsed && !state.objectPanel}
           aria-expanded={!collapsed && !state.objectPanel}
           aria-controls="watchlist-view"
-          title="Список котировок"
-          aria-label="Список котировок"
+          title={t("Список котировок")}
+          aria-label={t("Список котировок")}
           onClick={() => select("watchlist")}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -78,8 +79,8 @@ export function RightPanel() {
           aria-selected={!collapsed && state.objectPanel}
           aria-expanded={!collapsed && state.objectPanel}
           aria-controls="objects-view"
-          title="Дерево объектов"
-          aria-label="Дерево объектов"
+          title={t("Дерево объектов")}
+          aria-label={t("Дерево объектов")}
           onClick={() => select("objects")}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">

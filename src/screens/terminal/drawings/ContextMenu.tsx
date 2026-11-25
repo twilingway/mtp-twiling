@@ -1,3 +1,4 @@
+import { t } from "../../../i18n/messages.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TOOL_NAMES } from "../../../model/drawing-model.js";
 import type { Drawing, ImageAsset } from "../../../model/types.js";
@@ -20,7 +21,9 @@ export function ContextMenu() {
   const run = useCallback(
     (action: Promise<void>) => {
       void action.catch((error) =>
-        controller.notify(error instanceof Error ? error.message : "Не удалось выполнить действие.")
+        controller.notify(
+          error instanceof Error ? error.message : t("Не удалось выполнить действие.")
+        )
       );
     },
     [controller]
@@ -120,20 +123,21 @@ export function ContextMenu() {
         aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
       >
-        Порядок слоёв <span>›</span>
+        {t("Порядок слоёв")}
+        <span>›</span>
       </button>
       <div role="menu">
         <button role="menuitem" onClick={() => action("front")}>
-          Перенести поверх
+          {t("Перенести поверх")}
         </button>
         <button role="menuitem" onClick={() => action("back")}>
-          Отправить назад
+          {t("Отправить назад")}
         </button>
         <button role="menuitem" onClick={() => action("forward")}>
-          На один слой вперёд
+          {t("На один слой вперёд")}
         </button>
         <button role="menuitem" onClick={() => action("backward")}>
-          На один слой назад
+          {t("На один слой назад")}
         </button>
       </div>
     </div>
@@ -149,7 +153,7 @@ export function ContextMenu() {
     } else if (editing === "size" && image) {
       const width = Number(value);
       if (!Number.isFinite(width) || width < 60 || width > 900) {
-        controller.notify("Укажите ширину от 60 до 900 пикселей.");
+        controller.notify(t("Укажите ширину от 60 до 900 пикселей."));
         return;
       }
       run(controller.saveImage({ ...image, width }));
@@ -168,7 +172,7 @@ export function ContextMenu() {
     >
       {drawing && (
         <>
-          <strong>{drawing.title || TOOL_NAMES[drawing.name]}</strong>
+          <strong>{drawing.title || t(TOOL_NAMES[drawing.name])}</strong>
           <button
             role="menuitem"
             onClick={() =>
@@ -178,16 +182,16 @@ export function ContextMenu() {
               })
             }
           >
-            Настройки…
+            {t("Настройки…")}
           </button>
           <button role="menuitem" onClick={() => cloneDrawing(drawing)}>
-            Клонировать
+            {t("Клонировать")}
           </button>
           <button
             role="menuitem"
-            onClick={() => begin("name", drawing.title || TOOL_NAMES[drawing.name])}
+            onClick={() => begin("name", drawing.title || t(TOOL_NAMES[drawing.name]))}
           >
-            Переименовать…
+            {t("Переименовать…")}
           </button>
           {layers((action) => layerDrawing(drawing, action))}
           <hr />
@@ -197,7 +201,7 @@ export function ContextMenu() {
               act(() => run(controller.updateDrawing({ ...drawing, lock: !drawing.lock })))
             }
           >
-            {drawing.lock ? "Разблокировать" : "Заблокировать"}
+            {drawing.lock ? t("Разблокировать") : t("Заблокировать")}
           </button>
           <button
             role="menuitem"
@@ -207,17 +211,18 @@ export function ContextMenu() {
               )
             }
           >
-            {drawing.visible === false ? "Показать" : "Скрыть"}
+            {drawing.visible === false ? t("Показать") : t("Скрыть")}
           </button>
           <button
             role="menuitem"
             onClick={() => act(() => run(controller.panel.select("objects", false)))}
           >
-            Дерево объектов
+            {t("Дерево объектов")}
           </button>
           <hr />
           <button role="menuitem" onClick={() => removeDrawing(drawing)}>
-            Удалить <kbd>Del</kbd>
+            {t("Удалить")}
+            <kbd>Del</kbd>
           </button>
         </>
       )}
@@ -228,7 +233,7 @@ export function ContextMenu() {
             role="menuitem"
             onClick={() => act(() => run(controller.saveImage({ ...image, lock: !image.lock })))}
           >
-            {image.lock ? "Разблокировать" : "Заблокировать"}
+            {image.lock ? t("Разблокировать") : t("Заблокировать")}
           </button>
           <button
             role="menuitem"
@@ -236,17 +241,17 @@ export function ContextMenu() {
               act(() => run(controller.saveImage({ ...image, visible: image.visible === false })))
             }
           >
-            {image.visible === false ? "Показать" : "Скрыть"}
+            {image.visible === false ? t("Показать") : t("Скрыть")}
           </button>
           <button role="menuitem" onClick={() => act(() => run(controller.editing.clone(image)))}>
-            Клонировать
+            {t("Клонировать")}
           </button>
           {layers((action) => layerImage(image, action))}
           <button role="menuitem" onClick={() => begin("name", image.name)}>
-            Переименовать…
+            {t("Переименовать…")}
           </button>
           <button role="menuitem" onClick={() => begin("size", String(image.width))}>
-            Размер…
+            {t("Размер…")}
           </button>
           <hr />
           <button
@@ -257,49 +262,49 @@ export function ContextMenu() {
               })
             }
           >
-            Удалить изображение
+            {t("Удалить изображение")}
           </button>
         </>
       )}
       {target.kind === "indicator" && (
         <>
-          <strong>{INDICATOR_NAMES[target.key]}</strong>
+          <strong>{t(INDICATOR_NAMES[target.key])}</strong>
           <button
             role="menuitem"
             onClick={() => act(() => run(controller.toggleIndicator(target.key)))}
           >
-            {state.preferences.indicators[target.key] ? "Скрыть" : "Показать"}
+            {state.preferences.indicators[target.key] ? t("Скрыть") : t("Показать")}
           </button>
           <button role="menuitem" onClick={() => act(() => controller.editIndicator(target.key))}>
-            Настройки…
+            {t("Настройки…")}
           </button>
           <button
             role="menuitem"
             onClick={() => act(() => run(controller.panel.select("objects", false)))}
           >
-            Дерево объектов
+            {t("Дерево объектов")}
           </button>
         </>
       )}
       {target.kind === "chart" && (
         <>
           <button role="menuitem" onClick={() => act(() => controller.chart?.fit())}>
-            Показать весь график
+            {t("Показать весь график")}
           </button>
           <button role="menuitem" onClick={() => act(() => controller.setDialog("chart-settings"))}>
-            Настройки графика…
+            {t("Настройки графика…")}
           </button>
           <button
             role="menuitem"
             onClick={() => act(() => run(controller.panel.select("objects", false)))}
           >
-            Дерево объектов
+            {t("Дерево объектов")}
           </button>
           <button
             role="menuitem"
             onClick={() => act(() => run(controller.tools.requestRemove("drawings")))}
           >
-            Удалить все рисунки
+            {t("Удалить все рисунки")}
           </button>
         </>
       )}
@@ -311,7 +316,7 @@ export function ContextMenu() {
           }}
         >
           <label>
-            {editing === "size" ? "Ширина, пикселей" : "Название"}
+            {editing === "size" ? t("Ширина, пикселей") : t("Название")}
             <input
               autoFocus
               type={editing === "size" ? "number" : "text"}
@@ -320,9 +325,9 @@ export function ContextMenu() {
               onChange={(event) => setValue(event.currentTarget.value)}
             />
           </label>
-          <button type="submit">Сохранить</button>
+          <button type="submit">{t("Сохранить")}</button>
           <button type="button" onClick={() => setEditing(null)}>
-            Отмена
+            {t("Отмена")}
           </button>
         </form>
       )}

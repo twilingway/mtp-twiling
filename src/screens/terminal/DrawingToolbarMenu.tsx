@@ -1,3 +1,4 @@
+import { t } from "../../i18n/messages.js";
 import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { DrawingToolIcon, type DrawingIconName } from "./DrawingToolIcon.js";
@@ -52,7 +53,7 @@ export function DrawingToolbarSplit({
   onChoose,
   onMenu
 }: SplitProps) {
-  const tooltip = disabled ? `${label} — Пока не реализовано` : label;
+  const tooltip = disabled ? t(label) + t(" — Пока не реализовано") : t(label);
   return (
     <div className={`drawing-tool-split ${active ? "active" : ""}`} data-tool-group={id}>
       <button
@@ -76,7 +77,7 @@ export function DrawingToolbarSplit({
       <button
         type="button"
         className="drawing-tool-arrow"
-        aria-label={`${menuLabel}: открыть меню`}
+        aria-label={t(menuLabel) + t(": открыть меню")}
         aria-haspopup="menu"
         aria-expanded={expanded}
         aria-controls={expanded ? "drawing-toolbar-menu" : undefined}
@@ -201,31 +202,36 @@ export function DrawingToolbarMenu({ id, title, anchor, sections, onClose }: Pro
     <div ref={root} id={id} className="drawing-toolbar-popup" onKeyDown={keyDown}>
       <div className="drawing-toolbar-popup-heading">
         {level && (
-          <button type="button" className="drawing-menu-back" aria-label="Назад" onClick={back}>
+          <button
+            type="button"
+            className="drawing-menu-back"
+            aria-label={t("Назад")}
+            onClick={back}
+          >
             <DrawingToolIcon name="chevron" />
           </button>
         )}
-        <span>{level?.label ?? title}</span>
+        <span>{t(level?.label ?? title)}</span>
         <button
           type="button"
           className="drawing-menu-close"
-          aria-label="Закрыть меню"
+          aria-label={t("Закрыть меню")}
           onClick={() => onClose(true)}
         >
           <DrawingToolIcon name="close" />
         </button>
       </div>
-      <div role="menu" aria-label={level?.label ?? title} className="drawing-toolbar-menu">
+      <div role="menu" aria-label={t(level?.label ?? title)} className="drawing-toolbar-menu">
         {current.map((part, sectionIndex) => (
           <div
             key={sectionIndex}
             role="group"
-            aria-label={part.title ?? undefined}
+            aria-label={part.title ? t(part.title) : undefined}
             className="drawing-menu-section"
           >
             {part.title && (
               <div className="drawing-menu-section-title" role="presentation">
-                {part.title}
+                {t(part.title)}
               </div>
             )}
             {part.items.map((item) => (
@@ -251,7 +257,7 @@ export function DrawingToolbarMenu({ id, title, anchor, sections, onClose }: Pro
                   aria-haspopup={item.children ? "menu" : undefined}
                   tabIndex={activeId === item.id ? 0 : -1}
                   className={`drawing-menu-action ${item.checked ? "selected" : ""}`}
-                  title={item.disabled ? (item.reason ?? "Пока не реализовано") : item.label}
+                  title={item.disabled ? t(item.reason ?? "Пока не реализовано") : t(item.label)}
                   onFocus={() => setFocusId(item.id)}
                   onClick={() => open(item)}
                 >
@@ -259,8 +265,8 @@ export function DrawingToolbarMenu({ id, title, anchor, sections, onClose }: Pro
                     {item.icon && <DrawingToolIcon name={item.icon} />}
                   </span>
                   <span className="drawing-menu-label">
-                    {item.label}
-                    {item.disabled && <small>{item.reason ?? "Пока не реализовано"}</small>}
+                    {t(item.label)}
+                    {item.disabled && <small>{t(item.reason ?? "Пока не реализовано")}</small>}
                   </span>
                   {item.shortcut && <kbd>{item.shortcut}</kbd>}
                   {item.checked && (
@@ -281,8 +287,12 @@ export function DrawingToolbarMenu({ id, title, anchor, sections, onClose }: Pro
                     tabIndex={-1}
                     className={`drawing-menu-favorite ${item.favorite ? "selected" : ""}`}
                     aria-pressed={item.favorite}
-                    aria-label={`${item.favorite ? "Убрать из избранного" : "В избранное"}: ${item.label}`}
-                    title={item.favorite ? "Убрать из избранного" : "В избранное"}
+                    aria-label={
+                      t(item.favorite ? "Убрать из избранного" : "В избранное") +
+                      ": " +
+                      t(item.label)
+                    }
+                    title={item.favorite ? t("Убрать из избранного") : t("В избранное")}
                     onClick={item.onFavorite}
                   >
                     <DrawingToolIcon name="star" />

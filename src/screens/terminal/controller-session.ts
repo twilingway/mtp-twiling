@@ -1,4 +1,5 @@
 import * as storage from "../../services/storage.js";
+import { displayPreferences } from "../../i18n/preferences.js";
 import { TBankClient } from "../../services/tbank-client.js";
 import { TIMEFRAMES, updateCandleList } from "../../model/history-codec.js";
 import { migrateCandlePalette } from "../../model/candle-palette.js";
@@ -47,6 +48,7 @@ export class TerminalSession {
     const preferences: TerminalPreferences = {
       ...defaults,
       ...saved,
+      ...displayPreferences(saved),
       indicators: { ...DEFAULT_INDICATORS, ...saved.indicators },
       chartSettings: { ...DEFAULT_CHART_SETTINGS, ...migrateCandlePalette(saved.chartSettings) }
     };
@@ -66,6 +68,7 @@ export class TerminalSession {
     const previous = await storage.lastProfile();
     if (!bootstrapCurrent()) return;
     if (previous) await this.prepareProfile(previous.owner, previous.name, false, bootstrapCurrent);
+    else await this.prepareProfile("guest", "", true, bootstrapCurrent);
     if (!bootstrapCurrent()) return;
     const session = await storage.restoreSession();
     if (!bootstrapCurrent()) return;

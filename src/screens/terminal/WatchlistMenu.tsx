@@ -1,3 +1,4 @@
+import { t } from "../../i18n/messages.js";
 import { useEffect, useRef } from "react";
 import type { MarketRow } from "../../model/types.js";
 import { useTerminal } from "./context.js";
@@ -22,7 +23,9 @@ export function WatchlistMenu({
     void controller
       .removeInstrument(row)
       .catch((error: unknown) =>
-        controller.notify(error instanceof Error ? error.message : "Не удалось удалить инструмент.")
+        controller.notify(
+          error instanceof Error ? error.message : t("Не удалось удалить инструмент.")
+        )
       );
   };
   useEffect(() => {
@@ -58,7 +61,12 @@ export function WatchlistMenu({
       }}
     >
       <button role="menuitem" onClick={remove}>
-        <DeleteIcon /> <span>Удалить {row.ticker} из списка</span> <kbd>Del</kbd>
+        <DeleteIcon />{" "}
+        <span>
+          {t("Удалить")}
+          {row.ticker} {t("из списка")}
+        </span>{" "}
+        <kbd>Del</kbd>
       </button>
     </div>
   );

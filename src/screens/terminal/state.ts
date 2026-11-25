@@ -13,6 +13,8 @@ import type {
 } from "../../model/types.js";
 import { NATIVE_PERIOD_LABELS } from "../../model/intervals/native-timeframes.js";
 import type { IntervalId } from "../../model/intervals/registry.js";
+import type { DisplayPreferences } from "../../i18n/preferences.js";
+import { formatClock, formatNumber } from "../../i18n/format.js";
 export const DEFAULT_INDICATORS: IndicatorFlags = {
   ma: false,
   ema: false,
@@ -47,7 +49,7 @@ export const INDICATOR_NAMES: Record<IndicatorKey, string> = {
   ema: "EMA 50"
 };
 export const PERIOD_LABELS: Record<Timeframe, string> = NATIVE_PERIOD_LABELS;
-export interface TerminalPreferences {
+export interface TerminalPreferences extends DisplayPreferences {
   favoriteIntervals?: IntervalId[];
   rightPanelCollapsed?: boolean;
   rightPanelTab?: "watchlist" | "objects";
@@ -111,26 +113,13 @@ export interface TerminalState {
   crosshairBar: Candle | null;
 }
 export function number(value: number | null | undefined, digits = 2, signed = false): string {
-  return value == null || !Number.isFinite(value)
-    ? "—"
-    : new Intl.NumberFormat("ru-RU", {
-        minimumFractionDigits: digits,
-        maximumFractionDigits: digits,
-        signDisplay: signed ? "exceptZero" : "auto"
-      }).format(value);
+  return formatNumber(value, digits, signed);
 }
 export function signClass(value: number | null | undefined): string {
   return value == null || value === 0 ? "" : value > 0 ? "positive" : "negative";
 }
 export function timeLabel(value: string | number | null | undefined): string {
-  return value
-    ? new Intl.DateTimeFormat("ru-RU", {
-        timeZone: "Europe/Moscow",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit"
-      }).format(new Date(value))
-    : "—";
+  return value ? formatClock(new Date(value).getTime()) : "—";
 }
 export function logoUrl(row: MarketRow): string | null {
   const name = row.brand?.logoName;

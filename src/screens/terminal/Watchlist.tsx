@@ -1,3 +1,5 @@
+import { t, systemText } from "../../i18n/messages.js";
+import { timeZoneOffset } from "../../i18n/timezones.js";
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import type { DragEvent, MouseEvent } from "react";
 import type { MarketRow } from "../../model/types.js";
@@ -49,6 +51,7 @@ const QuoteRow = memo(function QuoteRow({
   onDragEnd: () => void;
 }) {
   const digits = precision(row);
+  const { state } = useTerminal();
   return (
     <tr
       className={`quote-row ${selected ? "selected" : ""} ${row.availability === "unavailable" ? "unavailable" : ""} ${dragClass}`}
@@ -57,7 +60,20 @@ const QuoteRow = memo(function QuoteRow({
       draggable
       tabIndex={0}
       aria-selected={selected}
-      title={`${row.name}${row.time ? " · Сделка " + timeLabel(row.time) + " МСК" : ""}`}
+      title={
+        row.name +
+        (row.time
+          ? " " +
+            t("· Сделка") +
+            " " +
+            timeLabel(row.time) +
+            " " +
+            timeZoneOffset(
+              state.preferences.timeZone ?? "Europe/Moscow",
+              new Date(row.time).getTime()
+            )
+          : "")
+      }
       onClick={() => onSelect(row.symbol, row.uid)}
       onContextMenu={(event) => onContext(event, row)}
       onDragStart={(event) => onDragStart(event, position)}
@@ -97,8 +113,8 @@ const QuoteRow = memo(function QuoteRow({
             event.preventDefault();
             event.stopPropagation();
           }}
-          title={`Удалить ${row.ticker} из списка`}
-          aria-label={`Удалить ${row.ticker} из списка`}
+          title={t("Удалить ") + row.ticker + t(" из списка")}
+          aria-label={t("Удалить ") + row.ticker + t(" из списка")}
           onClick={(event) => {
             event.stopPropagation();
             onRemove(row);
@@ -136,7 +152,9 @@ export function Watchlist() {
     void controller
       .removeInstrument(row)
       .catch((error: unknown) =>
-        controller.notify(error instanceof Error ? error.message : "Не удалось удалить инструмент.")
+        controller.notify(
+          error instanceof Error ? error.message : t("Не удалось удалить инструмент.")
+        )
       );
   };
   const [query, setQuery] = useState(""),
@@ -189,7 +207,7 @@ export function Watchlist() {
       .catch((error: unknown) => {
         if (controller.getSnapshot().owner === current.owner)
           controller.notify(
-            error instanceof Error ? error.message : "Не удалось сохранить порядок."
+            error instanceof Error ? error.message : t("Не удалось сохранить порядок.")
           );
       });
   };
@@ -221,27 +239,28 @@ export function Watchlist() {
       void controller.setPreferences({ symbol, instrumentUid }).catch((error: unknown) => {
         if (controller.getSnapshot().owner === owner)
           controller.notify(
-            error instanceof Error ? error.message : "Не удалось открыть инструмент."
+            error instanceof Error ? error.message : t("Не удалось открыть инструмент.")
           );
       });
     };
   return (
-    <aside className="watchlist-panel" aria-label="Список котировок">
+    <aside className="watchlist-panel" aria-label={t("Список котировок")}>
       <div className="watchlist-heading">
         <h2>
-          Список котировок <span>РФ</span>
+          {t("Список котировок")}
+          <span>{t("РФ")}</span>
         </h2>
         <button
           id="add-instrument"
-          title="Добавить инструмент"
-          aria-label="Добавить инструмент"
+          title={t("Добавить инструмент")}
+          aria-label={t("Добавить инструмент")}
           onClick={() => controller.setDialog(state.authenticated ? "instruments" : "account")}
         >
           ＋
         </button>
         <button
           id="reset-order"
-          title="Сбросить сортировку"
+          title={t("Сбросить сортировку")}
           onClick={() => {
             setSort(null);
             setQuery("");
@@ -255,8 +274,8 @@ export function Watchlist() {
         <input
           id="search"
           type="search"
-          placeholder="Найти инструмент"
-          aria-label="Поиск в списке"
+          placeholder={t("Найти инструмент")}
+          aria-label={t("Поиск в списке")}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
@@ -268,10 +287,10 @@ export function Watchlist() {
             <tr>
               {(
                 [
-                  ["symbol", "Инструмент"],
-                  ["price", "Посл. цена"],
-                  ["change", "Изм."],
-                  ["changePercent", "Изм. %"]
+                  ["symbol", t("Инструмент")],
+                  ["price", t("Посл. цена")],
+                  ["change", t("Изм.")],
+                  ["changePercent", t("Изм. %")]
                 ] as [SortKey, string][]
               ).map(([key, label]) => (
                 <th key={key}>
@@ -282,7 +301,7 @@ export function Watchlist() {
                       setSort(key);
                     }}
                   >
-                    {label}
+                    {t(label)}
                   </button>
                 </th>
               ))}
@@ -324,17 +343,18 @@ export function Watchlist() {
         {!visible.length && (
           <p id="empty-search">
             {state.rows.length
-              ? "Инструменты не найдены"
-              : "Список пуст. Добавьте инструмент кнопкой +."}
+              ? t("Инструменты не найдены")
+              : t("Список пуст. Добавьте инструмент кнопкой +.")}
           </p>
         )}
       </div>
       <div className="watchlist-meta">
         <span id="quote-count">
-          {visible.length} из {state.rows.length} ·{" "}
-          {state.rows.filter((row) => row.price != null).length} с ценой
+          {visible.length} {t("из")}
+          {state.rows.length} · {state.rows.filter((row) => row.price != null).length}{" "}
+          {t("с ценой")}
         </span>
-        <span>WebSocket · напрямую</span>
+        <span>{t("WebSocket · напрямую")}</span>
       </div>
       {menu && menu.owner === state.owner && <WatchlistMenu {...menu} onClose={closeMenu} />}
       {selected && (
@@ -344,10 +364,10 @@ export function Watchlist() {
             <h3 id="detail-symbol">{selected.ticker}</h3>
             <span className="market-tag" id="detail-type">
               {selected.type === "future"
-                ? "Фьючерс"
+                ? t("Фьючерс")
                 : selected.type === "index"
-                  ? "Индекс"
-                  : "Акция"}
+                  ? t("Индекс")
+                  : t("Акция")}
             </span>
           </div>
           <p id="detail-name">{selected.name}</p>
@@ -361,26 +381,37 @@ export function Watchlist() {
           </p>
           <div className="detail-facts">
             <div>
-              <span>Закрытие сессии</span>
+              <span>{t("Закрытие сессии")}</span>
               <b id="detail-close">{number(selected.previousClose, precision(selected))}</b>
             </div>
             <div>
-              <span>Время последней сделки</span>
-              <b id="detail-time">{timeLabel(selected.time)} МСК</b>
+              <span>{t("Время последней сделки")}</span>
+              <b id="detail-time">
+                {timeLabel(selected.time)}{" "}
+                {selected.time
+                  ? timeZoneOffset(
+                      state.preferences.timeZone ?? "Europe/Moscow",
+                      new Date(selected.time).getTime()
+                    )
+                  : ""}
+              </b>
             </div>
             <div>
-              <span>Источник</span>
-              <b>Т‑Инвестиции</b>
+              <span>{t("Источник")}</span>
+              <b>{t("Т‑Инвестиции")}</b>
             </div>
           </div>
           <p className="detail-note" id="detail-note">
-            {selected.note ||
-              "Изменение — к закрытию сессии из API. При закрытом рынке показывается последняя сделка."}
+            {selected.note
+              ? systemText(selected.note)
+              : t(
+                  "Изменение — к закрытию сессии из API. При закрытом рынке показывается последняя сделка."
+                )}
           </p>
         </section>
       )}
       <div className="private-note">
-        <span>◈</span> Личное пространство
+        <span>◈</span> {t("Личное пространство")}
       </div>
     </aside>
   );

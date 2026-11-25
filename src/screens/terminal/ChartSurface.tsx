@@ -1,3 +1,4 @@
+import { t } from "../../i18n/messages.js";
 import { useEffect, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { DEFAULT_FIB_LEVELS, drawingStyle, hitDrawing } from "../../model/drawing-model.js";
@@ -190,7 +191,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
           ]
         };
         if (isDrawing(candidate)) void controller.addDrawing(candidate);
-        else controller.notify("Не удалось создать рисунок.");
+        else controller.notify(t("Не удалось создать рисунок."));
         draft.current = [];
       } else controller.setPreview({ id: "preview", name: tool, points: [...draft.current] });
       return;
@@ -329,7 +330,9 @@ export function ChartGestures({ children }: { children: ReactNode }) {
     void controller.editing
       .finishGesture(token)
       .catch((error: unknown) =>
-        controller.notify(error instanceof Error ? error.message : "Не удалось сохранить рисунок.")
+        controller.notify(
+          error instanceof Error ? error.message : t("Не удалось сохранить рисунок.")
+        )
       );
   }
   function cancel(event: ReactPointerEvent<HTMLDivElement>) {

@@ -1,3 +1,4 @@
+import { t } from "../../i18n/messages.js";
 import { useEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { ImageAsset, PixelPoint } from "../../model/types.js";
@@ -149,7 +150,7 @@ function ImageAnnotation({ asset }: { asset: ImageAsset }) {
           .finishGesture(active.token)
           .catch((error: unknown) =>
             controller.notify(
-              error instanceof Error ? error.message : "Не удалось сохранить изображение."
+              error instanceof Error ? error.message : t("Не удалось сохранить изображение.")
             )
           );
       }}
@@ -159,8 +160,8 @@ function ImageAnnotation({ asset }: { asset: ImageAsset }) {
       <img src={url} alt={asset.name} draggable={false} />
       <button
         className="image-remove"
-        title="Удалить изображение"
-        aria-label="Удалить изображение"
+        title={t("Удалить изображение")}
+        aria-label={t("Удалить изображение")}
         onClick={(event) => {
           event.stopPropagation();
           void controller.deleteImage(asset.id);
@@ -168,7 +169,7 @@ function ImageAnnotation({ asset }: { asset: ImageAsset }) {
       >
         ×
       </button>
-      <span className="image-resize" title="Изменить размер" />
+      <span className="image-resize" title={t("Изменить размер")} />
     </div>
   );
 }
@@ -177,7 +178,7 @@ export function ImageLayer() {
   return (
     <div
       id="image-layer"
-      aria-label="Изображения на графике"
+      aria-label={t("Изображения на графике")}
       hidden={drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden}
     >
       {[...state.images]

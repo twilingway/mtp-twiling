@@ -1,3 +1,4 @@
+import { t } from "../../i18n/messages.js";
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 export function Modal({
@@ -27,8 +28,8 @@ export function Modal({
       }}
     >
       <header>
-        <h2>{title}</h2>
-        <button type="button" onClick={onClose} aria-label="Закрыть">
+        <h2>{t(title)}</h2>
+        <button type="button" onClick={onClose} aria-label={t("Закрыть")}>
           ×
         </button>
       </header>

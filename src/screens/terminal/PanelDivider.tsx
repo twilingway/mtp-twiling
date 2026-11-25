@@ -1,3 +1,4 @@
+import { t } from "../../i18n/messages.js";
 import { useEffect, useRef, useState } from "react";
 import { panelWidth } from "../../model/panel-layout.js";
 import { useTerminal } from "./context.js";
@@ -64,7 +65,7 @@ export function PanelDivider() {
   const save = (next: number) => {
     void controller.setPreferences({ sidebarWidth: next }).catch((error: unknown) => {
       controller.notify(
-        error instanceof Error ? error.message : "Не удалось сохранить ширину панели."
+        error instanceof Error ? error.message : t("Не удалось сохранить ширину панели.")
       );
     });
   };
@@ -74,12 +75,12 @@ export function PanelDivider() {
       hidden={collapsed}
       role="separator"
       tabIndex={collapsed ? -1 : 0}
-      aria-label="Ширина правой панели"
+      aria-label={t("Ширина правой панели")}
       aria-orientation="vertical"
       aria-valuemin={240}
       aria-valuemax={panelWidth(720, window.innerWidth)}
       aria-valuenow={width}
-      title="Перетащите, чтобы изменить ширину панели"
+      title={t("Перетащите, чтобы изменить ширину панели")}
       onPointerDown={(event) => {
         if (collapsed || event.button !== 0) return;
         event.preventDefault();

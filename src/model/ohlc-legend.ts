@@ -1,3 +1,4 @@
+import { intlLocale } from "../i18n/preferences.js";
 import type { Candle, ChartSettings } from "./types.js";
 import { TRADINGVIEW_CANDLE_STYLE } from "./candle-palette.js";
 import { chartPalette } from "./theme.js";
@@ -50,7 +51,7 @@ export function createOhlcLegend(
 export function formatOhlcValue(value: number | null, digits: number, signed = false): string {
   if (value === null || !Number.isFinite(value)) return "—";
   const precision = Number.isFinite(digits) ? Math.min(20, Math.max(0, Math.floor(digits))) : 2;
-  return new Intl.NumberFormat("ru-RU", {
+  return new Intl.NumberFormat(intlLocale(), {
     minimumFractionDigits: precision,
     maximumFractionDigits: precision,
     signDisplay: signed ? "exceptZero" : "auto"

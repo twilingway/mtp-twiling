@@ -1,16 +1,18 @@
+import { t } from "../../i18n/messages.js";
 import { memo, useEffect } from "react";
 import { setupPwa } from "../../services/pwa.js";
 import { DRAWING_CLIPBOARD_MIME } from "../../model/drawing-editing.js";
 import { useTerminal } from "./context.js";
 export const UpdateBanner = memo(function UpdateBanner() {
+  useTerminal();
   return (
     <aside id="update-banner" className="update-banner" role="status" hidden>
       <div>
-        <strong>Доступна новая версия</strong>
-        <p>Сохранения останутся на устройстве.</p>
+        <strong>{t("Доступна новая версия")}</strong>
+        <p>{t("Сохранения останутся на устройстве.")}</p>
       </div>
-      <button id="update-now">Обновить</button>
-      <button id="update-later" aria-label="Напомнить позже">
+      <button id="update-now">{t("Обновить")}</button>
+      <button id="update-later" aria-label={t("Напомнить позже")}>
         ×
       </button>
     </aside>
@@ -25,7 +27,9 @@ export function TerminalLifecycle() {
     void controller
       .start()
       .catch((error: unknown) =>
-        controller.notify(error instanceof Error ? error.message : "Не удалось открыть сохранения")
+        controller.notify(
+          error instanceof Error ? error.message : t("Не удалось открыть сохранения")
+        )
       );
     void setupPwa({
       notify: controller.notify,
@@ -44,7 +48,9 @@ export function TerminalLifecycle() {
       !!window.getSelection()?.toString();
     const run = (action: Promise<unknown>) =>
       void action.catch((error: unknown) =>
-        controller.notify(error instanceof Error ? error.message : "Не удалось изменить разметку.")
+        controller.notify(
+          error instanceof Error ? error.message : t("Не удалось изменить разметку.")
+        )
       );
     const copy = (event: ClipboardEvent) => {
       if (editingText(event.target) || !event.clipboardData) return;

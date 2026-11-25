@@ -1,3 +1,4 @@
+import { t } from "../../i18n/messages.js";
 import { useEffect, useState } from "react";
 import { Modal } from "./Modal.js";
 import { useTerminal } from "./context.js";
@@ -23,15 +24,15 @@ export function DeleteObjectDialog() {
       id="delete-object-dialog"
       title={
         pending.kind === "bulk"
-          ? "Удалить зафиксированные объекты?"
-          : "Удалить зафиксированный объект?"
+          ? t("Удалить зафиксированные объекты?")
+          : t("Удалить зафиксированный объект?")
       }
       onClose={close}
     >
-      <p>Удалить с графика, включая зафиксированные объекты?</p>
+      <p>{t("Удалить с графика, включая зафиксированные объекты?")}</p>
       <footer>
         <button onClick={close} disabled={busy}>
-          Отмена
+          {t("Отмена")}
         </button>
         <button
           className="primary-button"
@@ -49,13 +50,13 @@ export function DeleteObjectDialog() {
               .catch((error: unknown) => {
                 if (controller.tools.scopeKey() === pending.scope)
                   controller.notify(
-                    error instanceof Error ? error.message : "Не удалось удалить объект"
+                    error instanceof Error ? error.message : t("Не удалось удалить объект")
                   );
               })
               .finally(() => setBusy(false));
           }}
         >
-          Удалить
+          {t("Удалить")}
         </button>
       </footer>
     </Modal>
