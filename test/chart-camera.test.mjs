@@ -311,6 +311,8 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
         "model/candle-palette.ts": { lineColor: (value) => value }
       },
       {
+        requestAnimationFrame,
+        cancelAnimationFrame,
         ResizeObserver: class {
           observe() {}
         },

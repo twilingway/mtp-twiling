@@ -56,10 +56,25 @@ async function fixture({ ratio = 1 } = {}) {
     }
   }
   const canvasDom = () => {
+    let backingWidth = 0,
+      backingHeight = 0;
     const context = { clearRect() {}, scale() {} };
     return {
-      width: 0,
-      height: 0,
+      ink: false,
+      get width() {
+        return backingWidth;
+      },
+      set width(value) {
+        backingWidth = value;
+        this.ink = false;
+      },
+      get height() {
+        return backingHeight;
+      },
+      set height(value) {
+        backingHeight = value;
+        this.ink = false;
+      },
       style: {},
       get clientWidth() {
         return parseFloat(this.style.width) || 0;
@@ -85,7 +100,10 @@ async function fixture({ ratio = 1 } = {}) {
   new vm.Script(nativeCanvas + helperSource).runInContext(context);
   const NativeCanvas = vm.runInContext("Canvas", context);
   for (const height of [420, 371]) {
-    const canvas = new NativeCanvas({}, () => draws++);
+    const canvas = new NativeCanvas({}, () => {
+      draws++;
+      canvas.getElement().ink = true;
+    });
     canvases.push(canvas);
     canvas.update(width, height);
   }
@@ -137,7 +155,10 @@ async function fixture({ ratio = 1 } = {}) {
     width: (value) => (width = value),
     draws: () => draws,
     addCanvas(height) {
-      const canvas = new NativeCanvas({}, () => draws++);
+      const canvas = new NativeCanvas({}, () => {
+        draws++;
+        canvas.getElement().ink = true;
+      });
       canvases.push(canvas);
       canvas.update(width, height);
       return canvas;
@@ -249,4 +270,28 @@ test("new technical panes join recovery and removed canvases release observers",
   assert.ok(!recoveryObserver.targets.includes(removed));
   dispose();
   assert.equal(recoveryObserver.targets.length, 0);
+});
+
+test("installed Canvas recovery repaints after every backingstore reset on initial, TA and viewport resize", async () => {
+  const f = await fixture(),
+    dispose = f.attach();
+  f.emit();
+  f.settled();
+  assert.ok(f.canvases.every((canvas) => canvas.getElement().ink));
+  f.race();
+  f.settled();
+  assert.ok(f.canvases.every((canvas) => canvas.getElement().ink));
+  const lower = f.addCanvas(80);
+  f.settled();
+  await Promise.resolve();
+  dispose.refresh();
+  for (const height of [160, 30, 240]) {
+    lower.update(85, lower.getElement().clientHeight);
+    lower.update(85, height);
+    f.emit();
+    f.settled();
+    assert.equal(lower.getElement().height, height);
+    assert.ok(lower.getElement().ink, "native listener must run after buffer clears");
+  }
+  dispose();
 });

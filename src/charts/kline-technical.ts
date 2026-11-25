@@ -30,6 +30,18 @@ interface Entry {
   paneId: string;
   context: Context;
 }
+interface Settlement {
+  active: boolean;
+  revision: number;
+  schedule: () => void;
+}
+/** Native promises may outlive a removed pane or owner; never retain its chart in their callback. */
+function nativeSettled(weak: WeakRef<Settlement>, revision: number): () => void {
+  return () => {
+    const target = weak.deref();
+    if (target?.active && target.revision === revision) target.schedule();
+  };
+}
 const registered = new Set<string>();
 function contextOf(indicator: Indicator<Row>): Context | null {
   const value: unknown = indicator.extendData;
@@ -81,7 +93,8 @@ export function klineTechnical(
   alive: () => boolean,
   legacyRatio: () => number | null,
   restoreLegacy: () => void = () => {},
-  refreshCanvases: () => void = () => {}
+  refreshCanvases: () => void = () => {},
+  onSettled: () => void = () => {}
 ) {
   const calculation = new TechnicalRenderData();
   const entries = new Map<string, Entry>(),
@@ -93,6 +106,27 @@ export function klineTechnical(
   let disposed = false,
     lastMetrics = "",
     applying = false;
+  let settlementFrame = 0;
+  const settlement: Settlement = {
+    active: true,
+    revision: 0,
+    schedule: () => {
+      if (disposed || !alive() || settlementFrame) return;
+      settlementFrame = requestAnimationFrame(() => {
+        if (disposed || !alive()) return;
+        apply();
+        refreshCanvases();
+        // Applying a newly measured X-axis height can itself queue another native paint.
+        settlementFrame = requestAnimationFrame(() => {
+          settlementFrame = 0;
+          if (disposed || !alive()) return;
+          changed();
+          onSettled();
+        });
+      });
+    }
+  };
+  const weakSettlement = new WeakRef(settlement);
   let events: ReturnType<typeof attachTechnicalPaneEvents> | undefined;
   const nativeId = (key: string) => (key === "price" ? "candle_pane" : `technical:${key.slice(5)}`);
   const height = (id: string) => chart.getSize(id, DomPosition.Main)?.height ?? 0;
@@ -228,6 +262,7 @@ export function klineTechnical(
   }
   function reconcile() {
     if (disposed || !alive()) return;
+    const complete = nativeSettled(weakSettlement, ++settlement.revision);
     const compiled = calculation.compile(instances, layout);
     groups = compiled.groups;
     const nextOrder = groups.filter((group) => group.key !== "price").map((group) => group.key);
@@ -266,15 +301,23 @@ export function klineTechnical(
         });
         const value = descriptor(instance.id, outputs, context);
         if (!entry) {
-          chart.createIndicator(value, true, {
-            id: paneId,
-            height: 80,
-            minHeight: 30,
-            dragEnabled: true
-          });
+          // v9.8.12 reapplies these options AFTER async calc when stacking into an existing pane.
+          // Only the first instance may establish its height; subsequent ones must preserve it.
+          const paneExists = chart.getDom(paneId) !== null;
+          chart.createIndicator(
+            value,
+            true,
+            {
+              id: paneId,
+              ...(!paneExists && group.key !== "price"
+                ? { height: 80, minHeight: 30, dragEnabled: true }
+                : {})
+            },
+            complete
+          );
           entry = { name: value.name, paneId, context };
           entries.set(instance.id, entry);
-        } else chart.overrideIndicator(value, paneId);
+        } else chart.overrideIndicator(value, paneId, complete);
       }
     refreshCanvases();
     listen();
@@ -283,8 +326,9 @@ export function klineTechnical(
       if (dom) events?.observe(dom);
     }
     apply();
-    changed();
-    events?.schedule();
+    // Native calc uses promises even for synchronous common-core arrays. Its completion also
+    // queues DOM/canvas paint; emit coherent DOM bounds only from the following native frame.
+    settlement.schedule();
   }
   return {
     setData(data: readonly Candle[]) {
@@ -313,6 +357,9 @@ export function klineTechnical(
     },
     dispose() {
       disposed = true;
+      settlement.active = false;
+      settlement.schedule = () => {};
+      if (settlementFrame) cancelAnimationFrame(settlementFrame);
       events?.dispose();
       calculation.dispose();
       for (const [id, entry] of entries) remove(id, entry);

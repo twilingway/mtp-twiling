@@ -577,6 +577,7 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
     metricEvents,
     calls,
     ready,
+    queueFrame: globals.requestAnimationFrame,
     primaryWrites: () => primaryWrites,
     creations: () => creations,
     removed: () => removed,

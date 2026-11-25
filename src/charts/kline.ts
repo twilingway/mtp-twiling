@@ -413,7 +413,8 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     () => !live.retired,
     volumeLayout.ratio,
     volumeLayout.apply,
-    detachCanvasResize.refresh
+    detachCanvasResize.refresh,
+    paintFront
   );
   technical.update(options.technicalIndicators ?? [], options.technicalPaneLayout);
   return live;
