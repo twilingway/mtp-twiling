@@ -1,0 +1,68 @@
+.chart-navigation {
+  position: absolute;
+  z-index: 7;
+  left: calc(50% - 32px);
+  bottom: 70px;
+  height: 28px;
+  display: flex;
+  gap: 4px;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.chart-panel:hover > .chart-navigation,
+.chart-navigation:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+.chart-navigation button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  border: 0;
+  border-radius: 4px;
+  background: #1e222dcc;
+  color: #b2b5be;
+  touch-action: manipulation;
+}
+.chart-navigation button:not(:disabled):hover {
+  background: #2a2e39ee;
+  color: #fff;
+}
+.chart-navigation button:focus-visible {
+  outline: 2px solid #2962ff;
+  outline-offset: 2px;
+}
+.chart-navigation button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.chart-navigation svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+@media (hover: none), (pointer: coarse) {
+  .chart-navigation {
+    opacity: 1;
+    pointer-events: auto;
+    height: 36px;
+  }
+  .chart-navigation button {
+    width: 36px;
+    height: 36px;
+    padding: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chart-navigation {
+    transition: none;
+  }
+}

@@ -22,6 +22,9 @@ export interface ChartAdapter {
   getView(): ChartView | null;
   setView(view: ChartView): void;
   fit(): void;
+  zoom?(direction: -1 | 1): void;
+  scroll?(direction: -1 | 1): void;
+  resetView?(): void;
   beginPan?(start?: PixelPoint): void;
   endPan?(): void;
   focusPoints?(points: readonly DrawingPoint[]): void;

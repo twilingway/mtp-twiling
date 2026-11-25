@@ -22,6 +22,7 @@ import { paintCalendarAxis, paintCalendarGrid } from "./lightweight-calendar-gri
 import { lightweightDateFormatters } from "../i18n/chart-formatters.js";
 import { intlLocale } from "../i18n/preferences.js";
 import { calendarAxisDisplay } from "../i18n/calendar-axis.js";
+import { lightweightNavigation } from "./lightweight-navigation.js";
 
 export function makeLightweight(options: ChartOptions): ChartAdapter {
   const { container, row, settings, indicators, timeframe } = options;
@@ -293,6 +294,12 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
   }
   chart.timeScale().subscribeSizeChange(scheduleViewRestore);
   return {
+    ...lightweightNavigation(
+      chart,
+      series,
+      () => data.length,
+      () => !settingData && !viewStaged && restoreFrame === null && settleFrame === null
+    ),
     setData(next, fit) {
       settingData = true;
       data = next;

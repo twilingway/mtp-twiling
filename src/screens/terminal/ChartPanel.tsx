@@ -12,6 +12,7 @@ import { CandleCountdown } from "./CandleCountdown.js";
 import { IndicatorLegend } from "./IndicatorLegend.js";
 import { OhlcLegend } from "./OhlcLegend.js";
 import { ChartRangeControl } from "./intervals/ChartRangeControl.js";
+import { ChartNavigation } from "./ChartNavigation.js";
 const Version = memo(function Version() {
   return (
     <span id="app-version" hidden>
@@ -125,6 +126,7 @@ export function ChartPanel() {
           </div>
         )}
       </ChartGestures>
+      <ChartNavigation />
       <ChartRangeControl />
       <Version />
     </section>

@@ -27,6 +27,7 @@ import { calendarAxisDisplay } from "../i18n/calendar-axis.js";
 import { initializeKlineIndicators } from "./kline-indicators.js";
 import { attachVolumePaneLayout } from "./kline-pane-layout.js";
 import { attachKlineCanvasResize } from "./kline-canvas-resize.js";
+import { klineNavigation } from "./kline-navigation.js";
 
 export function makeKline(options: ChartOptions): ChartAdapter {
   const { container, settings, timeframe, indicators } = options;
@@ -275,6 +276,11 @@ export function makeKline(options: ChartOptions): ChartAdapter {
   volumeLayout.apply();
   const detachCanvasResize = attachKlineCanvasResize(chart, () => axisWidth);
   return {
+    ...klineNavigation(
+      chart,
+      () => data.length,
+      () => dataReady
+    ),
     setData(next, fit) {
       dataReady = false;
       data = next;
