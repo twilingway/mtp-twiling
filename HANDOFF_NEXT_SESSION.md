@@ -5,6 +5,41 @@
 
 ## Актуальный этап — читать первым
 
+### Самый новый статус — 26.11.2026, автономная работа
+
+- Пользователь ушёл спать и явно разрешил отдельную автономную копию Chrome без вопросов. Обычный
+  профиль не трогать; ручной Google вход при необходимости отложить, остальное продолжать.
+- Local .16: код6d5fbbf/buildb783575aa314c53d, check479/479, spec29/29, независимая browser QA PASS.
+  Отчёт `docs/RELEASE_0_3_16_QA.md`; exact46 prefs/Drawing/Image/vault восстановлены. Own Chrome
+  closed.
+- PR3 `https://github.com/twilingway/mtp-twiling/pull/3` открыт, main пока5d497ee/.15 после PR2 с
+  deployment pin. PR3 merge до завершения failed-first-release диагностики не выполнялся.
+- Первая VDS attempt .15 exact5d497ee завершилась timeout/ExecMainStatus15, MemoryPeak213032960. Во
+  время postinstall esbuild Node был DN/mem_cg; лимиты192/240MiB не повышались. Соседей не трогали;
+  таймер остаётся disabled. Root apply session48245 закончилась exit1. На сервере теперь upgraded
+  controller/include/profile и anonymous repo, поэтому старый first-release script с требованием
+  пустого repo НЕ запускать повторно. Backup
+  `/root/mtp-release-backup-20261125T201655Z-5d497eebd66b`. Нужно read-only состояние/журнал,
+  доказать lean frozen install без postinstall, затем отдельный reviewed recovery plan с тем же
+  бюджетом и свежими gates, без слепого retry.
+- .17 source: drawing livepreview/opacity готов63d3d935 (112/112 focused), ещё не интегрирован:
+  `vps/artifacts/drawing-settings-preview-worktree`; нуженCSSdrawing-opacity послеdrawing-controls.
+- Bybit foundation готов310e12aa (468/468,21Bybit tests). Следом тот же агент делает реальный market
+  facade/provider refs, public без банковского ключа, namespace/schema2 и old-writer isolation. Его
+  план `profile-v2:<logicalowner>` согласован, private auth/vault owners НЕ менять.
+- RootТАbranch `feat/technical-indicator-integration` worktree
+  technical-indicator-integration-worktree: контракт949d752
+  (instances/panes/preferences/JSON/Drive+immutable reorder), source tests27/27. ТА пока не
+  подключены к экрану. Native worker — бывший watchlist_details_vertical_resize, начинает оба
+  адаптера от949; rootUI/persistence/lifecycle TA hooks — отдельный scope. Отдельный свежий
+  ta_moving_averages делает WMA/VWMA/DEMA/TEMA/HMA/SMMA, verified PineIDs/defaults, без registry
+  edits.
+- Обязательная очередь пользователя: все127 ТА indicators + поиск/настройки/реальные вычисления,
+  overlay/lower placement, перестановка внутри панели и сохранение. Не путать с224 общими entries.
+  Livepreview цвета/толщины/стиля/opacity для всех8 drawing tools, cancel rollback/одноundo/неутечка
+  draft вDrive. Крипта Bybit primary и OKX только при доказанном отсутствии инструмента; USstock
+  perps иxStocks подписывать отдельно. Broad goal остаётся ACTIVE.
+
 ### Обновление после 0.3.15 — 26.11.2026
 
 - Main `c2d476b86f0016e62132cb09f73253db3d5631b5`, PR1 merged. Exact push CI `45689854414` success.
