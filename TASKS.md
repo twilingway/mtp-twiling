@@ -1,5 +1,11 @@
 # Текущая очередь
 
+ОБНОВЛЕНИЕ: см. самый верх HANDOFF_NEXT_SESSION.md. KLine canvasfix, nav5, flags7, Drivecore/UI,
+Welcome/Storage, MTP151 и выравнивание иконок уже в canonical SOURCE; served пока старая0.3.10. Три
+активныхfix: prior-dayquote bases(14UIDaudit), depth-only camera carry, Driveusercamera intent race.
+Затем0.3.11 общийcheck/spec и freshisolatedbrowserQA, только потом publicpush/CI/VDS. Ниже старые
+статусы, SOURCEFROZEN отменён после exactrestore/close kline-scale worker.
+
 САМОЕ НОВОЕ: .10/main1953608/build5219f27b5345f071 check222+spec11 PASS. Height ready+pending
 nativebrowserPASS, legend/favorites/mobileOHLC/PWA/RUEN/zones/minutegridPASS. Новый gateFAIL: KLine
 Yaxis0..10 послеFit/resize приценах78..119, freshkline_scale_regressionисследует (чистый

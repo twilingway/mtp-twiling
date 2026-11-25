@@ -5,6 +5,39 @@
 
 ## Актуальный этап — читать первым
 
+**Обновление после b24c818: сервер пока0.3.10/5219f27b5345f071; новые исходники ещё НЕ собраны.** В
+main влиты KLine canvas-resize1bce24a, navigation32f8181, цветные отметки2254434, Drive
+core/atomic/UI ca96b51+2620eb1+d63fb90, единый MTP151 SMA4–640f80ade1, Drive allowlist5f513fd,
+лупа7e4e2f7, Welcome/Storage31dd039, центрирование правых иконокea3e8c4. Левая панель: overflow-x
+hidden, button maxwidth100%, вертикальная прокрутка без native полосы. Branch checks прошли, общий
+check/spec и freshvisual интеграции ЕЩЁ НУЖНЫ; package пока0.3.10.
+
+KLine причина0..10 доказана: Canvas терял pixel-resize callback при pendingRAF. Native range/ticks
+были правильными, bitmap420/371 vs CSS516/275. Public setStyles recovery сохраняет manualY/camera;
+три actualinstalledCanvas теста. QAprofile восстановлен: layout/drawings/images/watchlist+34views
+равны,3 QAключа оставлены, browser closed. Source больше не frozen. Отчёт
+kline-scale-qa/report.json.
+
+Активные агенты: quotes_daily_change_audit (fix/daily-change), chart_navigation_controls
+(feat/history-depth-camera), google_drive_ui (feat/drive-camera-intent). Все isolatedworktrees в
+vps/artifacts, canonical пишет только root. Котировки: GetClosePrices.price за СЕГОДНЯ основную
+сессию, TV дневная база вчера; VTBR55 против ошибочных57.30. Все14 UID проверены. Фьючерс NG уTV
+settlement3.331, банк previousDAY3.322: честная подпись, не подгонять источник. Нужен bounded
+negativecache retry, агент знает. ГлубинаrangeDays должна переносить текущую камеру в новый
+существующий viewkey без потери backup. Drive camera race: nativepan не входит в portable state
+revision; агент добавляет user-intent доRAF + guarded settled autosave без quote/restoreecho. Yscale
+не входит в Backup1, полную Ysync не обещать.
+
+Далее завершить этиfix, bump0.3.11/check/spec, freshisolatedQA обоих движков, всех14процентов,
+depth5↔365, Welcome/Storage, flags/nav, MTP151, лупы/центрирования/toolbaroverflow. Только затем
+secret audit, первый publicpush, exactgreenCI и boundedVDSrelease. Repo public ещёEMPTY, VPS TLS
+foundation готов, timer disabled, сайт404. GoogleProduction разрешён ПОСЛЕ homepage/privacy.
+Custom4/6/7/8/9m+45m/3h, Bybit/OKX и nativecharttypes пока остаются. PineTS лишь изучен, не
+добавлен. Android/iOS PWA также IndexedDB. Слеш открывает глобальный instrumentsearch, не префикс
+фильтра.
+
+Дальнейшие абзацы ниже исторические; «причина неизвестна» и «ещё не влито» уже устарели.
+
 **САМЫЙ НОВЫЙ ЭТАП: main1953608,0.3.10/5219f27b5345f071, check222/222+spec11/11.** bc31abd снял
 только2 camera-only guards из onIndicatorLayout.valid; при loading/empty UIPane теперь пишется. .10
 fresh native browser PRIMARY PASS: READY GAZP VOL95→235/.2971, pending real request NVTK
