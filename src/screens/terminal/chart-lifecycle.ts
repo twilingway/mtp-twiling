@@ -230,8 +230,12 @@ export function useChartCanvas(
     const adapter = adapterRef.current;
     if (!adapter || adapter.retired || state.importingBackup || state.importRecoveryRequired)
       return;
-    adapter.updateTechnicalIndicators?.(technicalInputs(p), p.technicalPaneLayout ?? []);
-  }, [p, state.importingBackup, state.importRecoveryRequired]);
+    try {
+      adapter.updateTechnicalIndicators?.(technicalInputs(p), p.technicalPaneLayout ?? []);
+    } catch (error: unknown) {
+      controller.notify(error instanceof Error ? error.message : "Не удалось обновить индикатор.");
+    }
+  }, [controller, p, state.importingBackup, state.importRecoveryRequired]);
   useEffect(() => {
     adapterRef.current?.redrawDrawings();
   }, [

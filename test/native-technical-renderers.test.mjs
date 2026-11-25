@@ -70,15 +70,34 @@ function assertValues(f, instances, data = bars, layout = []) {
     }
   }
 }
+test("LW pane metrics tolerate the model existing before its widget is created", () => {
+  const f = nativeFixture("lightweight");
+  const { createTechnicalIndicatorInstance: create } = api(f);
+  const originalSize = f.native.paneSize;
+  let widgetReady = false;
+  f.native.paneSize = (index) => {
+    if (index > 0 && !widgetReady) throw new Error("Value is undefined");
+    return originalSize(index);
+  };
+  f.adapter.setData(bars);
+  const instance = create("rsi", "new-pane");
+  assert.doesNotThrow(() => f.adapter.updateTechnicalIndicators([instance], []));
+  assert.equal(f.adapter.technicalPaneMetrics().at(-1).key, "pane:new-pane");
+  widgetReady = true;
+  f.ready();
+  assertValues(f, [instance]);
+  f.adapter.destroy();
+});
+
 for (const engine of ["lightweight", "kline"]) {
-  test(`${engine}: actual adapter renders all 13 common formulas, warmup and real timestamps`, () => {
+  test(`${engine}: actual adapter renders all 21 common formulas, warmup and real timestamps`, () => {
     const f = nativeFixture(engine),
       { createTechnicalIndicatorInstance: create, technicalIndicatorDefinitions: definitions } =
         api(f);
     const instances = definitions.map((definition, i) =>
       create(definition.id, `instance-${i}`, { order: i })
     );
-    assert.equal(instances.length, 13);
+    assert.equal(instances.length, 21);
     f.adapter.setData(bars);
     const writes = f.primaryWrites(),
       camera = f.camera();
@@ -89,9 +108,28 @@ for (const engine of ["lightweight", "kline"]) {
     assert.equal(f.primaryWrites(), writes);
     assert.deepEqual(f.camera(), camera);
     assert.equal(f.changes.length, 0);
+    const lowerIds = new Set([
+      "momentum",
+      "roc",
+      "cci",
+      "williams-r",
+      "mfi",
+      "obv",
+      "adl",
+      "pvt",
+      "rsi",
+      "macd",
+      "atr",
+      "stochastic"
+    ]);
     assert.deepEqual(
       f.adapter.technicalPaneMetrics().map((item) => item.key),
-      ["price", "pane:instance-8", "pane:instance-9", "pane:instance-11", "pane:instance-12"]
+      [
+        "price",
+        ...instances
+          .filter((item) => lowerIds.has(item.definitionId))
+          .map((item) => `pane:${item.id}`)
+      ]
     );
     if (engine === "lightweight") {
       assert.ok(

@@ -65,7 +65,9 @@ export function lightweightTechnical(
         y = top;
       top += height + (index < all.length - 1 ? 1 : 0);
       const key = index === 0 ? "price" : reverse.get(pane);
-      return key ? [{ key, top: y, height, width: chart.paneSize(index).width }] : [];
+      // New model panes get their widgets on LW's next animation frame.
+      // Their shared time-scale width is already available; paneSize can throw here.
+      return key ? [{ key, top: y, height, width }] : [];
     });
   };
   const changed = () => {
