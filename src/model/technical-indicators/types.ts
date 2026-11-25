@@ -1,3 +1,5 @@
+import type { CumulativeHistoryRequirement } from "./momentum-volume/metadata.js";
+
 export type NumericValue = number | null;
 export type NumericSeries = readonly NumericValue[];
 export type TechnicalIndicatorId =
@@ -13,7 +15,15 @@ export type TechnicalIndicatorId =
   | "dema"
   | "tema"
   | "hma"
-  | "smma";
+  | "smma"
+  | "momentum"
+  | "roc"
+  | "cci"
+  | "williams-r"
+  | "mfi"
+  | "obv"
+  | "adl"
+  | "pvt";
 export type PriceSource = "open" | "high" | "low" | "close" | "hl2" | "hlc3" | "ohlc4" | "volume";
 export interface TechnicalBar {
   readonly timestamp: number;
@@ -24,6 +34,14 @@ export interface TechnicalBar {
   readonly volume: NumericValue;
 }
 export interface TechnicalParameters {
+  momentum: { length: number; source: PriceSource };
+  roc: { length: number; source: PriceSource };
+  cci: { length: number; source: PriceSource };
+  "williams-r": { length: number; source: PriceSource };
+  mfi: { length: number };
+  obv: Record<string, never>;
+  adl: Record<string, never>;
+  pvt: Record<string, never>;
   wma: { length: number; source: PriceSource };
   vwma: { length: number; source: PriceSource };
   dema: { length: number; source: PriceSource };
@@ -115,4 +133,6 @@ export type TechnicalHistoryRequirement =
         | "first-value-ema-chain"
         | "true-range-wilder";
       convergence: "full-input-dependent";
-    };
+    }
+  /** Reviewed accumulation policy; never substitute an EMA/recursive seed. */
+  | CumulativeHistoryRequirement;

@@ -4,6 +4,7 @@ import type {
   UnsupportedIndicatorDefinition
 } from "./types.js";
 import { movingAveragePresets } from "./averages/metadata.js";
+import { momentumVolumePresets } from "./momentum-volume/metadata.js";
 
 const reference = (name: string) =>
   `https://www.tradingview.com/pine-script-reference/v6/#fun_ta.${name}`;
@@ -52,6 +53,39 @@ const definition = (
 
 /** Data only: renderer/catalog consumers never deserialize executable calculations. */
 export const technicalIndicatorDefinitions: readonly TechnicalIndicatorDefinition[] = freezeData([
+  ...momentumVolumePresets.map((preset) =>
+    definition(
+      preset.id,
+      preset.title,
+      preset.shortTitle,
+      preset.defaultPane,
+      [
+        ...(preset.defaultLength === null
+          ? []
+          : [
+              {
+                ...length("length", preset.defaultLength),
+                min: preset.minLength!,
+                max: preset.maxLength!
+              }
+            ]),
+        ...(["momentum", "roc", "cci", "williams-r"].includes(preset.id)
+          ? [{ ...source, defaultValue: preset.defaultSource! }]
+          : [])
+      ],
+      [line("value", preset.shortTitle, "#7e57c2")],
+      [preset.reference],
+      preset.id === "cci"
+        ? [-100, 0, 100]
+        : preset.id === "williams-r"
+          ? [-80, -50, -20]
+          : preset.id === "mfi"
+            ? [20, 50, 80]
+            : preset.id === "momentum" || preset.id === "roc"
+              ? [0]
+              : []
+    )
+  ),
   ...movingAveragePresets.map((preset) =>
     definition(
       preset.id,

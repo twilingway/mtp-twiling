@@ -72,12 +72,12 @@ function controller(instances = []) {
 }
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
-test("all 127 public names are searchable in Russian and English with honest 13-plus-volume availability", () => {
+test("all 127 public names are searchable in Russian and English with honest 21-plus-volume availability", () => {
   for (const locale of ["ru", "en"]) {
     const entries = catalog.technicalCatalogEntries(locale);
     assert.equal(entries.length, 127);
     assert.equal(new Set(entries.map((entry) => entry.id)).size, 127);
-    assert.equal(entries.filter((entry) => entry.available).length, 14);
+    assert.equal(entries.filter((entry) => entry.available).length, 22);
     assert.ok(
       filterIndicatorLibrary(entries, "technicals", "RSI").some((entry) => entry.id === "STD;RSI")
     );

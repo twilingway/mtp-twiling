@@ -15,7 +15,15 @@ const implemented: Readonly<Record<string, TechnicalIndicatorId>> = {
   "STD;DEMA": "dema",
   "STD;TEMA": "tema",
   "STD;Hull%1MA": "hma",
-  "STD;Smoothed%1Moving%1Average": "smma"
+  "STD;Smoothed%1Moving%1Average": "smma",
+  "STD;Momentum": "momentum",
+  "STD;ROC": "roc",
+  "STD;CCI": "cci",
+  "STD;Willams_R": "williams-r",
+  "STD;Money_Flow": "mfi",
+  "STD;On_Balance_Volume": "obv",
+  "STD;Accumulation_Distribution": "adl",
+  "STD;Price_Volume_Trend": "pvt"
 };
 
 export function technicalDefinitionForCatalog(id: string): TechnicalIndicatorId | undefined {
@@ -36,13 +44,17 @@ export function technicalCatalogEntries(
       category: "technicals",
       available: ready && !blockedReason,
       description:
-        locale === "ru"
-          ? overlay
-            ? "На графике цены"
-            : "Отдельная панель"
-          : overlay
-            ? "On the price chart"
-            : "Separate pane",
+        id === "STD;CCI"
+          ? locale === "ru"
+            ? "Основная линия CCI в отдельной панели; без дополнительной линии сглаживания"
+            : "Core CCI line in a separate pane; additional smoothing line is not included"
+          : locale === "ru"
+            ? overlay
+              ? "На графике цены"
+              : "Отдельная панель"
+            : overlay
+              ? "On the price chart"
+              : "Separate pane",
       ...(!ready || blockedReason
         ? {
             reason:

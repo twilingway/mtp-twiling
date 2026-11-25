@@ -122,7 +122,7 @@ test("Stochastic extrema count bar positions, ignoring missing extrema without s
 
 test("all definitions are immutable serializable data; independent instances and styles round-trip with exact output keys", () => {
   const json = JSON.stringify(core.technicalIndicatorDefinitions);
-  assert.equal(JSON.parse(json).length, 13);
+  assert.equal(JSON.parse(json).length, 21);
   assert.ok(core.technicalIndicatorDefinitions.every((definition) => definition.status === "computed" && definition.references.length));
   assert.throws(() => { core.technicalIndicatorDefinitions[0].parameters[0].defaultValue = 999; }, TypeError);
   const a = make("rsi", "first", { params: { length: 2 }, pane: { kind: "pane", id: "osc" }, order: 1,
