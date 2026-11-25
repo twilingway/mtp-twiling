@@ -3,6 +3,7 @@ import { object, normaliseRows, imageAsset } from "./types.js";
 import { validateBackup, isDrawing, isChartView } from "../model/backup-format.js";
 import { isBankIdentity, providerRefFromId } from "../model/market-provider.js";
 import { isInstrumentViewKey } from "../model/instrument-symbol.js";
+import { readRawPublicPortableRecords } from "./storage-guest-records.js";
 
 export const PUBLIC_OWNER = "public";
 export const physicalOwner = (owner: string): string => `profile-v2:${owner}`;
@@ -38,11 +39,10 @@ async function migrate(owner: string, valid: () => boolean, signal?: AbortSignal
     check(valid);
     return;
   }
-  const [preferences, drawings, images] = await Promise.all([
-    all("preferences"),
-    all("drawings"),
-    all("images")
-  ]);
+  const [preferences, drawings, images] =
+    owner === PUBLIC_OWNER
+      ? await readRawPublicPortableRecords()
+      : await Promise.all([all("preferences"), all("drawings"), all("images")]);
   check(valid);
   const writes: { store: string; value: Record<string, unknown> }[] = [];
   for (const item of preferences) {

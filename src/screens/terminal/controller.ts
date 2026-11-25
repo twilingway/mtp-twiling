@@ -97,6 +97,7 @@ export class TerminalController {
     });
     this.session = new TerminalSession({
       ...bridge,
+      subscribe: this.subscribe,
       resetHistory: () => this.history.reset(),
       loadHistory: (refresh?: boolean) => this.history.load(refresh),
       isClearingHistory: () => this.history.clearing,

@@ -4,6 +4,23 @@ import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
 const root = fileURLToPath(new URL("../../src/", import.meta.url));
+function compare(a, b) {
+  if (Array.isArray(a) && Array.isArray(b)) {
+    for (let i = 0; i < Math.min(a.length, b.length); i++) {
+      const c = compare(a[i], b[i]);
+      if (c) return c;
+    }
+    return a.length - b.length;
+  }
+  if (Array.isArray(a)) return 1;
+  if (Array.isArray(b)) return -1;
+  return a === b ? 0 : a < b ? -1 : 1;
+}
+function matches(key, range) {
+  if (!range) return true;
+  if (Object.hasOwn(range, "only")) return compare(key, range.only) === 0;
+  return compare(key, range.lower) >= 0 && compare(key, range.upper) <= 0;
+}
 class NativeBoundaryDatabase {
   stores = Object.fromEntries(
     ["preferences", "drawings", "images", "history", "coverage", "vault"].map((name) => [
@@ -55,15 +72,22 @@ class NativeBoundaryTransaction {
     if (!this.names.includes(name)) throw new Error("store outside transaction");
     return {
       get: (key) => this.request(name, "get", () => structuredClone(this.copy[name].get(key))),
-      getAll: () =>
-        this.request(name, "getAll", () => structuredClone([...this.copy[name].values()])),
+      getAll: (range) =>
+        this.request(name, "getAll", () =>
+          structuredClone(
+            [...this.copy[name]].filter(([key]) => matches(key, range)).map(([, value]) => value)
+          )
+        ),
       index: (index) => ({
         getAll: (key) =>
           this.request(name, "getAll", () =>
             structuredClone(
               [...this.copy[name].values()].filter(
                 (value) =>
-                  index === "ownerSymbol" && value.owner === key[0] && value.symbol === key[1]
+                  index === "ownerSymbol" &&
+                  (Array.isArray(key)
+                    ? value.owner === key[0] && value.symbol === key[1]
+                    : matches([value.owner, value.symbol], key))
               )
             )
           )
@@ -148,7 +172,7 @@ export async function createPortableFixture() {
       module,
       module.exports,
       indexedDB,
-      { only: (value) => value },
+      { only: (value) => value, bound: (lower, upper) => ({ lower, upper }) },
       { dispatchEvent() {} }
     );
   }

@@ -643,6 +643,7 @@ test("offline session restoration accepts an explicitly cached empty watchlist",
     {
       "services/storage.ts": {
         PUBLIC_OWNER: "public",
+        adoptLegacyGuestWorkspace: async () => "source-empty",
         prepareProfileV2: async () => {},
         copyPublicProfile: async () => ({ conflict: false, count: 0 }),
         loadWatchlist: async () => [],
