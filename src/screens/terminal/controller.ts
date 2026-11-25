@@ -3,13 +3,14 @@ import { setDisplayPreferences } from "../../i18n/preferences.js";
 import type { MarketClient } from "../../services/market-client.js";
 import type { BackupImportOptions } from "../../model/backup-import.js";
 import type { BackupExportOptions } from "../../model/backup-export.js";
-import { moveWatchlistRow, type WatchlistMove } from "../../services/watchlist-order.js";
+import type { WatchlistMove } from "../../services/watchlist-order.js";
 import { marketCalendar } from "../../services/market-calendar.js";
 import { toggleIndicatorFlags } from "../../model/indicator-flags.js";
 import { historyDepthTransition, saveControllerView } from "./controller-camera.js";
 import type { TradingCalendarDay } from "../../model/candle-clock.js";
 import { resolveWatchlist } from "../../model/market-model.js";
 import { pinSelectedInstrument, selectedMarketRow } from "../../model/selected-instrument.js";
+import { removeWatchlistInstrument, reorderCanonicalWatchlist } from "./controller-watchlist.js";
 import type {
   Backup,
   Candle,
@@ -96,6 +97,7 @@ export class TerminalController {
     });
     this.session = new TerminalSession({
       ...bridge,
+      subscribe: this.subscribe,
       resetHistory: () => this.history.reset(),
       loadHistory: (refresh?: boolean) => this.history.load(refresh),
       isClearingHistory: () => this.history.clearing,
@@ -407,46 +409,9 @@ export class TerminalController {
   };
   removeInstrument = async (
     reference: Pick<TerminalState["rows"][number], "uid" | "symbol">
-  ): Promise<void> => {
-    const client = this.client,
-      owner = this.state.owner;
-    if (!client || !importWritable(this.state)) return;
-    await this.flush();
-    if (!this.session.matches(client) || !importWritable(this.state, owner)) return;
-    const selected = selectedMarketRow(this.state.rows, this.state.preferences);
-    await client.removeInstrument(reference);
-    if (!this.session.matches(client) || !importWritable(this.state, owner)) return;
-    this.session.applyBankState(client.snapshot());
-    const removedSelected =
-      selected &&
-      !selectedMarketRow(this.state.rows, { symbol: selected.symbol, instrumentUid: selected.uid });
-    if (
-      removedSelected &&
-      this.state.preferences.symbol === selected.symbol &&
-      (this.state.preferences.instrumentUid === undefined ||
-        this.state.preferences.instrumentUid === selected.uid)
-    ) {
-      const next = this.state.rows.find((item) => item.uid) ?? this.state.rows[0];
-      await this.setPreferences(
-        { symbol: next?.symbol ?? "", instrumentUid: next?.uid ?? null },
-        true
-      );
-    }
-  };
-  reorderWatchlist = async (move: WatchlistMove, expectedOwner: string): Promise<boolean> => {
-    const client = this.client;
-    if (!client || !importWritable(this.state, expectedOwner) || !this.session.matches(client))
-      return false;
-    if (!moveWatchlistRow(this.state.rows, move)) return false;
-    const preferences = pinSelectedInstrument(this.state.rows, this.state.preferences);
-    if (preferences !== this.state.preferences) this.update({ preferences });
-    await this.savePreferences();
-    if (!this.session.matches(client) || !importWritable(this.state, expectedOwner)) return false;
-    const changed = await client.reorderWatchlist(move);
-    if (!this.session.matches(client) || !importWritable(this.state, expectedOwner)) return false;
-    if (changed) this.session.applyBankState(client.snapshot());
-    return changed;
-  };
+  ): Promise<void> => removeWatchlistInstrument(this, this.session, reference);
+  reorderWatchlist = async (move: WatchlistMove, expectedOwner: string): Promise<boolean> =>
+    reorderCanonicalWatchlist(this, this.session, move, expectedOwner);
   getStorageStats = async () => ({
     candles: await storage.historyStats(this.state.owner),
     browser: await storage.usage()

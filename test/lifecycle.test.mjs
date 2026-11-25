@@ -315,6 +315,7 @@ function terminalFixture({ restore = async () => null, candles, importBackup, on
     savedSessions = [];
   const storage = {
     PUBLIC_OWNER: "public",
+        adoptLegacyGuestWorkspace: async () => "source-empty",
     prepareProfileV2: async () => {},
     copyPublicProfile: async () => ({ conflict: false, count: 0 }),
     loadWatchlist: async () => undefined,

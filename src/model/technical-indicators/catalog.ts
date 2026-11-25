@@ -23,7 +23,15 @@ const implemented: Readonly<Record<string, TechnicalIndicatorId>> = {
   "STD;Money_Flow": "mfi",
   "STD;On_Balance_Volume": "obv",
   "STD;Accumulation_Distribution": "adl",
-  "STD;Price_Volume_Trend": "pvt"
+  "STD;Price_Volume_Trend": "pvt",
+  "STD;Bollinger_Bands_B": "bollinger-percent-b",
+  "STD;Bollinger_Bands_Width": "bollinger-bandwidth",
+  "STD;Historical_Volatility": "historical-volatility",
+  "STD;Awesome_Oscillator": "awesome-oscillator",
+  "STD;Balance%1of%1Power": "balance-of-power",
+  "STD;Chande_Momentum_Oscillator": "cmo",
+  "STD;Ultimate_Oscillator": "ultimate-oscillator",
+  "STD;TRIX": "trix"
 };
 
 export function technicalDefinitionForCatalog(id: string): TechnicalIndicatorId | undefined {

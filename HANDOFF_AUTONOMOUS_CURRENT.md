@@ -7,6 +7,61 @@ login отложить. Ответы коротко по-русски. Реал�
 
 ## Опубликовано
 
+### Новейший статус — важнее исторических строк ниже
+
+- PR5 merged, main `3a31c02aa86bd4fe3494b6fefe50fa35aeb81c71`: публичная и локальная0.3.18, build
+  `62b7c12c8b73f573`. Main push CI45715266056/run14 PASS;622 tests/spec35.
+- Настоящий автоматический timer deploy: UTC22:46:30,12.811s wall,192.4MiB peak, лимиты192/240/Swap0
+  сохранены, соседние hashes/PIDs/health прежние. Root руками deploy/service start не запускал.
+- Все66 публичных файлов подтверждены. Прямая canonical-сборка с обычным node_modules побайтно
+  совпала с native deployment по всем66 именам и содержимому:
+  `vps/artifacts/deploy-release-readiness/auto-release-0318-canonical-parity.json`. Имена двух
+  chunks отличались только у изолированной сборки через dependency junction; payload совпадал.
+- Bybit CSP include обновлён отдельно; backup
+  `/root/mtp-nginx-include-backup-20261125T223553Z-6d33e1d0e979`. Timer остаётся включён.
+- Local canonical чисто FF до main3a31 и собран. Старый собственный PID11464 был проверен и
+  остановлен через session39079 ради нового server CSP. Новый server5210 — managed session1404;
+  версия и реальные Bybit REST/WS origins в headers проверены. Другие процессы не трогать.
+- Независимый public .17→.18 PWA report `vps/artifacts/public-0318-pwa-qa/report.json`: scopedPASS,
+  26 captures/22 viewed, оба engines/реальный Bybit/RSI/Line/375/documents online-offline. Google
+  OAuth и реальный bank key не использовались. Старый guest layout byte-exact сохранён, но новый
+  public owner его не показывает — recovery исправляется в следующем пакете.
+- Nginx charset уже исправлен одной строкой `charset utf-8;`, с отдельными preflight/backup/reload:
+  include SHA256 `5adf21f222f2e50407a4cf0252b50e101e9374e4bf703e599bd68e9ffb234436`. Тела всех66
+  файлов, CSP, controller, лимиты и соседи сохранены. Пять txt теперь UTF-8 online; старые cached
+  headers .18 не переписывались. Evidence `nginx-charset-root-apply.log`.
+- Кандидат0.3.19: ветка `feat/release-0319`, source cut `3757264`, build `9d68e99e91dea44d`,697
+  tests/spec39; PR6 draft, exact CI45723932977/run17 PASS.29 computed TA + разделы + Guest recovery.
+  Giant SVG и перекрытие overlay settings исправлены и отдельно визуально проверены:
+  `release-0319-ui-fixes-qa/report.json`. .19 не публиковалась.
+- Guest recovery source `549f17b` интегрирован как `53fc5b7`: exact raw guest→public только в пустой
+  target атомарно, source сохраняется; при occupied только явный offline export/import. Vault,
+  session и bank owners исключены. Final browser A raw17 PASS; B occupied18 + offline export/import
+  и восстановление текущего backup PASS. C genuine empty18 первоначальный BLOCKER исправлен строгим
+  classifier be6dfc2→3757264. Новый C из original .18 baseline через обычную кнопку Обновить PASS:
+  KLine/180/en/light/gridfalse/font13, raw guest/Drive/device byte-exact, reload без дублей.
+  Исходные C и failing C-run сохранены; их decision не удалялся. Независимое source review be6dfc2
+  PASS. Полный secret audit116commits/1559blobs без findings.
+- Native IndexedDB D перенос и fault/race PASS на неизменённой6edd части: source/PNG/history SHA,
+  no-history payload reads0, explicit history exact1152bytes, асинхронный native DOMException quota
+  rollback без partial copies/decision и с рабочим пустым bootstrap/recovery download. Late DB и
+  Blob await+UI import не дают старых download/alerts. Foreign/vault reads0. Итоговый scoped PASS:
+  `guest-recovery-final-qa/report.json`, manifest,18 captures/18 viewed. C-fixed smoke обоих engines
+  и late warning после prepared client PASS. Own5224/9324 и Chrome закрыты, baseline/repro
+  сохранены. Google не авторизовать. Это ещё не public .19 PWA gate.
+- Следующая ветка .20 `vps/artifacts/release-0320-worktree`, head `ef2b633`:35 вычислений, точные
+  Drive keys diLength/adxSmoothing и native/portable fixtures; Guest375 объединён.
+  Полныйcheck726/726, build e2883e84c9dbc548; предыдущий cut strict spec42 PASS. Независимый source
+  review35 PASS, focused51/51; новый fresh visual worker проверяет свой5225/DevTools isolated page2.
+  Исследование derived intervals `d13250e` интегрировано только как docs/spec proposal; интервалы
+  production не менялись. Volume math58da04e source7 готов, независимое review выявило all-SMA PVO
+  seed metadata blocker; исправлен автором в b259447, source16/16 и spec41 PASS. Автор регистрирует7
+  в отдельном ta-volume-registration от220b227; контракты choice/history/positive-volume gate
+  согласованы, native/root integration pending. Все127 алгоритмов по-прежнему не реализованы.
+  Реальный Google sync/login/два устройства pending.
+
+Ниже сохранён исторический ход0.3.17→0.3.18; его pending пункты не отменяют эту сводку.
+
 - Public repo: https://github.com/twilingway/mtp-twiling, Issues включены.
 - PR3 и PR4 merged. Main `b721744af1b58b9d06b0dfefc420461feaf5bb30`.
 - Локальный canonical и публичный https://mtp.twiling.ru — версия 0.3.17, build `1b49aca5787d1ec4`.
@@ -40,10 +95,10 @@ Worktree `vps/artifacts/technical-indicator-integration-worktree`, ветка
   Общая кандидатная сборка: check620/620, strict spec PASS, build `866106385a4c0bf7`. Повторная
   browser QA обоих движков ещё обязательна; старый frozen98ee212 остаётся FAIL.
 - Candidate `5ea3f3b` / build866106385a4c0bf7 — FAIL на прежнем QA-профиле: KLine price/volume
-  застывают, RSI живой. Установлена точная причина: native fractional heights598.5672/33.4328
-  против integer clientHeight599/33; Canvas.update пропускает redraw, ожидая отсутствующий RO.
-  Исправление целочисленных native bounds сохраняет общий размер и ratios. Check622/622,
-  strict spec35/35, build `65fd586523b0a42e`; новый browser gate ещё требуется.
+  застывают, RSI живой. Установлена точная причина: native fractional heights598.5672/33.4328 против
+  integer clientHeight599/33; Canvas.update пропускает redraw, ожидая отсутствующий RO. Исправление
+  целочисленных native bounds сохраняет общий размер и ratios. Check622/622, strict spec35/35, build
+  `65fd586523b0a42e`; новый browser gate ещё требуется.
 
 Сохраняются независимые TA instances, параметры, стили, overlay/lower pane, группировка, порядок,
 высоты/collapse. Есть каталог127 +4MTP, поиск RU/EN; доступно21 вычисление +volume, остальные строки
@@ -70,9 +125,9 @@ TA + provider JSON/Drive preparation/storage migration проверены сов
 ## Следующие обязательные шаги
 
 1. Public0.3.17 standard PWA gate и timer-finalize завершены. Backup
-   `/root/mtp-watcher-backup-20261125T220317Z-b721744af1b5`; лимиты сохранены, pin убран,
-   provenance содержит настоящий browser proof. Timer enabled/active. Старые first-release apply
-   scripts не запускать.
+   `/root/mtp-watcher-backup-20261125T220317Z-b721744af1b5`; лимиты сохранены, pin убран, provenance
+   содержит настоящий browser proof. Timer enabled/active. Старые first-release apply scripts не
+   запускать.
 2. Включить подтверждённый KLine fix, полный check/spec и новую QA0.3.18 с21 TA/Bybit/рисунками,
    reload, viewport, сохранением камеры, extreme pane overflow и отсутствием click-through.
 3. До публикации0.3.18 отдельно reviewed обновить только свой nginx CSP include: добавить
@@ -80,8 +135,8 @@ TA + provider JSON/Drive preparation/storage migration проверены сов
    Обязательно nginx-t/reload/публичные headers/соседи. Не забыть этот gate после local browser
    PASS.
 4. PR5 draft уже открыт (head до fractional fix5ea3f3b, CI45710199951 success). Secret audit всей
-   release history; версия0.3.18 уже в package. Затем PR/CI/main и отдельное
-   доказательство публичного SHA/build/health/visible behavior. Не смешивать код/merge/deploy/QA.
+   release history; версия0.3.18 уже в package. Затем PR/CI/main и отдельное доказательство
+   публичного SHA/build/health/visible behavior. Не смешивать код/merge/deploy/QA.
 5. Реальный Google Drive login/sync/reload/2device, homepage/privacy/terms и Google Production после
    доступного авторизованного входа. Клиентская архитектура без нашего auth backend сохраняется.
 6. Продолжить оставшиеся127 TA, настройки/отображение, полноценные watchlist sections с переносом

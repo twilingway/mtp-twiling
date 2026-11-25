@@ -41,7 +41,12 @@ test("TA settings migrate once and survive mixed-provider schema2 JSON/Drive wit
         params: { length: 21 },
         pane: { kind: "pane", id: "strength" },
         order: 2
-      })
+      }),
+      make("bollinger-bandwidth", "bandwidth", {
+        params: { expansionLength: 57, contractionLength: 83 }
+      }),
+      make("ultimate-oscillator", "ultimate", { params: { middleLength: 17 } }),
+      make("historical-volatility", "volatility", { params: { length: 13 } })
     ],
     technicalPaneLayout: [{ paneId: "strength", heightRatio: 0.31, collapsed: true }],
     indicatorPaneLayout: { volume: { heightRatio: 0.25 } },

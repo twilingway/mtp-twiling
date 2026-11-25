@@ -5,7 +5,8 @@ import { Modal } from "./Modal.js";
 import { ApplicationInfo } from "./ApplicationInfo.js";
 import { GoogleDriveSettings } from "./GoogleDriveSettings.js";
 import { StoragePanel } from "./StoragePanel.js";
-function TransferSettings() {
+import { LegacyGuestRecovery } from "./LegacyGuestRecovery.js";
+function TransferSettings({ active }: { active: boolean }) {
   const { controller, state } = useTerminal(),
     [history, setHistory] = useState(false),
     [busy, setBusy] = useState(false),
@@ -113,6 +114,7 @@ function TransferSettings() {
             .finally(() => setBusy(false));
         }}
       />
+      <LegacyGuestRecovery active={active} includeHistory={history} />
     </section>
   );
 }
@@ -288,7 +290,7 @@ export function AccountDialog() {
         id="account-section-transfer"
         hidden={section !== "transfer"}
       >
-        <TransferSettings />
+        <TransferSettings active={section === "transfer"} />
       </div>
       <div className="account-help-links">
         <button type="button" id="open-welcome" onClick={() => controller.setDialog("welcome")}>

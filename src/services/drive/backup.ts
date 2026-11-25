@@ -1,5 +1,6 @@
 import { fromBase64, isRecord, toBase64, validateBackup } from "../../model/backup-format.js";
 import { isWatchlistFlags } from "../../model/watchlist-flags.js";
+import { validWatchlistSectionsField } from "../../model/watchlist-sections.js";
 import type { Backup } from "../../model/types.js";
 import { DriveError } from "./types.js";
 import type { ContentReference, SnapshotManifest } from "./types.js";
@@ -48,7 +49,7 @@ const backupShape: Shape = {
       {
         ...scalars("schemaVersion id definitionId visible order"),
         params: scalars(
-          "length source fastLength slowLength signalLength multiplier smoothK smoothD"
+          "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength"
         ),
         pane: scalars("kind id"),
         styles: { $: scalars("color width visible opacity lineStyle") }
@@ -57,6 +58,10 @@ const backupShape: Shape = {
     technicalPaneLayout: [scalars("paneId heightRatio collapsed")],
     indicatorPaneLayout: { volume: scalars("heightRatio") },
     watchlistFlags: { $: true },
+    watchlistSections: {
+      version: true,
+      entries: [scalars("kind id title collapsed uid symbol occurrence")]
+    },
     chartSettings,
     indicators: scalars(indicators)
   },
@@ -128,6 +133,8 @@ function project(value: unknown, shape: Shape): unknown {
 
 /** Deep allowlist; never serializes local owner, history, tokens or market quote fields. */
 export function sanitizeDriveBackup(value: unknown): Backup {
+  if (isRecord(value) && isRecord(value.layout) && !validWatchlistSectionsField(value.layout))
+    throw new DriveError("remote-invalid", "Некорректные разделы списка инструментов.");
   const flagColors = ["red", "blue", "green", "yellow", "purple", "cyan", "pink"];
   if (isRecord(value) && isRecord(value.layout) && value.layout.watchlistFlags !== undefined) {
     const flags = value.layout.watchlistFlags;

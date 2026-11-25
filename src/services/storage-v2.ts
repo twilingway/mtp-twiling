@@ -30,6 +30,11 @@ export {
   saveCatalog
 } from "./storage.js";
 export { prepareProfileV2, copyPublicProfile, PUBLIC_OWNER } from "./storage-v2-migration.js";
+export {
+  adoptLegacyGuestWorkspace,
+  inspectLegacyGuestWorkspace,
+  createLegacyGuestBackup
+} from "./storage-guest-recovery.js";
 export type { HistoryStats, HistoryGroup } from "./storage.js";
 const prepared = async (owner: string) => {
   await prepareProfileV2(owner);

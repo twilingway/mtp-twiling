@@ -14,6 +14,7 @@ import type {
 } from "../model/technical-indicator-layout.js";
 import type { ChartOptions, TechnicalPaneMetric } from "./adapter.js";
 import { TechnicalRenderData } from "./technical-render-data.js";
+import { technicalCalculationContext } from "./technical-calculation-context.js";
 import type { TechnicalRenderOutput } from "./technical-render-data.js";
 import { capturedTechnicalLayout } from "./technical-pane-geometry.js";
 import { klinePaneGeometry } from "./kline-pane-geometry.js";
@@ -97,7 +98,7 @@ export function klineTechnical(
   refreshCanvases: () => void = () => {},
   onSettled: () => void = () => {}
 ) {
-  const calculation = new TechnicalRenderData();
+  const calculation = new TechnicalRenderData(technicalCalculationContext(options.timeframe));
   const entries = new Map<string, Entry>(),
     slots = new Map<string, number>();
   let groups: TechnicalIndicatorGroup[] = [],

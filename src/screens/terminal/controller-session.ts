@@ -5,11 +5,15 @@ import type { MarketSnapshot } from "../../services/market-client.js";
 import { TIMEFRAMES, updateCandleList } from "../../model/history-codec.js";
 import { migrateCandlePalette } from "../../model/candle-palette.js";
 import { pinSelectedInstrument, selectedMarketRow } from "../../model/selected-instrument.js";
+import { orderedWatchlistRows } from "../../model/watchlist-sections.js";
 import type { Candle } from "../../model/types.js";
 import { DEFAULT_CHART_SETTINGS, DEFAULT_INDICATORS } from "./state.js";
 import type { TerminalPreferences } from "./state.js";
 import { defaultPreferences, errorText } from "./controller-bridge.js";
 import type { SessionBridge } from "./controller-bridge.js";
+import { publicGuestRecoveryCache } from "../../services/storage-guest-cache.js";
+import { guestRecoveryText } from "../../i18n/messages-guest-recovery.js";
+import { guestActivationFence } from "./controller-guest-activation.js";
 const cancelled = () => new DOMException("Отключено", "AbortError");
 
 export class TerminalSession {
@@ -198,8 +202,19 @@ export class TerminalSession {
       previous = this.client,
       sourceOwner = storage.PUBLIC_OWNER,
       previousPaused = previous?.cachePaused ?? false;
-    const candidate = new MarketClient(token, name, storage, owner ? { owner } : {});
-    const attempt = () => this.current(lifecycle, activation);
+    let guestRecoveryFailed = false,
+      guestRecoveryQuota = false;
+    const cache =
+      token === null ? publicGuestRecoveryCache(storage, () => guestRecoveryQuota) : storage;
+    const candidate = new MarketClient(token, name, cache, owner ? { owner } : {});
+    const recoveryFence = guestActivationFence(
+      this.bridge,
+      () => candidate.owner,
+      () => this.current(lifecycle, activation),
+      transition,
+      token === null
+    );
+    const attempt = recoveryFence.valid;
     this.bridge.update({ profileTransition: true });
     try {
       await previous?.settleMutations?.();
@@ -209,6 +224,12 @@ export class TerminalSession {
       const target = await candidate.prepareOwner();
       if (!attempt()) throw cancelled();
       await storage.prepareProfileV2(target, attempt, transition.signal);
+      if (token === null && target === storage.PUBLIC_OWNER && recoveryFence.canAdopt) {
+        const recovery = await storage.adoptLegacyGuestWorkspace(attempt, transition.signal);
+        guestRecoveryQuota = recovery === "quota-failed";
+        guestRecoveryFailed =
+          guestRecoveryQuota || recovery === "failed" || recovery === "source-invalid";
+      }
       const transfer = await storage.copyPublicProfile(
         sourceOwner,
         target,
@@ -221,12 +242,13 @@ export class TerminalSession {
       if (!attempt()) throw cancelled();
       await previous?.close();
       if (!attempt()) throw cancelled();
+      recoveryFence.beforeProfileCommit();
       this.bridge.resetHistory();
       this.cancelLiveFrame();
       this.client = candidate;
       this.reconnectClient = null;
       this.attach(candidate, lifecycle);
-      const valid = () => this.current(lifecycle, activation, candidate);
+      const valid = () => attempt() && this.current(lifecycle, activation, candidate);
       await this.prepareProfile(target, name, false, valid);
       if (!valid()) throw cancelled();
       this.bridge.update({
@@ -237,7 +259,7 @@ export class TerminalSession {
       this.applyBankState(candidate.snapshot());
       const state = this.bridge.getState();
       if (!selectedMarketRow(state.rows, state.preferences)) {
-        const first = state.rows[0];
+        const first = orderedWatchlistRows(state.rows, state.preferences.watchlistSections)[0];
         this.bridge.update({
           preferences: {
             ...state.preferences,
@@ -247,13 +269,31 @@ export class TerminalSession {
           }
         });
       }
+      recoveryFence.afterProfileCommit();
       await this.bridge.loadHistory();
       if (!valid()) throw cancelled();
+      if (
+        guestRecoveryFailed &&
+        recoveryFence.warningAllowed() &&
+        target === storage.PUBLIC_OWNER &&
+        !this.bridge.getState().importingBackup
+      )
+        this.bridge.notify(guestRecoveryText("autoFailed"));
       return candidate;
     } catch (error) {
-      if (candidate !== this.client) await candidate.close();
+      if (candidate !== this.client) {
+        if (
+          token === null &&
+          (transition.signal.aborted ||
+            ((error instanceof DOMException || error instanceof Error) &&
+              error.name === "AbortError"))
+        )
+          candidate.cachePaused = true;
+        await candidate.close();
+      }
       throw error;
     } finally {
+      recoveryFence.dispose();
       if (previous && !previous.closed) previous.cachePaused = previousPaused;
       if (attempt()) this.bridge.update({ profileTransition: false });
     }

@@ -404,7 +404,7 @@ test("actual search component exposes currency category and distinguishes MOEX a
     react: { useState: (value) => [value, () => {}], useEffect: () => {} },
     "react/jsx-runtime": { jsx, jsxs: jsx },
     "screens/terminal/context.tsx": {
-      useTerminal: () => ({ state: { owner: "one", rows }, controller: {} })
+      useTerminal: () => ({ state: { owner: "one", rows, preferences: {} }, controller: {} })
     },
     "screens/terminal/Modal.tsx": { Modal: "modal" },
     "i18n/messages.ts": { t: (value) => value, systemText: (value) => value },

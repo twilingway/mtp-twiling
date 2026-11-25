@@ -122,7 +122,7 @@ test("Stochastic extrema count bar positions, ignoring missing extrema without s
 
 test("all definitions are immutable serializable data; independent instances and styles round-trip with exact output keys", () => {
   const json = JSON.stringify(core.technicalIndicatorDefinitions);
-  assert.equal(JSON.parse(json).length, 21);
+  assert.equal(JSON.parse(json).length, 29);
   assert.ok(core.technicalIndicatorDefinitions.every((definition) => definition.status === "computed" && definition.references.length));
   assert.throws(() => { core.technicalIndicatorDefinitions[0].parameters[0].defaultValue = 999; }, TypeError);
   const a = make("rsi", "first", { params: { length: 2 }, pane: { kind: "pane", id: "osc" }, order: 1,
@@ -134,7 +134,7 @@ test("all definitions are immutable serializable data; independent instances and
   assert.notDeepEqual(core.calculateTechnicalIndicator(a, input).series.value, core.calculateTechnicalIndicator(b, input).series.value);
   assert.equal(core.calculateTechnicalIndicator(b, input).instanceId, "second");
   for (const definition of core.technicalIndicatorDefinitions) {
-    const result = core.calculateTechnicalIndicator(make(definition.id, definition.id), input);
+    const result = core.calculateTechnicalIndicator(make(definition.id, definition.id), input, { historicalVolatilityPeriodsPerYear: 365 });
     assert.deepEqual(Object.keys(result.series), definition.outputs.map((output) => output.id));
     assert.deepEqual(result.timestamps, input.map((bar) => bar.timestamp));
     assert.ok(Object.values(result.series).every((values) => values.length === input.length && values.every((v) => v === null || Number.isFinite(v))));
@@ -195,7 +195,7 @@ test("frozen full input is not mutated; replacing latest or historical bars reco
 
 test("empty/short histories are aligned and invalid bars/series fail before producing NaN or synthetic data", () => {
   for (const definition of core.technicalIndicatorDefinitions) {
-    const result = core.calculateTechnicalIndicator(make(definition.id, definition.id), []);
+    const result = core.calculateTechnicalIndicator(make(definition.id, definition.id), [], { historicalVolatilityPeriodsPerYear: 365 });
     assert.deepEqual(result.timestamps, []);
     assert.ok(Object.values(result.series).every((value) => value.length === 0));
   }

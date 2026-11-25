@@ -1,0 +1,131 @@
+.watchlist-scroll {
+  overflow-x: hidden;
+}
+.watchlist-section-row td {
+  padding: 0 4px !important;
+  height: 31px;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--line);
+  max-width: 0;
+}
+.watchlist-section-content {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  width: 100%;
+  gap: 4px;
+}
+.watchlist-section-content button {
+  height: 28px;
+  min-width: 26px;
+  padding: 3px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.watchlist-section-content button:hover,
+.watchlist-section-row:focus-within td {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.watchlist-section-content button:focus-visible,
+.watchlist-section-row:focus-visible td {
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
+}
+.watchlist-section-content svg {
+  display: block;
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+.watchlist-section-handle {
+  cursor: grab;
+  color: var(--muted);
+  width: 16px;
+  flex-shrink: 0;
+}
+.watchlist-section-content .watchlist-section-name {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+.watchlist-section-count {
+  font-size: 10px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.watchlist-section-row.dragging {
+  opacity: 0.45;
+}
+.watchlist-section-row.drop-before td {
+  box-shadow: inset 0 2px var(--accent);
+}
+.watchlist-section-row.drop-after td {
+  box-shadow: inset 0 -2px var(--accent);
+}
+.watchlist-section-edit {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.watchlist-section-edit input {
+  min-width: 0;
+  width: 100%;
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  font: inherit;
+}
+.watchlist-section-destination {
+  display: grid;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.watchlist-section-destination select {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 6px;
+  font: inherit;
+}
+.watchlist-section-menu,
+.watchlist-context-menu {
+  max-height: calc(100dvh - 12px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+.watchlist-section-menu > button > svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+}
+@media (max-width: 800px) {
+  .watchlist-section-row td {
+    height: 38px;
+  }
+  .watchlist-section-content button {
+    height: 34px;
+    min-width: 32px;
+  }
+}

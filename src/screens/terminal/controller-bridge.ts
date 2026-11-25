@@ -17,6 +17,7 @@ export interface HistoryBridge extends TerminalBridge {
   isAlive: () => boolean;
 }
 export interface SessionBridge extends TerminalBridge {
+  subscribe?: (listener: () => void) => () => void;
   resetHistory: () => void;
   loadHistory: (refresh?: boolean) => Promise<void>;
   isClearingHistory: () => boolean;

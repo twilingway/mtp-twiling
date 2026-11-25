@@ -2,6 +2,7 @@ import type { DrawingToolbarSettings } from "./drawing-toolbar.js";
 import type { IntervalId, NativeIntervalId } from "./intervals/registry.js";
 import type { DisplayPreferences } from "../i18n/preferences.js";
 import type { WatchlistFlags, WatchlistFlagFilter } from "./watchlist-flags.js";
+import type { WatchlistSections } from "./watchlist-sections.js";
 import type { TechnicalIndicatorInstance } from "./technical-indicators/types.js";
 import type { TechnicalPaneLayout } from "./technical-indicator-layout.js";
 import type { MarketProviderRef, ProviderAttributes } from "./market-provider.js";
@@ -231,6 +232,7 @@ export interface ProfilePreferences extends DisplayPreferences {
   technicalPaneLayout?: TechnicalPaneLayout;
   providerRef?: MarketProviderRef | undefined;
   watchlistFlags?: WatchlistFlags;
+  watchlistSections?: WatchlistSections;
   watchlistFlagFilter?: WatchlistFlagFilter;
   indicatorPaneLayout?: IndicatorPaneLayout;
   favoriteIntervals?: IntervalId[];
