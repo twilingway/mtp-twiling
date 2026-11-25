@@ -24,6 +24,27 @@ export async function saveChartView(owner: string, key: string, view: ChartView)
     ...(shared ? [put("preferences", { id, owner, value: shared })] : [])
   ]);
 }
+/** Keep the legacy depth key; a later import transaction wins in IDB transaction order. */
+export async function copyDepthChartView(
+  owner: string,
+  key: string,
+  view: ChartView,
+  valid: () => boolean
+): Promise<boolean> {
+  if (!parseChartViewKey(key) || owner === "guest" || !valid()) return false;
+  let written = false;
+  await transaction(["preferences"], (tx) => {
+    if (!valid()) return;
+    tx.objectStore("preferences").put({
+      id: `view:${owner}:${key}`,
+      owner,
+      viewKey: key,
+      value: view
+    });
+    written = true;
+  });
+  return written && valid();
+}
 export async function loadChartView(owner: string, key: string): Promise<ChartView | undefined> {
   const source = parseChartViewKey(key);
   if (!source) return undefined;

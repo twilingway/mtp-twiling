@@ -22,8 +22,23 @@ export function ChartRangeControl() {
         id="range"
         aria-label={t("Период истории")}
         value={days}
+        disabled={
+          state.loading ||
+          state.historyViewReady === false ||
+          state.backupBusy ||
+          state.importingBackup ||
+          state.importRecoveryRequired
+        }
         onChange={(event) => {
-          void controller.setPreferences({ rangeDays: Number(event.target.value) });
+          const owner = state.owner;
+          void controller
+            .setPreferences({ rangeDays: Number(event.target.value) })
+            .catch((error: unknown) => {
+              if (controller.getSnapshot().owner === owner)
+                controller.notify(
+                  error instanceof Error ? error.message : t("Не удалось восстановить график.")
+                );
+            });
         }}
       >
         {!RANGE_OPTIONS.some(([value]) => value === days) ? (

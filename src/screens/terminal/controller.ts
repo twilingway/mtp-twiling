@@ -4,8 +4,8 @@ import type { TBankClient } from "../../services/tbank-client.js";
 import type { BackupImportOptions } from "../../model/backup-import.js";
 import { moveWatchlistRow, type WatchlistMove } from "../../services/watchlist-order.js";
 import { loadCandleCalendar } from "../../services/tbank-calendar.js";
-import { saveChartView } from "../../services/chart-camera.js";
 import { toggleIndicatorFlags } from "../../model/indicator-flags.js";
+import { historyDepthTransition, saveControllerView } from "./controller-camera.js";
 import type { TradingCalendarDay } from "../../model/candle-clock.js";
 import { resolveWatchlist } from "../../model/market-model.js";
 import { pinSelectedInstrument, selectedMarketRow } from "../../model/selected-instrument.js";
@@ -158,34 +158,10 @@ export class TerminalController {
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => this.update({ toast: "" }), 5000);
   };
-  private get viewKey(): string {
-    const p = this.state.preferences;
-    return `${p.symbol}:${p.timeframe}:${p.engine}:${p.rangeDays}`;
-  }
   private async savePreferences(): Promise<void> {
     await storage.savePreferences(this.state.owner, this.state.preferences);
   }
-  saveView = async (): Promise<void> => {
-    if (
-      this.state.importRecoveryRequired ||
-      this.state.importingBackup ||
-      this.state.historyViewReady === false ||
-      this.chart?.retired ||
-      this.chart?.persistView === false
-    )
-      return;
-    const source = this.chart?.source;
-    if (
-      source &&
-      (source.owner !== this.state.owner ||
-        source.viewKey !== this.viewKey ||
-        source.uid !== selectedMarketRow(this.state.rows, this.state.preferences)?.uid)
-    )
-      return;
-    const view = this.chart?.getView();
-    if (view && this.state.owner !== "guest")
-      await saveChartView(this.state.owner, this.viewKey, view);
-  };
+  saveView = (): Promise<void> => saveControllerView(this);
   flush = async (): Promise<void> => {
     const client = this.client;
     await this.editing.flush();
@@ -253,54 +229,72 @@ export class TerminalController {
     const epoch = routing ? ++this.selectionEpoch : this.selectionEpoch;
     const owner = this.state.owner,
       client = this.client;
-    await this.saveView();
-    await this.editing.flush();
-    if (
-      !this.session.matches(client) ||
-      !importWritable(this.state, owner) ||
-      (routing && epoch !== this.selectionEpoch) ||
-      !valid()
-    )
-      return;
-    const previous = this.state.preferences,
-      merged = {
-        ...previous,
-        ...patch
-      };
-    if ("symbol" in patch && !("instrumentUid" in patch)) delete merged.instrumentUid;
-    const next = routing ? pinSelectedInstrument(this.state.rows, merged) : merged;
-    const reload =
-      next.symbol !== previous.symbol ||
-      next.instrumentUid !== previous.instrumentUid ||
-      next.timeframe !== previous.timeframe ||
-      next.rangeDays !== previous.rangeDays ||
-      next.engine !== previous.engine ||
-      forceReload;
-    if (reload) this.resetHistory();
-    this.update({
-      preferences: next,
-      crosshairBar: null,
-      ...(reload
-        ? {
-            candles: [],
-            loading: false,
-            drawings: [],
-            images: [],
-            selectedObject: null,
-            activeTool: null,
-            preview: null
-          }
-        : {})
-    });
-    await this.savePreferences();
-    if (
-      reload &&
-      this.state.authenticated &&
-      epoch === this.selectionEpoch &&
-      this.session.matches(client) &&
-      owner === this.state.owner
-    )
-      await this.loadHistory();
+    const depth = historyDepthTransition(this, patch);
+    try {
+      await this.saveView();
+      await this.editing.flush();
+      if (
+        !this.session.matches(client) ||
+        !importWritable(this.state, owner) ||
+        (routing && epoch !== this.selectionEpoch) ||
+        !valid() ||
+        !depth.valid()
+      )
+        return;
+      const previous = this.state.preferences,
+        merged = {
+          ...previous,
+          ...patch
+        };
+      if ("symbol" in patch && !("instrumentUid" in patch)) delete merged.instrumentUid;
+      const next = routing ? pinSelectedInstrument(this.state.rows, merged) : merged;
+      const reload =
+        next.symbol !== previous.symbol ||
+        next.instrumentUid !== previous.instrumentUid ||
+        next.timeframe !== previous.timeframe ||
+        next.rangeDays !== previous.rangeDays ||
+        next.engine !== previous.engine ||
+        forceReload;
+      if (
+        depth.active &&
+        !(await depth.carry(
+          next,
+          () =>
+            this.session.matches(client) &&
+            owner === this.state.owner &&
+            (!routing || epoch === this.selectionEpoch) &&
+            valid()
+        ))
+      )
+        return;
+      if (reload) this.resetHistory();
+      this.update({
+        preferences: next,
+        crosshairBar: null,
+        ...(reload
+          ? {
+              candles: [],
+              loading: false,
+              drawings: [],
+              images: [],
+              selectedObject: null,
+              activeTool: null,
+              preview: null
+            }
+          : {})
+      });
+      await this.savePreferences();
+      if (
+        reload &&
+        this.state.authenticated &&
+        epoch === this.selectionEpoch &&
+        this.session.matches(client) &&
+        owner === this.state.owner
+      )
+        await this.loadHistory();
+    } finally {
+      depth.dispose();
+    }
   };
   setTimeframe = async (timeframe: Timeframe): Promise<void> => {
     nativeTimeframe(timeframe);
