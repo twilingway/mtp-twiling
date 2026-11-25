@@ -4,6 +4,7 @@ import { TOOL_NAMES } from "../../../model/drawing-model.js";
 import type { Drawing, ImageAsset } from "../../../model/types.js";
 import { INDICATOR_NAMES } from "../state.js";
 import { useTerminal } from "../context.js";
+import { ChevronIcon } from "./controls/ChevronIcon.js";
 
 type LayerAction = "front" | "back" | "forward" | "backward";
 export function ContextMenu() {
@@ -124,7 +125,7 @@ export function ContextMenu() {
         onClick={() => setExpanded(!expanded)}
       >
         {t("Порядок слоёв")}
-        <span>›</span>
+        <ChevronIcon direction="right" />
       </button>
       <div role="menu">
         <button role="menuitem" onClick={() => action("front")}>

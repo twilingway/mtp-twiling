@@ -16,6 +16,7 @@ import type {
 import { useTerminal } from "../context.js";
 import { DrawingTemplateMenu } from "./DrawingTemplateMenu.js";
 import { DrawingStylePopover, Swatch } from "./DrawingStylePopover.js";
+import { DrawingLineControls } from "./controls/DrawingLineControls.js";
 import type { ColorTarget } from "./DrawingStylePopover.js";
 import { defaultVisibility, initialSettings } from "./drawing-settings-model.js";
 import { dateTimeInput, parseDateTimeInput } from "../../../i18n/datetime-input.js";
@@ -114,21 +115,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
     </label>
   );
   const colorControl = (trend = false) => (
-    <>
-      <Swatch
-        color={trend ? settings.trendColor : settings.color}
-        label={trend ? t("Цвет линии тренда") : t("Цвет линий")}
-        onClick={() => setColorTarget({ kind: trend ? "trend" : "line" })}
-      />
-      <button
-        type="button"
-        className="line-style-button"
-        aria-label={trend ? t("Стиль линии тренда") : t("Стиль линий")}
-        onClick={() => setColorTarget({ kind: trend ? "trend" : "line" })}
-      >
-        {trend ? "╌╌╌" : "━━"}
-      </button>
-    </>
+    <DrawingLineControls settings={settings} trend={trend} onOpen={setColorTarget} />
   );
   const candidate = (): Drawing | null => {
     if (GROUPS.some(([group, , max]) => draft.visibility[group].to > max)) {

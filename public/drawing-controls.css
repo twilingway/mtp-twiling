@@ -1,0 +1,99 @@
+.drawing-chevron {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+}
+[aria-expanded="true"] > .drawing-chevron[data-direction="down"] {
+  transform: rotate(180deg);
+}
+.drawing-line-preview {
+  flex: 0 0 64px;
+  width: 64px;
+  height: 16px;
+  pointer-events: none;
+}
+.drawing-line-picker,
+#drawing-template-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.drawing-line-picker {
+  min-height: 32px;
+  padding: 4px 8px;
+  color: var(--text, #d1d4dc);
+  background: var(--surface-input, #1e222d);
+  border: 1px solid var(--control-line, #434651);
+  border-radius: 4px;
+}
+.drawing-line-picker:focus-visible,
+.drawing-line-option[data-active="true"] {
+  outline: 2px solid #5685ff;
+  outline-offset: -2px;
+}
+.drawing-line-picker:disabled {
+  opacity: 0.45;
+}
+.drawing-line-picker-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+}
+.drawing-line-options {
+  position: fixed;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow: auto;
+  padding: 4px;
+  color: var(--text, #d1d4dc);
+  background: var(--surface-raised, #1e222d);
+  border: 1px solid var(--control-line, #434651);
+  border-radius: 6px;
+  box-shadow: 0 6px 24px #0006;
+  font-size: 13px;
+}
+.drawing-line-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+  padding: 4px 8px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+.drawing-line-option[data-active="true"] {
+  background: #5685ff24;
+}
+.drawing-line-selected {
+  width: 14px;
+  margin-left: auto;
+}
+.drawing-control-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.line-style-button .drawing-line-preview {
+  width: 48px;
+  flex-basis: 48px;
+}
+.layer-submenu-trigger > .drawing-chevron {
+  margin-left: auto;
+}
+@media (forced-colors: active) {
+  .drawing-line-option[data-active="true"] {
+    outline-color: Highlight;
+  }
+  .drawing-line-preview path {
+    stroke: CanvasText;
+  }
+}

@@ -94,7 +94,7 @@ export const drawingMessages = {
   "Точечный пунктир": "Dotted",
   Готово: "Done",
   "Укажите другое название шаблона.": "Enter another template name.",
-  "Шаблон ⌄": "Template ⌄",
+  Шаблон: "Template",
   "Название шаблона": "Template name",
   "Сохранить как…": "Save as…",
   "Применить по умолчанию": "Apply as default",
