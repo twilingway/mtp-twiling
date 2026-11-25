@@ -69,8 +69,7 @@ export function useChartCanvas(
               owned !== null &&
               controller.chart === owned &&
               !owned.retired &&
-              owned.persistView !== false &&
-              current.historyViewReady !== false &&
+              // Pane dimensions remain editable while history/camera restoration is pending.
               !current.backupBusy &&
               !current.importingBackup &&
               !current.importRecoveryRequired

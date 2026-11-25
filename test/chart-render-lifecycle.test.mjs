@@ -206,11 +206,40 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
   original.retired = true;
   original.options.onIndicatorLayout({ volume: { heightRatio: 0.7 } });
   original.retired = false;
-  original.persistView = false;
-  original.options.onIndicatorLayout({ volume: { heightRatio: 0.7 } });
-  original.persistView = true;
   await new Promise(setImmediate);
   assert.equal(layoutWrites.length, 1);
+  // Pane dimensions are UI preferences, even before history/camera restoration is ready.
+  state = { ...state, candles: [], historyViewReady: false };
+  original.persistView = false;
+  original.options.onIndicatorLayout({ volume: { heightRatio: 0.41 } });
+  await new Promise(setImmediate);
+  assert.equal(layoutWrites.length, 2);
+  assert.equal(state.preferences.indicatorPaneLayout.volume.heightRatio, 0.41);
+  assert.equal(original.persistView, false, "pane writes cannot enable camera persistence");
+  // A transfer/source change after the async write starts must still invalidate it.
+  for (const patch of [
+    { backupBusy: true },
+    { importingBackup: true },
+    { importRecoveryRequired: true },
+    { owner: "different-owner" },
+    { chartRevision: state.chartRevision + 1 },
+    { rows: [{ symbol: "GAZP", uid: "different-uid" }] },
+    { preferences: { ...state.preferences, symbol: "SBER" } }
+  ]) {
+    const previous = state;
+    original.options.onIndicatorLayout({ volume: { heightRatio: 0.7 } });
+    state = { ...state, ...patch };
+    await new Promise(setImmediate);
+    assert.equal(layoutWrites.length, 2);
+    state = previous;
+  }
+  original.options.onIndicatorLayout({ volume: { heightRatio: 0.7 } });
+  original.retired = true;
+  await new Promise(setImmediate);
+  assert.equal(layoutWrites.length, 2);
+  original.retired = false;
+  state = { ...state, candles, historyViewReady: true };
+  original.persistView = true;
   for (let i = 0; i < 5; i++) {
     await tools({ lastTools: { lines: i % 2 ? "segment" : "rayLine" } });
     await tools({
@@ -261,7 +290,7 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
   };
   await render();
   assert.equal(adapters.length, 2);
-  assert.equal(adapters.at(-1).options.indicatorPaneLayout.volume.heightRatio, 0.33);
+  assert.equal(adapters.at(-1).options.indicatorPaneLayout.volume.heightRatio, 0.41);
   assert.equal(adapters.at(-1).options.settings.upColor, "#123456");
   state = {
     ...state,
@@ -297,7 +326,7 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
   outgoing.options.onNearStart();
   outgoing.options.onCrosshair(candles[0]);
   outgoing.options.onIndicatorLayout({ volume: { heightRatio: 0.7 } });
-  assert.equal(layoutWrites.length, 1, "old-revision drag callbacks cannot write after import");
+  assert.equal(layoutWrites.length, 2, "old-revision drag callbacks cannot write after import");
   outgoing.options.paint({}, 800, 500, () => null, "back");
   assert.equal(nearStarts, 0);
   assert.equal(crosshairs, 0);
