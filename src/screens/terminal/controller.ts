@@ -33,6 +33,7 @@ import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { defaultPreferences, terminalHistoryLabel } from "./controller-bridge.js";
 import { nativeTimeframe } from "../../model/intervals/native-timeframes.js";
 import { importWritable } from "./controller-transfer-guard.js";
+import { openLegacyIndicatorSettings } from "./indicator-preferences.js";
 import { marketAvailable } from "./market-readiness.js";
 import { nativeInterval } from "../../services/providers/bybit/market.js";
 import type { ContextMenu, TerminalDialog, TerminalPreferences, TerminalState } from "./state.js";
@@ -491,12 +492,7 @@ export class TerminalController {
       createdAt: Date.now()
     });
   };
-  editIndicator = (key: IndicatorKey): void =>
-    this.update({
-      editingIndicator: key,
-      dialog: key === "volume" ? "chart-settings" : "indicator-settings",
-      contextMenu: null
-    });
+  editIndicator = (key: IndicatorKey): void => openLegacyIndicatorSettings(this, key);
   setCrosshair = (crosshairBar: Candle | null): void => {
     if (this.state.crosshairBar?.timestamp !== crosshairBar?.timestamp)
       this.update({ crosshairBar });

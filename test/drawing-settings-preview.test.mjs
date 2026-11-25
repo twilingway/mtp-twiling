@@ -135,6 +135,7 @@ function fixture(name = "segment") {
   };
   const load = sources({
     "services/storage.ts": storage,
+    "services/storage-v2.ts": storage,
     "services/storage-db.ts": {},
     "services/drive/auth.ts": { DriveAuth: class {} },
     "services/drive/coordinator.ts": {
