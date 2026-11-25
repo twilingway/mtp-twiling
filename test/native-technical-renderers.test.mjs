@@ -23,11 +23,12 @@ function api(f) {
 function outputs(f, instances, data = bars, layout = []) {
   const { technicalIndicatorGroups } = f.load("model/technical-indicator-layout.ts");
   const { getTechnicalIndicatorDefinition, calculateTechnicalIndicator } = api(f);
+  const context = f.load("charts/technical-calculation-context.ts").technicalCalculationContext(f.options.timeframe);
   return technicalIndicatorGroups(instances, layout).flatMap((group) =>
     group.instances
       .filter((item) => item.visible)
       .flatMap((instance) => {
-        const result = calculateTechnicalIndicator(instance, data);
+        const result = calculateTechnicalIndicator(instance, data, context);
         return getTechnicalIndicatorDefinition(instance.definitionId).outputs.map((output) => ({
           key: `${instance.id}/${output.id}`,
           instanceId: instance.id,
@@ -90,14 +91,14 @@ test("LW pane metrics tolerate the model existing before its widget is created",
 });
 
 for (const engine of ["lightweight", "kline"]) {
-  test(`${engine}: actual adapter renders all 21 common formulas, warmup and real timestamps`, () => {
+  test(`${engine}: actual adapter renders all 29 common formulas, warmup and real timestamps`, () => {
     const f = nativeFixture(engine),
       { createTechnicalIndicatorInstance: create, technicalIndicatorDefinitions: definitions } =
         api(f);
     const instances = definitions.map((definition, i) =>
       create(definition.id, `instance-${i}`, { order: i })
     );
-    assert.equal(instances.length, 21);
+    assert.equal(instances.length, 29);
     f.adapter.setData(bars);
     const writes = f.primaryWrites(),
       camera = f.camera();
@@ -120,7 +121,15 @@ for (const engine of ["lightweight", "kline"]) {
       "rsi",
       "macd",
       "atr",
-      "stochastic"
+      "stochastic",
+      "bollinger-percent-b",
+      "bollinger-bandwidth",
+      "historical-volatility",
+      "awesome-oscillator",
+      "balance-of-power",
+      "cmo",
+      "ultimate-oscillator",
+      "trix"
     ]);
     assert.deepEqual(
       f.adapter.technicalPaneMetrics().map((item) => item.key),

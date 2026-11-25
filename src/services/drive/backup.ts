@@ -49,7 +49,7 @@ const backupShape: Shape = {
       {
         ...scalars("schemaVersion id definitionId visible order"),
         params: scalars(
-          "length source fastLength slowLength signalLength multiplier smoothK smoothD"
+          "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength"
         ),
         pane: scalars("kind id"),
         styles: { $: scalars("color width visible opacity lineStyle") }

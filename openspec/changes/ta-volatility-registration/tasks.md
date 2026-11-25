@@ -13,6 +13,12 @@
 
 ## Workflow follow-up
 
+- [x] Координатор передаёт явный timeframe context через TechnicalRenderData обоим renderers;
+      проверены все29 definitions и соотношение дневного/недельного HV в actual adapter fixtures.
+- [x] Координатор расширил Drive allowlist ровно тремя ключами и проверил полный JSON/Drive v2
+      roundtrip нестандартных BBW/UO/HV параметров вместе с provider identity и старыми данными.
+- [ ] Независимая browser QA общей версии0.3.19 с29 вычислениями и разделами списка котировок.
+
 - Координатор подключает явный HV context к обоим renderers и проверяет native поведение.
 - Координатор добавляет expansionLength/contractionLength/middleLength в Drive allowlist и проверяет
   roundtrip всех восьми shapes.

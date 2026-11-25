@@ -6,6 +6,7 @@ import { getTechnicalIndicatorDefinition } from "../model/technical-indicators/d
 import { isTechnicalIndicatorInstance } from "../model/technical-indicators/instances.js";
 import type {
   OutputStyle,
+  TechnicalCalculationContext,
   TechnicalIndicatorInstance,
   TechnicalIndicatorResult
 } from "../model/technical-indicators/types.js";
@@ -26,6 +27,10 @@ export interface TechnicalRenderOutput {
 export class TechnicalRenderData {
   private bars: readonly Candle[] = [];
   private readonly cache = new Map<string, TechnicalIndicatorResult>();
+  private readonly context: TechnicalCalculationContext | undefined;
+  constructor(context?: TechnicalCalculationContext) {
+    this.context = context ? { ...context } : undefined;
+  }
   setData(bars: readonly Candle[]): void {
     this.bars = bars;
     this.cache.clear();
@@ -46,7 +51,7 @@ export class TechnicalRenderData {
         seen.add(key);
         let result = this.cache.get(key);
         if (!result) {
-          result = calculateTechnicalIndicator(instance, this.bars);
+          result = calculateTechnicalIndicator(instance, this.bars, this.context);
           this.cache.set(key, result);
         }
         for (const output of definition.outputs) {
