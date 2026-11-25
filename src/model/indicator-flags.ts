@@ -19,3 +19,16 @@ export function mtpSelection(flags: IndicatorFlags): { all: boolean; partial: bo
   const all = !!flags.mtpAll || values.every(Boolean);
   return { all, partial: !all && values.some(Boolean) };
 }
+
+export function indicatorEnabled(flags: IndicatorFlags, key: IndicatorKey): boolean {
+  if (key === "mtpAll") return mtpSelection(flags).all;
+  return key.startsWith("mtp") ? !!flags.mtpAll || flags[key] : !!flags[key];
+}
+
+/** Library selection enables an entry without disabling an already active MTP range. */
+export function enableIndicatorFlags(flags: IndicatorFlags, key: IndicatorKey): IndicatorFlags {
+  if (indicatorEnabled(flags, key)) return flags;
+  if (key === "mtpAll")
+    return { ...flags, mtpAll: true, mtp160: false, mtp440: false, mtp640: false };
+  return { ...flags, [key]: true };
+}

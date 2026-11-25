@@ -209,6 +209,7 @@ export function isChartSettings(value: unknown): value is ChartSettings {
       scaleFontSize: numberBetween(1, 100),
       showLegend: boolean,
       legendCollapsed: boolean,
+      mtpMenuCollapsed: boolean,
       priceLine: boolean,
       showCandleCountdown: boolean,
       indicatorOptions: isIndicatorOptions,

@@ -18,6 +18,7 @@ import { ContextMenu } from "./screens/terminal/drawings/ContextMenu.js";
 import { TerminalLifecycle, UpdateBanner } from "./screens/terminal/TerminalLifecycle.js";
 import { ThemeEffect } from "./screens/terminal/ThemeEffect.js";
 import { LocaleEffect } from "./screens/terminal/LocaleEffect.js";
+import { TerminalIndicatorLibrary } from "./screens/terminal/TerminalIndicatorLibrary.js";
 function Terminal() {
   const { state } = useTerminal();
   return (
@@ -38,6 +39,7 @@ function Terminal() {
       {state.dialog === "instruments" && <InstrumentSearch />}
       {state.dialog === "chart-settings" && <ChartSettingsDialog />}
       {state.dialog === "indicator-settings" && <IndicatorSettingsDialog />}
+      {state.dialog === "indicator-library" && <TerminalIndicatorLibrary />}
       <DrawingSettingsDialog />
       <DeleteObjectDialog />
       <ContextMenu />

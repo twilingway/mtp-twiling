@@ -1,4 +1,11 @@
 export const uiMessages = {
+  "Быстрый выбор индикаторов": "Quick indicator selection",
+  "Сохранение…": "Saving…",
+  "Закрыть быстрое меню": "Close quick menu",
+  "Настройки недоступны во время восстановления.": "Settings are unavailable during recovery.",
+  "Свернуть диапазоны МТП": "Collapse MTP ranges",
+  "Развернуть диапазоны МТП": "Expand MTP ranges",
+  "Не удалось сохранить настройки.": "Could not save settings.",
   "Точка координат": "Coordinate point",
   "на вашем скриншоте обозначен IRUS": "labelled IRUS in your screenshot",
   МБ: "MB",

@@ -23,5 +23,15 @@
 
 ## Workflow follow-up
 
-- Интегратор подключает Toolbar, quick dropdown и CSS; проверяет реальный диалог в свободном
-  QA-браузере, затем архивирует change.
+- Проверить реальный диалог и split controls в свободном QA-браузере, затем архивировать change.
+
+## 4. Подключение к терминалу и collapse
+
+- [x] 4.1 Подключить основную кнопку, TerminalDialog/App и CSS; проверить split action handlers и
+      реальный каталог из семи записей.
+- [x] 4.2 Подключить quick dropdown с поглощением outside pointer/click и Escape; проверить
+      маршрутизацию обработчиков.
+- [x] 4.3 Сохранить MTP collapse и enable-only добавление через guarded controller preferences;
+      проверить owner/import bounce, ручной backup, Drive, render key и camera identity.
+- [x] 4.4 Выполнить полный check и spec:validate после интеграции; сохранить результаты (375/375 и
+      21/21).

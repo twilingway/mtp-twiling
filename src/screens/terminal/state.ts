@@ -77,6 +77,7 @@ export type TerminalDialog =
   | "instruments"
   | "chart-settings"
   | "drawing-settings"
+  | "indicator-library"
   | "indicator-settings";
 export type ContextTarget =
   | { kind: "drawing"; id: string }

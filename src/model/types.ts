@@ -186,6 +186,7 @@ export interface DrawingTemplate {
 }
 export interface ChartSettings {
   legendCollapsed?: boolean;
+  mtpMenuCollapsed?: boolean;
   theme?: "dark" | "light";
   drawingTools?: DrawingToolbarSettings;
   removedIndicators?: IndicatorKey[];

@@ -13,6 +13,7 @@ const root = fileURLToPath(new URL("../src/", import.meta.url));
 function modules(overrides = {}) {
   const cache = new Map();
   function load(relative) {
+    relative = relative.replaceAll(path.sep, "/");
     if (Object.hasOwn(overrides, relative)) return overrides[relative];
     if (relative === "react") return react;
     if (relative === "react/jsx-runtime") return jsx;
@@ -237,5 +238,280 @@ test("actual React SSR renders localized scripts and active badge without unsupp
     assert.match(html, locale === "ru" ? /Добавлен/ : /Added/);
     assert.match(html, /aria-label="(?:Поиск индикаторов|Search indicators)"/);
     assert.doesNotMatch(html, /Community|Fundamentals|Purchased|Стратегии|Покупки|Сообщество/);
+  }
+});
+
+function memoryDatabase() {
+  const stores = new Map();
+  const store = (name) => {
+    if (!stores.has(name)) stores.set(name, new Map());
+    return stores.get(name);
+  };
+  return {
+    get: async (name, key) => structuredClone(store(name).get(key)),
+    all: async (name) => structuredClone([...store(name).values()]),
+    put: async (name, record) => {
+      store(name).set(record.id, structuredClone(record));
+    },
+    flush: async () => {},
+    transaction: async (_names, action) =>
+      action({
+        objectStore: (name) => ({
+          put: (record) => store(name).set(record.id, structuredClone(record)),
+          delete: (id) => store(name).delete(id)
+        })
+      })
+  };
+}
+function terminalFixture() {
+  const database = memoryDatabase(),
+    load = modules({ "services/storage-db.js": database });
+  const { TerminalController } = load("screens/terminal/controller.js"),
+    controller = new TerminalController();
+  controller.update({ owner: "profile-A" });
+  controller.saveView = async () => {};
+  let reloads = 0;
+  controller.loadHistory = async () => {
+    reloads++;
+  };
+  return { controller, load, database, reloads: () => reloads };
+}
+
+test("library add enables original ranges and master without duplicating or disabling active MTP", async () => {
+  const f = terminalFixture(),
+    { changeMenuIndicator } = f.load("screens/terminal/indicator-menu-actions.js");
+  await changeMenuIndicator(f.controller, "mtpAll", true);
+  const combined = f.controller.getSnapshot().preferences.indicators;
+  assert.equal(combined.mtpAll, true);
+  assert.equal(combined.mtp160, false);
+  assert.equal(combined.mtp440, false);
+  assert.equal(combined.mtp640, false);
+  await changeMenuIndicator(f.controller, "mtp160", true);
+  await changeMenuIndicator(f.controller, "mtpAll", true);
+  assert.equal(f.controller.getSnapshot().preferences.indicators, combined);
+  assert.equal(f.reloads(), 1);
+  await changeMenuIndicator(f.controller, "ma", true);
+  await changeMenuIndicator(f.controller, "ma", true);
+  assert.equal(f.controller.getSnapshot().preferences.indicators.ma, true);
+  assert.equal(f.reloads(), 2);
+  await changeMenuIndicator(f.controller, "mtp640");
+  const partial = f.controller.getSnapshot().preferences.indicators;
+  assert.equal(partial.mtpAll, false);
+  assert.equal(partial.mtp640, false);
+  assert.equal(partial.mtp160, true);
+  assert.equal(partial.mtp440, true);
+  await changeMenuIndicator(f.controller, "mtp640", true);
+  assert.equal(
+    f
+      .load("model/indicator-flags.js")
+      .mtpSelection(f.controller.getSnapshot().preferences.indicators).all,
+    true
+  );
+});
+
+test("collapse persists per owner through manual backup and Drive, while render config and camera stay identical", async () => {
+  const f = terminalFixture(),
+    { persistMtpMenuCollapsed } = f.load("screens/terminal/indicator-menu-actions.js");
+  const storage = f.load("services/storage.js"),
+    backup = f.load("model/backup-format.js");
+  const key = f.load("charts/render-config.js").chartRenderConfigKey;
+  const before = f.controller.getSnapshot().preferences,
+    camera = { barSpace: 11, rightOffsetBars: -50 };
+  f.controller.chart = { camera };
+  await storage.savePreferences("profile-B", { chartSettings: { mtpMenuCollapsed: false } });
+  await persistMtpMenuCollapsed(f.controller);
+  const after = f.controller.getSnapshot().preferences;
+  assert.equal(after.chartSettings.mtpMenuCollapsed, true);
+  assert.equal(after.indicators, before.indicators);
+  assert.equal(f.controller.chart.camera, camera);
+  assert.equal(
+    key(before.chartSettings, before.indicators),
+    key(after.chartSettings, after.indicators)
+  );
+  assert.equal(f.reloads(), 0);
+  const exported = backup.validateBackup(
+    JSON.parse(JSON.stringify(await storage.createBackup("profile-A")))
+  );
+  await storage.importBackup("profile-C", exported);
+  assert.equal((await storage.loadPreferences("profile-C")).chartSettings.mtpMenuCollapsed, true);
+  assert.equal((await storage.loadPreferences("profile-B")).chartSettings.mtpMenuCollapsed, false);
+  const drive = f.load("services/drive/backup.js"),
+    prepared = await drive.prepareDriveBackup(exported);
+  const restored = await drive.restoreDriveBackup(prepared.payload, []);
+  assert.equal(restored.layout.chartSettings.mtpMenuCollapsed, true);
+  assert.equal(backup.isProfilePreferences({ chartSettings: { mtpMenuCollapsed: "true" } }), false);
+});
+
+test("pending menu writes reject owner/import/revision changes including a boundary that has already bounced back", async () => {
+  for (const action of ["add", "collapse"])
+    for (const boundary of [
+      "owner",
+      "owner-bounce",
+      "import",
+      "import-finished",
+      "revision",
+      "preferences"
+    ]) {
+      const f = terminalFixture(),
+        initial = f.controller.getSnapshot();
+      let release;
+      f.controller.saveView = () =>
+        new Promise((resolve) => {
+          release = resolve;
+        });
+      const actions = f.load("screens/terminal/indicator-menu-actions.js");
+      const pending =
+        action === "add"
+          ? actions.changeMenuIndicator(f.controller, "mtpAll", true)
+          : actions.persistMtpMenuCollapsed(f.controller);
+      if (boundary.startsWith("owner")) {
+        f.controller.update({ owner: "profile-B" });
+        if (boundary === "owner-bounce") f.controller.update({ owner: initial.owner });
+      } else if (boundary.startsWith("import")) {
+        f.controller.update({ importingBackup: true });
+        if (boundary === "import-finished") f.controller.update({ importingBackup: false });
+      } else if (boundary === "revision")
+        f.controller.update({ chartRevision: initial.chartRevision + 1 });
+      else
+        f.controller.update({
+          preferences: {
+            ...initial.preferences,
+            chartSettings: { ...initial.preferences.chartSettings, grid: false }
+          }
+        });
+      release();
+      await pending;
+      assert.equal(
+        f.controller.getSnapshot().preferences.chartSettings.mtpMenuCollapsed,
+        undefined,
+        `${action}/${boundary}`
+      );
+      assert.equal(
+        f.controller.getSnapshot().preferences.indicators.mtpAll,
+        false,
+        `${action}/${boundary}`
+      );
+      assert.equal(await f.database.get("preferences", "layout:profile-B"), undefined);
+      assert.equal(f.reloads(), 0);
+    }
+});
+
+test("terminal library exposes only real native-ready entries and maps SMA to its legacy flag", async () => {
+  const f = terminalFixture(),
+    load = modules({
+      "screens/terminal/context.js": {
+        useTerminal: () => ({ controller: f.controller, state: f.controller.getSnapshot() })
+      },
+      "screens/terminal/useIndicatorMenuAction.js": {
+        useIndicatorMenuAction: () => ({ pending: false, run: (action) => action() })
+      }
+    });
+  const { TerminalIndicatorLibrary } = load("screens/terminal/TerminalIndicatorLibrary.js"),
+    dialog = TerminalIndicatorLibrary();
+  assert.deepEqual(
+    dialog.props.entries.map((entry) => entry.id),
+    ["mtpAll", "mtp160", "mtp440", "mtp640", "volume", "sma", "ema"]
+  );
+  assert.equal(
+    dialog.props.entries.every((entry) => entry.available),
+    true
+  );
+  dialog.props.onAdd("sma");
+  await new Promise(setImmediate);
+  assert.equal(f.controller.getSnapshot().preferences.indicators.ma, true);
+  f.controller.update({ importingBackup: true });
+  assert.equal(
+    TerminalIndicatorLibrary().props.entries.every((entry) => !entry.available && entry.reason),
+    true
+  );
+});
+
+test("split controls route main click to library, chevron to quick panel, and dismiss shield consumes chart gestures", () => {
+  const state = { preferences: { indicators: {}, chartSettings: {} } },
+    calls = [],
+    refs = [{ current: { focus: () => calls.push("focus") } }, { current: null }];
+  let open = false,
+    refIndex = 0;
+  const load = modules({
+    react: {
+      ...react,
+      useEffect: () => {},
+      useState: () => [
+        open,
+        (value) => {
+          open = value;
+        }
+      ],
+      useRef: () => refs[refIndex++]
+    },
+    "screens/terminal/context.js": {
+      useTerminal: () => ({ state, controller: { setDialog: (value) => calls.push(value) } })
+    },
+    "screens/terminal/useIndicatorMenuAction.js": {
+      useIndicatorMenuAction: () => ({ pending: false, run: (action) => action() })
+    }
+  });
+  const { TerminalIndicatorControls } = load("screens/terminal/TerminalIndicatorControls.js");
+  const render = () => {
+    refIndex = 0;
+    return TerminalIndicatorControls();
+  };
+  let tree = render();
+  walk(tree, (node) => node.props?.id === "indicators-button")[0].props.onClick();
+  assert.deepEqual(calls, ["indicator-library"]);
+  assert.equal(open, false);
+  walk(tree, (node) => node.props?.id === "indicator-quick-button")[0].props.onClick();
+  tree = render();
+  assert.equal(walk(tree, (node) => node.props?.id === "indicators-panel").length, 1);
+  const shield = walk(tree, (node) => node.props?.className === "indicator-menu-dismiss")[0];
+  let stopped = 0,
+    prevented = 0;
+  const event = { preventDefault: () => prevented++, stopPropagation: () => stopped++ };
+  shield.props.onPointerDown(event);
+  assert.equal(open, true);
+  shield.props.onClick(event);
+  assert.equal(open, false);
+  assert.equal(stopped, 2);
+  assert.equal(prevented, 2);
+  walk(render(), (node) => node.props?.id === "indicator-quick-button")[0].props.onClick();
+  render().props.onKeyDown({ ...event, key: "Escape" });
+  assert.equal(open, false);
+});
+
+test("pending indicator action catches failure, releases pending and suppresses errors after owner bounce", async () => {
+  for (const bounce of [false, true]) {
+    const f = terminalFixture(),
+      changes = [],
+      notices = [],
+      refs = [];
+    f.controller.notify = (message) => notices.push(message);
+    const hook = modules({
+      react: {
+        ...react,
+        useState: () => [false, (value) => changes.push(value)],
+        useRef: (value) => {
+          const ref = { current: value };
+          refs.push(ref);
+          return ref;
+        },
+        useEffect: (callback) => callback()
+      }
+    })("screens/terminal/useIndicatorMenuAction.js").useIndicatorMenuAction(f.controller);
+    let reject;
+    const pending = hook.run(
+      () =>
+        new Promise((_resolve, fail) => {
+          reject = fail;
+        })
+    );
+    if (bounce) {
+      f.controller.update({ owner: "profile-B" });
+      f.controller.update({ owner: "profile-A" });
+    }
+    reject(new Error("Save failed"));
+    await pending;
+    assert.deepEqual(changes, [true, false]);
+    assert.deepEqual(notices, bounce ? [] : ["Save failed"]);
+    assert.equal(refs[0].current, false);
   }
 });

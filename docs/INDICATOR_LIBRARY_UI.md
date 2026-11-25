@@ -1,8 +1,8 @@
 # Библиотека индикаторов: интеграция
 
 Компонент: `src/screens/terminal/IndicatorLibraryDialog.tsx`. Нужен stylesheet
-`/indicator-library.css` после базовых `style.css` и `theme.css`. Подключение Toolbar/HTML
-принадлежит интегратору и в этой ветке не выполнено.
+`/indicator-library.css` после базовых `style.css` и `theme.css`. Toolbar/App и оба stylesheet
+подключены. Основная кнопка открывает библиотеку, соседняя стрелка — быстрое меню.
 
 Props:
 
@@ -25,12 +25,13 @@ Caller локализует содержимое entries. Общие labels ок
 экземпляр через движок после его интеграции. Компонент не меняет параметры, профиль или данные.
 
 В «Моих скриптах»: `mtpAll` (MTP 0–640), `mtp160` (0–160), `mtp440` (160–440), `mtp640` (440–640). В
-«Теханализе»: `rsi`, `macd`, `bollinger-bands`, `atr`, `stochastic`, `sma`, `ema`, а также legacy
-`volume`. Связь `sma` с существующим legacy `ma` выполняет caller. Эти строки не расширяют
-IndicatorKey банковского или профильного слоя. Компонент не содержит собственного каталога:
-интегратор передаёт только поддержанные ID. Для ещё не подключённого расчёта caller передаёт
-`available:false` и понятный `reason`; fallback-причина локализована. Не создавать фиктивные
-series/points ради активной кнопки.
+«Теханализе» этой версии: только `volume`, `sma` (20) и `ema` (50). `rsi`, `macd`,
+`bollinger-bands`, `atr`, `stochastic` ещё не подключены к native adapters и не объявлены готовыми.
+Связь `sma` с существующим legacy `ma` выполняет caller. Эти строки не расширяют IndicatorKey
+банковского или профильного слоя. Компонент не содержит собственного каталога: интегратор передаёт
+только поддержанные ID. Для ещё не подключённого расчёта caller передаёт `available:false` и
+понятный `reason`; fallback-причина локализована. Не создавать фиктивные series/points ради активной
+кнопки.
 
 Поиск фильтрует label/aliases текущего раздела без сети, case-insensitive substring, Unicode NFKC.
 Описание и причина не участвуют в поиске. Запрос сохраняется при смене раздела. Первоначальный
@@ -58,7 +59,15 @@ selected sidebar highlight, hover и focus-visible. Нет платных, об�
 запускались: QA-профиль занят проверкой release 0.3.12. После подключения интегратор проверяет
 desktop/mobile 375px, фокус и закрытие.
 
-Результат проверки этой ветки: pnpm check — 369/369 тестов (включая 5 новых),
+Результат проверки после интеграции: pnpm check — 375/375 тестов (11 проверок библиотеки/меню),
 format/lint/typecheck/build успешно; pnpm spec:validate — 21/21. Первая sandbox-попытка node test
 завершилась spawn EPERM; полный check успешно повторён вне sandbox без изменения кода ради ошибки
-окружения.
+окружения. Отчёт полного прогона сохранён вне Git: `../indicator-menu-check.log`.
+
+Быстрое меню содержит те же реальные MTP/Volume/SMA20/EMA50. Стрелка MTP сохраняет
+`chartSettings.mtpMenuCollapsed` отдельно от выбора диапазонов. Значение валидируется в manual
+backup и Drive allowlist, не участвует в chartRenderConfigKey и не вызывает загрузку истории.
+Сохранение через existing controller setPreferences отвергает устаревшие
+owner/session/revision/import состояния, в том числе завершившийся переход туда-обратно. Обработчики
+поглощают outside pointer/click; Escape возвращает фокус стрелке. Проверка этих жестов в настоящем
+браузере остаётся QA.

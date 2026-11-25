@@ -1,9 +1,8 @@
 import { t } from "../../i18n/messages.js";
-import { memo, useState } from "react";
-import type { ChartEngine, IndicatorKey } from "../../model/types.js";
+import { memo } from "react";
+import type { ChartEngine } from "../../model/types.js";
 import { useTerminal } from "./context.js";
-import { INDICATOR_NAMES } from "./state.js";
-import { MtpIndicatorGroup } from "./MtpIndicatorGroup.js";
+import { TerminalIndicatorControls } from "./TerminalIndicatorControls.js";
 import { TimeframeMenu } from "./intervals/TimeframeMenu.js";
 import { isNativeIntervalId } from "../../model/intervals/registry.js";
 import { DERIVED_INTERVAL_UNAVAILABLE } from "../../model/intervals/native-timeframes.js";
@@ -22,7 +21,6 @@ const InstallButton = memo(function InstallButton() {
 export function Toolbar() {
   const { controller, state } = useTerminal(),
     p = state.preferences;
-  const [indicatorsOpen, setIndicatorsOpen] = useState(false);
   return (
     <header className="topbar">
       <a className="brand" href="./" aria-label="MTP TWILING" title="MTP TWILING">
@@ -60,42 +58,7 @@ export function Toolbar() {
         />
       </nav>
       <div className="divider" />
-      <div className="indicator-control">
-        <button
-          id="indicators-button"
-          aria-label={t("Индикаторы")}
-          className="text-button"
-          onClick={() => setIndicatorsOpen(!indicatorsOpen)}
-        >
-          ⌃ <span>{t("Индикаторы")}</span>
-        </button>
-        {indicatorsOpen && (
-          <div className="popover" id="indicators-panel">
-            <strong>{t("Индикаторы")}</strong>
-            <MtpIndicatorGroup
-              flags={p.indicators}
-              onToggle={(key) => {
-                void controller.toggleIndicator(key);
-              }}
-            />
-            {(Object.entries(INDICATOR_NAMES) as [IndicatorKey, string][])
-              .filter(([key]) => !key.startsWith("mtp"))
-              .map(([key, name]) => (
-                <label key={key}>
-                  <input
-                    type="checkbox"
-                    id={`indicator-${key}`}
-                    checked={!!p.indicators[key]}
-                    onChange={() => {
-                      void controller.toggleIndicator(key);
-                    }}
-                  />
-                  {t(name)}
-                </label>
-              ))}
-          </div>
-        )}
-      </div>
+      <TerminalIndicatorControls />
       <div className="top-spacer" />
       <InstallButton />
       <label className="engine-label" htmlFor="engine">
