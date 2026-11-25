@@ -258,6 +258,11 @@ test("mixed watchlist keeps order; bank cache and requests receive only bank ide
       /Bybit/
     );
     assert.equal(f.calls.filter((x) => x.bankRequest).length, 0);
+    assert.throws(
+      () =>
+        f.client.request("MarketDataService", "GetCandles", { instrument: publicRow.providerRef }),
+      /Bybit/
+    );
   } finally {
     await f.client.close();
   }

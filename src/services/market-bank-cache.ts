@@ -18,6 +18,8 @@ export function assertBankRequest(body: unknown, depth = 0): void {
   if (depth > 20) throw new Error("Слишком сложный банковский запрос.");
   if (typeof body === "string" && body.startsWith("bybit:"))
     throw new Error("Bybit нельзя отправлять в API банка.");
+  if (body && typeof body === "object" && "provider" in body && body.provider === "bybit")
+    throw new Error("Bybit нельзя отправлять в API банка.");
   if (body && typeof body === "object")
     for (const value of Object.values(body)) assertBankRequest(value, depth + 1);
 }
