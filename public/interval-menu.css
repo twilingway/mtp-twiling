@@ -71,11 +71,11 @@
 .chart-range-control select {
   min-height: 25px;
   max-width: 130px;
-  padding: 2px 7px;
+  padding: 2px 26px 2px 7px;
   border: 1px solid var(--control-line, #434651);
   border-radius: 4px;
   color: inherit;
-  background: var(--surface-input, #171b26);
+  background-color: var(--surface-input, #171b26);
 }
 .chart-range-note {
   color: var(--muted, #9598a1);
