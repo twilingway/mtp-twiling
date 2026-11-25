@@ -357,9 +357,12 @@ export class DriveCoordinator {
     this.check(epoch, revision);
     if (!backup.layout || !backup.watchlist || !backup.views)
       throw new DriveError("remote-invalid", "Неполный снимок настроек Google Диска");
+    const signal = this.authorization?.signal;
+    if (!signal) throw cancelled();
     try {
       await this.bridge.importBackup(backup, {
         replacePortable: true,
+        signal,
         valid: () => this.current(epoch) && revision === this.revision,
         onCommitted: () => {
           this.applyingEpoch = epoch;

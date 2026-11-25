@@ -306,9 +306,10 @@ export async function importBackup(
   options: BackupImportOptions = {}
 ): Promise<{ drawings: number; images: number; history: number }> {
   const data = validateBackup(input);
+  const signal = options.replacePortable ? options.signal : undefined;
   if (options.replacePortable && (!data.layout || !data.watchlist || !data.views))
     throw new Error("Для синхронизации нужен полный снимок настроек.");
-  assertImportCurrent(options.valid);
+  assertImportCurrent(options.valid, signal);
   const existingImages = (await all("images"))
     .map(imageAsset)
     .filter((image) => image?.owner === owner);
@@ -366,40 +367,48 @@ export async function importBackup(
       updatedAt: Date.now()
     });
   }
-  assertImportCurrent(options.valid);
-  await transaction(["preferences", "drawings", "images", "history"], (tx) => {
-    assertImportCurrent(options.valid);
-    const write = () => {
-      tx.objectStore("preferences").put({ id: `layout:${owner}`, owner, value: data.layout ?? {} });
-      if (data.watchlist !== undefined) {
+  assertImportCurrent(options.valid, signal);
+  await transaction(
+    ["preferences", "drawings", "images", "history"],
+    (tx) => {
+      assertImportCurrent(options.valid, signal);
+      const write = () => {
         tx.objectStore("preferences").put({
-          id: `watchlist:${owner}`,
+          id: `layout:${owner}`,
           owner,
-          value: data.watchlist
+          value: data.layout ?? {}
         });
-        tx.objectStore("preferences").put({
-          id: `market:${owner}`,
-          owner,
-          value: { rows: data.watchlist, at: Date.now() }
-        });
-      }
-      for (const view of data.views ?? []) {
-        if (view.key.length > 200) throw new Error("Некорректный вид графика.");
-        tx.objectStore("preferences").put({
-          id: `view:${owner}:${view.key}`,
-          owner,
-          viewKey: view.key,
-          value: view.value
-        });
-      }
-      for (const record of drawings) tx.objectStore("drawings").put(record);
-      for (const image of images) tx.objectStore("images").put(image);
-      for (const block of history) tx.objectStore("history").put(block);
-    };
-    if (options.replacePortable)
-      replacePortableRecords(tx, owner, write, options.valid ?? (() => true));
-    else write();
-  });
+        if (data.watchlist !== undefined) {
+          tx.objectStore("preferences").put({
+            id: `watchlist:${owner}`,
+            owner,
+            value: data.watchlist
+          });
+          tx.objectStore("preferences").put({
+            id: `market:${owner}`,
+            owner,
+            value: { rows: data.watchlist, at: Date.now() }
+          });
+        }
+        for (const view of data.views ?? []) {
+          if (view.key.length > 200) throw new Error("Некорректный вид графика.");
+          tx.objectStore("preferences").put({
+            id: `view:${owner}:${view.key}`,
+            owner,
+            viewKey: view.key,
+            value: view.value
+          });
+        }
+        for (const record of drawings) tx.objectStore("drawings").put(record);
+        for (const image of images) tx.objectStore("images").put(image);
+        for (const block of history) tx.objectStore("history").put(block);
+      };
+      if (options.replacePortable)
+        replacePortableRecords(tx, owner, write, options.valid ?? (() => true));
+      else write();
+    },
+    signal
+  );
   return {
     drawings: drawings.reduce((sum, item) => sum + item.items.length, 0),
     images: images.length,

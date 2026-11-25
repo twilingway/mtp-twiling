@@ -55,15 +55,60 @@ export function all(store: Store): Promise<unknown[]> {
 }
 export function transaction(
   stores: Store[],
-  action: (transaction: IDBTransaction) => void
+  action: (transaction: IDBTransaction) => void,
+  signal?: AbortSignal
 ): Promise<void> {
   return track(
     new Promise<void>((resolve, reject) => {
+      const cancelled = () => new DOMException("Запись отменена.", "AbortError");
+      if (signal?.aborted) {
+        reject(cancelled());
+        return;
+      }
       const tx = db.transaction(stores, "readwrite");
+      const cleanup = () => signal?.removeEventListener("abort", abort);
+      const abort = () => {
+        try {
+          tx.abort();
+        } catch (error) {
+          cleanup();
+          // Native commit is the point of no return, before the JS complete event.
+          if (!(error instanceof DOMException && error.name === "InvalidStateError"))
+            reject(
+              error instanceof Error
+                ? error
+                : new Error("IndexedDB cancellation failed.", { cause: error })
+            );
+        }
+      };
+      tx.oncomplete = () => {
+        cleanup();
+        resolve();
+      };
+      tx.onerror = () => {
+        cleanup();
+        reject(
+          signal?.aborted ? cancelled() : (tx.error ?? new Error("IndexedDB transaction failed."))
+        );
+      };
+      tx.onabort = () => {
+        cleanup();
+        reject(signal?.aborted ? cancelled() : (tx.error ?? new Error("Запись отменена.")));
+      };
+      signal?.addEventListener("abort", abort, { once: true });
+      if (signal?.aborted) {
+        abort();
+        return;
+      }
       try {
         action(tx);
       } catch (error) {
-        tx.abort();
+        cleanup();
+        try {
+          tx.abort();
+        } catch {
+          // Preserve the writer error if native transaction state already changed.
+        }
         reject(
           error instanceof Error
             ? error
@@ -71,9 +116,6 @@ export function transaction(
         );
         return;
       }
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error ?? new Error("IndexedDB transaction failed."));
-      tx.onabort = () => reject(tx.error ?? new Error("Запись отменена."));
     })
   );
 }

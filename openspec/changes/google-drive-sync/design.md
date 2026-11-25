@@ -43,6 +43,10 @@
   Обычный импорт сохраняет merge. Guard проверяется после очереди/flush/saveView и внутри
   transaction; onCommitted переключает подавление собственного import echo перед восстановлением
   профиля.
+- Drive import захватывает AbortSignal Google-сессии до await и передаёт его до IDB transaction.
+  Отмена до native commit вызывает tx.abort; complete/error/abort/ошибка writer удаляют listener.
+  После начала native commit InvalidStateError от позднего abort не превращается в ошибку уже
+  записанной транзакции. Обычный файловый merge-import эту гарантию не получает.
 - Раздел аккаунта загружает GIS заранее; кнопка включает popup непосредственно по клику. Истечение
   даёт явный повторный вход. Локальный static server/nginx разрешают только необходимые Google CSP
   endpoints и COOP same-origin-allow-popups; privacy доступна отдельным статическим HTML без ключа.
