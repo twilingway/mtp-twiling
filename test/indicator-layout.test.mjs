@@ -353,6 +353,7 @@ test("legend collapse exposes an accessible compact count without toggling indic
   };
   const load = sources({
     react: { memo: (component) => component },
+    "react-dom": { createPortal: () => assert.fail("legend test must not open a list menu") },
     "react/jsx-runtime": { jsx, jsxs: jsx },
     "services/storage-db.ts": {},
     "screens/terminal/context.tsx": { useTerminal: () => ({ state, controller }) }

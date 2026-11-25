@@ -143,10 +143,7 @@ export function Watchlist() {
   return (
     <aside className="watchlist-panel" aria-label={t("Список котировок")}>
       <div className="watchlist-heading">
-        <h2>
-          {t("Список котировок")}
-          <span>{t("РФ")}</span>
-        </h2>
+        <WatchlistFlagFilter />
         <button
           id="add-instrument"
           title={t("Добавить инструмент")}
@@ -181,7 +178,6 @@ export function Watchlist() {
         />
         <kbd>/</kbd>
       </div>
-      <WatchlistFlagFilter />
       <div className="watchlist-scroll">
         <table>
           <thead>

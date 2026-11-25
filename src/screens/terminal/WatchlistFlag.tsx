@@ -13,8 +13,8 @@ export function stopFlagEvent(event: SyntheticEvent) {
 }
 export function FlagIcon() {
   return (
-    <svg viewBox="0 0 16 20" aria-hidden="true" focusable="false">
-      <path d="M3 1.5h10v16l-5-3-5 3Z" />
+    <svg viewBox="0 0 14 12" aria-hidden="true" focusable="false">
+      <path d="M14 12 10 6 14 0H0v12Z" />
     </svg>
   );
 }

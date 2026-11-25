@@ -11,8 +11,9 @@
   pointer-events: none;
   transition: opacity 120ms ease;
 }
-.chart-panel:hover > .chart-navigation,
-.chart-navigation:focus-within {
+.chart-navigation[data-nearby],
+.chart-navigation:has(button:focus-visible),
+.chart-navigation:has(button:active) {
   opacity: 1;
   pointer-events: auto;
 }

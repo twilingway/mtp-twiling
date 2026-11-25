@@ -1,6 +1,29 @@
 .quote-symbol {
   position: relative;
 }
+.quote-row {
+  position: relative;
+  transition: none;
+}
+.quote-row::after {
+  position: absolute;
+  inset: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  pointer-events: none;
+  content: "";
+}
+.quote-row:hover::after {
+  border-color: var(--control-line);
+}
+html[data-theme] .quote-row.selected {
+  box-shadow: none;
+  color: var(--text);
+}
+.quote-row.selected::after,
+.quote-row:focus-visible::after {
+  border-color: var(--text);
+}
 .watchlist-flag {
   position: absolute;
   left: -16px;
@@ -17,8 +40,8 @@
   touch-action: manipulation;
 }
 .watchlist-flag svg {
-  width: 10px;
-  height: 18px;
+  width: 14px;
+  height: 12px;
   fill: none;
   stroke: currentColor;
   stroke-width: 1.4;
@@ -78,46 +101,99 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.watchlist-flag-filter {
+.watchlist-list-picker {
+  margin-right: auto;
+  min-width: 0;
+}
+.watchlist-list-trigger {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin: 0 10px 8px;
-  color: var(--muted, #9598a1);
+  gap: 7px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--text, #d1d4dc);
+  font-size: 14px;
+  font-weight: 550;
 }
-.watchlist-flag-filter-label {
-  font-size: 11px;
+.watchlist-list-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.watchlist-flag-filter select {
-  flex: 1;
-  min-width: 0;
-  min-height: 28px;
-  padding: 3px 26px 3px 6px;
-  border: 1px solid var(--line, #2a2e39);
-  border-radius: 3px;
-  background-color: var(--surface, #131722);
-  color: var(--text, #d1d4dc);
+.watchlist-list-chevron {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  fill: none;
+  stroke: currentColor;
 }
-.watchlist-flag-filter button {
+.watchlist-list-marker {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 3px;
-  border: 0;
-  border-radius: 3px;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+}
+.watchlist-list-marker svg {
+  width: 14px;
+  height: 12px;
+  fill: currentColor;
+}
+.watchlist-list-marker .watchlist-all-icon {
+  fill: none;
+  stroke: currentColor;
+}
+.watchlist-lists-menu {
+  position: fixed;
+  z-index: 55;
+  width: 240px;
+  max-width: calc(100vw - 16px);
+  overflow: auto;
+  padding: 5px;
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  color: var(--text);
+  box-shadow: 0 4px 18px var(--shadow);
+}
+.watchlist-lists-menu > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  padding: 5px 9px;
+  border: none;
+  border-radius: 4px;
   background: transparent;
   color: inherit;
+  text-align: left;
+}
+.watchlist-list-count {
+  margin-left: auto;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.watchlist-lists-menu > button[aria-checked="true"] {
+  background: var(--surface-selected);
+}
+.watchlist-lists-divider {
+  border-top: 1px solid var(--line);
+  margin: 5px 4px;
 }
 .watchlist-flag:focus-visible,
 .watchlist-flag-palette button:focus-visible,
-.watchlist-flag-filter :is(select, button):focus-visible {
+.watchlist-list-trigger:focus-visible,
+.watchlist-lists-menu button:focus-visible {
   outline: 2px solid var(--accent, #2962ff);
   outline-offset: -2px;
 }
 .watchlist-flag-palette button:disabled,
-.watchlist-flag-filter button:disabled {
+.watchlist-list-trigger:disabled,
+.watchlist-lists-menu button:disabled {
   opacity: 0.4;
   cursor: default;
 }
@@ -131,7 +207,8 @@
     width: 26px;
     height: 30px;
   }
-  .watchlist-flag-filter :is(select, button) {
+  .watchlist-list-trigger,
+  .watchlist-lists-menu > button {
     min-height: 36px;
   }
   .watchlist-flag-palette > button {

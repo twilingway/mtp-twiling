@@ -11,15 +11,6 @@ interface CountdownPosition {
   width: number;
 }
 
-function textColor(background: string): string {
-  if (!/^#[0-9a-f]{6}$/i.test(background)) return "#fff";
-  const channels = [1, 3, 5].map((index) =>
-    Number.parseInt(background.slice(index, index + 2), 16)
-  );
-  const brightness = (channels[0]! * 299 + channels[1]! * 587 + channels[2]! * 114) / 1000;
-  return brightness > 140 ? "#131722" : "#fff";
-}
-
 export function CandleCountdown() {
   const { controller, state } = useTerminal();
   const [now, setNow] = useState(Date.now());
@@ -117,7 +108,7 @@ export function CandleCountdown() {
         top: position.top,
         width: position.width,
         background: color,
-        color: textColor(color)
+        color: "#fff"
       }}
     >
       {countdown}

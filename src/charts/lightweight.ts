@@ -6,7 +6,7 @@ import {
   LineSeries,
   createChart
 } from "lightweight-charts";
-import type { ISeriesPrimitive, Logical, Time, UTCTimestamp } from "lightweight-charts";
+import type { IPriceLine, ISeriesPrimitive, Logical, Time, UTCTimestamp } from "lightweight-charts";
 import { MtpModel, activeMtpPeriods, lightweightMtp } from "../model/mtp.js";
 import { TIMEFRAMES } from "../model/history-codec.js";
 import type { Candle, ChartView, DrawingPoint } from "../model/types.js";
@@ -35,6 +35,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     restoreFrame: number | null = null,
     settleFrame: number | null = null;
   const pendingView = new PendingChartView();
+  let lastPriceLabel: IPriceLine | null = null;
   const palette = chartPalette(settings);
   const dateFormatters = lightweightDateFormatters(timeframe, options);
   const display = calendarAxisDisplay(timeframe, options);
@@ -44,7 +45,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     autoSize: true,
     layout: {
       background: { type: ColorType.Solid, color: palette.background },
-      textColor: palette.muted,
+      textColor: palette.text,
       fontFamily: '-apple-system,BlinkMacSystemFont,"Trebuchet MS",Roboto,Ubuntu,sans-serif',
       fontSize: settings.scaleFontSize ?? 11,
       attributionLogo: false
@@ -93,7 +94,8 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     borderDownColor: settings.borderDownColor ?? "#eb4d5c",
     borderVisible: settings.borderVisible !== false,
     wickVisible: settings.wickVisible !== false,
-    priceLineVisible: settings.priceLine !== false,
+    priceLineVisible: false,
+    lastValueVisible: false,
     priceFormat: { type: "price", precision: precision(row), minMove: row.step ?? 0.01 }
   });
   const volume = chart.addSeries(HistogramSeries, {
@@ -250,6 +252,29 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     return x == null || y == null ? null : { x, y };
   }
   const time = (bar: Candle): UTCTimestamp => Math.floor(bar.timestamp / 1000) as UTCTimestamp;
+  function updateLastPriceLabel() {
+    const bar = data.at(-1);
+    if (!bar) {
+      if (lastPriceLabel) series.removePriceLine(lastPriceLabel);
+      lastPriceLabel = null;
+      return;
+    }
+    const color =
+      bar.close >= bar.open ? (settings.upColor ?? "#53b987") : (settings.downColor ?? "#eb4d5c");
+    const label = {
+      price: bar.close,
+      color,
+      axisLabelColor: color,
+      axisLabelTextColor: "#fff",
+      axisLabelVisible: true,
+      lineVisible: settings.priceLine !== false,
+      lineWidth: 1 as const,
+      lineStyle: 2,
+      title: ""
+    };
+    if (lastPriceLabel) lastPriceLabel.applyOptions(label);
+    else lastPriceLabel = series.createPriceLine(label);
+  }
   function averages() {
     sma.setData(
       indicators.ma
@@ -309,6 +334,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       data = next;
       model.reset(data, activeMtpPeriods(indicators));
       series.setData(data.map((bar) => ({ ...bar, time: time(bar) })));
+      updateLastPriceLabel();
       volume.setData(
         indicators.volume
           ? data.map((bar) => ({
@@ -337,6 +363,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       else data.push(bar);
       model.update(data);
       series.update({ ...bar, time: time(bar) });
+      updateLastPriceLabel();
       if (indicators.volume)
         volume.update({
           time: time(bar),

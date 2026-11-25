@@ -147,20 +147,21 @@ export function makeKline(options: ChartOptions): ChartAdapter {
             show: settings.priceLine !== false,
             upColor: settings.upColor ?? "#53b987",
             downColor: settings.downColor ?? "#eb4d5c",
-            noChangeColor: settings.upColor ?? "#53b987"
+            noChangeColor: settings.upColor ?? "#53b987",
+            text: { color: "#fff", paddingLeft: 4, paddingRight: 4 }
           }
         }
       },
       xAxis: {
         axisLine: { color: palette.border },
         tickLine: { color: palette.border },
-        tickText: { color: palette.muted, size: settings.scaleFontSize ?? 11 }
+        tickText: { color: palette.text, size: settings.scaleFontSize ?? 11 }
       },
       yAxis: {
         size: axisWidth,
         axisLine: { color: palette.border },
         tickLine: { color: palette.border },
-        tickText: { color: palette.muted, size: settings.scaleFontSize ?? 11 }
+        tickText: { color: palette.text, size: settings.scaleFontSize ?? 11 }
       },
       separator: { color: palette.border, fill: true, activeBackgroundColor: palette.grid }
     }

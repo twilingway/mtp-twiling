@@ -99,6 +99,7 @@ function harness(engine) {
     primitives = [],
     frames = new Map();
   let constructedOptions;
+  const priceLabels = new Set();
   let frameId = 0,
     drawScheduled = false,
     nativeOperations = [],
@@ -197,6 +198,14 @@ function harness(engine) {
             }
           },
           setSeriesOrder() {},
+          createPriceLine(options) {
+            const line = { options: { ...options }, applyOptions(patch) {
+              Object.assign(this.options, patch);
+            } };
+            priceLabels.add(line);
+            return line;
+          },
+          removePriceLine(line) { priceLabels.delete(line); },
           attachPrimitive(primitive) {
             primitives.push(primitive);
           },
@@ -318,6 +327,7 @@ function harness(engine) {
     calls,
     chartOptions: () => constructedOptions,
     primitives,
+    priceLabels,
     camera: () => ({ spacing, offset })
   };
 }
@@ -362,6 +372,24 @@ test("Lightweight binds actual calendar grid to the bottom primitive and disable
   assert.equal(starts.length, 3);
   views[1].renderer().draw(target);
   assert.equal(starts.length, 3, "front drawing layer cannot duplicate calendar grid lines");
+});
+
+test("last-price label stays white for both candle directions and removes stale prices on empty data", () => {
+  const f = harness("lightweight");
+  const bar = { timestamp: Date.UTC(2026, 0, 1), open: 10, high: 12, low: 9, close: 11, volume: 1 };
+  f.adapter.setData([bar], false);
+  f.ready();
+  assert.equal(f.priceLabels.size, 1);
+  const label = [...f.priceLabels][0];
+  assert.equal(label.options.price, 11);
+  assert.equal(label.options.axisLabelTextColor, "#fff");
+  f.adapter.setData([{ ...bar, close: 9.5 }], false);
+  assert.equal(f.priceLabels.size, 1);
+  assert.equal([...f.priceLabels][0], label);
+  assert.equal(label.options.price, 9.5);
+  assert.equal(label.options.axisLabelTextColor, "#fff");
+  f.adapter.setData([], false);
+  assert.equal(f.priceLabels.size, 0);
 });
 
 for (const engine of ["lightweight", "kline"])

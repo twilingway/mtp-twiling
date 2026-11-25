@@ -28,8 +28,33 @@ function stop(event: SyntheticEvent) {
 export function ChartNavigation() {
   const { controller, state } = useTerminal(),
     ref = useRef<HTMLDivElement>(null),
-    [position, setPosition] = useState<Position | null>(null);
+    [position, setPosition] = useState<Position | null>(null),
+    [nearby, setNearby] = useState(false);
   const hold = useMemo(() => new ChartScrollHold(controller), [controller]);
+  useEffect(() => {
+    const panel = ref.current?.parentElement;
+    if (!panel) return;
+    const move = (event: globalThis.PointerEvent) => {
+      if (event.pointerType === "touch") return;
+      const bounds = ref.current?.getBoundingClientRect();
+      setNearby(
+        !!bounds &&
+          event.clientX >= bounds.left - 32 &&
+          event.clientX <= bounds.right + 32 &&
+          event.clientY >= bounds.top - 24 &&
+          event.clientY <= bounds.bottom + 24
+      );
+    };
+    const leave = () => setNearby(false);
+    panel.addEventListener("pointermove", move);
+    panel.addEventListener("pointerleave", leave);
+    window.addEventListener("blur", leave);
+    return () => {
+      panel.removeEventListener("pointermove", move);
+      panel.removeEventListener("pointerleave", leave);
+      window.removeEventListener("blur", leave);
+    };
+  }, []);
   useEffect(() => {
     const cancel = () => hold.cancel(),
       hidden = () => {
@@ -134,6 +159,7 @@ export function ChartNavigation() {
     <div
       ref={ref}
       className="chart-navigation"
+      data-nearby={nearby || undefined}
       role="group"
       aria-label={navigationText("navigation", state.preferences.locale)}
       style={position ? { left: position.left, top: position.top } : undefined}
