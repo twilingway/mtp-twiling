@@ -5,6 +5,7 @@ import { errorMessages } from "./messages-errors.js";
 import { intervalMessages } from "./messages-intervals.js";
 import { driveMessages } from "./messages-drive.js";
 import { accountMessages } from "./messages-account.js";
+import { cameraMessages } from "./messages-camera.js";
 import { currentDisplayPreferences } from "./preferences.js";
 import type { Locale } from "./preferences.js";
 
@@ -15,7 +16,8 @@ export const english = {
   ...errorMessages,
   ...intervalMessages,
   ...driveMessages,
-  ...accountMessages
+  ...accountMessages,
+  ...cameraMessages
 } as const;
 export type MessageKey = keyof typeof english;
 export const russian = Object.fromEntries(Object.keys(english).map((key) => [key, key])) as Record<

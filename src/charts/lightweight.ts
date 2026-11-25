@@ -23,8 +23,10 @@ import { lightweightDateFormatters } from "../i18n/chart-formatters.js";
 import { intlLocale } from "../i18n/preferences.js";
 import { calendarAxisDisplay } from "../i18n/calendar-axis.js";
 import { lightweightNavigation } from "./lightweight-navigation.js";
+import { UserCameraEvents } from "./camera-events.js";
 
 export function makeLightweight(options: ChartOptions): ChartAdapter {
+  const camera = new UserCameraEvents(options);
   const { container, row, settings, indicators, timeframe } = options;
   let data: Candle[] = [],
     updateDrawings = () => {},
@@ -223,6 +225,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
   series.attachPrimitive(primitive);
   chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
     if (range && range.from < 80) options.onNearStart();
+    camera.nativeChanged();
   });
   chart.subscribeCrosshairMove((event) => {
     const bar = event.seriesData.get(series);
@@ -294,7 +297,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     });
   }
   chart.timeScale().subscribeSizeChange(scheduleViewRestore);
-  return {
+  const adapter: ChartAdapter = {
     ...lightweightNavigation(
       chart,
       series,
@@ -417,4 +420,5 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       chart.remove();
     }
   };
+  return camera.wrap(adapter);
 }

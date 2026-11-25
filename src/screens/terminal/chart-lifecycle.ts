@@ -4,13 +4,14 @@ import type { Candle, Drawing } from "../../model/types.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import type { ChartAdapter, ChartOptions } from "../../charts/adapter.js";
 import { paintDrawings } from "../../model/drawing-model.js";
-import { loadChartView, saveAdapterView } from "../../services/chart-camera.js";
+import { loadChartView, saveAdapterView, saveChartView } from "../../services/chart-camera.js";
 import { useTerminal } from "./context.js";
 import { viewKey } from "./controller-bridge.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { chartRenderConfigFromKey, chartRenderConfigKey } from "../../charts/render-config.js";
 import type { TerminalState } from "./state.js";
 import { persistIndicatorPaneLayout } from "./indicator-preferences.js";
+import { cameraCallbacks } from "./controller-camera-sync.js";
 
 export function useChartCanvas(
   ref: RefObject<HTMLDivElement | null>,
@@ -50,6 +51,7 @@ export function useChartCanvas(
         instrument = selectedMarketRow(snapshot.rows, snapshot.preferences);
       if (!instrument || !matches()) return;
       const options: ChartOptions = {
+        ...cameraCallbacks(controller, () => owned, matches, saveChartView),
         ...(p.locale ? { locale: p.locale } : {}),
         ...(p.timeZone ? { timeZone: p.timeZone } : {}),
         container,

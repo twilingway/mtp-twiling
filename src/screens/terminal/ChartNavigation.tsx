@@ -4,6 +4,7 @@ import type { ChartAdapter } from "../../charts/adapter.js";
 import { navigationText } from "../../i18n/messages-navigation.js";
 import { chartNavigationReady } from "./chart-navigation-state.js";
 import { useTerminal } from "./context.js";
+import { userCameraAction } from "./controller-camera-sync.js";
 
 const buttons = [
   ["zoomOut", "M5 12h14"],
@@ -74,10 +75,12 @@ export function ChartNavigation() {
   function perform(action: Action) {
     const current = controller.chart;
     if (!chartNavigationReady(controller.getSnapshot(), current)) return;
-    if (action === "reset") current.resetView?.();
-    else if (action === "older" || action === "newer")
-      current.scroll?.(action === "older" ? -1 : 1);
-    else current.zoom?.(action === "zoomIn" ? 1 : -1);
+    userCameraAction(controller, current, () => {
+      if (action === "reset") current.resetView?.();
+      else if (action === "older" || action === "newer")
+        current.scroll?.(action === "older" ? -1 : 1);
+      else current.zoom?.(action === "zoomIn" ? 1 : -1);
+    });
   }
   return (
     <div

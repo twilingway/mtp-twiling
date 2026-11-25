@@ -93,6 +93,7 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
   };
   const controller = {
     chart: null,
+    sessionKey: () => null,
     getSnapshot: () => state,
     setPreferences: async (patch, _reload, valid) => {
       await Promise.resolve();

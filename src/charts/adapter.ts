@@ -25,6 +25,8 @@ export interface ChartAdapter {
   zoom?(direction: -1 | 1): void;
   scroll?(direction: -1 | 1): void;
   resetView?(): void;
+  beginViewInteraction?(changed?: boolean): void;
+  endViewInteraction?(): void;
   beginPan?(start?: PixelPoint): void;
   endPan?(): void;
   focusPoints?(points: readonly DrawingPoint[]): void;
@@ -35,6 +37,9 @@ export interface ChartAdapter {
   destroy(): void;
 }
 export interface ChartOptions extends DisplayPreferences {
+  onCameraIntent?: (() => void) | undefined;
+  onCameraChange?: ((view: ChartView) => void) | undefined;
+  onCameraIdle?: ((reason: "unchanged" | "cancelled" | "unavailable") => void) | undefined;
   indicatorPaneLayout?: IndicatorPaneLayout | undefined;
   onIndicatorLayout?: ((layout: IndicatorPaneLayout) => void) | undefined;
   container: HTMLDivElement;

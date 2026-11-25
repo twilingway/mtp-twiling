@@ -1,9 +1,10 @@
 import * as storage from "../../services/storage.js";
 import { assertImportCurrent, type BackupImportOptions } from "../../model/backup-import.js";
 import { importTerminalBackup, restoreImportedProfile } from "./controller-import.js";
+import type { BackupExportOptions } from "../../model/backup-export.js";
 
 type Bridge = Parameters<typeof importTerminalBackup>[1] & {
-  flush: () => Promise<void>;
+  flush: (options?: BackupExportOptions) => Promise<void>;
   isAlive: () => boolean;
 };
 
@@ -43,10 +44,10 @@ export class TerminalBackups {
     });
     return task;
   }
-  export = (includeHistory: boolean) =>
+  export = (includeHistory: boolean, options?: BackupExportOptions) =>
     this.enqueue(async () => {
       const { owner } = this.bridge.getState();
-      await this.bridge.flush();
+      await this.bridge.flush(options);
       return storage.createBackup(owner, { includeHistory });
     });
   private importNow = (input: unknown, options: BackupImportOptions = {}): Promise<void> =>

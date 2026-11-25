@@ -28,8 +28,10 @@ import { initializeKlineIndicators } from "./kline-indicators.js";
 import { attachVolumePaneLayout } from "./kline-pane-layout.js";
 import { attachKlineCanvasResize } from "./kline-canvas-resize.js";
 import { klineNavigation } from "./kline-navigation.js";
+import { UserCameraEvents } from "./camera-events.js";
 
 export function makeKline(options: ChartOptions): ChartAdapter {
+  const camera = new UserCameraEvents(options);
   const { container, settings, timeframe, indicators } = options;
   let data: Candle[] = [],
     dataReady = false;
@@ -261,8 +263,14 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     flushView();
     paintFront();
   });
-  chart.subscribeAction(ActionType.OnZoom, () => paintFront());
-  chart.subscribeAction(ActionType.OnScroll, () => paintFront());
+  chart.subscribeAction(ActionType.OnZoom, () => {
+    paintFront();
+    camera.nativeChanged();
+  });
+  chart.subscribeAction(ActionType.OnScroll, () => {
+    paintFront();
+    camera.nativeChanged();
+  });
   chart.subscribeAction(ActionType.OnCrosshairChange, (value: unknown) => {
     const index =
       value &&
@@ -276,7 +284,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
   initializeKlineIndicators(chart, options, volumeLayout.height());
   volumeLayout.apply();
   const detachCanvasResize = attachKlineCanvasResize(chart, () => axisWidth);
-  return {
+  const adapter: ChartAdapter = {
     ...klineNavigation(
       chart,
       () => data.length,
@@ -389,4 +397,5 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       dispose(container);
     }
   };
+  return camera.wrap(adapter);
 }

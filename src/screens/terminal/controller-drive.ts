@@ -6,6 +6,7 @@ import { loadDriveRecord, saveDriveRecord } from "../../services/drive/local.js"
 import { sanitizeDriveBackup } from "../../services/drive/backup.js";
 import type { TerminalController } from "./controller.js";
 import type { TerminalState } from "./state.js";
+import { cameraPending, flushCamera, subscribeCamera } from "./controller-camera-sync.js";
 
 const drives = new WeakMap<TerminalController, DriveCoordinator>();
 export function terminalDrive(controller: TerminalController): DriveCoordinator {
@@ -20,6 +21,7 @@ export function terminalDrive(controller: TerminalController): DriveCoordinator 
             session: controller.sessionKey(),
             authenticated: state.authenticated,
             blocked: !!(
+              cameraPending(controller) ||
               state.backupBusy ||
               state.importingBackup ||
               state.importRecoveryRequired ||
@@ -30,7 +32,10 @@ export function terminalDrive(controller: TerminalController): DriveCoordinator 
             )
           };
         },
-        exportBackup: () => controller.exportBackup(false),
+        exportBackup: async () => {
+          await flushCamera(controller);
+          return controller.exportBackup(false, { captureView: false });
+        },
         importBackup: (backup, options) => controller.importBackup(backup, options)
       },
       {
@@ -76,6 +81,10 @@ export function portableStateSignature(state: TerminalState): string {
 
 export function startTerminalDrive(controller: TerminalController): () => void {
   const drive = terminalDrive(controller);
+  const unsubscribeCamera = subscribeCamera(controller, (kind) => {
+    if (kind === "intent") drive.localIntent();
+    else drive.localChanged();
+  });
   let previous = controller.getSnapshot(),
     signature = portableStateSignature(previous);
   drive.profileChanged();
@@ -111,6 +120,7 @@ export function startTerminalDrive(controller: TerminalController): () => void {
   document.addEventListener("visibilitychange", wake);
   return () => {
     unsubscribe();
+    unsubscribeCamera();
     clearInterval(timer);
     window.removeEventListener("focus", wake);
     document.removeEventListener("visibilitychange", wake);

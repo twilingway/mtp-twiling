@@ -2,6 +2,7 @@ import * as storage from "../../services/storage.js";
 import { setDisplayPreferences } from "../../i18n/preferences.js";
 import type { TBankClient } from "../../services/tbank-client.js";
 import type { BackupImportOptions } from "../../model/backup-import.js";
+import type { BackupExportOptions } from "../../model/backup-export.js";
 import { moveWatchlistRow, type WatchlistMove } from "../../services/watchlist-order.js";
 import { loadCandleCalendar } from "../../services/tbank-calendar.js";
 import { toggleIndicatorFlags } from "../../model/indicator-flags.js";
@@ -162,10 +163,10 @@ export class TerminalController {
     await storage.savePreferences(this.state.owner, this.state.preferences);
   }
   saveView = (): Promise<void> => saveControllerView(this);
-  flush = async (): Promise<void> => {
+  flush = async (options: BackupExportOptions = {}): Promise<void> => {
     const client = this.client;
     await this.editing.flush();
-    await this.saveView();
+    if (options.captureView !== false) await this.saveView();
     await client?.flush();
     await storage.flush();
   };
@@ -442,7 +443,8 @@ export class TerminalController {
   });
   clearHistory = (uid: string | null, timeframe: Timeframe | null): Promise<void> =>
     this.history.clear(uid, timeframe);
-  exportBackup = (includeHistory: boolean): Promise<Backup> => this.backups.export(includeHistory);
+  exportBackup = (includeHistory: boolean, options?: BackupExportOptions): Promise<Backup> =>
+    this.backups.export(includeHistory, options);
   importBackup = (input: unknown, options?: BackupImportOptions): Promise<void> =>
     this.backups.import(input, options);
   importBackupFile = (file: File): Promise<void> => this.backups.importFile(file);

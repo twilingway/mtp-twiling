@@ -13,6 +13,7 @@ import { useChartCanvas } from "./chart-lifecycle.js";
 import { useTerminal } from "./context.js";
 import type { TerminalState } from "./state.js";
 import { drawingVisibleOnInterval } from "../../model/intervals/drawing-visibility.js";
+import { useCameraInput } from "./camera-input.js";
 
 export function visibleDrawings(state: TerminalState): Drawing[] {
   if (drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden) return [];
@@ -64,6 +65,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
     pointer = useRef<HTMLSpanElement>(null),
     drag = useRef<Drag | null>(null),
     pan = useRef<NativePan | null>(null);
+  const cameraInput = useCameraInput(controller);
   useEffect(() => {
     const finish = (event: PointerEvent) => {
       if (event.pointerId === pan.current?.pointerId) finishNativePan(pan);
@@ -347,17 +349,34 @@ export function ChartGestures({ children }: { children: ReactNode }) {
   return (
     <div
       className={`chart-body ${state.activeTool ? "drawing-active" : ""}`}
-      onPointerDownCapture={down}
-      onPointerMoveCapture={move}
-      onPointerUpCapture={up}
-      onPointerCancelCapture={cancel}
-      onLostPointerCapture={cancel}
+      onPointerDownCapture={(event) => {
+        if (cameraInput.down(event) !== false) down(event);
+      }}
+      onPointerMoveCapture={(event) => {
+        if (cameraInput.move(event) !== false) move(event);
+      }}
+      onPointerUpCapture={(event) => {
+        cameraInput.up(event);
+        up(event);
+      }}
+      onWheelCapture={(event) => {
+        cameraInput.action(event);
+      }}
+      onPointerCancelCapture={(event) => {
+        cameraInput.up(event);
+        cancel(event);
+      }}
+      onLostPointerCapture={(event) => {
+        cameraInput.up(event);
+        cancel(event);
+      }}
       onPointerLeave={(event) => {
         if (pointer.current) pointer.current.style.display = "none";
         controller.setCrosshair(null);
         if (!drag.current && !pan.current) cursor(event.currentTarget, "");
       }}
       onDoubleClickCapture={(event) => {
+        if (cameraInput.action(event) === false) return;
         if (
           event.target instanceof Element &&
           event.target.closest("[data-image-id],.indicator-legend")

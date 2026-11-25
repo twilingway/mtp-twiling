@@ -73,6 +73,10 @@ export class DriveCoordinator {
       this.schedule();
     }
   }
+  /** Invalidates an incoming snapshot before native geometry settles, without requesting upload. */
+  localIntent(): void {
+    if (this.applyingEpoch !== this.epoch) this.revision++;
+  }
   private schedule(): void {
     clearTimeout(this.debounce);
     if (!this.status.connected || !this.status.automatic || this.preview) return;
