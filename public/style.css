@@ -418,8 +418,15 @@ select {
   height: 33px;
   color: var(--muted);
 }
-.watchlist-search > span {
-  font-size: 22px;
+.watchlist-search-icon {
+  display: block;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
 }
 .watchlist-search input {
   width: 100%;
