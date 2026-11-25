@@ -1,5 +1,11 @@
 # Tasks
 
+## Toolbar favorites regression
+
+- [x] Render starred intervals as quick buttons in the top toolbar, preserving availability, active
+      selection and saved favorites. Scroll the strip inside narrow layouts.
+- [ ] Verify adding/removing favorites, switching an interval, reload and mobile layout in browser.
+
 ## 1. Модель
 
 - [x] 1.1 Реализовать реестр по официальному proto и mapping; проверить node

@@ -122,6 +122,28 @@ export function TimeframeMenu({
   const favoriteItems = INTERVALS.filter((item) => favorites.includes(item.id));
   return (
     <span className={`interval-menu ${className}`}>
+      {favoriteItems.length ? (
+        <span className="interval-favorites" role="group" aria-label="Избранные интервалы свечей">
+          {favoriteItems.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`interval-favorite${value === item.id ? " is-selected" : ""}`}
+              data-interval-favorite={item.id}
+              aria-label={item.label}
+              aria-pressed={value === item.id}
+              disabled={Boolean(availability[item.id])}
+              title={availability[item.id] ?? item.label}
+              onClick={() => {
+                onSelect(item.id);
+                close(false);
+              }}
+            >
+              {item.shortLabel}
+            </button>
+          ))}
+        </span>
+      ) : null}
       <button
         type="button"
         ref={triggerRef}
