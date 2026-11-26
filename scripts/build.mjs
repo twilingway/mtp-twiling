@@ -53,8 +53,23 @@ for (const file of legacy) {
   }
 }
 const { version, buildId } = await prepareVersion(root);
-const result = await build({
+const browserBuild = {
   absWorkingDir: root,
+  bundle: true,
+  platform: "browser",
+  target: "es2023",
+  outdir: "public",
+  metafile: true,
+  minify: true,
+  legalComments: "eof"
+};
+const installCapture = await build({
+  ...browserBuild,
+  entryPoints: { "pwa-install-entry": "src/pwa-install-entry.ts" },
+  format: "iife"
+});
+const result = await build({
+  ...browserBuild,
   entryPoints: {
     "app-entry": "src/main.tsx",
     "history-codec": "src/model/history-codec.ts",
@@ -63,19 +78,15 @@ const result = await build({
     "drawing-model": "src/model/drawing-model.ts",
     "backup-format": "src/model/backup-format.ts"
   },
-  bundle: true,
   splitting: true,
   format: "esm",
-  platform: "browser",
-  target: "es2023",
-  outdir: "public",
   chunkNames: "assets/[name]-[hash]",
-  metafile: true,
-  minify: true,
-  legalComments: "eof",
   define: { "process.env.NODE_ENV": '"production"' }
 });
-const outputs = Object.keys(result.metafile.outputs);
+const outputs = [
+  ...Object.keys(installCapture.metafile.outputs),
+  ...Object.keys(result.metafile.outputs)
+];
 await writeFile(join(root, ".build-manifest.json"), JSON.stringify(outputs));
 await mkdir(join(publicDir, "licenses"), { recursive: true });
 for (const [dependency, files] of [

@@ -11,6 +11,7 @@ import { isWatchlistFlags, isWatchlistFlagFilter } from "./watchlist-flags.js";
 import { isWatchlistSections, validWatchlistSectionsField } from "./watchlist-sections.js";
 import { isTechnicalIndicatorInstanceList } from "./technical-indicators/instances.js";
 import { isTechnicalPaneLayout } from "./technical-indicator-layout.js";
+import { isVolumeAveragePeriod } from "./volume-average.js";
 import type {
   Backup,
   BackupDrawing,
@@ -219,6 +220,8 @@ export function isChartSettings(value: unknown): value is ChartSettings {
       priceLine: boolean,
       showCandleCountdown: boolean,
       indicatorOptions: isIndicatorOptions,
+      volumeAverage: (value) =>
+        isRecord(value) && boolean(value.enabled) && isVolumeAveragePeriod(value.period),
       drawingTemplates: (value) =>
         isRecord(value) &&
         Object.values(value).every(

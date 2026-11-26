@@ -1,6 +1,5 @@
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { t } from "../../i18n/messages.js";
-import { memo } from "react";
 import { useTerminal } from "./context.js";
 import { ChartEngineSelect } from "./ChartEngineSelect.js";
 import { TerminalIndicatorControls } from "./TerminalIndicatorControls.js";
@@ -11,14 +10,6 @@ import {
   DEFAULT_INTERVAL_FAVORITES,
   toggleIntervalFavorite
 } from "../../model/intervals/favorites.js";
-const InstallButton = memo(function InstallButton() {
-  useTerminal();
-  return (
-    <button id="install-app" className="install-button" hidden>
-      {t("Установить")}
-    </button>
-  );
-});
 export function Toolbar() {
   const { controller, state } = useTerminal(),
     p = state.preferences,
@@ -81,7 +72,20 @@ export function Toolbar() {
       <div className="divider" />
       <TerminalIndicatorControls />
       <div className="top-spacer" />
-      <InstallButton />
+      <div id="install-actions" className="install-actions" hidden>
+        <button type="button" id="install-app" className="install-button">
+          {t("Установить приложение")}
+        </button>
+        <a
+          className="install-certificate-link"
+          href="./android-certificate.html"
+          target="_blank"
+          rel="noopener"
+          aria-label={t("Сертификат Т‑Банка на Android")}
+        >
+          {t("Сертификат Т‑Банка")}
+        </a>
+      </div>
       <label className="engine-label" htmlFor="engine">
         {t("График")}
       </label>

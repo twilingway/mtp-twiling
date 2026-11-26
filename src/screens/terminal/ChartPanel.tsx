@@ -22,11 +22,7 @@ import { SupplementalStudyStatusContext } from "./SupplementalStudyStatus.js";
 import { useOpenInterest } from "./use-open-interest.js";
 import { useQuoteTurnover } from "./use-quote-turnover.js";
 const Version = memo(function Version() {
-  return (
-    <span id="app-version" hidden>
-      PWA
-    </span>
-  );
+  return <span id="app-version" hidden />;
 });
 export function ChartPanel() {
   const [scrollTop, setScrollTop] = useState(0);

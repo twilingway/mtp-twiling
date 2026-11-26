@@ -8,7 +8,14 @@ const UPLOAD = "https://www.googleapis.com/upload/drive/v3/files";
 const FIELDS = "id,name,size,appProperties";
 const CHUNK = 1024 * 1024;
 const MAX_FILES = 10000;
+const DEFAULT_TIMEOUT_MS = 20_000;
 const invalid = () => new DriveError("remote-invalid", "Некорректный ответ Google Диска.");
+
+class DriveTimeout extends DriveError {
+  constructor() {
+    super("network", "Google Диск слишком долго отвечает.");
+  }
+}
 
 function parseFile(value: unknown): DriveFile {
   if (
@@ -23,10 +30,15 @@ function parseFile(value: unknown): DriveFile {
     !Object.values(value.appProperties).every((item) => typeof item === "string")
   )
     throw invalid();
+  const version =
+    typeof value.version === "string" && /^(?:0|[1-9]\d{0,18})$/.test(value.version)
+      ? value.version
+      : undefined;
   return {
     id: value.id,
     name: value.name,
     size: Number(value.size),
+    ...(version !== undefined ? { version } : {}),
     appProperties: value.appProperties as Record<string, string>
   };
 }
@@ -45,7 +57,8 @@ function accessToken(authorization: DriveAuthorization): string {
 async function boundedBody(
   response: Response,
   maxBytes: number,
-  authorization: DriveAuthorization
+  authorization: DriveAuthorization,
+  timeoutMs: number
 ): Promise<Blob> {
   accessToken(authorization);
   if (Number(response.headers.get("Content-Length")) > maxBytes)
@@ -60,32 +73,52 @@ async function boundedBody(
   }
   const chunks: ArrayBuffer[] = [];
   let total = 0;
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  let timedOut = false;
   const cancel = () => {
     void reader.cancel().catch(() => undefined);
+  };
+  const resetIdleTimer = () => {
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      timedOut = true;
+      cancel();
+    }, timeoutMs);
   };
   authorization.signal.addEventListener("abort", cancel, { once: true });
   try {
     accessToken(authorization);
+    resetIdleTimer();
     while (true) {
       const result = await reader.read();
       accessToken(authorization);
+      if (timedOut) throw new DriveTimeout();
       if (result.done) break;
-      total += result.value.byteLength;
+      const size = result.value.byteLength;
+      if (size === 0) continue;
+      total += size;
       if (total > maxBytes) throw new DriveError("limit", "Файл Google Диска слишком большой.");
       chunks.push(result.value.slice().buffer);
+      resetIdleTimer();
     }
   } catch (error) {
     accessToken(authorization);
+    if (timedOut) throw new DriveTimeout();
     if (error instanceof DriveError) throw error;
     throw new DriveError("network", "Не удалось получить данные Google Диска.");
   } finally {
+    clearTimeout(idleTimer);
     authorization.signal.removeEventListener("abort", cancel);
     cancel();
   }
   return new Blob(chunks);
 }
-async function json(response: Response, authorization: DriveAuthorization): Promise<unknown> {
-  const body = await boundedBody(response, 8 * 1024 * 1024, authorization);
+async function json(
+  response: Response,
+  authorization: DriveAuthorization,
+  timeoutMs: number
+): Promise<unknown> {
+  const body = await boundedBody(response, 8 * 1024 * 1024, authorization, timeoutMs);
   try {
     const text = await body.text();
     accessToken(authorization);
@@ -95,11 +128,15 @@ async function json(response: Response, authorization: DriveAuthorization): Prom
     throw invalid();
   }
 }
-async function retryable(response: Response, authorization: DriveAuthorization): Promise<boolean> {
+async function retryable(
+  response: Response,
+  authorization: DriveAuthorization,
+  timeoutMs: number
+): Promise<boolean> {
   if (response.status === 429 || response.status >= 500) return true;
   if (response.status !== 403) return false;
   try {
-    const value = await json(response, authorization);
+    const value = await json(response, authorization, timeoutMs);
     return (
       isRecord(value) &&
       isRecord(value.error) &&
@@ -124,12 +161,14 @@ export interface DriveTransportOptions {
   fetch?: typeof fetch;
   sleep?: (milliseconds: number) => Promise<void>;
   random?: () => number;
+  timeoutMs?: number;
 }
 export class DriveTransport implements DriveStore {
   private readonly namespace: "mtp-drive-v1" | "mtp-drive-v2";
   private readonly fetcher: typeof fetch;
   private readonly sleep: (milliseconds: number) => Promise<void>;
   private readonly random: () => number;
+  private readonly timeoutMs: number;
   constructor(
     private readonly authorization: DriveAuthorization,
     options: DriveTransportOptions = {}
@@ -138,6 +177,35 @@ export class DriveTransport implements DriveStore {
     this.fetcher = options.fetch ?? fetch.bind(globalThis);
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.random = options.random ?? Math.random;
+    this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    if (!Number.isInteger(this.timeoutMs) || this.timeoutMs < 1 || this.timeoutMs > 60_000)
+      throw new RangeError("Invalid Drive request timeout");
+  }
+
+  private async fetchResponse(url: string, init: RequestInit, token: string): Promise<Response> {
+    const deadline = new AbortController();
+    const timer = setTimeout(() => deadline.abort(), this.timeoutMs);
+    try {
+      const response = await this.fetcher(url, {
+        ...init,
+        headers: {
+          ...Object.fromEntries(new Headers(init.headers)),
+          Authorization: `Bearer ${token}`
+        },
+        signal: AbortSignal.any([this.authorization.signal, deadline.signal]),
+        cache: "no-store",
+        credentials: "omit",
+        redirect: "error",
+        referrerPolicy: "no-referrer"
+      });
+      deadline.signal.throwIfAborted();
+      return response;
+    } catch (error) {
+      if (deadline.signal.aborted) throw new DriveTimeout();
+      throw error;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   private async request(
@@ -150,20 +218,10 @@ export class DriveTransport implements DriveStore {
       const token = accessToken(this.authorization);
       let response: Response;
       try {
-        response = await this.fetcher(url, {
-          ...init,
-          headers: {
-            ...Object.fromEntries(new Headers(init.headers)),
-            Authorization: `Bearer ${token}`
-          },
-          signal: this.authorization.signal,
-          cache: "no-store",
-          credentials: "omit",
-          redirect: "error",
-          referrerPolicy: "no-referrer"
-        });
-      } catch {
+        response = await this.fetchResponse(url, init, token);
+      } catch (error) {
         accessToken(this.authorization);
+        if (error instanceof DriveTimeout) throw error;
         if (!retry || attempt >= 3) throw new DriveError("network", "Нет связи с Google Диском.");
         await this.backoff(attempt);
         continue;
@@ -174,7 +232,7 @@ export class DriveTransport implements DriveStore {
         throw new DriveError("auth-required", "Подключите Google Диск повторно.", 401);
       }
       if (response.ok || allowed.includes(response.status)) return response;
-      const transient = await retryable(response, this.authorization);
+      const transient = await retryable(response, this.authorization, this.timeoutMs);
       if (retry && transient && attempt < 3) {
         await this.backoff(attempt, response.headers.get("Retry-After"));
         continue;
@@ -206,11 +264,11 @@ export class DriveTransport implements DriveStore {
           spaces: "appDataFolder",
           pageSize: "1000",
           pageToken,
-          fields: `files(${FIELDS}),nextPageToken,incompleteSearch`,
+          fields: `files(${FIELDS},version),nextPageToken,incompleteSearch`,
           q: `trashed = false and appProperties has { key='mtpNamespace' and value='${this.namespace}' } and appProperties has { key='mtpKind' and value='${kind}' }`
         })
       );
-      const value = await json(response, this.authorization);
+      const value = await json(response, this.authorization, this.timeoutMs);
       if (
         !isRecord(value) ||
         !Array.isArray(value.files) ||
@@ -241,7 +299,7 @@ export class DriveTransport implements DriveStore {
     const response = await this.request(
       query(`${API}/${encodeURIComponent(file.id)}`, { alt: "media" })
     );
-    const body = await boundedBody(response, maxBytes, this.authorization);
+    const body = await boundedBody(response, maxBytes, this.authorization, this.timeoutMs);
     if (body.size !== file.size) throw invalid();
     return body;
   }
@@ -254,7 +312,8 @@ export class DriveTransport implements DriveStore {
       await this.request(
         query(`${API}/generateIds`, { count: "1", space: "appDataFolder", type: "files" })
       ),
-      this.authorization
+      this.authorization,
+      this.timeoutMs
     );
     if (
       !isRecord(generated) ||
@@ -291,7 +350,7 @@ export class DriveTransport implements DriveStore {
       result =
         response.status === 409
           ? await this.existing(id)
-          : await json(response, this.authorization);
+          : await json(response, this.authorization, this.timeoutMs);
     } else result = await this.resumable(metadata, body);
     const file = parseFile(result);
     if (
@@ -307,7 +366,8 @@ export class DriveTransport implements DriveStore {
   private async existing(id: string): Promise<unknown> {
     return json(
       await this.request(query(`${API}/${encodeURIComponent(id)}`, { fields: FIELDS })),
-      this.authorization
+      this.authorization,
+      this.timeoutMs
     );
   }
   private async resumable(
@@ -366,7 +426,11 @@ export class DriveTransport implements DriveStore {
             false
           );
         } catch (error) {
-          if (!(error instanceof DriveError) || !["network", "quota"].includes(error.code))
+          if (
+            error instanceof DriveTimeout ||
+            !(error instanceof DriveError) ||
+            !["network", "quota"].includes(error.code)
+          )
             throw error;
           await this.backoff(stalls++);
           response = await this.request(
@@ -379,7 +443,7 @@ export class DriveTransport implements DriveStore {
             [308, 404]
           );
         }
-        if (response.ok) return json(response, this.authorization);
+        if (response.ok) return json(response, this.authorization, this.timeoutMs);
         if (response.status === 404) break;
         const range = response.headers.get("Range");
         const match = range?.match(/^bytes=0-(\d+)$/);
@@ -400,7 +464,7 @@ export class DriveTransport implements DriveStore {
             },
             [308, 404]
           );
-          if (status.ok) return json(status, this.authorization);
+          if (status.ok) return json(status, this.authorization, this.timeoutMs);
           throw invalid();
         }
       }

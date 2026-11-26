@@ -37,14 +37,14 @@ instance2/envelope3, IndexedDB migration и разрешение G5 сюда н�
 
 ## Стоимость чтения
 
-Кеша нет: ни node ID, ни persisted baseHeads не заменяют проверку нового reader. Payload JSON
-читается снова при каждой попытке, отдельно coordinator и standalone writer; существующие size
-limits сохраняются. `validateHeads` хранит один payload за раз. Coordinator по-прежнему ограничивает
-preview восемью конфликтующими heads. Бинарное изображение больше не скачивается повторно ради
-same-head guard.
+Каждая сверка получает свежий список снимков. Проверенные манифесты переиспользуются в памяти
+текущего подключения по идентификатору, серверной версии, SHA‑256 и размеру. Снимки без серверной
+версии загружаются заново. Payload JSON читается снова при каждой попытке, отдельно coordinator и
+standalone writer. `validateHeads` хранит один payload за раз. Coordinator ограничивает preview
+восемью конфликтующими heads. Бинарное изображение проверяется при загрузке и дедупликации.
 
-Измерение настоящих source coordinator/DriveSync через memory Store, одно изображение 100 КиБ
-(102400 bytes), payload JSON 313 bytes:
+Измерение coordinator/DriveSync через memory Store без серверных версий файлов, одно изображение 100
+КиБ (102400 bytes), payload JSON 313 bytes:
 
 | Same-head             | Payload reads/bytes | Image reads/bytes | Manifest reads | Upload               |
 | --------------------- | ------------------: | ----------------: | -------------: | -------------------- |

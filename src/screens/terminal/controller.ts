@@ -366,8 +366,9 @@ export class TerminalController {
     };
     this.update({ preferences: { ...this.state.preferences, indicators, chartSettings } });
     await this.savePreferences();
-    if (key !== "volume" && this.session.matches(client) && owner === this.state.owner)
-      await this.loadHistory(true);
+    if (!this.session.matches(client) || owner !== this.state.owner) return;
+    if (key === "volume") this.scheduleOlderHistory(true);
+    else await this.loadHistory(true);
   };
   setChartSettings = async (patch: ChartSettings): Promise<void> => {
     const owner = this.state.owner,
@@ -427,7 +428,7 @@ export class TerminalController {
       () => !this.session.disposed && owner === this.state.owner && this.session.matches(client)
     );
   };
-  scheduleOlderHistory = (): void => this.history.scheduleOlder();
+  scheduleOlderHistory = (volumeAverage = false): void => this.history.scheduleOlder(volumeAverage);
   searchInstruments = async (query: string, kind: InstrumentSearchKind, signal: AbortSignal) =>
     this.client?.searchInstruments(query, kind, signal) ?? [];
   addInstrument = async (

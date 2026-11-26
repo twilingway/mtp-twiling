@@ -27,6 +27,7 @@ const chartSettings: Shape = {
     "theme legendCollapsed mtpMenuCollapsed showCandleCountdown bodyVisible wickUpColor wickDownColor borderUpColor borderDownColor borderVisible wickVisible candlePaletteVersion grid upColor downColor background scaleFontSize showLegend priceLine"
   ),
   removedIndicators: [true],
+  volumeAverage: scalars("enabled period"),
   drawingTools: {
     ...scalars(
       "cursor magnet magnetStrength snapIndicators stayInDrawingMode drawingsHidden indicatorsHidden drawingsLocked indicatorsLocked hideTarget lockTarget deleteLocked"

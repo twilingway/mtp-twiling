@@ -236,14 +236,24 @@ export function AccountDialog() {
               "Ключ отправляется только в Т‑Банк и сохраняется в зашифрованном виде на устройстве. Приложение использует только справочник и рыночные данные."
             )}
           </p>
-          <a
-            className="settings-link"
-            href="https://www.tbank.ru/invest/settings/"
-            target="_blank"
-            rel="noopener"
-          >
-            {t("Открыть настройки Т‑Инвестиций")}
-          </a>
+          <div className="login-help-links">
+            <a
+              className="settings-link"
+              href="https://www.tbank.ru/invest/settings/"
+              target="_blank"
+              rel="noopener"
+            >
+              {t("Открыть настройки Т‑Инвестиций")}
+            </a>
+            <a
+              className="settings-link"
+              href="./android-certificate.html"
+              target="_blank"
+              rel="noopener"
+            >
+              {t("Сертификат Т‑Банка на Android")}
+            </a>
+          </div>
           {error && (
             <p id="login-error" role="alert">
               {systemText(error)}

@@ -1,4 +1,5 @@
 export const uiMessages = {
+  "Установить приложение": "Install app",
   "Т‑Банк подключён": "T-Bank is connected",
   "Аккаунт Т‑Банка настроен": "T-Bank account is configured",
   "Котировки поступают по WebSocket": "Receiving quotes over WebSocket",
@@ -145,6 +146,9 @@ export const uiMessages = {
   "Размер шрифта шкал": "Scale font size",
   Ок: "OK",
   "Источник: закрытие свечи (Close)": "Source: candle close (Close)",
+  "Средняя объёма (SMA)": "Volume moving average (SMA)",
+  "Период в свечах": "Period in bars",
+  "Настройки объёма": "Volume settings",
   "Цвет линии": "Line colour",
   Толщина: "Width",
   "Прозрачность:": "Transparency:",
@@ -199,7 +203,6 @@ export const uiMessages = {
   "Сохранения останутся на устройстве.": "Saved data stays on this device.",
   Обновить: "Update",
   "Напомнить позже": "Remind me later",
-  Установить: "Install",
   "Найти инструмент": "Find symbol",
   Таймфрейм: "Interval",
   "Период истории": "History range",

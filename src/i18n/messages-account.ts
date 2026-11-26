@@ -1,4 +1,6 @@
 export const accountMessages = {
+  "Сертификат Т‑Банка": "T-Bank certificate",
+  "Сертификат Т‑Банка на Android": "T-Bank certificate on Android",
   "Поиск инструмента в хранилище": "Search stored instruments",
   "Тикер или название инструмента": "Ticker or instrument name",
   "Инструменты не найдены": "No instruments found",
@@ -23,8 +25,8 @@ export const accountMessages = {
   "Сервер приложения раздаёт оболочку и обновления. Ключ банка, котировки и локальные сохранения находятся в браузере устройства; запросы к Т‑Банку идут напрямую. Если включить Drive, выбранные переносимые данные хранятся на вашем личном Google Диске.":
     "The app server delivers the app shell and updates. Your bank key, quotes and local saves stay in your device's browser; T-Bank requests go directly to the bank. If you enable Drive, selected portable data is stored in your personal Google Drive.",
   "Открытый код на GitHub": "Source code on GitHub",
-  "Установленное приложение хранит данные на вашем устройстве. Очистка данных сайта или приложения удалит сохранения только на этом устройстве. Настройки и разметку можно восстановить с личного Google Диска, если синхронизация была включена.":
-    "The installed app stores data on your device. Clearing site or app data deletes saves only on this device. Settings and drawings can be restored from your personal Google Drive if sync was enabled.",
+  "Терминал хранит данные в вашем браузере. Очистка данных сайта удалит локальные сохранения. Если синхронизация была включена, настройки и разметку можно восстановить с личного Google Диска.":
+    "The terminal stores data in your browser. Clearing site data deletes local saves. If sync was enabled, you can restore settings and drawings from your personal Google Drive.",
   "Больше не показывать на этом устройстве": "Don't show again on this device",
   "Не удалось прочитать настройку приветствия. Можно продолжить без её сохранения.":
     "Could not read the welcome preference. You can continue without saving it.",
@@ -59,8 +61,8 @@ export const accountMessages = {
   "Групп интервалов": "Interval groups",
   "Всё приложение в браузере": "Entire app in this browser",
   "Оценка недоступна": "Estimate unavailable",
-  "Это приблизительная оценка, включая изображения и файлы PWA.":
-    "This is an estimate including images and PWA files.",
+  "Это приблизительная оценка, включая изображения и кэш сайта.":
+    "This is an estimate including images and the site cache.",
   "История по инструментам и интервалам": "History by instrument and interval",
   Выбор: "Selection",
   Выбрать: "Select",

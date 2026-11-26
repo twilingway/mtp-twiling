@@ -1,4 +1,6 @@
 export const errorMessages = {
+  "Приложение установлено.": "The app has been installed.",
+  "Не удалось открыть установку приложения.": "Could not open the app installation dialog.",
   Загружено: "Loaded",
   частей: "parts",
   "новых запросов": "new requests",
@@ -65,14 +67,11 @@ export const errorMessages = {
   "Не удалось удалить инструмент.": "Could not remove symbol.",
   "Не удалось сохранить порядок.": "Could not save order.",
   "Не удалось открыть инструмент.": "Could not open symbol.",
-  "Приложение установлено.": "Application installed.",
-  "Не удалось открыть установку приложения.": "Could not open app installation.",
   "Сохраняем…": "Saving…",
   "Не удалось завершить сохранение. Обновление отложено.":
     "Could not finish saving. Update postponed.",
-  "Для установки PWA нужен HTTPS или localhost.": "PWA installation requires HTTPS or localhost.",
-  "Не удалось подготовить PWA для работы офлайн. Проверьте сеть.":
-    "Could not prepare PWA for offline use. Check your network.",
+  "Не удалось подготовить сайт для работы офлайн. Проверьте сеть.":
+    "Could not prepare the site for offline use. Check your network.",
   "Нет транзакции обновления IndexedDB.": "No IndexedDB upgrade transaction.",
   "Браузер не разрешил открыть IndexedDB.": "Browser denied IndexedDB access.",
   "Запись отменена.": "Write cancelled.",

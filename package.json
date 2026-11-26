@@ -1,9 +1,9 @@
 {
   "name": "mtp-twiling",
-  "version": "0.3.27",
+  "version": "0.3.33",
   "private": true,
   "type": "module",
-  "description": "Личный PWA-терминал с прямым T‑Invest API и локальными сохранениями",
+  "description": "Личный браузерный терминал с прямым T‑Invest API и локальными сохранениями",
   "engines": {
     "node": ">=22.21.0"
   },

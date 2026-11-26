@@ -1,8 +1,9 @@
 import * as storage from "../../services/storage-v2.js";
 import { loadChartView } from "../../services/chart-camera.js";
 import { activeMtpPeriods } from "../../model/mtp.js";
+import { volumeAverageWarmup } from "../../model/volume-average.js";
 import { mergeCandles, TIMEFRAMES } from "../../model/history-codec.js";
-import { olderHistoryStart } from "../../model/intervals/calendar.js";
+import { historyWindowStart, olderHistoryStart } from "../../model/intervals/calendar.js";
 import type { Candle, ChartEngine, Timeframe } from "../../model/types.js";
 import {
   historyFirstDate,
@@ -302,10 +303,18 @@ export class TerminalHistory {
         });
       }
     } finally {
-      if (this.current(id, client, owner)) this.bridge.update({ loading: false });
+      if (this.current(id, client, owner)) {
+        this.bridge.update({ loading: false });
+        if (this.bridge.getState().historyViewReady) this.scheduleOlder(true);
+      }
     }
   }
-  scheduleOlder(): void {
+  private volumeAverageDeficit(): number {
+    const { candles, preferences: p } = this.bridge.getState();
+    const period = p.indicators.volume ? volumeAverageWarmup(p.chartSettings, true) : 0;
+    return Math.max(0, period - candles.length);
+  }
+  scheduleOlder(volumeAverage = false): void {
     const state = this.bridge.getState();
     if (
       !this.bridge.isAlive() ||
@@ -313,16 +322,18 @@ export class TerminalHistory {
       this.olderBusy ||
       this.startReached ||
       this.clearing ||
-      !state.candles.length
+      !state.candles.length ||
+      (volumeAverage &&
+        (!state.historyViewReady || !navigator.onLine || !this.volumeAverageDeficit()))
     )
       return;
     if (this.olderTimer !== null) clearTimeout(this.olderTimer);
     this.olderTimer = setTimeout(() => {
       this.olderTimer = null;
-      void this.loadOlder();
+      void this.loadOlder(volumeAverage);
     }, 350);
   }
-  private async loadOlder(): Promise<void> {
+  private async loadOlder(volumeAverage: boolean): Promise<void> {
     const state = this.bridge.getState(),
       client = this.bridge.getClient(),
       first = state.candles[0];
@@ -341,6 +352,8 @@ export class TerminalHistory {
       owner = state.owner,
       p = state.preferences;
     const until = Math.min(this.cursor ?? first.timestamp, first.timestamp);
+    const missing = volumeAverage ? this.volumeAverageDeficit() : 0;
+    if (volumeAverage && (!navigator.onLine || !missing)) return;
 
     const parsed = Date.parse(
       (["1d", "1w", "1M"].includes(p.timeframe)
@@ -350,20 +363,28 @@ export class TerminalHistory {
         "1990-01-01"
     );
     const earliest = Number.isFinite(parsed) ? parsed : Date.parse("1990-01-01");
-    const from = Math.max(earliest, olderHistoryStart(until, p.timeframe));
+    const from = Math.max(
+      earliest,
+      volumeAverage
+        ? historyWindowStart(until, 0, p.timeframe, missing)
+        : olderHistoryStart(until, p.timeframe)
+    );
     if (from >= until) {
       this.startReached = true;
       return;
     }
     this.olderBusy = true;
     this.bridge.update({ historyHelp: "Подгружаем более ранние свечи…" });
+    let addedEarlier = false;
     try {
       const options = { uid: row.uid, ...(this.abort ? { signal: this.abort.signal } : {}) };
       const result = await client.candles(p.symbol, p.timeframe, { from, to: until }, options);
       if (!this.current(id, client, owner) || this.clearing) return;
       this.cursor = from;
       this.startReached = from <= earliest || (!navigator.onLine && !result.candles.length);
-      const candles = mergeCandles(result.candles, this.bridge.getState().candles);
+      const loaded = this.bridge.getState().candles,
+        candles = mergeCandles(result.candles, loaded);
+      addedEarlier = candles.length > loaded.length;
       this.bridge.update({
         candles,
         historyHelp: `${candles.length} свечей · история слева · ${result.requests} новых запросов`
@@ -371,7 +392,10 @@ export class TerminalHistory {
     } catch (error) {
       if (!isAbort(error) && this.current(id, client, owner)) this.bridge.notify(errorText(error));
     } finally {
-      if (this.current(id, client, owner)) this.olderBusy = false;
+      if (this.current(id, client, owner)) {
+        this.olderBusy = false;
+        if (addedEarlier) this.scheduleOlder(true);
+      }
     }
   }
   async clear(uid: string | null, timeframe: Timeframe | null): Promise<void> {
