@@ -11,6 +11,11 @@
 - [x] 2.1 Выполнить focused Node tests, whole-source strict compilerhost, scoped lint/format, strict
       OpenSpec и diff scope; сохранить evidence.
 
+## 3. Независимое review
+
+- [x] 3.1 Исправить два P2 finite arithmetic; проверить88 targeted/ordinary tests и оригинальные3
+      reviewer probes, повторить strict source/lint/format/spec.
+
 ## Workflow follow-up
 
 - Регистрация, generic fill/offset renderer, native/browser и Pine runtime parity остаются следующей

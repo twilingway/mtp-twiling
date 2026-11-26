@@ -502,3 +502,60 @@ test("subnormal flat prices remain prices rather than artificial zero", () => {
   }
   assert.deepEqual(chandelierExit(input, { atrLength: 2 }).longExit, [null, tiny, tiny, tiny]);
 });
+
+for (const length of [9, 25])
+  for (const sign of [-1, 1]) {
+    test(`LSMA constant signed MAX_VALUE survives mean rounding length${length} sign${sign}`, () => {
+      // A constant least-squares fit has covariance/slope exactly zero, at every evaluation coordinate.
+      const constant = sign * Number.MAX_VALUE;
+      const source = Array(length + 2).fill(constant);
+      for (const offset of [-10000, 0, 10000]) {
+        const actual = lsma(source, { length, offset });
+        assert.deepEqual(
+          actual,
+          source.map((_, i) => (i < length - 1 ? null : constant))
+        );
+      }
+    });
+  }
+test("Keltner final finite bands survive intermediate ATR times multiplier overflow in both directions", () => {
+  // Express every value in units u=1e308: (-1)+1*2=1, and 1-1*2=-1.
+  const options = { length: 1, atrLength: 1, multiplier: 2 };
+  assertOutputs(keltnerChannels([bar(-5e307, -1.5e308, -1e308)], options), {
+    basis: [-1e308],
+    upper: [1e308],
+    lower: [null]
+  });
+  assertOutputs(keltnerChannels([bar(1.5e308, 5e307, 1e308)], options), {
+    basis: [1e308],
+    upper: [null],
+    lower: [-1e308]
+  });
+});
+test("Chandelier final finite exits survive intermediate ATR times multiplier overflow in both directions", () => {
+  // L1/ATR1: TR=H-L; long H-2*(H-L), short L+2*(H-L).
+  const options = { length: 1, atrLength: 1, multiplier: 2 };
+  assertOutputs(chandelierExit([bar(1e308, 0, 0)], options), {
+    longExit: [-1e308],
+    shortExit: [null]
+  });
+  assertOutputs(chandelierExit([bar(0, -1e308, 0)], options), {
+    longExit: [null],
+    shortExit: [1e308]
+  });
+  assertOutputs(chandelierExit([bar(Number.MAX_VALUE, 0, 0)], options), {
+    longExit: [-Number.MAX_VALUE],
+    shortExit: [null]
+  });
+  assertOutputs(chandelierExit([bar(0, -Number.MAX_VALUE, 0)], options), {
+    longExit: [null],
+    shortExit: [Number.MAX_VALUE]
+  });
+});
+test("LSMA genuine out-of-range projection remains null after constant-window correction", () => {
+  // Exact line through -u,+u has slope2u; one step beyond is3u, outside binary64.
+  assert.deepEqual(lsma([-1e308, 1e308], { length: 2, offset: -1 }), [null, null]);
+  assert.deepEqual(lsma([1e308, -1e308], { length: 2, offset: -1 }), [null, null]);
+  // This ordinary extrapolation is finite and must not be clamped to the source range.
+  assert.deepEqual(lsma([1, 3], { length: 2, offset: -1 }), [null, 5]);
+});

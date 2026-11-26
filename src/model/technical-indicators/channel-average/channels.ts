@@ -1,6 +1,15 @@
 import type { NumericSeries, NumericValue, PriceSource, TechnicalBar } from "../types.js";
 import { average, extrema, trueRange } from "./filters.js";
-import { barsInput, bounded, convex, finite, integer, period, prices } from "./inputs.js";
+import {
+  addScaled,
+  barsInput,
+  bounded,
+  convex,
+  finite,
+  integer,
+  period,
+  prices
+} from "./inputs.js";
 
 export interface ChannelResult {
   readonly basis: NumericSeries;
@@ -50,10 +59,10 @@ export function keltnerChannels(
         ? trueRange(bars)
         : average(trueRange(bars), atrLength, "RMA");
   const upper = basis.map((value, i) =>
-    value === null || range[i] === null ? null : finite(value + range[i]! * multiplier)
+    value === null || range[i] === null ? null : addScaled(value, range[i]!, multiplier)
   );
   const lower = basis.map((value, i) =>
-    value === null || range[i] === null ? null : finite(value - range[i]! * multiplier)
+    value === null || range[i] === null ? null : addScaled(value, range[i]!, -multiplier)
   );
   return { basis, upper, lower };
 }
@@ -114,7 +123,7 @@ export function chandelierExit(
   );
   const atr = average(trueRange(bars), atrLength, "RMA");
   const level = (extreme: NumericValue, range: NumericValue, sign: number) =>
-    extreme === null || range === null ? null : finite(extreme + sign * range * multiplier);
+    extreme === null || range === null ? null : addScaled(extreme, range, sign * multiplier);
   return {
     longExit: high.map((value, i) => level(value, atr[i]!, -1)),
     shortExit: low.map((value, i) => level(value, atr[i]!, 1))

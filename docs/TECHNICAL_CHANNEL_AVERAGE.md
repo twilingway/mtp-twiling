@@ -197,3 +197,22 @@ node scripts/spec.mjs validate --all --strict
 Typecheck читает весь source с исходными strict options. Только если baseline generated app-version
 отсутствует, compilerhost виртуально предоставляет APP_VERSION:string и BUILD_ID:string. Нет записи
 generated, подавления diagnostics или изменения flags. Итоги — verification.md.
+
+## Follow-up по независимому review frozen70a4db2
+
+Два P2 исправлены отдельным commit поверх frozen snapshot без изменения API, presets и формул. LSMA
+теперь вычисляет среднее normalized y через convex online mean: постоянные окна length9/default25 на
+плюс/минус Number.MAX_VALUE имеют exact mean и slope0, без накопления девяти 1/9
+до1.0000000000000002. Проекция не clamp к диапазону окна: ordinary [1,3] с offset-1 по-прежнему
+даёт5; действительно непредставимая экстраполяция даёт null.
+
+KC/Chandelier используют finite-safe a+b*c. Обычный finite product сохраняет прежний порядок
+arithmetic. Только если product отдельно переполнился, вся сумма вычисляется в общем
+scale=max(abs(a),abs(b)) и затем масштабируется обратно. Это сохраняет представимые конечные линии
+после cancellation, а действительно непредставимые конечные линии остаются null.
+
+Независимые аналитические regressions: в единицах u=1e308 KC upper=(-1+1*2)*u=u, KC
+lower=(1-1*2)*u=-u; Chandelier long=(1-1*2)*u=-u и зеркальный short=u. Дополнительно проверены оба
+знака Number.MAX_VALUE, постоянная LSMA length9/25 при offsets-10000/0/10000 и сохранение null для
+истинного overflow. Исходный независимый reviewer probe не редактировался; все три вектора теперь
+PASS. Полный focused набор88/88 PASS, включая прежние ordinary ledgers.

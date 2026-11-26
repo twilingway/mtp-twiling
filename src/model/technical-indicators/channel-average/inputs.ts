@@ -16,6 +16,13 @@ export function integer(value: number, min: number, max: number): void {
   if (!Number.isInteger(value)) throw new RangeError("Expected integer parameter");
 }
 export const finite = (value: number): NumericValue => (Number.isFinite(value) ? value : null);
+/** Preserve finite a+b*c when b*c alone overflows before cancellation. */
+export function addScaled(base: number, value: number, multiplier: number): NumericValue {
+  const product = value * multiplier;
+  if (Number.isFinite(product)) return finite(base + product);
+  const scale = Math.max(Math.abs(base), Math.abs(value));
+  return finite((base / scale + (value / scale) * multiplier) * scale);
+}
 /** Finite-safe convex combination, including equal subnormal values. */
 export function convex(a: number, b: number, weight: number): number {
   if (a === b) return a;

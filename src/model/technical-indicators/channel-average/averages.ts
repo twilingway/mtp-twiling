@@ -1,5 +1,5 @@
 import type { NumericSeries, NumericValue } from "../types.js";
-import { bounded, directBudget, finite, integer, period, seriesInput } from "./inputs.js";
+import { bounded, convex, directBudget, finite, integer, period, seriesInput } from "./inputs.js";
 
 export interface AlmaOptions {
   readonly length?: number;
@@ -72,7 +72,7 @@ export function lsma(source: NumericSeries, options: LsmaOptions = {}): NumericV
     let covariance = 0;
     for (let j = 0; j < length; j++) {
       const value = source[i - length + 1 + j]! / scale;
-      mean += value / length;
+      mean = j === 0 ? value : convex(mean, value, 1 / (j + 1));
       covariance += (j - center) * value;
     }
     result[i] = finite((mean + (covariance / denominator) * (center - offset)) * scale);
