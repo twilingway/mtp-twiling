@@ -20,6 +20,7 @@ import type { TerminalState } from "./state.js";
 import { persistIndicatorPaneLayout } from "./indicator-preferences.js";
 import { cameraCallbacks } from "./controller-camera-sync.js";
 import { watchChartPriceMetadata } from "./chart-price-metadata.js";
+import { publishWorkspaceCrosshair } from "./workspace-sync-controller.js";
 import { persistTechnicalPaneLayout } from "./technical-indicator-actions.js";
 import type { TerminalPreferences } from "./state.js";
 
@@ -162,7 +163,10 @@ export function useChartCanvas(
           if (matches()) controller.scheduleOlderHistory();
         },
         onCrosshair: (bar) => {
-          if (matches()) controller.setCrosshair(bar);
+          if (matches()) {
+            controller.setCrosshair(bar);
+            publishWorkspaceCrosshair(controller, bar?.timestamp ?? null);
+          }
         },
         paint: (ctx, width, height, project, layer) => {
           if (!matches()) return;

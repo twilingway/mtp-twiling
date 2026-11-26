@@ -6,6 +6,7 @@ import { mergeCandles, TIMEFRAMES } from "../../model/history-codec.js";
 import { historyWindowStart, olderHistoryStart } from "../../model/intervals/calendar.js";
 import type { Candle, ChartEngine, Timeframe } from "../../model/types.js";
 import {
+  HISTORY_FALLBACK_FIRST,
   historyFirstDate,
   historyRangeCovered,
   historyViewBackfillFrom,
@@ -204,14 +205,19 @@ export class TerminalHistory {
       );
       if (!current()) return;
       available = mergeCandles(available, result.candles);
-      const probeSpotDailyStart =
-        !plan.knownFirst && row.providerRef?.category === "spot" && p.timeframe === "1d";
+      const provider =
+          row.providerRef?.provider === "okx" ? "OKX" : row.providerRef ? "Bybit" : "Т‑Банк",
+        probeSpotStart =
+          !plan.knownFirst &&
+          row.providerRef?.category === "spot" &&
+          (p.timeframe === "1d" || p.timeframe === "1w" || p.timeframe === "1M");
       let coverage = historyViewCoverage(plan, available, from),
         requests = result.requests,
         rangeCovered = result.requestedRangeCovered === true,
         emptySpan = available.length ? 0 : until - from,
         backfillMultiplier = 1,
         historyViewFallback = false,
+        exhausted = false,
         incomplete = "";
       while (!coverage.complete) {
         if (!navigator.onLine) {
@@ -219,27 +225,28 @@ export class TerminalHistory {
           break;
         }
         if (from <= plan.earliest) {
+          exhausted = true;
           const first = available[0];
-          if (probeSpotDailyStart && rangeCovered && first) {
+          if (probeSpotStart && rangeCovered && first) {
             coverage = { ...coverage, complete: true };
             historyViewFallback =
               plan.visibleTo < first.timestamp ||
               (plan.mode === "anchor" && plan.target < first.timestamp);
             if (historyViewFallback)
-              incomplete =
-                "Сохранённое окно раньше первой свечи Bybit. Показана доступная история.";
+              incomplete = `Сохранённое окно раньше первой свечи ${provider}. Показана доступная история.`;
           } else {
             incomplete = "Достигнута граница истории, но сохранённое окно покрыто не полностью.";
           }
           break;
         }
         if (!plan.knownFirst && emptySpan >= 365 * 86400000) {
+          exhausted = true;
           incomplete = "Источник не дал свечей за год: сохранённое окно ещё не восстановлено.";
           break;
         }
         const nextFrom = Math.max(
             plan.earliest,
-            probeSpotDailyStart && rangeCovered && available.length
+            probeSpotStart && rangeCovered && available.length
               ? plan.earliest
               : historyViewBackfillFrom(plan, from, coverage.missingBars, backfillMultiplier)
           ),
@@ -266,22 +273,26 @@ export class TerminalHistory {
           backfillMultiplier *= 2;
         }
       }
+      if (exhausted && !coverage.complete && available.length && navigator.onLine) {
+        historyViewFallback = true;
+        incomplete = "Не удалось восстановить сохранённое окно. Показаны доступные свечи.";
+      }
       if (restoring && coverage.complete && !navigator.onLine) {
         const ranges = await storage.loadCoverage(owner, row.uid, p.timeframe);
         if (!current()) return;
         const cachedWindow = historyViewCachedWindow(plan, available);
         if (!historyRangeCovered(ranges, cachedWindow.from, cachedWindow.to)) {
           coverage = { ...coverage, complete: false };
+          historyViewFallback = false;
           incomplete = "Офлайн: покрытие сохранённого окна в кеше не подтверждено.";
         }
       }
       this.cursor = from;
       this.startReached = from <= plan.earliest;
-      const candles = refresh ? mergeCandles(available, this.bridge.getState().candles) : available,
-        provider = row.providerRef ? "Bybit" : "Т‑Банк";
+      const candles = refresh ? mergeCandles(available, this.bridge.getState().candles) : available;
       this.bridge.update({
         candles,
-        historyViewReady: coverage.complete,
+        historyViewReady: coverage.complete || historyViewFallback,
         historyViewFallback,
         historyHelp:
           incomplete ||
@@ -354,14 +365,7 @@ export class TerminalHistory {
     const missing = volumeAverage ? this.volumeAverageDeficit() : 0;
     if (volumeAverage && (!navigator.onLine || !missing)) return;
 
-    const parsed = Date.parse(
-      (["1d", "1w", "1M"].includes(p.timeframe)
-        ? row.first1dayCandleDate
-        : row.first1minCandleDate) ??
-        row.firstTradeDate ??
-        "1990-01-01"
-    );
-    const earliest = Number.isFinite(parsed) ? parsed : Date.parse("1990-01-01");
+    const earliest = historyFirstDate(row, p.timeframe) ?? HISTORY_FALLBACK_FIRST;
     const from = Math.max(
       earliest,
       volumeAverage

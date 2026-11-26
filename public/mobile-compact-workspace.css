@@ -64,6 +64,7 @@
   }
 
   .topbar > .chart-layout-control,
+  .topbar > .chart-layout-picker,
   .workspace .chart-range-control[data-placement="footer"],
   .workspace .right-panel-tools {
     display: none;
@@ -109,7 +110,7 @@
     font-variant-numeric: tabular-nums;
   }
 
-  .topbar .mobile-workspace-trigger .chart-layout-icon {
+  .topbar .mobile-workspace-trigger .chart-layout-thumbnail {
     width: 15px;
     height: 13px;
     padding: 1px;
@@ -165,6 +166,20 @@
     border-color: var(--accent);
     color: var(--accent);
     background: var(--accent-surface);
+  }
+
+  .mobile-workspace-layout {
+    border: 1px solid var(--control-line);
+    border-radius: 5px;
+  }
+
+  .mobile-workspace-layout summary {
+    padding: 9px 8px;
+    cursor: pointer;
+  }
+
+  .mobile-workspace-layout .chart-layout-variant-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .topbar

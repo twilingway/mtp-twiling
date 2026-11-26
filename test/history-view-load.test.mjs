@@ -296,6 +296,42 @@ test("BTCUSD daily shows real candles at the confirmed spot history boundary", a
   }
 });
 
+test("weekly and monthly spot charts restore with fewer candles than the MTP warmup", async () => {
+  const now = Date.parse("2026-11-26T12:00:00Z"),
+    uid = "bybit:spot:BTCUSD",
+    providerRef = { provider: "bybit", category: "spot", symbol: "BTCUSD" };
+  for (const [timeframe, dates] of [
+    ["1w", ["2026-04-13", "2026-04-20", "2026-11-23"]],
+    ["1M", ["2026-04-01", "2026-05-01", "2026-11-01"]]
+  ]) {
+    const bars = dates.map((date) => bar(Date.parse(date)));
+    for (const overlaps of [true, false]) {
+      const target = overlaps ? bars[1].timestamp : Date.parse("2022-01-01"),
+        f = fixture({
+          now,
+          timeframe,
+          period: 640,
+          view: { from: target / 1000, to: (target + DAY) / 1000 },
+          provider: ({ range }) => ({
+            candles: bars.filter((item) => item.timestamp >= range.from && item.timestamp <= range.to),
+            requests: 1,
+            requestedRangeCovered: true
+          })
+        });
+      f.change({
+        preferences: { ...f.state().preferences, symbol: uid, instrumentUid: uid },
+        rows: [{ symbol: uid, uid, providerRef }]
+      });
+      await f.history.load();
+      assert.deepEqual(Array.from(f.state().candles), bars);
+      assert.equal(f.state().historyViewReady, true);
+      assert.equal(f.state().historyViewFallback, !overlaps);
+      assert.equal(f.calls[0].timeframe, timeframe);
+      assert.equal(f.calls.at(-1).range.from, Date.parse("1990-01-01"));
+    }
+  }
+});
+
 test("offline needs both enough candles and continuous cached coverage", async () => {
   const left = Date.parse("2022-05-31"),
     right = left + DAY,
@@ -432,13 +468,30 @@ test("owner, UID and cancellation guards discard stale saved-view awaits and net
 test("unknown first date stops explicitly after a whole empty year, not a short market gap", async () => {
   const f = fixture({
     first: undefined,
-    view: { from: Date.parse("2022-05-31") / 1000 },
-    bars: [bar(NOW - DAY)]
+    rangeDays: 30,
+    view: { from: (NOW - 30 * DAY) / 1000 },
+    bars: []
   });
   f.change({ rows: [{ symbol: "SBER", uid: "uid" }] });
   await f.history.load();
   assert.equal(f.state().historyViewReady, false);
   assert.match(f.state().historyHelp, /год|граница/);
+  assert.ok(f.calls.length > 2 && f.calls.length < 15);
+});
+
+test("exhausted online bank history still displays actual candles without restoring the saved camera", async () => {
+  const bars = [bar(NOW - DAY)];
+  const f = fixture({
+    first: undefined,
+    view: { from: Date.parse("2022-05-31") / 1000 },
+    bars
+  });
+  f.change({ rows: [{ symbol: "SBER", uid: "uid" }] });
+  await f.history.load();
+  assert.deepEqual(Array.from(f.state().candles), bars);
+  assert.equal(f.state().historyViewReady, true);
+  assert.equal(f.state().historyViewFallback, true);
+  assert.match(f.state().historyHelp, /доступные свечи/);
   assert.ok(f.calls.length > 2 && f.calls.length < 15);
 });
 

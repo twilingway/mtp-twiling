@@ -245,6 +245,8 @@ export function isChartSettings(value: unknown): value is ChartSettings {
       background: color,
       scaleFontSize: numberBetween(1, 100),
       showLegend: boolean,
+      ohlcDisplay: member(["candle", "corner", "icon", "hidden"]),
+      ohlcOnHold: boolean,
       legendCollapsed: boolean,
       mtpMenuCollapsed: boolean,
       mtpAllHidden: boolean,

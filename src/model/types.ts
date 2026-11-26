@@ -205,6 +205,8 @@ export interface VolumeAverageSettings {
   enabled: boolean;
   period: number;
 }
+export type OhlcDisplay = "candle" | "corner" | "icon" | "hidden";
+
 export interface PriceAxisLabelColors {
   fill?: string;
   text?: string;
@@ -215,6 +217,8 @@ export interface PriceAxisLabelPalette {
 }
 export type PriceAxisLabelThemes = Partial<Record<"light" | "dark", PriceAxisLabelPalette>>;
 export interface ChartSettings {
+  ohlcDisplay?: OhlcDisplay;
+  ohlcOnHold?: boolean;
   legendCollapsed?: boolean;
   mtpMenuCollapsed?: boolean;
   mtpAllHidden?: boolean;

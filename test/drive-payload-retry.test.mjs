@@ -56,3 +56,18 @@ test("v2 payloads ignore only the export date and still read existing dated file
   const { payload: legacyPayload } = await prepareDriveBackup(legacy);
   assert.equal((await restoreDriveBackup(legacyPayload, [])).exportedAt, old.exportedAt);
 });
+
+test("Drive carries OHLC display and hold preferences without adding them to old workspaces", async () => {
+  const old = backup();
+  const update = {
+    ...old,
+    layout: {
+      ...old.layout,
+      chartSettings: { ...old.layout.chartSettings, ohlcDisplay: "icon", ohlcOnHold: true }
+    }
+  };
+  for (const input of [old, update]) {
+    const { payload } = await prepareDriveBackup(input);
+    assert.deepEqual((await restoreDriveBackup(payload, [])).layout, input.layout);
+  }
+});

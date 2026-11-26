@@ -4,6 +4,7 @@ import { drawingToolbarSettings, type DrawingTarget } from "../../model/drawing-
 import { useTerminal } from "./context.js";
 import { DrawingToolIcon, type DrawingIconName } from "./DrawingToolIcon.js";
 import { ChartMeasurementButton } from "./ChartMeasurement.js";
+import { ChartRangeZoomButton } from "./ChartRangeZoom.js";
 import {
   DrawingToolbarMenu,
   DrawingToolbarSplit,
@@ -32,6 +33,7 @@ const disabledReason = "Пока не реализовано";
 export function DrawingToolbar() {
   const { controller, state } = useTerminal();
   const settings = drawingToolbarSettings(state.preferences.chartSettings);
+  const showValuesOnHold = state.preferences.chartSettings.ohlcOnHold === true;
   const [menu, setMenu] = useState<OpenMenu | null>(null);
   const [confirmation, setConfirmation] = useState<{
     target: DrawingTarget;
@@ -159,8 +161,11 @@ export function DrawingToolbar() {
       items: [
         {
           id: "values-tooltip-on-long-press",
-          label: t("Подсказывать значения при долгом нажатии"),
-          disabled: true
+          label: t("Подсказывать значения при удержании"),
+          kind: "checkbox",
+          checked: showValuesOnHold,
+          action: () =>
+            run(() => controller.setChartSettings({ ohlcOnHold: !showValuesOnHold }), false)
         }
       ]
     });
@@ -403,7 +408,7 @@ export function DrawingToolbar() {
       })}
       <span className="tool-divider" />
       <ChartMeasurementButton onChoose={closeMenu} />
-      {button("zoom", t("Увеличить масштаб"), "zoom", () => {}, false, true)}
+      <ChartRangeZoomButton onChoose={closeMenu} />
       {button("zoom-out", t("Уменьшить масштаб"), "zoomOut", () => {}, false, true)}
       <span className="tool-divider" />
       {utility(

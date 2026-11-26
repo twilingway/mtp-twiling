@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { t } from "../../i18n/messages.js";
-import { ChartLayoutControl, ChartLayoutPreview } from "./ChartLayoutControl.js";
-import type { ChartLayoutCount } from "./ChartLayoutControl.js";
+import { chartLayout, defaultChartLayout } from "../../model/chart-workspace-layout.js";
+import type { ChartLayoutCount } from "../../model/chart-workspace-layout.js";
+import { ChartLayoutOptions, ChartLayoutThumbnail } from "./ChartLayoutPicker.js";
+import type { ChartLayoutPickerProps } from "./ChartLayoutPicker.js";
 import { ClockZoneControl } from "./ClockZoneControl.js";
 import type { TerminalController } from "./controller.js";
 import { ChartRangeControl } from "./intervals/ChartRangeControl.js";
@@ -12,14 +14,14 @@ export function MobileChartTools({
   panelOpen,
   objectsOpen,
   count,
-  onChartCountChange,
+  layout,
   children
 }: {
   controller: TerminalController;
   panelOpen: boolean;
   objectsOpen: boolean;
   count: ChartLayoutCount;
-  onChartCountChange?: ((count: ChartLayoutCount) => void) | undefined;
+  layout?: ChartLayoutPickerProps | undefined;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -76,7 +78,7 @@ export function MobileChartTools({
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
-        <ChartLayoutPreview count={count} />
+        <ChartLayoutThumbnail layout={chartLayout(layout?.layoutId) ?? defaultChartLayout(count)} />
         <span>{count}</span>
       </button>
       <div
@@ -114,8 +116,11 @@ export function MobileChartTools({
                 {t("Дерево объектов")}
               </button>
             </nav>
-            {onChartCountChange && (
-              <ChartLayoutControl value={count} onChange={onChartCountChange} showLabel />
+            {layout && (
+              <details className="mobile-workspace-layout">
+                <summary>{t("Раскладка графиков")}</summary>
+                <ChartLayoutOptions {...layout} />
+              </details>
             )}
             <ChartRangeControl placement="toolbar" />
             <div className="mobile-workspace-zone">

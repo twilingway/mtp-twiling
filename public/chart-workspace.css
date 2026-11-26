@@ -1,5 +1,4 @@
 .chart-workspace {
-  --chart-cell-span: 12;
   position: relative;
   display: grid;
   grid-column: 2;
@@ -12,8 +11,9 @@
 }
 
 .chart-workspace > :is(.chart-panel, .auxiliary-chart, [data-chart-slot]) {
-  grid-column: span var(--chart-cell-span);
-  grid-row: auto;
+  position: relative;
+  grid-column: var(--chart-pane-column, 1 / -1);
+  grid-row: var(--chart-pane-row, auto);
   min-width: 0;
   min-height: 0;
 }
@@ -23,51 +23,19 @@
   background: var(--line);
 }
 
-.chart-workspace:is([data-chart-count="2"], [data-chart-count="3"], [data-chart-count="4"]) {
-  --chart-cell-span: 6;
+.chart-workspace[data-chart-stacked="true"] {
+  grid-auto-rows: minmax(220px, 1fr);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
 }
 
-.chart-workspace[data-chart-count="3"] > :first-child {
-  grid-row: span 2;
-}
-
-/* Twelve tracks keep the short rows full-width while retaining even panels within each row. */
-.chart-workspace:is(
-  [data-chart-count="5"],
-  [data-chart-count="6"],
-  [data-chart-count="7"],
-  [data-chart-count="8"],
-  [data-chart-count="9"]
-) {
-  --chart-cell-span: 4;
-}
-
-.chart-workspace:is(
-  [data-chart-count="10"],
-  [data-chart-count="11"],
-  [data-chart-count="12"],
-  [data-chart-count="13"],
-  [data-chart-count="14"],
-  [data-chart-count="15"],
-  [data-chart-count="16"]
-) {
-  --chart-cell-span: 3;
-}
-
-.chart-workspace:is([data-chart-count="5"], [data-chart-count="7"]) > :nth-child(n + 4),
-.chart-workspace[data-chart-count="8"] > :nth-child(n + 7) {
-  --chart-cell-span: 6;
-}
-
-.chart-workspace:is([data-chart-count="10"], [data-chart-count="13"]) > :nth-child(n + 5),
-.chart-workspace:is([data-chart-count="11"], [data-chart-count="14"]) > :nth-child(n + 9),
-.chart-workspace[data-chart-count="15"] > :nth-child(n + 13) {
-  --chart-cell-span: 4;
-}
-
-.chart-workspace:not([data-chart-count="1"]) > [data-chart-active="true"] {
-  outline: 1px solid var(--accent);
-  outline-offset: -1px;
+.chart-workspace:not([data-chart-count="1"]) > [data-chart-active="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border: 2px solid var(--accent);
+  pointer-events: none;
 }
 
 .chart-layout-control {
@@ -249,16 +217,13 @@
 
   .chart-workspace > :is(.chart-panel, .auxiliary-chart, [data-chart-slot]) {
     grid-column: 1;
+    grid-row: auto;
   }
 
-  .chart-workspace:not([data-chart-count="1"]) {
+  .chart-workspace[data-chart-count]:not([data-chart-count="1"]) {
     grid-auto-rows: minmax(clamp(300px, 64dvh, 540px), 1fr);
     overflow-y: auto;
     overscroll-behavior-y: contain;
-  }
-
-  .chart-workspace[data-chart-count="3"] > :first-child {
-    grid-row: auto;
   }
 }
 

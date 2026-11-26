@@ -6,7 +6,6 @@ import type { Candle, ChartView, DrawingPoint } from "../model/types.js";
 import { logicalForTime, timeForLogical } from "./adapter.js";
 import { chartPriceFormat, lightweightPriceFormat } from "./price-format.js";
 import type { ChartAdapter, ChartOptions } from "./adapter.js";
-import { focusRange } from "./navigation.js";
 import { PendingChartView } from "./view-camera.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { chartPalette } from "../model/theme.js";
@@ -21,6 +20,8 @@ import { UserCameraEvents } from "./camera-events.js";
 import { lightweightLegacy } from "./lightweight-legacy.js";
 import { observeWorkspaceTouchScroll } from "./workspace-touch.js";
 import { lightweightTechnical } from "./lightweight-technical.js";
+import { lightweightDrawingX } from "./lightweight-drawing-projection.js";
+import { lightweightLink } from "./lightweight-link.js";
 import {
   preserveLightweightCamera,
   preserveLightweightProjection,
@@ -211,25 +212,11 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     if (range && range.from < 80) options.onNearStart();
     camera.nativeChanged();
   });
-  chart.subscribeCrosshairMove((event) => {
-    const bar = event.seriesData.get(series);
-    if (bar && "open" in bar && typeof bar.time === "number")
-      options.onCrosshair({
-        timestamp: bar.time * 1000,
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-        volume: 0
-      });
-    else options.onCrosshair(null);
-  });
   function pointToPixel(point: DrawingPoint) {
-    const x = chart
-        .timeScale()
-        .logicalToCoordinate(
-          logicalForTime(data, point.timestamp, TIMEFRAMES[timeframe].ms) as Logical
-        ),
+    const x = lightweightDrawingX(
+        chart.timeScale(),
+        logicalForTime(data, point.timestamp, TIMEFRAMES[timeframe].ms)
+      ),
       y = series.priceToCoordinate(point.value);
     return x == null || y == null ? null : { x, y };
   }
@@ -296,6 +283,14 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
   chart.timeScale().subscribeSizeChange(scheduleViewRestore);
   const projectionDelta = () =>
     technical.hasProjectedPlots() ? projectedBaseDelta(chart.timeScale(), data.length) : 0;
+  const link = lightweightLink(
+    chart,
+    series,
+    timeframe,
+    () => technical.metrics()[0]?.height ?? container.clientHeight - 28,
+    projectionDelta,
+    options.onCrosshair
+  );
   const adapter: ChartAdapter = {
     setLastPriceLabelColors(colors) {
       if (
@@ -332,8 +327,14 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       chart,
       series,
       () => data.length,
-      () => !settingData && !viewStaged && restoreFrame === null && settleFrame === null,
-      projectionDelta
+      () =>
+        !live.retired &&
+        !settingData &&
+        !viewStaged &&
+        restoreFrame === null &&
+        settleFrame === null,
+      projectionDelta,
+      () => ({ data, timeframe, minMove: priceFormat.minMove })
     ),
     setData(next, fit) {
       if (live.retired) return;
@@ -384,7 +385,8 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       const index = Math.max(0, Math.min(data.length - 1, Math.round((range.from + range.to) / 2))),
         bar = data[index],
         x = scale.logicalToCoordinate(index as Logical),
-        view = scale.getVisibleRange();
+        view = scale.getVisibleRange(),
+        lastCandle = time(data.at(-1)!);
       return {
         camera: {
           barSpace: scale.options().barSpacing,
@@ -393,8 +395,11 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
         ...(bar && x != null
           ? { anchor: { timestamp: bar.timestamp, xFraction: x / scale.width() } }
           : {}),
-        ...(view && typeof view.from === "number" && typeof view.to === "number"
-          ? { from: view.from, to: view.to }
+        ...(view &&
+        typeof view.from === "number" &&
+        typeof view.to === "number" &&
+        view.from <= lastCandle
+          ? { from: view.from, to: Math.min(view.to, lastCandle) }
           : {})
       };
     },
@@ -402,6 +407,13 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       pendingView.stage(view);
       viewStaged = true;
       scheduleViewRestore();
+    },
+    setLinkedCrosshair(timestamp) {
+      if (!live.retired) link.setCrosshair(data, timestamp);
+    },
+    setLinkedTimeWindow(window) {
+      if (!live.retired && !settingData && !viewStaged && restoreFrame === null)
+        camera.programmatic(() => link.setTimeWindow(data, window));
     },
     pointToPixel,
     technicalPaneMetrics: () => technical.metrics(),
@@ -434,28 +446,6 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
           )
         );
     },
-    focusPoints(points) {
-      const timeScale = chart.timeScale(),
-        visible = timeScale.getVisibleLogicalRange(),
-        priceScale = series.priceScale(),
-        priceRange = priceScale.getVisibleRange();
-      if (!visible || !points.length) return;
-      const horizontal = focusRange(
-        points.map((point) => logicalForTime(data, point.timestamp, TIMEFRAMES[timeframe].ms)),
-        visible
-      );
-      if (horizontal) timeScale.setVisibleLogicalRange(horizontal);
-      if (priceRange) {
-        const vertical = focusRange(
-          points.map((point) => point.value),
-          priceRange
-        );
-        if (horizontal || vertical) {
-          priceScale.applyOptions({ autoScale: false });
-          priceScale.setVisibleRange(vertical ?? priceRange);
-        }
-      }
-    },
     beginPan() {
       const scale = series.priceScale(),
         range = scale.getVisibleRange();
@@ -483,6 +473,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     redrawDrawings: () => updateDrawings(),
     destroy() {
       stopTouchScroll();
+      link.dispose();
       if (restoreFrame !== null) cancelAnimationFrame(restoreFrame);
       if (settleFrame !== null) cancelAnimationFrame(settleFrame);
       mtp.destroy();

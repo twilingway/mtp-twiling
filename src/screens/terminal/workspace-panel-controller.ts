@@ -168,15 +168,15 @@ export class WorkspacePanelController extends TerminalController {
         ? this.combinedPreferences(parent.preferences, local, row)
         : state.preferences;
     this.shared = parent.preferences;
+    const resetAnnotations =
+      parent.owner !== state.owner ||
+      this.route?.market !== route?.market ||
+      this.route?.row.symbol !== route?.row.symbol ||
+      this.route?.row.uid !== route?.row.uid ||
+      parent.importingBackup ||
+      parent.importRecoveryRequired;
     if (reset) {
-      if (
-        parent.owner !== state.owner ||
-        this.route?.market !== route?.market ||
-        this.route?.row.symbol !== route?.row.symbol ||
-        parent.importingBackup ||
-        parent.importRecoveryRequired
-      )
-        this.editing.reset();
+      if (resetAnnotations) this.editing.reset();
       this.stop();
       this.route = route;
       this.historyFrom = undefined;
@@ -198,10 +198,8 @@ export class WorkspacePanelController extends TerminalController {
       this.update({
         ...patch,
         chartRevision: state.chartRevision + 1,
-        annotationReady: false,
         candles: [],
-        drawings: [],
-        images: [],
+        ...(resetAnnotations ? { annotationReady: false, drawings: [], images: [] } : {}),
         crosshairBar: null,
         selectedObject: null,
         contextMenu: null,

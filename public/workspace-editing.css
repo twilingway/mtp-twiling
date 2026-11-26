@@ -50,29 +50,144 @@
   max-width: 100%;
 }
 
-.auxiliary-chart .chart-range-control {
+.chart-instrument-heading {
+  display: contents;
+}
+
+.chart-instrument-heading > .instrument-title {
+  flex-shrink: 0;
+}
+
+.chart-panel .chart-heading[data-grid-depth="true"] {
+  container: workspace-price-header / inline-size;
+  max-inline-size: 100%;
+  padding: 5px 6px;
+}
+
+.chart-heading[data-grid-depth="true"] .chart-instrument-heading {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
   gap: 4px;
+  min-inline-size: 0;
+}
+
+.chart-heading[data-grid-depth="true"] .chart-instrument-heading > .instrument-title {
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  min-inline-size: 0;
+}
+
+.chart-heading[data-grid-depth="true"] .chart-instrument-button {
+  gap: 3px;
+  font-size: 12px;
+}
+
+.chart-instrument-heading .chart-range-control[data-placement="plot"] {
+  position: relative;
+  flex: none;
+  min-inline-size: 0;
+  min-block-size: 24px;
+  padding: 0;
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  background: var(--surface-input);
+  color: var(--text);
+  pointer-events: auto;
+}
+
+.chart-range-control[data-placement="plot"]:has(select:disabled) {
+  opacity: 0.6;
+}
+
+.chart-range-control[data-placement="plot"]:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.chart-range-control[data-placement="plot"] select {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  min-block-size: 0;
+  max-inline-size: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.chart-range-control[data-placement="plot"] select:disabled {
+  cursor: wait;
+}
+
+.chart-depth-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-inline-size: 24px;
   padding-inline: 4px;
+  white-space: nowrap;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
-.auxiliary-chart .chart-range-control select {
-  min-width: 0;
-  max-width: 100%;
+.chart-depth-icon {
+  position: relative;
+  box-sizing: border-box;
+  inline-size: 11px;
+  block-size: 10px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
 }
 
-.chart-workspace:not(
-    [data-chart-count="1"],
-    [data-chart-count="2"],
-    [data-chart-count="3"],
-    [data-chart-count="4"]
-  )
-  .chart-range-control
-  :is(.clock-zone-control, .chart-range-note) {
-  display: none;
+.chart-depth-icon::before {
+  position: absolute;
+  inset: 2px 0 auto;
+  border-top: 1px solid currentColor;
+  content: "";
+}
+
+@container workspace-price-header (max-width: 225px) {
+  .chart-instrument-heading .market-tag,
+  .chart-depth-days > span {
+    display: none;
+  }
+}
+
+@container workspace-price-header (max-width: 122px) {
+  .chart-depth-days {
+    display: none;
+  }
+}
+
+@container workspace-price-header (max-width: 70px) {
+  .chart-heading[data-grid-depth="true"] .chart-instrument-heading {
+    flex-wrap: wrap;
+  }
+
+  .chart-heading[data-grid-depth="true"] .chart-instrument-heading > .instrument-title {
+    flex-basis: 100%;
+  }
+
+  .chart-instrument-heading .chart-range-control[data-placement="plot"] {
+    order: -1;
+  }
 }
 
 @media (max-width: 1050px) {
   .chart-workspace:not([data-chart-count="1"]) .chart-scroll-host {
     overscroll-behavior-y: auto;
+  }
+}
+
+@media (pointer: coarse) {
+  .chart-instrument-heading .chart-range-control[data-placement="plot"] {
+    min-block-size: 32px;
+  }
+
+  .chart-depth-pill {
+    min-inline-size: 30px;
   }
 }

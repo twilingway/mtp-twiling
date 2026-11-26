@@ -4,13 +4,22 @@ import { t } from "../../i18n/messages.js";
 import {
   chartGridDividers,
   chartGridResizeRange,
-  chartLayoutRowWidths,
+  defaultChartLayout,
   resizeChartGridTracks
 } from "../../model/chart-workspace-layout.js";
-import type { ChartGridDivider, ChartLayoutCount } from "../../model/chart-workspace-layout.js";
+import type {
+  ChartGridDivider,
+  ChartLayoutCount,
+  ChartLayoutDefinition
+} from "../../model/chart-workspace-layout.js";
+import {
+  readWorkspaceGridSizes,
+  workspaceGridStorageKey,
+  writeWorkspaceGridSizes
+} from "./workspace-grid-storage.js";
+import type { LayoutSizes } from "./workspace-grid-storage.js";
 
 type Axis = ChartGridDivider["axis"];
-type LayoutSizes = Partial<Record<Axis, readonly number[]>>;
 
 interface Drag {
   id: number;
@@ -50,21 +59,38 @@ function sum(sizes: readonly number[]): number {
 
 function paneMinimum(
   sizes: readonly number[],
-  count: ChartLayoutCount,
+  definition: ChartLayoutDefinition,
   axis: Axis,
   narrow: boolean
 ): number {
   if (axis === "row" && narrow) return 240;
-  const cells = axis === "column" ? Math.max(...chartLayoutRowWidths(count)) : sizes.length;
+  if (axis === "row" && definition.id.endsWith("-stack")) return 160;
+  const cells =
+    axis === "column"
+      ? Math.max(
+          ...Array.from(
+            { length: definition.rows },
+            (_, index) =>
+              definition.panes.filter((pane) => pane.rowStart <= index && index < pane.rowEnd)
+                .length
+          )
+        )
+      : sizes.length;
   return Math.min(axis === "column" ? 128 : 112, (0.8 * sum(sizes)) / cells);
 }
 
-function applySizes(grid: HTMLElement, axis: Axis, narrow: boolean, sizes: readonly number[]) {
-  const stack = narrow && axis === "row";
-  const property = axis === "column" ? columnProperty : stack ? narrowRowProperty : rowProperty;
+function applySizes(
+  grid: HTMLElement,
+  axis: Axis,
+  narrow: boolean,
+  scrollable: boolean,
+  sizes: readonly number[]
+) {
+  const property = axis === "column" ? columnProperty : narrow ? narrowRowProperty : rowProperty;
+  const pixels = axis === "row" && scrollable;
   grid.style.setProperty(
     property,
-    sizes.map((size) => (stack ? `${size}px` : `minmax(0, ${size}fr)`)).join(" ")
+    sizes.map((size) => (pixels ? `${size}px` : `minmax(0, ${size}fr)`)).join(" ")
   );
 }
 
@@ -107,34 +133,56 @@ function clearDrag(drag: Drag) {
   if (drag.handle.hasPointerCapture(drag.id)) drag.handle.releasePointerCapture(drag.id);
 }
 
-export function WorkspaceGridDividers({ count }: { count: ChartLayoutCount }) {
+export function WorkspaceGridDividers({
+  count,
+  definition = defaultChartLayout(count),
+  owner
+}: {
+  count: ChartLayoutCount;
+  definition?: ChartLayoutDefinition;
+  owner?: string;
+}) {
   const narrow = useSyncExternalStore(subscribe, isNarrow, () => false);
-  const dividers = useMemo(() => chartGridDividers(count, narrow), [count, narrow]);
+  const dividers = useMemo(() => chartGridDividers(definition, narrow), [definition, narrow]);
+  const scrollable = narrow || definition.id.endsWith("-stack");
   const layout = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const saved = useRef(new Map<string, LayoutSizes>());
-  const key = `${count}:${narrow}`;
+  const key = workspaceGridStorageKey(owner ?? "", definition, narrow);
 
   useLayoutEffect(() => {
     const layer = layout.current;
     const grid = layer?.parentElement;
     if (!layer || !grid) return;
-    const sizes = saved.current.get(key);
+    const measurements = saved.current;
+    const sizes =
+      measurements.get(key) ?? (owner ? readWorkspaceGridSizes(key, definition, narrow) : {});
+    measurements.set(key, sizes);
     for (const axis of ["column", "row"] as const) {
       const restored = sizes?.[axis];
-      if (restored) applySizes(grid, axis, narrow, restored);
+      if (restored) applySizes(grid, axis, narrow, scrollable, restored);
       const current = trackSizes(grid, axis);
-      updateHandleValues(layer, dividers, axis, current, paneMinimum(current, count, axis, narrow));
+      updateHandleValues(
+        layer,
+        dividers,
+        axis,
+        current,
+        paneMinimum(current, definition, axis, narrow)
+      );
     }
     return () => {
       const current = drag.current;
       drag.current = null;
-      if (current) clearDrag(current);
+      if (current) {
+        clearDrag(current);
+        const pending = measurements.get(key);
+        if (owner && pending) writeWorkspaceGridSizes(key, pending);
+      }
       grid.style.removeProperty(columnProperty);
       grid.style.removeProperty(rowProperty);
       grid.style.removeProperty(narrowRowProperty);
     };
-  }, [count, dividers, key, narrow]);
+  }, [definition, dividers, key, narrow, owner, scrollable]);
 
   const resize = (
     divider: ChartGridDivider,
@@ -148,8 +196,13 @@ export function WorkspaceGridDividers({ count }: { count: ChartLayoutCount }) {
     const { axis } = divider;
     const next = resizeChartGridTracks(sizes, divider, delta, minimum);
     saved.current.set(key, { ...saved.current.get(key), [axis]: next });
-    applySizes(grid, axis, narrow, next);
+    applySizes(grid, axis, narrow, scrollable, next);
     updateHandleValues(layer, dividers, axis, next, minimum);
+  };
+
+  const persistSizes = () => {
+    const current = saved.current.get(key);
+    if (owner && current) writeWorkspaceGridSizes(key, current);
   };
 
   const startDrag = (event: PointerEvent<HTMLDivElement>, divider: ChartGridDivider) => {
@@ -167,7 +220,7 @@ export function WorkspaceGridDividers({ count }: { count: ChartLayoutCount }) {
       start: coordinate(event, divider.axis),
       handle,
       sizes,
-      minimum: paneMinimum(sizes, count, divider.axis, narrow)
+      minimum: paneMinimum(sizes, definition, divider.axis, narrow)
     };
   };
 
@@ -176,6 +229,7 @@ export function WorkspaceGridDividers({ count }: { count: ChartLayoutCount }) {
     if (current?.id !== pointerId) return;
     drag.current = null;
     clearDrag(current);
+    persistSizes();
   };
 
   const keyboardResize = (event: KeyboardEvent<HTMLDivElement>, divider: ChartGridDivider) => {
@@ -198,7 +252,8 @@ export function WorkspaceGridDividers({ count }: { count: ChartLayoutCount }) {
     event.preventDefault();
     const sizes = trackSizes(grid, divider.axis);
     if (sizes.length < divider.adjacentTracks.end || sizes.some((size) => size <= 0)) return;
-    resize(divider, sizes, paneMinimum(sizes, count, divider.axis, narrow), delta);
+    resize(divider, sizes, paneMinimum(sizes, definition, divider.axis, narrow), delta);
+    persistSizes();
   };
 
   return (

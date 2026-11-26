@@ -32,6 +32,9 @@ import {
 import type { KlineDrawingContext } from "./kline-drawing-indicators.js";
 import { klineTechnical } from "./kline-technical.js";
 import { preserveKlineCamera } from "./kline-preserve-camera.js";
+import { klineLink } from "./kline-link.js";
+import { zoomKlineSelection } from "./kline-selection-zoom.js";
+import { selectionZoomBounds } from "./selection-zoom.js";
 
 export function makeKline(options: ChartOptions): ChartAdapter {
   const camera = new UserCameraEvents(options);
@@ -144,8 +147,8 @@ export function makeKline(options: ChartOptions): ChartAdapter {
   const front = document.createElement("canvas");
   front.className = "foreground-canvas";
   container.parentElement?.append(front);
-  function toPixel(point: Partial<Point>): Partial<Coordinate> {
-    const result = chart!.convertToPixel([point], { paneId: "candle_pane", absolute: true });
+  function toPixel(point: Partial<Point>, absolute = true): Partial<Coordinate> {
+    const result = chart!.convertToPixel([point], { paneId: "candle_pane", absolute });
     return Array.isArray(result) ? (result[0] ?? {}) : result;
   }
   function fromPixel(point: Partial<Coordinate>): Partial<Point> {
@@ -243,13 +246,15 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     paintFront();
     camera.nativeChanged();
   });
+  const link = klineLink(chart, timeframe, (point) => toPixel(point, false));
   chart.subscribeAction(ActionType.OnCrosshairChange, (value: unknown) => {
+    link.acceptNativeCrosshair();
     const index =
       value &&
       typeof value === "object" &&
-      "dataIndex" in value &&
-      typeof value.dataIndex === "number"
-        ? Math.round(value.dataIndex)
+      "realDataIndex" in value &&
+      typeof value.realDataIndex === "number"
+        ? value.realDataIndex
         : -1;
     options.onCrosshair(data[index] ?? null);
   });
@@ -368,6 +373,22 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     setView(view) {
       pendingView.stage(view);
       flushView();
+    },
+    setLinkedCrosshair(timestamp) {
+      if (!live.retired) link.setCrosshair(dataReady ? data : [], timestamp);
+    },
+    setLinkedTimeWindow(window) {
+      if (!live.retired && dataReady) camera.programmatic(() => link.setTimeWindow(data, window));
+    },
+    zoomToSelection(from, to) {
+      if (live.retired || !dataReady) return;
+      const bounds = selectionZoomBounds(
+        { data, timeframe, minMove: priceFormat.minMove },
+        from,
+        to
+      );
+      if (bounds && zoomKlineSelection(chart, bounds, (dataIndex) => toPixel({ dataIndex }).x))
+        paintFront();
     },
     pointToPixel,
     technicalPaneMetrics: () => technical?.metrics() ?? [],

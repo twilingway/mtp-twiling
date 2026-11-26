@@ -325,8 +325,9 @@ export class TerminalController {
                 candles: [],
                 loading: false,
                 historyViewReady: false,
-                drawings: [],
-                images: [],
+                ...(next.symbol !== previous.symbol || next.instrumentUid !== previous.instrumentUid
+                  ? { drawings: [], images: [] }
+                  : {}),
                 selectedObject: null,
                 activeTool: null,
                 preview: null

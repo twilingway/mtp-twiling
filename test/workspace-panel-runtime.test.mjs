@@ -272,6 +272,24 @@ test("late history and annotations cannot cross an instrument change", async () 
   panel.stop();
 });
 
+test("changing an auxiliary timeframe keeps the already loaded drawing document", async () => {
+  let reads = 0;
+  const drawings = [{ id: "support" }];
+  const f = fixtures(async () => {
+    reads++;
+    return { drawings, images: [] };
+  });
+  const panel = f.create(2);
+  panel.configure(f.second, f.state);
+  await immediate();
+  assert.equal(panel.getSnapshot().annotationReady, true);
+  await panel.setTimeframe("4h");
+  assert.equal(panel.getSnapshot().annotationReady, true);
+  assert.deepEqual(panel.getSnapshot().drawings, drawings);
+  assert.equal(reads, 1);
+  panel.stop();
+});
+
 test("history admissions are limited to four per session and queued aborts never call the provider", async () => {
   const f = fixtures();
   const { loadPanelCandles } = f.load("screens/terminal/workspace-panel-candle-queue.js");

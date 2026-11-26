@@ -6,6 +6,7 @@ import { INDICATOR_NAMES } from "./state.js";
 import { Modal } from "./Modal.js";
 import { TRADINGVIEW_CANDLE_STYLE } from "../../model/candle-palette.js";
 import { chartBackground, terminalTheme, withTheme } from "../../model/theme.js";
+import { ohlcDisplayMode } from "../../model/ohlc-legend.js";
 import {
   DEFAULT_LAST_PRICE_COLOR,
   updatePriceAxisLabelColor
@@ -24,6 +25,12 @@ const CANDLE_PARTS = [
   ["bodyVisible", "Тело свечи", "upColor", "downColor"],
   ["borderVisible", "Границы", "borderUpColor", "borderDownColor"],
   ["wickVisible", "Фитили", "wickUpColor", "wickDownColor"]
+] as const;
+const OHLC_MODES = [
+  ["candle", "У свечи"],
+  ["corner", "В углу"],
+  ["icon", "Значок"],
+  ["hidden", "Скрыто"]
 ] as const;
 export function ChartSettingsDialog() {
   const { controller, state } = useTerminal(),
@@ -147,6 +154,34 @@ export function ChartSettingsDialog() {
             onChange={(e) => update({ background: e.target.value })}
           />
         </label>
+        <label>
+          {t("Данные свечи (OHLC)")}
+          <select
+            name="ohlcDisplay"
+            value={ohlcDisplayMode(settings)}
+            onChange={(event) => {
+              const option = OHLC_MODES.find(([value]) => value === event.target.value);
+              if (option) update({ ohlcDisplay: option[0] });
+            }}
+          >
+            {OHLC_MODES.map(([value, label]) => (
+              <option key={value} value={value}>
+                {t(label)}
+              </option>
+            ))}
+          </select>
+        </label>
+        {ohlcDisplayMode(settings) === "candle" && (
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              name="ohlcOnHold"
+              checked={settings.ohlcOnHold === true}
+              onChange={(event) => update({ ohlcOnHold: event.target.checked })}
+            />
+            {t("Подсказывать значения при удержании")}
+          </label>
+        )}
         {(
           [
             ["grid", t("Линии сетки")],

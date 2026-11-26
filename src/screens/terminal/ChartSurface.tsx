@@ -20,6 +20,9 @@ import { useCameraInput } from "./camera-input.js";
 import { drawingRenderList } from "./drawing-settings-preview.js";
 import { ChartMeasurementOverlay } from "./ChartMeasurement.js";
 import { useChartMeasurementInput } from "./chart-measurement-input.js";
+import { publishWorkspaceCrosshair } from "./workspace-sync-controller.js";
+import { useOhlcInspection } from "./ohlc-inspection-input.js";
+import { OhlcCandleCard } from "./OhlcCandleCard.js";
 const chartControls =
   "[data-image-id],.indicator-legend,.technical-pane-legends,.calendar-analysis-overlays";
 
@@ -129,6 +132,7 @@ export function ChartGestures({
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   };
   const measurement = useChartMeasurementInput(controller, state, pixel, chartControls);
+  const ohlc = useOhlcInspection(controller, state, pixel, chartControls);
   const find = (p: PixelPoint) => {
     const chart = controller.chart;
     if (!chart) return null;
@@ -175,15 +179,18 @@ export function ChartGestures({
     const current = controller.getSnapshot(),
       options = drawingToolbarSettings(current.preferences.chartSettings);
     const mode = temporary ? (options.magnet === "off" ? "weak" : "off") : options.magnet;
+    const flags = current.preferences.indicators;
+    const indicators =
+      flags.mtpAll && current.preferences.chartSettings.mtpAllHidden
+        ? { ...flags, mtpAll: false, mtp160: false, mtp440: false, mtp640: false }
+        : flags;
     const point = snapDrawingPoint(
       raw,
       p,
       current.candles,
       (point) => chart.pointToPixel(point),
       mode,
-      options.snapIndicators && !options.indicatorsHidden
-        ? current.preferences.indicators
-        : undefined
+      options.snapIndicators && !options.indicatorsHidden ? indicators : undefined
     );
     const step = nativePriceStep(selectedMarketRow(current.rows, current.preferences));
     return { ...point, value: roundPriceToStep(point.value, step) };
@@ -397,35 +404,50 @@ export function ChartGestures({
       className={`chart-body ${state.activeTool ? "drawing-active" : ""}`}
       style={{ minHeight: minimumHeight }}
       onPointerDownCapture={(event) => {
-        if (!measurement.down(event) && cameraInput.down(event) !== false) down(event);
+        if (!measurement.down(event) && cameraInput.down(event) !== false) {
+          down(event);
+          ohlc.down(event, measurement.active() || pan.current?.pointerId !== event.pointerId);
+        } else ohlc.clear();
       }}
       onPointerMoveCapture={(event) => {
         if (measurement.move(event)) {
+          ohlc.clear();
           if (pointer.current) pointer.current.style.display = "none";
           cursor(event.currentTarget, "crosshair");
-        } else if (cameraInput.move(event) !== false) move(event);
+        } else if (cameraInput.move(event) !== false) {
+          move(event);
+          ohlc.move(event, Boolean(drag.current || pan.current?.started || measurement.active()));
+        }
       }}
       onPointerUpCapture={(event) => {
         cameraInput.up(event);
-        if (!measurement.up(event)) up(event);
+        if (!measurement.up(event)) {
+          ohlc.up(event, Boolean(drag.current || pan.current?.started || measurement.active()));
+          up(event);
+        } else ohlc.clear();
       }}
       onWheelCapture={(event) => {
+        ohlc.clear();
         cameraInput.action(event);
       }}
       onPointerCancelCapture={(event) => {
+        ohlc.cancel(event);
         measurement.cancel(event);
         cameraInput.up(event);
         cancel(event);
       }}
       onLostPointerCapture={(event) => {
+        ohlc.cancel(event);
         measurement.cancel(event);
         cameraInput.up(event);
         cancel(event);
       }}
       onPointerLeave={(event) => {
+        ohlc.leave();
         measurement.cancel(event);
         if (pointer.current) pointer.current.style.display = "none";
         controller.setCrosshair(null);
+        publishWorkspaceCrosshair(controller, null);
         if (!drag.current && !pan.current) cursor(event.currentTarget, "");
       }}
       onDoubleClickCapture={(event) => {
@@ -444,6 +466,7 @@ export function ChartGestures({
         if (event.target instanceof Element && event.target.closest(chartControls)) return;
         event.preventDefault();
         event.stopPropagation();
+        if (ohlc.touchPress()) return;
         const hit = find(pixel(event));
         controller.selectObject(hit?.id ?? null);
         controller.setContext({
@@ -454,6 +477,9 @@ export function ChartGestures({
       }}
     >
       {children}
+      {ohlc.timestamp != null && (
+        <OhlcCandleCard timestamp={ohlc.timestamp} drawingProjection={drawingProjection} />
+      )}
       <ChartMeasurementOverlay
         controller={controller}
         state={state}

@@ -1,10 +1,53 @@
-.chart-heading .ohlc-legend {
+.ohlc-legend {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 3px 8px;
   max-width: 100%;
   color: var(--ohlc-label-color, var(--chart-muted, var(--muted)));
+}
+.ohlc-candle-card,
+.chart-heading .ohlc-icon-content .ohlc-legend {
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--chart-background, var(--surface));
+}
+.ohlc-candle-card {
+  position: absolute;
+  z-index: 9;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  visibility: hidden;
+}
+.ohlc-candle-card .ohlc-legend,
+.chart-heading .ohlc-icon-content .ohlc-legend {
+  margin: 0;
+}
+.ohlc-icon-control {
+  pointer-events: auto;
+}
+.ohlc-icon-button {
+  display: grid;
+  inline-size: 24px;
+  block-size: 24px;
+  place-items: center;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+}
+.ohlc-icon-content {
+  position: absolute;
+  z-index: 1;
+  left: 12px;
+  right: 0;
+  margin-top: 2px;
+  pointer-events: none;
 }
 .ohlc-legend .ohlc-field {
   display: inline-flex;
@@ -25,7 +68,7 @@
   white-space: nowrap;
 }
 @media (max-width: 800px) {
-  .chart-heading .ohlc-legend {
+  .ohlc-legend {
     column-gap: 6px;
   }
 }
