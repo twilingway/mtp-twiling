@@ -15,6 +15,9 @@ Research закончен отдельно от реализации. Runtime co
       resolver; проверить source-only geometry/palette tests и frozen numeric42 fixtures.
 - [x] 1.4 Документировать принятый contract/limits и точные новые ownership paths; проверить scoped
       Prettier и strict OpenSpec, обновить G decision record.
+- [x] 1.5 Подключить необязательный descriptor к общему runtime render-data без изменения
+      definitions/registry; проверить legacy shape, plots/fills/cache/instance boundary четырьмя
+      bridge tests и whole-source strict check. Контракт описан в `docs/TA_RENDER_DATA_BRIDGE.md`.
 
 ## 2. LW — L, после 1.3
 

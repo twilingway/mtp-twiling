@@ -1,6 +1,7 @@
 import type { CumulativeHistoryRequirement } from "./momentum-volume/metadata.js";
 import type { VolumeFlowHistoryRequirement, VolumeFlowId } from "./volume-flow/metadata.js";
 import type { VolumeAverage } from "./volume-flow/parameters.js";
+import type { PresentationDefinition } from "./presentation-types.js";
 import type {
   StateOscillatorId,
   StateOscillatorHistoryRequirement
@@ -165,6 +166,8 @@ export interface TechnicalIndicatorDefinition {
   outputs: readonly TechnicalOutputDefinition[];
   levels: readonly number[];
   references: readonly string[];
+  /** Runtime-only drawing metadata. Never serialized as indicator instance preferences. */
+  presentation?: PresentationDefinition;
 }
 export interface UnsupportedIndicatorDefinition {
   schemaVersion: 1;
