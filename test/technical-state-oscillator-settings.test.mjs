@@ -57,7 +57,7 @@ test("RU/EN human labels render every numeric input; actual settings submit save
       const saved = f.controller.getSnapshot().preferences.technicalIndicators[0];
       assert.deepEqual(saved.params, expected);
       assert.equal(core.isTechnicalIndicatorInstance(saved), true);
-      assert.equal(Object.keys(saved.styles).length, 2);
+      assert.equal(Object.hasOwn(saved, "styles"), false);
     }
 });
 test("actual settings submit rejects invalid numeric fields before save without default replacement", async () => {
