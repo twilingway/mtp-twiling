@@ -266,6 +266,7 @@ export class DriveCoordinator {
       unreadableDrivePause(
         error,
         this.authorization,
+        this.dependencies.auth,
         () => {
           this.authorization = this.remote = this.record = this.preview = undefined;
           clearTimeout(this.debounce);

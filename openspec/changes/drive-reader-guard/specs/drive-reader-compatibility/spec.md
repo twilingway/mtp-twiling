@@ -39,6 +39,23 @@ Loader SHALL создавать association только при её отсут�
 - **THEN** её bytes, marker, heads и automatic сохраняются
 - **AND** статус показывает остановку с предложением обновить приложение, без connected и autosync
 
+### Requirement: Unsupported pause retains saved Google credentials
+
+Reader SHALL сохранять действующие Google credentials при unsupported pause через non-destructive
+auth suspension. Format guard SHALL прерывать handles без изменения ciphertext/generation/expiresAt.
+
+#### Scenario: Saved authorization meets unsupported data
+
+- **WHEN** automatic restore или явный connect обнаруживает unsupported remote/local формат
+- **THEN** handles прерываются и autosync останавливается без guard-induced vault writes/removal
+- **AND** совместимый reader восстанавливает credential без Google prompt до исходного expiry
+
+#### Scenario: Actual expiry after compatible reopen
+
+- **WHEN** восстановленный credential достигает исходного expiresAt
+- **THEN** штатный conditional expiry удаляет только свою generation, сохраняя другой owner и более
+  новую generation
+
 ### Requirement: Supported data retains existing behavior
 
 Reader SHALL сохранять текущие envelope1/2 и TA instance1 flows, epoch/revision/connection guards и

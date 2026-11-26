@@ -25,6 +25,9 @@
 - Только отсутствие association разрешает bootstrap. Неизвестная association и capability расширения
   останавливаются с unsupported-format; форма явно сообщает обновить приложение и сохранить данные.
   Runtime pause не переписывает automatic в неизвестной association.
+- Format pause вызывает `DriveAuth.suspend()` — abort handles без забывания saved credential.
+  `invalidate/expire` остаются для настоящего expiry/401; guard не должен удалять vault record.
+  Статус сохраняет известный stored flag, а UI поясняет сохранение прежнего срока доступа.
 
 ## Risks / Trade-offs
 

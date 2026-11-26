@@ -21,6 +21,13 @@
 - [x] 3.2 Зафиксировать clean frozen commit для независимого root review; не запускать
       build/version/browser.
 
+## 4. Credential preservation follow-up
+
+- [x] 4.1 Заменить destructive invalidate на auth.suspend при unsupported pause; проверить actual
+      DriveAuth + AES-GCM vault для automatic/manual/local association и owner/expiry generations.
+- [x] 4.2 Согласовать saved-status и RU/EN copy; повторить 66 reader + 108 existing + новые auth
+      regressions, strict/lint/format/spec и зафиксировать отдельный follow-up commit.
+
 ## Workflow follow-up
 
 - Архивировать после независимого review и принятия root.

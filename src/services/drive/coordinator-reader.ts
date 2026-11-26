@@ -51,11 +51,12 @@ export async function restoreReadableDriveProfile(
 export function unreadableDrivePause(
   error: unknown,
   authorization: DriveAuthorization | undefined,
+  auth: DriveDependencies["auth"],
   reset: () => void,
   update: (patch: Partial<DriveStatus>) => void
 ): boolean {
   if (!(error instanceof DriveError) || error.code !== "unsupported-format") return false;
-  authorization?.invalidate();
+  auth.suspend();
   reset();
   update({
     phase: "error",
@@ -64,7 +65,8 @@ export function unreadableDrivePause(
     automatic: false,
     conflict: undefined,
     pauseReason: undefined,
-    authorizationStored: false
+    authorizationStored: authorization?.stored === true,
+    credentialSaveError: authorization?.persistenceError === true
   });
   return true;
 }

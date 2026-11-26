@@ -1,4 +1,6 @@
 export const driveMessages = {
+  "Синхронизация на паузе. Сохранённый вход Google не удаляется, срок доступа остаётся прежним.":
+    "Sync is paused. Saved Google sign-in is retained and its expiry stays unchanged.",
   "Завершите восстановление профиля, чтобы изменять настройки.":
     "Finish profile recovery before editing settings.",
   "Применяем настройки. Аккаунт и отключение доступны.":

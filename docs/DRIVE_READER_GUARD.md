@@ -28,6 +28,12 @@ instance2/envelope3, IndexedDB migration и разрешение G5 сюда н�
   ссылку для pending-marker writes. Сохранённый automatic, heads, digest и время не переписываются.
   Это состояние не изображается как успешное подключение Google. Новый явный connect повторит
   проверку; молчаливого принятия неизвестного формата нет.
+- Пауза использует настоящий `DriveAuth.suspend()`, прерывающий handles без удаления сохранённого
+  credential. Guard не вызывает invalidate/expire/disconnect/revoke и не меняет ciphertext,
+  generation или expiresAt. Известный authorizationStored отражает retained credential; RU/EN
+  подпись поясняет сохранение входа и прежнего срока доступа. При неизвестной association до auth
+  restore stored flag не выдумывается. Штатный явный connect по-прежнему может заменить прежнюю
+  generation новой авторизацией; format pause не удаляет эту новую сохранённую generation.
 
 ## Стоимость чтения
 
@@ -70,13 +76,21 @@ defaults: envelope1 с drawings/images/camera и envelope2 с provider/TA pane/d
 Существующие Drive/auth/abort/bootstrap/transfer tests: **108/108 PASS**. Whole-source strict
 TypeScript: 0 diagnostics с единственным виртуальным отсутствующим `src/generated/app-version.ts`,
 экспортирующим только APP_VERSION/BUILD_ID. Scoped ESLint/Prettier и OpenSpec strict проверяются без
-prepare-version/build. Coordinator — 497 физических строк; runtime state/reader seams вынесены в
+prepare-version/build. Coordinator — 498 физических строк; runtime state/reader seams вынесены в
 `coordinator-reader.ts`, capability/identity — в `reader-guard.ts`.
+
+Follow-up после независимого P2 review добавляет **7/7 PASS tests** с настоящими DriveAuth,
+EncryptedDriveAuthVault и AES-GCM/WebCrypto на memory backend. Проверяются exact ciphertext двух
+owners, отсутствие guard-induced vault writes/removal, abort старых handles, отсутствие скрытого
+автовозобновления, failed local restore → manual connect, remote manual/automatic, смена owner во
+время чтения и повторное открытие совместимого reader без Google prompt. Исходный expiry не
+продлевается; настоящий expiry удаляет только свою generation, сохраняя другую/более новую.
 
 Команды:
 
 ```text
 node --test --experimental-test-isolation=none test/drive-reader-guard.test.mjs
+node --test --experimental-test-isolation=none test/drive-reader-auth-pause.test.mjs
 node --test --experimental-test-isolation=none test/drive-coordinator.test.mjs test/drive-sync.test.mjs test/drive-sync-body.test.mjs test/drive-v2-migration.test.mjs test/drive-import-abort.test.mjs test/drive-auth-persistence.test.mjs test/guest-drive-bootstrap.test.mjs test/backup-transfer-queue.test.mjs
 node scripts/spec.mjs validate --all --strict
 ```
