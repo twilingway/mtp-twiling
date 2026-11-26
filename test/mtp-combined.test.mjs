@@ -86,7 +86,10 @@ test("MTP master checkbox shows partial ranges and clears all individually selec
 test("combined legend shows one MTP entry and backup roundtrip accepts optional new data", async () => {
   const { indicatorLegendKeys } = await pureModule("indicator-legend");
   assert.deepEqual(indicatorLegendKeys({}, { ...off, mtpAll: true }), ["volume", "mtpAll"]);
-  assert.equal(indicatorLegendKeys({}, off).includes("mtpAll"), false);
+  assert.deepEqual(indicatorLegendKeys({}, off), ["volume"]);
+  assert.deepEqual(indicatorLegendKeys({}, { ...off, mtp440: true }), [
+    "volume", "mtp640", "mtp440", "mtp160"
+  ]);
   assert.equal(indicatorLegendKeys({ removedIndicators: ["mtpAll"] }, { ...off, mtpAll: true }).includes("mtpAll"), false);
   const old = { application: "personal-terminal", schemaVersion: 1, layout: { indicators: off }, drawings: [], images: [] };
   assert.equal(validateBackup(old), old);

@@ -63,21 +63,33 @@ export class TerminalSession {
   }
   async start(): Promise<void> {
     this.disposed = false;
-    const lifecycle = ++this.lifecycle,
-      activation = this.activation;
+    const lifecycle = ++this.lifecycle;
+    let activation = this.activation;
     window.addEventListener("online", this.onOnline);
     window.addEventListener("pagehide", this.onPageHide);
-    const session = await storage.restoreSession();
-    if (!this.current(lifecycle, activation)) return;
-    await this.activate(null, "", lifecycle, storage.PUBLIC_OWNER);
-    if (!this.current(lifecycle)) return;
-    this.bridge.update({ ready: true });
-    if (session)
+    try {
+      const session = await storage.restoreSession();
+      if (!this.current(lifecycle, activation)) return;
+      activation++;
+      await this.activate(null, "", lifecycle, storage.PUBLIC_OWNER, Boolean(session));
+      if (!this.current(lifecycle, activation)) return;
+      this.bridge.update({ ready: true });
+      if (!session || !this.current(lifecycle, activation)) return;
+      activation++;
       try {
         await this.activate(session.token, session.name, lifecycle);
       } catch (error) {
-        if (this.current(lifecycle)) this.bridge.notify(errorText(error));
+        if (this.current(lifecycle, activation)) this.bridge.notify(errorText(error));
       }
+    } catch (error) {
+      if (!this.current(lifecycle, activation)) return;
+      this.failWatchlistStartup();
+      throw error;
+    }
+  }
+  private failWatchlistStartup(): void {
+    if (this.bridge.getState().watchlistStartup === "loading")
+      this.bridge.update({ watchlistStartup: "error" });
   }
   private onOnline = (): void => {
     const client = this.client;
@@ -119,7 +131,7 @@ export class TerminalSession {
     if (this.liveFrame !== null) cancelAnimationFrame(this.liveFrame);
     this.liveFrame = null;
   }
-  applyBankState(snapshot: MarketSnapshot): void {
+  applyBankState(snapshot: MarketSnapshot, settleEmptyStartup = false): void {
     const state = this.bridge.getState(),
       directions = new Map(state.pricesDirection),
       before = new Map(state.rows.map((row) => [row.symbol, row.price]));
@@ -131,6 +143,10 @@ export class TerminalSession {
     });
     this.bridge.update({
       rows,
+      ...(state.watchlistStartup === "error" ||
+      (state.watchlistStartup === "loading" && (rows.length > 0 || settleEmptyStartup))
+        ? { watchlistStartup: "ready" }
+        : {}),
       preferences: pinSelectedInstrument(rows, state.preferences),
       marketReady: snapshot.marketReady,
       authenticated: snapshot.authenticated,
@@ -197,7 +213,8 @@ export class TerminalSession {
     token: string | null,
     name: string,
     lifecycle = this.lifecycle,
-    owner?: string
+    owner?: string,
+    deferEmptyWatchlist = false
   ): Promise<MarketClient> {
     this.transitionAbort?.abort();
     const transition = new AbortController();
@@ -260,7 +277,8 @@ export class TerminalSession {
         profileTransition: false,
         pendingPublicSource: transfer.conflict ? sourceOwner : null
       });
-      this.applyBankState(candidate.snapshot());
+      if (!valid()) throw cancelled();
+      this.applyBankState(candidate.snapshot(), !deferEmptyWatchlist);
       const state = this.bridge.getState();
       if (!selectedMarketRow(state.rows, state.preferences)) {
         const first = orderedWatchlistRows(state.rows, state.preferences.watchlistSections)[0];
@@ -295,6 +313,7 @@ export class TerminalSession {
           candidate.cachePaused = true;
         await candidate.close();
       }
+      if (attempt()) this.failWatchlistStartup();
       throw error;
     } finally {
       recoveryFence.dispose();

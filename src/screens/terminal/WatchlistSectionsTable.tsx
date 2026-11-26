@@ -23,6 +23,7 @@ import { QuoteRow } from "./WatchlistQuoteRow.js";
 import { WatchlistMenu } from "./WatchlistMenu.js";
 import { WatchlistSectionHeader } from "./WatchlistSectionHeader.js";
 import { WatchlistSectionMenu } from "./WatchlistSectionMenu.js";
+import { WatchlistStartupStatus, watchlistStartupNotice } from "./WatchlistStartupStatus.js";
 import type { TerminalController } from "./controller.js";
 import { publishWorkspaceInstrument } from "./workspace-sync-controller.js";
 
@@ -49,6 +50,7 @@ export function WatchlistSectionsTable({
   activeInstrument?: MarketRow | null;
 }) {
   const { controller, state } = useTerminal();
+  const startup = watchlistStartupNotice(state);
   const editor = chartEditor ?? controller;
   const rowMenuId = useId();
   const [menu, setMenu] = useState<Menu | null>(null),
@@ -324,6 +326,7 @@ export function WatchlistSectionsTable({
         </thead>
         <tbody
           id="quotes"
+          aria-busy={startup === "loading" || undefined}
           onDragLeave={(event) => {
             if (
               !(event.relatedTarget instanceof Node) ||
@@ -332,81 +335,84 @@ export function WatchlistSectionsTable({
               setDrop(null);
           }}
         >
-          {groups.flatMap((group) => {
-            const section = group.section,
-              key = section ? watchlistEntryKey(section) : "";
-            return [
-              section ? (
-                <WatchlistSectionHeader
-                  key={key}
-                  section={section}
-                  count={group.rows.length}
-                  disabled={disabled}
-                  dragClass={dragClass(key)}
-                  editing={editingSection === section.id}
-                  onEdit={(editing) => setEditingSection(editing ? section.id : null)}
-                  onToggle={() => {
-                    if (!drag.current && Date.now() >= suppressClickUntil.current)
-                      apply({ kind: "collapse", id: section.id });
-                  }}
-                  onRename={(title) => apply({ kind: "rename", id: section.id, title })}
-                  onContext={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    controller.setContext(null);
-                    const rect = event.currentTarget.getBoundingClientRect();
-                    setMenu({
-                      kind: "section",
-                      section,
-                      x: event.type === "click" ? rect.left : event.clientX,
-                      y: event.type === "click" ? rect.bottom : event.clientY,
-                      owner: state.owner
-                    });
-                  }}
-                  onMove={(direction) => step(key, direction)}
-                  onDragStart={(event) => startDrag(event, key)}
-                  onDragOver={(event) => over(event, key)}
-                  onDrop={(event) => dropOn(event, key)}
-                  onDragEnd={endDrag}
-                />
-              ) : null,
-              ...(section?.collapsed
-                ? []
-                : group.rows.map(({ row, position, key }) => (
-                    <QuoteRow
-                      key={key}
-                      row={row}
-                      position={position}
-                      selected={row === selected}
-                      direction={state.pricesDirection.get(row.symbol) ?? ""}
-                      dragClass={dragClass(key)}
-                      onDragStart={(event) => startDrag(event, key)}
-                      onDragOver={(event) => over(event, key)}
-                      onDrop={(event) => dropOn(event, key)}
-                      onDragEnd={endDrag}
-                      onStep={(direction) => step(key, direction)}
-                      onSelect={select}
-                      onRemove={remove}
-                      onFlag={(event) => openRow(event, row, key, "flag")}
-                      onContext={(event) => openRow(event, row, key)}
-                      menuId={
-                        menu?.kind === "row" && menu.key === key && menu.fromAction
-                          ? rowMenuId
-                          : undefined
-                      }
-                    />
-                  )))
-            ];
-          })}
+          {!startup &&
+            groups.flatMap((group) => {
+              const section = group.section,
+                key = section ? watchlistEntryKey(section) : "";
+              return [
+                section ? (
+                  <WatchlistSectionHeader
+                    key={key}
+                    section={section}
+                    count={group.rows.length}
+                    disabled={disabled}
+                    dragClass={dragClass(key)}
+                    editing={editingSection === section.id}
+                    onEdit={(editing) => setEditingSection(editing ? section.id : null)}
+                    onToggle={() => {
+                      if (!drag.current && Date.now() >= suppressClickUntil.current)
+                        apply({ kind: "collapse", id: section.id });
+                    }}
+                    onRename={(title) => apply({ kind: "rename", id: section.id, title })}
+                    onContext={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      controller.setContext(null);
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      setMenu({
+                        kind: "section",
+                        section,
+                        x: event.type === "click" ? rect.left : event.clientX,
+                        y: event.type === "click" ? rect.bottom : event.clientY,
+                        owner: state.owner
+                      });
+                    }}
+                    onMove={(direction) => step(key, direction)}
+                    onDragStart={(event) => startDrag(event, key)}
+                    onDragOver={(event) => over(event, key)}
+                    onDrop={(event) => dropOn(event, key)}
+                    onDragEnd={endDrag}
+                  />
+                ) : null,
+                ...(section?.collapsed
+                  ? []
+                  : group.rows.map(({ row, position, key }) => (
+                      <QuoteRow
+                        key={key}
+                        row={row}
+                        position={position}
+                        selected={row === selected}
+                        direction={state.pricesDirection.get(row.symbol) ?? ""}
+                        dragClass={dragClass(key)}
+                        onDragStart={(event) => startDrag(event, key)}
+                        onDragOver={(event) => over(event, key)}
+                        onDrop={(event) => dropOn(event, key)}
+                        onDragEnd={endDrag}
+                        onStep={(direction) => step(key, direction)}
+                        onSelect={select}
+                        onRemove={remove}
+                        onFlag={(event) => openRow(event, row, key, "flag")}
+                        onContext={(event) => openRow(event, row, key)}
+                        menuId={
+                          menu?.kind === "row" && menu.key === key && menu.fromAction
+                            ? rowMenuId
+                            : undefined
+                        }
+                      />
+                    )))
+              ];
+            })}
         </tbody>
       </table>
-      {!groups.some((group) => group.rows.length) && !sections.length && (
+      {startup ? (
+        <WatchlistStartupStatus phase={startup} locale={state.preferences.locale} />
+      ) : !groups.some((group) => group.rows.length) && !sections.length ? (
         <p id="empty-search">
           {state.rows.length
             ? t("Инструменты не найдены")
             : t("Список пуст. Добавьте инструмент кнопкой +.")}
         </p>
-      )}
+      ) : null}
       {menu &&
         menu.owner === state.owner &&
         createPortal(
