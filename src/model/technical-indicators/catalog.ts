@@ -47,7 +47,12 @@ const implemented: Readonly<Record<string, TechnicalIndicatorId>> = {
   "STD;Positive_Volume_Index": "pvi",
   "STD;True%1Strength%1Indicator": "tsi",
   "STD;Know_Sure_Thing": "kst",
-  "STD;Fisher_Transform": "fisher-transform"
+  "STD;Fisher_Transform": "fisher-transform",
+  "STD;PSAR": "parabolic-sar",
+  "STD;Supertrend": "supertrend",
+  "STD;Arnaud%1Legoux%1Moving%1Average": "alma",
+  "STD;Least%1Squares%1Moving%1Average": "lsma",
+  "STD;Chandelier_Exit": "chandelier-exit"
 };
 
 export function technicalDefinitionForCatalog(id: string): TechnicalIndicatorId | undefined {

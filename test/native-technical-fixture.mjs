@@ -62,6 +62,7 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
     observers = [],
     registry = new Map(),
     axisRegistry = [],
+    yAxisRegistry = [],
     allSeries = [],
     allIndicators = [];
   const window = events(),
@@ -154,12 +155,14 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
   };
   function priceScale() {
     let autoScale = true,
+      textColor,
       range = { from: 50, to: 150 };
     return {
       applyOptions(value) {
         if (value.autoScale !== undefined) autoScale = value.autoScale;
+        if (value.textColor !== undefined) textColor = value.textColor;
       },
-      options: () => ({ autoScale }),
+      options: () => ({ autoScale, textColor }),
       getVisibleRange: () => ({ ...range }),
       setVisibleRange: (value) => {
         range = { ...value };
@@ -509,6 +512,7 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
         },
         registerIndicator: (descriptor) => registry.set(descriptor.name, descriptor),
         registerXAxis: (descriptor) => axisRegistry.push(descriptor),
+        registerYAxis: (descriptor) => yAxisRegistry.push(descriptor),
         IndicatorSeries: { Normal: "normal", Price: "price" },
         DomPosition: { Main: "main", YAxis: "yAxis" },
         LineType: { Solid: "solid", Dashed: "dashed" },
@@ -571,6 +575,7 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
     allIndicators,
     registry,
     axisRegistry,
+    yAxisRegistry,
     container,
     window,
     changes,

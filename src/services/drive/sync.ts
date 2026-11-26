@@ -13,6 +13,11 @@ import {
   verifyContent
 } from "./backup.js";
 import { DRIVE_NAMESPACE, DriveError } from "./types.js";
+import {
+  assertDriveInspectionUnchanged,
+  assertReadableDriveManifest,
+  assertReadableDrivePayload
+} from "./reader-guard.js";
 import type {
   ContentReference,
   DriveFile,
@@ -90,6 +95,8 @@ export interface PublishOptions {
   deviceId: string;
   /** Last observed/applied remote parent; [] only for a genuinely empty Drive. */
   parents: string[];
+  /** Optional pinned observation from a coordinator; never persisted. */
+  expectedInspection?: DriveInspection;
 }
 export interface PublishResult {
   nodeId: string;
@@ -119,6 +126,7 @@ export class DriveSync {
       } catch {
         throw invalid();
       }
+      assertReadableDriveManifest(value);
       const manifest = validateManifest(value);
       if (file.appProperties.mtpKey !== manifest.nodeId) throw invalid();
       snapshots.push({ manifest, file });
@@ -126,13 +134,14 @@ export class DriveSync {
     return inspectGraph(snapshots, this.namespace);
   }
 
-  async download(nodeId: string): Promise<Backup> {
+  async download(nodeId: string, expectedInspection?: DriveInspection): Promise<Backup> {
     const inspection = await this.inspect();
+    if (expectedInspection) assertDriveInspectionUnchanged(expectedInspection, inspection);
     const snapshot = inspection.snapshots.find((item) => item.manifest.nodeId === nodeId);
     if (!snapshot) throw invalid();
     const blobs = await this.blobIndex();
     const manifest = snapshot.manifest;
-    const payload = await this.loadBlob(manifest.payload, blobs, MAX_PAYLOAD_BYTES);
+    const payload = await this.readPayload(manifest, blobs);
     const images: Blob[] = [];
     for (const image of manifest.images)
       images.push(await this.loadBlob(image, blobs, MAX_IMAGE_BYTES));
@@ -140,6 +149,41 @@ export class DriveSync {
     if (backup.images.some((image, index) => image.type !== manifest.images[index]?.mimeType))
       throw invalid();
     return backup;
+  }
+
+  /** Reader capability check only: no image binary download or base64 allocation. */
+  async validateHeads(inspection: DriveInspection): Promise<void> {
+    const blobs = await this.blobIndex();
+    for (const head of inspection.heads) {
+      const snapshot = inspection.snapshots.find((item) => item.manifest.nodeId === head);
+      if (!snapshot) throw invalid();
+      await this.readPayload(snapshot.manifest, blobs);
+      for (const image of snapshot.manifest.images)
+        if (!blobs.get(image.sha256)?.some((file) => file.size === image.size)) throw invalid();
+    }
+    assertDriveInspectionUnchanged(inspection, await this.inspect());
+  }
+
+  private async readPayload(
+    manifest: SnapshotManifest,
+    blobs: Map<string, DriveFile[]>
+  ): Promise<Blob> {
+    const payload = await this.loadBlob(manifest.payload, blobs, MAX_PAYLOAD_BYTES);
+    let decoded: unknown;
+    try {
+      decoded = JSON.parse(await payload.text());
+    } catch {
+      throw invalid();
+    }
+    const backup = assertReadableDrivePayload(decoded);
+    if (
+      backup.images.length !== manifest.images.length ||
+      backup.images.some(
+        (image, index) => image.data !== "" || image.type !== manifest.images[index]?.mimeType
+      )
+    )
+      throw invalid();
+    return payload;
   }
 
   publish(backup: unknown, options: PublishOptions): Promise<PublishResult> {
@@ -176,13 +220,17 @@ export class DriveSync {
     // Clone parent identities before yielding, so caller mutation cannot reparent a snapshot.
     const parents = [...options.parents];
     const deviceId = options.deviceId;
+    const expected = options.expectedInspection && structuredClone(options.expectedInspection);
     try {
       const prepared = await prepareDriveBackup(backup);
       const before = await this.inspect();
+      if (expected) assertDriveInspectionUnchanged(expected, before);
       if (!sameSet(parents, before.heads) || (before.conflict && !resolving))
         throw new DriveConflictError(before.heads);
+      await this.validateHeads(before);
       const blobs = await this.blobIndex();
       const payload = await reference(prepared.payload);
+      assertDriveInspectionUnchanged(before, await this.inspect());
       await this.saveBlob(prepared.payload, payload, blobs);
       for (const image of prepared.images) await this.saveBlob(image.body, image.reference, blobs);
       const manifest: SnapshotManifest = {
@@ -202,7 +250,9 @@ export class DriveSync {
       const body = new Blob([JSON.stringify(manifest)], { type: "application/json" });
       if (body.size > MAX_MANIFEST_BYTES)
         throw new DriveError("limit", "Манифест снимка слишком большой.");
-      await this.store.create("snapshot", manifest.nodeId, await sha256(body), body);
+      const manifestHash = await sha256(body);
+      assertDriveInspectionUnchanged(before, await this.inspect());
+      await this.store.create("snapshot", manifest.nodeId, manifestHash, body);
       return { nodeId: manifest.nodeId, inspection: await this.inspect() };
     } finally {
       this.writing = false;

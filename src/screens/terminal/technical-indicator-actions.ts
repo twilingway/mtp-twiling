@@ -14,9 +14,12 @@ import {
   reorderTechnicalIndicators,
   reorderTechnicalPanes,
   technicalIndicatorGroups,
-  technicalPaneKey
+  DEFAULT_TECHNICAL_PANE_HEIGHT_RATIO
 } from "../../model/technical-indicator-layout.js";
-import type { TechnicalPaneLayout } from "../../model/technical-indicator-layout.js";
+import type {
+  TechnicalPaneLayout,
+  TechnicalPaneCaptureContext
+} from "../../model/technical-indicator-layout.js";
 
 type Patch = Pick<TerminalPreferences, "technicalIndicators" | "technicalPaneLayout">;
 const queues = new WeakMap<TerminalController, Promise<void>>();
@@ -167,21 +170,48 @@ export function moveTechnicalPane(
 export function persistTechnicalPaneLayout(
   controller: TerminalController,
   changed: TechnicalPaneLayout,
-  valid: () => boolean
+  valid: () => boolean,
+  capture?: TechnicalPaneCaptureContext
 ): Promise<void> {
   return changeTechnicalPreferences(
     controller,
     (preferences) => {
       const layout = preferences.technicalPaneLayout ?? [];
-      const existing = new Set(
-        (preferences.technicalIndicators ?? []).map((item) => technicalPaneKey(item.pane))
+      const groups = technicalIndicatorGroups(preferences.technicalIndicators ?? [], layout).filter(
+        (group) => group.pane.kind === "pane"
       );
-      const accepted = changed.filter((item) => existing.has(`pane:${item.paneId}`));
+      const freshOrder = groups.map((group) => group.key.slice(5)),
+        existing = new Set(freshOrder);
+      const accepted = changed.filter((item) => existing.has(item.paneId));
+      const capturedOrder = accepted.map((item) => item.paneId),
+        captured = new Set(capturedOrder);
+      const baseline = capture?.baselineOrder ?? [],
+        common = new Set(
+          baseline.filter((id) => existing.has(id) && layout.some((item) => item.paneId === id))
+        ),
+        baselineCommon = baseline.filter((id) => common.has(id)),
+        freshCommon = layout.map((item) => item.paneId).filter((id) => common.has(id));
+      // A resize has no reorder intent: an earlier queued model reorder wins over its old snapshot.
+      const reordered = baselineCommon.some((id, index) => freshCommon[index] !== id);
+      const order =
+        capture && !reordered
+          ? [...capturedOrder, ...freshOrder.filter((id) => !captured.has(id))]
+          : freshOrder;
+      const resized = new Set(capture?.resizedPaneIds ?? capturedOrder);
       return {
-        technicalPaneLayout: [
-          ...layout.map((item) => accepted.find((next) => next.paneId === item.paneId) ?? item),
-          ...accepted.filter((item) => !layout.some((next) => next.paneId === item.paneId))
-        ]
+        technicalPaneLayout: order.map((paneId) => {
+          const measured = accepted.find((item) => item.paneId === paneId),
+            fresh = layout.find((item) => item.paneId === paneId);
+          return (
+            (resized.has(paneId) ? measured : fresh) ??
+            fresh ??
+            measured ?? {
+              paneId,
+              heightRatio: DEFAULT_TECHNICAL_PANE_HEIGHT_RATIO,
+              collapsed: false
+            }
+          );
+        })
       };
     },
     valid

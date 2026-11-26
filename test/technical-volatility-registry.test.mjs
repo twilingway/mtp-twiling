@@ -1,3 +1,7 @@
+import {
+  EXPECTED_COMPUTED_COUNT,
+  EXPECTED_TECHNICAL_COUNT
+} from "./technical-registry-expectation.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -82,7 +86,7 @@ function series(actual, expected) {
   });
 }
 
-test("45 immutable definitions preserve the original21 ordering and all legacy defaults", () => {
+test("reviewed immutable definitions preserve the original21 ordering and all legacy defaults", () => {
   const old = {
     momentum: { length: 10, source: "close" },
     roc: { length: 9, source: "close" },
@@ -106,7 +110,7 @@ test("45 immutable definitions preserve the original21 ordering and all legacy d
     atr: { length: 14 },
     stochastic: { length: 14, smoothK: 3, smoothD: 3 }
   };
-  assert.equal(core.technicalIndicatorDefinitions.length, 45);
+  assert.equal(core.technicalIndicatorDefinitions.length, EXPECTED_COMPUTED_COUNT);
   assert.deepEqual(
     core.technicalIndicatorDefinitions.slice(0, 21).map((item) => item.id),
     Object.keys(old)
@@ -122,11 +126,11 @@ test("45 immutable definitions preserve the original21 ordering and all legacy d
   for (const instance of restored) assert.deepEqual(instance.params, old[instance.definitionId]);
 });
 
-test("exact eight public IDs retain42 plus Volume availability with no aliases treated as implementations", () => {
+test("exact eight public IDs retain reviewed availability with no aliases treated as implementations", () => {
   for (const locale of ["ru", "en"]) {
     const entries = catalog.technicalCatalogEntries(locale);
     assert.equal(entries.length, 127);
-    assert.equal(entries.filter((entry) => entry.available).length, 46);
+    assert.equal(entries.filter((entry) => entry.available).length, EXPECTED_TECHNICAL_COUNT);
     for (const [publicId, id] of Object.entries(publicIds)) {
       assert.equal(catalog.technicalDefinitionForCatalog(publicId), id);
       assert.equal(entries.find((entry) => entry.id === publicId).available, true);

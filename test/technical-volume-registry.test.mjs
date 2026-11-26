@@ -1,3 +1,7 @@
+import {
+  EXPECTED_COMPUTED_COUNT,
+  EXPECTED_TECHNICAL_COUNT
+} from "./technical-registry-expectation.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -47,8 +51,8 @@ function series(actual, expected) {
   );
 }
 
-test("45 definitions retain seven exact volume presets after an unchanged frozen35 contract", () => {
-  assert.equal(core.technicalIndicatorDefinitions.length, 45);
+test("reviewed definitions retain seven exact volume presets after an unchanged frozen35 contract", () => {
+  assert.equal(core.technicalIndicatorDefinitions.length, EXPECTED_COMPUTED_COUNT);
   assert.deepEqual(
     core.technicalIndicatorDefinitions.slice(35, 42).map((item) => item.id),
     ids
@@ -86,11 +90,11 @@ test("45 definitions retain seven exact volume presets after an unchanged frozen
   assert.ok(Object.isFrozen(choice.choices));
 });
 
-test("catalog retains all127 entries and exposes43 available TA with exact public IDs/search", () => {
+test("catalog retains all127 entries and exposes the reviewed TA set with exact public IDs/search", () => {
   for (const locale of ["ru", "en"]) {
     const entries = catalog.technicalCatalogEntries(locale);
     assert.equal(entries.length, 127);
-    assert.equal(entries.filter((entry) => entry.available).length, 46);
+    assert.equal(entries.filter((entry) => entry.available).length, EXPECTED_TECHNICAL_COUNT);
     for (const [i, publicId] of publicIds.entries()) {
       assert.equal(catalog.technicalDefinitionForCatalog(publicId), ids[i]);
       const entry = entries.find((item) => item.id === publicId);

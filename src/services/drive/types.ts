@@ -4,6 +4,7 @@ export const DRIVE_CLIENT_ID =
 export const DRIVE_NAMESPACE = "mtp-drive-v2";
 export const LEGACY_DRIVE_NAMESPACE = "mtp-drive-v1";
 export type DriveErrorCode =
+  | "unsupported-format"
   | "auth-required"
   | "auth-cancelled"
   | "not-ready"

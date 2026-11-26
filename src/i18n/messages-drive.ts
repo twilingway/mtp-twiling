@@ -1,4 +1,6 @@
 export const driveMessages = {
+  "Синхронизация на паузе. Сохранённый вход Google не удаляется, срок доступа остаётся прежним.":
+    "Sync is paused. Saved Google sign-in is retained and its expiry stays unchanged.",
   "Завершите восстановление профиля, чтобы изменять настройки.":
     "Finish profile recovery before editing settings.",
   "Применяем настройки. Аккаунт и отключение доступны.":
@@ -45,6 +47,8 @@ export const driveMessages = {
   "Google не предоставил доступ к данным приложения": "Google did not grant access to app data",
   "Данные Google Диска повреждены. Локальные данные сохранены.":
     "Google Drive data is invalid. Local data is retained.",
+  "Формат синхронизации не поддерживается. Обновите приложение. Данные сохранены, автосинхронизация остановлена.":
+    "This sync format is not supported. Update the app. Data is retained and automatic sync is stopped.",
   "На Google Диске появились другие изменения. Повторите проверку.":
     "Google Drive has other changes. Check again.",
   "Превышен лимит данных синхронизации": "Sync data limit exceeded",

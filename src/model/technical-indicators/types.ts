@@ -1,6 +1,13 @@
 import type { CumulativeHistoryRequirement } from "./momentum-volume/metadata.js";
 import type { VolumeFlowHistoryRequirement, VolumeFlowId } from "./volume-flow/metadata.js";
 import type { VolumeAverage } from "./volume-flow/parameters.js";
+import type { PresentationDefinition } from "./presentation-types.js";
+import type { TrendPriceId, TrendPriceHistoryRequirement } from "./trend-price-contract.js";
+import type {
+  ChannelPriceId,
+  ChannelPriceParameters,
+  ChannelPriceHistoryRequirement
+} from "./channel-average-contract.js";
 import type {
   StateOscillatorId,
   StateOscillatorHistoryRequirement
@@ -45,7 +52,9 @@ export type TechnicalIndicatorId =
   | "vortex"
   | "choppiness-index"
   | VolumeFlowId
-  | StateOscillatorId;
+  | StateOscillatorId
+  | TrendPriceId
+  | ChannelPriceId;
 export type PriceSource = "open" | "high" | "low" | "close" | "hl2" | "hlc3" | "ohlc4" | "volume";
 export interface TechnicalBar {
   readonly timestamp: number;
@@ -55,7 +64,9 @@ export interface TechnicalBar {
   readonly close: NumericValue;
   readonly volume: NumericValue;
 }
-export interface TechnicalParameters {
+export interface TechnicalParameters extends ChannelPriceParameters {
+  "parabolic-sar": { start: number; increment: number; maximum: number };
+  supertrend: { atrLength: number; factor: number };
   tsi: { longLength: number; shortLength: number; signalLength: number };
   kst: {
     roc1Length: number;
@@ -165,6 +176,8 @@ export interface TechnicalIndicatorDefinition {
   outputs: readonly TechnicalOutputDefinition[];
   levels: readonly number[];
   references: readonly string[];
+  /** Runtime-only drawing metadata. Never serialized as indicator instance preferences. */
+  presentation?: PresentationDefinition;
 }
 export interface UnsupportedIndicatorDefinition {
   schemaVersion: 1;
@@ -184,8 +197,8 @@ export interface TechnicalIndicatorResult {
   warmupBars: number | null;
   /** Present only when the parameters make every output mathematically undefined. */
   alwaysUndefined?: true;
-  /** New volume-flow indicators only; absent from legacy and available results. */
-  unavailableReason?: "volume-unavailable";
+  /** Runtime only; absent from legacy and available results. Never an instance/backup field. */
+  unavailableReason?: "volume-unavailable" | "calculation-limit";
   historyRequirement: TechnicalHistoryRequirement;
 }
 /** Explicit current-timeframe context; never persisted in indicator instances or inferred from bars. */
@@ -215,4 +228,6 @@ export type TechnicalHistoryRequirement =
   /** Reviewed accumulation policy; never substitute an EMA/recursive seed. */
   | CumulativeHistoryRequirement
   | VolumeFlowHistoryRequirement
-  | StateOscillatorHistoryRequirement;
+  | StateOscillatorHistoryRequirement
+  | TrendPriceHistoryRequirement
+  | ChannelPriceHistoryRequirement;

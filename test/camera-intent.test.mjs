@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -337,6 +338,7 @@ function fixture() {
   adapter.source = { owner: "A", viewKey: key, uid: "one" };
   controller.chart = adapter;
   const { DriveCoordinator } = modules("services/drive/coordinator.ts"),
+    { assertReadableDrivePayload } = modules("services/drive/reader-guard.ts"),
     nodes = new Map();
   let heads = [],
     record = {
@@ -349,8 +351,9 @@ function fixture() {
   const inspect = async () => ({
     heads: [...heads],
     conflict: heads.length > 1,
-    snapshots: [...nodes].map(([nodeId]) => ({
-      manifest: { nodeId, createdAt: "2026-11-25T00:00:00Z" }
+    snapshots: [...nodes].map(([nodeId, backup]) => ({
+      manifest: { nodeId, createdAt: "2026-11-25T00:00:00Z" },
+      file: { appProperties: { mtpHash: createHash("sha256").update(JSON.stringify(backup)).digest("hex") } }
     }))
   });
   const publish = async (backup) => {
@@ -395,6 +398,12 @@ function fixture() {
       },
       sync: () => ({
         inspect,
+        validateHeads: async (inspection) => {
+          for (const id of inspection.heads) {
+            assert.ok(nodes.has(id));
+            assertReadableDrivePayload(nodes.get(id));
+          }
+        },
         download: async (id) => {
           await hooks.download?.();
           return structuredClone(nodes.get(id));
@@ -549,14 +558,17 @@ test("native pan/zoom intent during download or before commit invalidates incomi
     t.after(() => f.close());
     await f.connect();
     f.remote();
-    const gate = deferred();
-    let entered = false;
+    const gate = deferred(), entered = deferred();
     f.hooks[phase === "download" ? "download" : "beforeCommit"] = async () => {
-      entered = true;
+      entered.resolve();
       await gate.promise;
     };
     const syncing = f.coordinator.sync();
-    while (!entered) await tick();
+    assert.equal(
+      await Promise.race([entered.promise.then(() => true), syncing.then(() => false)]),
+      true,
+      "sync must reach the intended hook before completing"
+    );
     f.camera.userCameraAction(f.controller, f.adapter, () => f.adapter.zoom());
     assert.equal(f.view().camera.barSpace, 8, "native setter still waits for RAF");
     gate.resolve();

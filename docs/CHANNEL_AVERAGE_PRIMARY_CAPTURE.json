@@ -1,0 +1,38 @@
+[
+  {
+    "id": "STD;Arnaud%1Legoux%1Moving%1Average",
+    "url": "https://pine-facade.tradingview.com/pine-facade/get/STD%3BArnaud%251Legoux%251Moving%251Average/last",
+    "version": "30.0",
+    "sha256": "6392823a19e1c4cf55a794491c857dff845230998cba8eb92f0d6646d0caff04",
+    "status": 200,
+    "httpDate": "Thu, 26 Nov 2026 03:02:14 GMT",
+    "plotCount": 1,
+    "plotColorTokens": [[]],
+    "tls": "Python default CERT_REQUIRED/check_hostname, no proxy, no insecure flags",
+    "fullSourceSaved": false
+  },
+  {
+    "id": "STD;Least%1Squares%1Moving%1Average",
+    "url": "https://pine-facade.tradingview.com/pine-facade/get/STD%3BLeast%251Squares%251Moving%251Average/last",
+    "version": "30.0",
+    "sha256": "0454f77822ea2d48d989106c72a1798dbded9d380034eed30002f2c58ddd2d33",
+    "status": 200,
+    "httpDate": "Thu, 26 Nov 2026 03:02:14 GMT",
+    "plotCount": 1,
+    "plotColorTokens": [[]],
+    "tls": "Python default CERT_REQUIRED/check_hostname, no proxy, no insecure flags",
+    "fullSourceSaved": false
+  },
+  {
+    "id": "STD;Chandelier_Exit",
+    "url": "https://pine-facade.tradingview.com/pine-facade/get/STD%3BChandelier_Exit/last",
+    "version": "4.0",
+    "sha256": "b66ee578b5a5645af8173c752838221ea848729ea593459d26ffaf7417a7a37f",
+    "status": 200,
+    "httpDate": "Thu, 26 Nov 2026 03:02:15 GMT",
+    "plotCount": 2,
+    "plotColorTokens": [[], ["#ff6d00"]],
+    "tls": "Python default CERT_REQUIRED/check_hostname, no proxy, no insecure flags",
+    "fullSourceSaved": false
+  }
+]

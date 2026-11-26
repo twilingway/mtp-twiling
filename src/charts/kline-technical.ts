@@ -1,13 +1,16 @@
 import {
+  ActionType,
   DomPosition,
   IndicatorSeries,
   LineType,
   PolygonType,
-  registerIndicator
+  registerIndicator,
+  registerYAxis
 } from "klinecharts";
-import type { Chart, Indicator, IndicatorCreate, IndicatorDrawParams } from "klinecharts";
+import type { Chart, IndicatorCreate, IndicatorFigureStylesCallbackData } from "klinecharts";
 import type { Candle } from "../model/types.js";
 import type { TechnicalIndicatorInstance } from "../model/technical-indicators/types.js";
+import type { PlotPrecisionPolicy } from "../model/technical-indicators/presentation-types.js";
 import type {
   TechnicalIndicatorGroup,
   TechnicalPanePreference
@@ -16,21 +19,44 @@ import type { ChartOptions, TechnicalPaneMetric } from "./adapter.js";
 import { TechnicalRenderData } from "./technical-render-data.js";
 import { technicalCalculationContext } from "./technical-calculation-context.js";
 import type { TechnicalRenderOutput } from "./technical-render-data.js";
-import { capturedTechnicalLayout } from "./technical-pane-geometry.js";
+import { captureTechnicalPaneLayout } from "./technical-pane-geometry.js";
 import { klinePaneGeometry } from "./kline-pane-geometry.js";
 import { attachTechnicalPaneEvents } from "./technical-pane-events.js";
+import { klineCompactCrosshair } from "./technical-compact-crosshair.js";
 import { lineColor } from "../model/candle-palette.js";
+import {
+  drawKlineTechnical,
+  drawKlineTechnicalFills,
+  klineTechnicalContext,
+  klineTechnicalIndex,
+  klineTechnicalColor,
+  klineColumnsBase,
+  klineColumnsBaseFigure
+} from "./kline-technical-geometry.js";
+import type {
+  KlineTechnicalContext as Context,
+  KlineTechnicalRow as Row
+} from "./kline-technical-geometry.js";
 
-type Row = Record<string, number | undefined>;
-interface Context {
-  rows: Row[];
-  levels: number[];
-  disposed: boolean;
+const COMPACT_AXIS = "PERSONAL_TA_COMPACT_AXIS";
+let compactAxisRegistered = false;
+function technicalAxis(): string {
+  if (!compactAxisRegistered) {
+    registerYAxis({
+      name: COMPACT_AXIS,
+      createTicks: ({ bounding, defaultTicks }) => (bounding.height <= 30 ? [] : defaultTicks)
+    });
+    compactAxisRegistered = true;
+  }
+  return COMPACT_AXIS;
 }
+
 interface Entry {
   name: string;
   paneId: string;
   context: Context;
+  policy: PlotPrecisionPolicy;
+  fillName?: string;
 }
 interface Settlement {
   active: boolean;
@@ -45,45 +71,23 @@ function nativeSettled(weak: WeakRef<Settlement>, revision: number): () => void 
   };
 }
 const registered = new Set<string>();
-function contextOf(indicator: Indicator<Row>): Context | null {
-  const value: unknown = indicator.extendData;
-  return value && typeof value === "object" && "context" in value
-    ? (value.context as Context)
-    : null;
-}
-function referenceLevels({ ctx, indicator, yAxis, bounding }: IndicatorDrawParams<Row>) {
-  const context = contextOf(indicator);
-  if (!context || context.disposed || !context.levels.length) return false;
-  ctx.save();
-  ctx.strokeStyle = "#787b8666";
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]);
-  for (const value of context.levels) {
-    const y = yAxis.convertToPixel(value);
-    if (!Number.isFinite(y) || y < 0 || y > bounding.height) continue;
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(bounding.width, y);
-    ctx.stroke();
-  }
-  ctx.restore();
-  return false;
-}
-/** At most 100 reusable names; registry callbacks never close over a chart, source or dataset. */
-function registerSlot(slot: number): string {
-  const name = `PERSONAL_TA_${slot}`;
+/** Four reusable families of at most 100 slots; callbacks retain no chart, owner or dataset. */
+function registerSlot(slot: number, policy: PlotPrecisionPolicy, fill = false): string {
+  if (slot >= 100) throw new RangeError("Too many native TA slots");
+  const nativePrice = policy === "native-price";
+  const name = `PERSONAL_TA_${fill ? "FILL_" : ""}${nativePrice ? "PRICE_" : ""}${slot}`;
   if (!registered.has(name)) {
     registered.add(name);
     registerIndicator<Row>({
       name,
       shortName: "",
-      series: IndicatorSeries.Normal,
+      series: nativePrice ? IndicatorSeries.Price : IndicatorSeries.Normal,
       figures: [],
       calc: (_bars, indicator) => {
-        const context = contextOf(indicator);
-        return context && !context.disposed ? context.rows : [];
+        const context = klineTechnicalContext(indicator);
+        return context && !context.disposed && !fill ? context.rows : [];
       },
-      draw: referenceLevels
+      draw: fill ? drawKlineTechnicalFills : drawKlineTechnical
     });
   }
   return name;
@@ -150,10 +154,19 @@ export function klineTechnical(
       return value;
     });
   };
+  const crosshair = klineCompactCrosshair(
+    chart,
+    options.container,
+    metrics,
+    alive,
+    ActionType?.OnCrosshairChange,
+    DomPosition.YAxis
+  );
   const changed = () => {
     if (disposed || !alive()) return;
     const next = metrics(),
       signature = JSON.stringify(next);
+    crosshair.refresh(next);
     if (signature !== lastMetrics) {
       lastMetrics = signature;
       options.onTechnicalPaneMetrics?.(next);
@@ -196,11 +209,11 @@ export function klineTechnical(
       changed,
       capture(before, after) {
         if (disposed || !alive()) return;
-        const next = capturedTechnicalLayout(layout, before, after);
+        const next = captureTechnicalPaneLayout(layout, before, after);
         if (next) {
-          layout = next;
+          layout = next.layout;
           groups = calculation.compile(instances, layout).groups;
-          options.onTechnicalPaneLayout?.(next);
+          options.onTechnicalPaneLayout?.(next.layout, next.context);
         }
       }
     });
@@ -209,13 +222,18 @@ export function klineTechnical(
     entry.context.disposed = true;
     entry.context.rows = [];
     entry.context.levels = [];
+    entry.context.outputs = [];
+    entry.context.fills = [];
+    entry.context.columnsBase = null;
+    if (entry.fillName) chart.removeIndicator(entry.paneId, entry.fillName);
     chart.removeIndicator(entry.paneId, entry.name);
     entries.delete(id);
   };
   function descriptor(
     id: string,
     outputs: readonly TechnicalRenderOutput[],
-    context: Context
+    context: Context,
+    policy: PlotPrecisionPolicy
   ): IndicatorCreate<Row> {
     let slot = slots.get(id);
     if (slot === undefined) {
@@ -246,18 +264,32 @@ export function klineTechnical(
         borderDashedValue: []
       }));
     return {
-      name: registerSlot(slot),
+      name: registerSlot(slot, policy),
       shortName: "",
-      precision: 6,
-      series: outputs[0]?.paneKey === "price" ? IndicatorSeries.Price : IndicatorSeries.Normal,
+      ...(policy === "native-price" ? {} : { precision: 6 }),
+      series:
+        policy === "native-price" || outputs[0]?.paneKey === "price"
+          ? IndicatorSeries.Price
+          : IndicatorSeries.Normal,
       zLevel: 10 + (outputs[0]?.order ?? 0),
       extendData: { context },
-      figures: visible.map((output) => ({
-        key: output.outputId,
-        title: "",
-        type: output.kind === "histogram" ? "bar" : "line",
-        ...(output.kind === "histogram" ? { baseValue: 0 } : {})
-      })),
+      figures: [
+        ...(context.columnsBase ? [klineColumnsBaseFigure(context.columnsBase)] : []),
+        ...visible.map((output) => ({
+          key: output.outputId,
+          title: "",
+          type: output.kind === "histogram" ? "bar" : "line",
+          ...(output.kind === "histogram" ? { baseValue: 0 } : {}),
+          ...(output.presentation
+            ? {
+                styles: (data: IndicatorFigureStylesCallbackData<Row>) => {
+                  const index = data.current.indicatorData?.[klineTechnicalIndex];
+                  return index === undefined ? {} : { color: klineTechnicalColor(output, index) };
+                }
+              }
+            : {})
+        }))
+      ],
       styles: { lines, bars },
       visible: visible.length > 0
     };
@@ -281,18 +313,37 @@ export function klineTechnical(
     for (const group of groups)
       for (const instance of group.instances) {
         const outputs = compiled.outputs.filter((output) => output.instanceId === instance.id);
+        const fills = compiled.fills.filter((fill) => fill.instanceId === instance.id);
+        const policy = outputs[0]?.presentation?.precisionPolicy ?? "legacy-fixed-6";
         const paneId = nativeId(group.key);
         let entry = entries.get(instance.id);
-        if (entry && entry.paneId !== paneId) {
+        if (entry && (entry.paneId !== paneId || entry.policy !== policy)) {
           remove(instance.id, entry);
           entry = undefined;
         }
-        const context: Context = entry?.context ?? { rows: [], levels: [], disposed: false };
-        context.rows = (outputs[0]?.timestamps ?? []).map((_timestamp, index) =>
-          Object.fromEntries(
-            outputs.map((output) => [output.outputId, output.values[index] ?? undefined])
-          )
-        );
+        const context: Context = entry?.context ?? {
+          rows: [],
+          levels: [],
+          outputs: [],
+          fills: [],
+          columnsBase: null,
+          disposed: false
+        };
+        context.outputs = outputs;
+        context.fills = fills;
+        context.columnsBase = klineColumnsBase(outputs);
+        context.rows = (outputs[0]?.timestamps ?? []).map((_timestamp, index) => {
+          const row = Object.assign(
+              Object.fromEntries(
+                outputs.map((output) => [output.outputId, output.values[index] ?? undefined])
+              ),
+              { [klineTechnicalIndex]: index }
+            ),
+            base = context.columnsBase;
+          if (base && base.plots.some((output) => Number.isFinite(output.values[index])))
+            Object.defineProperty(row, base.key, { value: base.value, enumerable: false });
+          return row;
+        });
         context.levels = [
           ...new Set(outputs.flatMap((output) => (output.style.visible ? output.levels : [])))
         ].filter((level) => {
@@ -301,7 +352,7 @@ export function klineTechnical(
           decorated.add(key);
           return true;
         });
-        const value = descriptor(instance.id, outputs, context);
+        const value = descriptor(instance.id, outputs, context, policy);
         if (!entry) {
           // v9.8.12 reapplies these options AFTER async calc when stacking into an existing pane.
           // Only the first instance may establish its height; subsequent ones must preserve it.
@@ -312,14 +363,43 @@ export function klineTechnical(
             {
               id: paneId,
               ...(!paneExists && group.key !== "price"
-                ? { height: 80, minHeight: 30, dragEnabled: true }
+                ? {
+                    height: 80,
+                    minHeight: 30,
+                    dragEnabled: true,
+                    axisOptions: { name: technicalAxis() }
+                  }
                 : {})
             },
             complete
           );
-          entry = { name: value.name, paneId, context };
+          entry = { name: value.name, paneId, context, policy };
           entries.set(instance.id, entry);
         } else chart.overrideIndicator(value, paneId, complete);
+        if (fills.length) {
+          const fillName = registerSlot(slots.get(instance.id)!, policy, true);
+          const fillValue: IndicatorCreate<Row> = {
+            name: fillName,
+            shortName: "",
+            figures: [],
+            ...(policy === "native-price" ? {} : { precision: 6 }),
+            series:
+              policy === "native-price" || group.key === "price"
+                ? IndicatorSeries.Price
+                : IndicatorSeries.Normal,
+            zLevel: -3 - (outputs[0]?.order ?? 0),
+            extendData: { context },
+            visible: fills.some((fill) => fill.visible)
+          };
+          if (entry.fillName) chart.overrideIndicator(fillValue, paneId, complete);
+          else {
+            chart.createIndicator(fillValue, true, { id: paneId }, complete);
+            entry.fillName = fillName;
+          }
+        } else if (entry.fillName) {
+          chart.removeIndicator(paneId, entry.fillName);
+          delete entry.fillName;
+        }
       }
     refreshCanvases();
     listen();
@@ -358,6 +438,7 @@ export function klineTechnical(
         : options.container.clientHeight - timeHeight();
     },
     dispose() {
+      crosshair.dispose();
       disposed = true;
       settlement.active = false;
       settlement.schedule = () => {};

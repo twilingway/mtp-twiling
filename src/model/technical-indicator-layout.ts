@@ -6,6 +6,17 @@ export interface TechnicalPanePreference {
   collapsed: boolean;
 }
 export type TechnicalPaneLayout = TechnicalPanePreference[];
+export const DEFAULT_TECHNICAL_PANE_HEIGHT_RATIO = 0.18;
+
+/** Runtime resize intent only; neither field belongs to the persisted layout schema. */
+export interface TechnicalPaneCaptureContext {
+  readonly resizedPaneIds: readonly string[];
+  readonly baselineOrder: readonly string[];
+}
+export interface TechnicalPaneCapture {
+  readonly layout: TechnicalPaneLayout;
+  readonly context: TechnicalPaneCaptureContext;
+}
 
 const paneId = (value: unknown): value is string =>
   typeof value === "string" && /^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$/.test(value);

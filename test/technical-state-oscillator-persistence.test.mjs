@@ -1,4 +1,5 @@
 import test from "node:test";
+import { EXPECTED_DRIVE_PARAMETER_KEYS } from "./technical-registry-expectation.mjs";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
@@ -100,28 +101,14 @@ test("raw root/JSON/Drive reject array/null/unknown/extra params and styles befo
     );
   }
 });
-test("Drive parameter allowlist adds exactly10 authorized scalar keys", () => {
+test("Drive parameter allowlist retains exactly the reviewed scalar keys", () => {
   const source = readFileSync(new URL("../src/services/drive/backup.ts", import.meta.url), "utf8");
   const keys = source.match(/params:\s*scalars\(\s*"([^"]+)"/)[1].split(" ");
   const previous =
     "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength diLength adxSmoothing divisor emaLength oscillatorAverage signalAverage".split(
       " "
     );
-  assert.deepEqual(
-    keys.filter((k) => !previous.includes(k)),
-    [
-      "longLength",
-      "shortLength",
-      "roc1Length",
-      "roc2Length",
-      "roc3Length",
-      "roc4Length",
-      "sma1Length",
-      "sma2Length",
-      "sma3Length",
-      "sma4Length"
-    ]
-  );
+  assert.deepEqual(keys, EXPECTED_DRIVE_PARAMETER_KEYS);
   assert.ok(previous.every((k) => keys.includes(k)));
   assert.equal(keys.length, new Set(keys).size);
 });

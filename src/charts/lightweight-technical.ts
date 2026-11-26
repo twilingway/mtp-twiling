@@ -4,6 +4,7 @@ import type {
   IPaneApi,
   IPriceLine,
   ISeriesApi,
+  AutoscaleInfoProvider,
   Time,
   UTCTimestamp
 } from "lightweight-charts";
@@ -17,16 +18,22 @@ import type { ChartOptions, TechnicalPaneMetric } from "./adapter.js";
 import { TechnicalRenderData } from "./technical-render-data.js";
 import { technicalCalculationContext } from "./technical-calculation-context.js";
 import type { TechnicalRenderOutput } from "./technical-render-data.js";
-import { capturedTechnicalLayout, technicalPaneGeometry } from "./technical-pane-geometry.js";
+import { captureTechnicalPaneLayout, technicalPaneGeometry } from "./technical-pane-geometry.js";
 import { attachTechnicalPaneEvents } from "./technical-pane-events.js";
 import { lineColor } from "../model/candle-palette.js";
+import { chartPalette } from "../model/theme.js";
+import { presentationColor } from "../model/technical-indicators/presentation.js";
+import { LightweightTechnicalPrimitive } from "./lightweight-technical-primitives.js";
+import { lightweightCompactCrosshair } from "./technical-compact-crosshair.js";
 
 type Series = ISeriesApi<"Line"> | ISeriesApi<"Histogram">;
 interface Entry {
   series: Series;
   kind: string;
+  presented: boolean;
   levels: IPriceLine[];
   levelKey: string;
+  primitive?: LightweightTechnicalPrimitive;
 }
 
 export function lightweightTechnical(
@@ -37,6 +44,7 @@ export function lightweightTechnical(
   const calculation = new TechnicalRenderData(technicalCalculationContext(options.timeframe));
   const owned = new Map<string, Entry>(),
     panes = new Map<string, IPaneApi<Time>>();
+  const fills = new Map<string, { primitive: LightweightTechnicalPrimitive; series: Series }>();
   let instances: readonly TechnicalIndicatorInstance[] = [],
     layout: readonly TechnicalPanePreference[] = [];
   let groups: TechnicalIndicatorGroup[] = [],
@@ -71,10 +79,22 @@ export function lightweightTechnical(
       return key ? [{ key, top: y, height, width }] : [];
     });
   };
+  const crosshair = lightweightCompactCrosshair(
+    chart,
+    options.container,
+    metrics,
+    alive,
+    (index) => {
+      if (index === 0) return "price";
+      const pane = nativePanes()[index];
+      return [...panes].find(([, value]) => value === pane)?.[0];
+    }
+  );
   const changed = () => {
     if (disposed || !alive()) return;
     const next = metrics(),
       key = JSON.stringify(next);
+    crosshair.refresh(next);
     if (key !== lastMetrics) {
       lastMetrics = key;
       options.onTechnicalPaneMetrics?.(next);
@@ -107,11 +127,11 @@ export function lightweightTechnical(
       changed,
       capture(before, after) {
         if (disposed || !alive()) return;
-        const next = capturedTechnicalLayout(layout, before, after);
+        const next = captureTechnicalPaneLayout(layout, before, after);
         if (next) {
-          layout = next;
+          layout = next.layout;
           groups = calculation.compile(instances, layout).groups;
-          options.onTechnicalPaneLayout?.(next);
+          options.onTechnicalPaneLayout?.(next.layout, next.context);
         }
       }
     });
@@ -120,22 +140,52 @@ export function lightweightTechnical(
       if (element) events.observe(element);
     }
   }
-  function outputOptions(output: TechnicalRenderOutput) {
+  const primitivePlot = (output: TechnicalRenderOutput) =>
+    output.presentation?.geometry.kind === "cross" ||
+    (output.presentation?.geometry.kind === "line" &&
+      output.presentation.geometry.gaps === "break");
+  function outputOptions(output: TechnicalRenderOutput, fillCarrier = false) {
+    const autoscaleInfoProvider: AutoscaleInfoProvider = (original) =>
+      !disposed && alive() && output.style.visible ? original() : null;
     return {
       color: lineColor(output.style.color, output.style.opacity),
-      visible: output.style.visible,
+      visible: output.style.visible || fillCarrier,
       priceScaleId: "right",
       lastValueVisible: false,
       priceLineVisible: false,
+      ...(output.presentation ? { autoscaleInfoProvider } : {}),
       ...(output.kind === "line"
         ? {
             lineWidth: output.style.width as 1 | 2 | 3 | 4,
             crosshairMarkerVisible: false,
+            ...(output.presentation
+              ? {
+                  lineVisible: output.style.visible && !primitivePlot(output),
+                  pointMarkersVisible: false,
+                  lastPriceAnimation: 0
+                }
+              : {}),
             lineStyle:
               output.style.lineStyle === "dashed" ? 2 : output.style.lineStyle === "dotted" ? 1 : 0
           }
-        : { base: 0 })
+        : {
+            base: 0,
+            ...(output.presentation && !output.style.visible ? { color: "transparent" } : {})
+          })
     };
+  }
+  function removeEntry(entry: Entry) {
+    if (entry.primitive) {
+      entry.primitive.dispose();
+      entry.series.detachPrimitive(entry.primitive);
+    }
+    for (const [key, fill] of fills)
+      if (fill.series === entry.series) {
+        fill.primitive.dispose();
+        fill.series.detachPrimitive(fill.primitive);
+        fills.delete(key);
+      }
+    chart.removeSeries(entry.series);
   }
   function reconcile() {
     if (disposed || !alive()) return;
@@ -146,7 +196,7 @@ export function lightweightTechnical(
     const activeSeries = new Set(compiled.outputs.map((output) => output.key));
     for (const [key, entry] of owned)
       if (!activeSeries.has(key)) {
-        chart.removeSeries(entry.series);
+        removeEntry(entry);
         owned.delete(key);
       }
     for (const group of lower) if (!panes.has(group.key)) panes.set(group.key, chart.addPane(true));
@@ -154,8 +204,8 @@ export function lightweightTechnical(
     for (const output of compiled.outputs) {
       const pane = output.paneKey === "price" ? nativePanes()[0]! : panes.get(output.paneKey)!;
       let entry = owned.get(output.key);
-      if (entry && entry.kind !== output.kind) {
-        chart.removeSeries(entry.series);
+      if (entry && (entry.kind !== output.kind || entry.presented !== !!output.presentation)) {
+        removeEntry(entry);
         owned.delete(output.key);
         entry = undefined;
       }
@@ -164,16 +214,45 @@ export function lightweightTechnical(
           output.kind === "histogram"
             ? chart.addSeries(HistogramSeries, outputOptions(output), pane.paneIndex())
             : chart.addSeries(LineSeries, outputOptions(output), pane.paneIndex());
-        entry = { series, kind: output.kind, levels: [], levelKey: "" };
+        entry = {
+          series,
+          kind: output.kind,
+          presented: !!output.presentation,
+          levels: [],
+          levelKey: ""
+        };
         owned.set(output.key, entry);
       }
       if (entry.series.getPane() !== pane) entry.series.moveToPane(pane.paneIndex());
-      entry.series.applyOptions(outputOptions(output));
+      const fillCarrier = compiled.fills.some(
+        (fill) => fill.scalePlotKey === output.key && fill.visible
+      );
+      entry.series.applyOptions(outputOptions(output, fillCarrier));
+      if (primitivePlot(output)) {
+        if (!entry.primitive) {
+          entry.primitive = new LightweightTechnicalPrimitive(chart, entry.series, alive);
+          entry.series.attachPrimitive(entry.primitive);
+        }
+        entry.primitive.updatePlot(output);
+      } else if (entry.primitive) {
+        entry.primitive.dispose();
+        entry.series.detachPrimitive(entry.primitive);
+        delete entry.primitive;
+      }
       entry.series.setData(
         output.timestamps.map((timestamp, index) => {
           const time = Math.floor(timestamp / 1000) as UTCTimestamp,
             value = output.values[index];
-          return value === null || value === undefined ? { time } : { time, value };
+          if (value === null || value === undefined || !Number.isFinite(value)) return { time };
+          const color =
+            output.presentation?.geometry.kind === "columns"
+              ? output.style.visible
+                ? presentationColor(output.presentation, index)
+                : "transparent"
+              : null;
+          return color
+            ? { time, value, color: lineColor(color, output.style.opacity) }
+            : { time, value };
         })
       );
       const levels = output.style.visible
@@ -200,6 +279,46 @@ export function lightweightTechnical(
         entry.levelKey = levelKey;
       }
     }
+    const activeFills = new Set(compiled.fills.map((fill) => fill.key));
+    for (const [key, fill] of fills)
+      if (!activeFills.has(key)) {
+        fill.primitive.dispose();
+        fill.series.detachPrimitive(fill.primitive);
+        fills.delete(key);
+      }
+    for (const fill of compiled.fills) {
+      const carrier = owned.get(fill.scalePlotKey);
+      if (!carrier) continue;
+      let entry = fills.get(fill.key);
+      if (!entry || entry.series !== carrier.series) {
+        if (entry) {
+          entry.primitive.dispose();
+          entry.series.detachPrimitive(entry.primitive);
+        }
+        const primitive = new LightweightTechnicalPrimitive(chart, carrier.series, alive);
+        carrier.series.attachPrimitive(primitive);
+        entry = { primitive, series: carrier.series };
+        fills.set(fill.key, entry);
+      }
+      const coordinates = [
+        carrier.series,
+        ...compiled.outputs
+          .filter(
+            (output) =>
+              output.instanceId === fill.instanceId &&
+              output.paneKey === fill.paneKey &&
+              output.key !== fill.scalePlotKey
+          )
+          .map((output) => owned.get(output.key)!.series)
+      ];
+      entry.primitive.updateFill(fill, (value) => {
+        for (const series of coordinates) {
+          const coordinate = series.priceToCoordinate(value);
+          if (coordinate !== null && Number.isFinite(coordinate)) return coordinate;
+        }
+        return null;
+      });
+    }
     for (const [key, pane] of panes)
       if (!activePanes.has(key)) {
         chart.removePane(pane.paneIndex());
@@ -208,6 +327,10 @@ export function lightweightTechnical(
     lower.forEach((group, index) => {
       const pane = panes.get(group.key)!;
       if (pane.paneIndex() !== index + 1) pane.moveTo(index + 1);
+      // Keep a collapsed strip's range and width; it has no visible data scale to label.
+      const axis = pane.priceScale("right"),
+        color = group.preference?.collapsed ? "transparent" : chartPalette(options.settings).text;
+      if (axis.options().textColor !== color) axis.applyOptions({ textColor: color });
     });
     const allOwned = new Set([...owned.values()].map((entry) => entry.series));
     for (const group of groups) {
@@ -251,10 +374,11 @@ export function lightweightTechnical(
         : options.container.clientHeight - timeHeight();
     },
     dispose() {
+      crosshair.dispose();
       disposed = true;
       events?.dispose();
       calculation.dispose();
-      for (const entry of owned.values()) chart.removeSeries(entry.series);
+      for (const entry of owned.values()) removeEntry(entry);
       for (const pane of [...panes.values()].sort((a, b) => b.paneIndex() - a.paneIndex()))
         chart.removePane(pane.paneIndex());
       owned.clear();

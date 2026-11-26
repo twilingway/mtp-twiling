@@ -27,6 +27,8 @@ const errors: Record<NonNullable<DriveStatus["error"]>, string> = {
   quota: "Google временно ограничил запросы. Повторите позже.",
   permission: "Google не предоставил доступ к данным приложения",
   "remote-invalid": "Данные Google Диска повреждены. Локальные данные сохранены.",
+  "unsupported-format":
+    "Формат синхронизации не поддерживается. Обновите приложение. Данные сохранены, автосинхронизация остановлена.",
   conflict: "На Google Диске появились другие изменения. Повторите проверку.",
   limit: "Превышен лимит данных синхронизации",
   "local-changed": "Локальные данные изменились. Проверяем заново."
@@ -145,7 +147,12 @@ export function GoogleDriveSettings() {
           id="google-drive-automatic"
           type="checkbox"
           checked={status.automatic}
-          disabled={busy || !state.marketReady || state.profileTransition}
+          disabled={
+            busy ||
+            !state.marketReady ||
+            state.profileTransition ||
+            status.error === "unsupported-format"
+          }
           onChange={(event) => {
             void drive
               .setAutomatic(event.target.checked)
@@ -295,9 +302,11 @@ export function GoogleDriveSettings() {
       )}
       <small className="drive-auth-note">
         {t(
-          status.authorizationStored
-            ? "Вход сохранён на этом устройстве. Когда срок доступа Google истечёт, синхронизация приостановится до повторного подключения."
-            : "Подключение Google будет сохранено на этом устройстве в зашифрованном виде до окончания срока токена."
+          status.error === "unsupported-format"
+            ? "Синхронизация на паузе. Сохранённый вход Google не удаляется, срок доступа остаётся прежним."
+            : status.authorizationStored
+              ? "Вход сохранён на этом устройстве. Когда срок доступа Google истечёт, синхронизация приостановится до повторного подключения."
+              : "Подключение Google будет сохранено на этом устройстве в зашифрованном виде до окончания срока токена."
         )}
       </small>
     </section>

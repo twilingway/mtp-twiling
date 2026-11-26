@@ -1,0 +1,273 @@
+{
+  "writerCommit": "8836aa0374eb41aff42312e3bc51bc7caaafd62a",
+  "writerSource": "src/services/drive/backup.ts",
+  "writerSourceSha256": "fd3d7d3d4747cc817171aa6c0cacce28edfc4f26efa90c5dc2f734a37d7a9dec",
+  "provenance": "Historical writer output from the unchanged historical drive-sync fixture plus supported provider/TA/style fields. In-memory data only; no real Google.",
+  "fixtures": [
+    {
+      "name": "preexisting-schema1-drawings-images-camera",
+      "payload": {
+        "application": "personal-terminal",
+        "schemaVersion": 1,
+        "layout": {
+          "symbol": "TEST",
+          "chartSettings": {
+            "theme": "dark",
+            "drawingTools": {
+              "magnet": "weak",
+              "favorites": ["segment"]
+            },
+            "indicatorOptions": {
+              "ma": {
+                "color": "#abcdef",
+                "width": 2
+              }
+            },
+            "drawingTemplates": {
+              "sample": {
+                "settings": {
+                  "color": "#aabbcc",
+                  "width": 2
+                }
+              }
+            }
+          },
+          "indicators": {
+            "ma": true,
+            "volume": true
+          }
+        },
+        "watchlist": [
+          {
+            "symbol": "TEST",
+            "name": "Test fixture",
+            "uid": "fake-instrument",
+            "ticker": "TEST",
+            "brand": {
+              "logoName": "test"
+            }
+          }
+        ],
+        "drawings": [
+          {
+            "symbol": "TEST",
+            "items": [
+              {
+                "id": "drawing",
+                "name": "horizontalRayLine",
+                "points": [
+                  {
+                    "timestamp": 100,
+                    "value": 99
+                  }
+                ],
+                "settings": {
+                  "color": "#123456",
+                  "width": 2,
+                  "levels": [0, 1]
+                }
+              }
+            ]
+          }
+        ],
+        "images": [
+          {
+            "id": "image",
+            "symbol": "TEST",
+            "name": "fixture.png",
+            "type": "image/png",
+            "width": 100,
+            "data": "",
+            "point": {
+              "timestamp": 123,
+              "value": 99
+            }
+          }
+        ],
+        "views": [
+          {
+            "key": "TEST:1d:kline:30",
+            "value": {
+              "camera": {
+                "barSpace": 7,
+                "rightOffsetBars": 2
+              }
+            }
+          }
+        ]
+      },
+      "images": [
+        {
+          "index": 0,
+          "mimeType": "image/png",
+          "reference": {
+            "sha256": "8b97c30a5f0de85feb5a2714945e3097c157b66778f7f4e47d63391ca480018f",
+            "size": 18
+          },
+          "base64": "ZmFrZS1pbWFnZS1maXh0dXJl"
+        }
+      ]
+    },
+    {
+      "name": "preexisting-schema2-provider-TA-pane-style",
+      "payload": {
+        "application": "personal-terminal",
+        "schemaVersion": 2,
+        "layout": {
+          "providerRef": {
+            "provider": "bybit",
+            "category": "linear",
+            "symbol": "BTCUSDT"
+          },
+          "locale": "en",
+          "timeZone": "Europe/Moscow",
+          "rightPanelTab": "objects",
+          "sidebarWidth": 340,
+          "symbol": "bybit:linear:BTCUSDT",
+          "instrumentUid": "bybit:linear:BTCUSDT",
+          "favoriteIntervals": ["1m", "1d"],
+          "technicalIndicators": [
+            {
+              "schemaVersion": 1,
+              "id": "legacy-ema",
+              "definitionId": "ema",
+              "visible": true,
+              "order": 0,
+              "params": {
+                "length": 9,
+                "source": "close"
+              },
+              "pane": {
+                "kind": "pane",
+                "id": "legacy-pane"
+              },
+              "styles": {
+                "value": {
+                  "color": "#123456",
+                  "width": 3,
+                  "visible": true,
+                  "opacity": 0.4,
+                  "lineStyle": "dotted"
+                }
+              }
+            }
+          ],
+          "technicalPaneLayout": [
+            {
+              "paneId": "legacy-pane",
+              "heightRatio": 0.3,
+              "collapsed": false
+            }
+          ],
+          "indicatorPaneLayout": {
+            "volume": {
+              "heightRatio": 0.25
+            }
+          },
+          "watchlistFlags": {
+            "uid:bybit:linear:BTCUSDT": "red"
+          },
+          "chartSettings": {
+            "theme": "dark",
+            "drawingTools": {
+              "magnet": "weak",
+              "favorites": ["segment"]
+            },
+            "indicatorOptions": {
+              "ma": {
+                "color": "#abcdef",
+                "width": 2
+              }
+            },
+            "drawingTemplates": {
+              "sample": {
+                "settings": {
+                  "color": "#aabbcc",
+                  "width": 2
+                }
+              }
+            }
+          },
+          "indicators": {
+            "ma": true,
+            "volume": true
+          }
+        },
+        "watchlist": [
+          {
+            "symbol": "bybit:linear:BTCUSDT",
+            "name": "Bitcoin",
+            "uid": "bybit:linear:BTCUSDT",
+            "ticker": "BTCUSDT",
+            "assetClass": "crypto",
+            "productKind": "perpetual",
+            "nativePriceStep": 1e-12,
+            "providerRef": {
+              "provider": "bybit",
+              "category": "linear",
+              "symbol": "BTCUSDT"
+            }
+          }
+        ],
+        "drawings": [
+          {
+            "symbol": "TEST",
+            "items": [
+              {
+                "id": "drawing",
+                "name": "horizontalRayLine",
+                "points": [
+                  {
+                    "timestamp": 100,
+                    "value": 99
+                  }
+                ],
+                "settings": {
+                  "color": "#123456",
+                  "width": 2,
+                  "levels": [0, 1]
+                }
+              }
+            ]
+          }
+        ],
+        "images": [
+          {
+            "id": "image",
+            "symbol": "TEST",
+            "name": "fixture.png",
+            "type": "image/png",
+            "width": 100,
+            "data": "",
+            "point": {
+              "timestamp": 123,
+              "value": 99
+            }
+          }
+        ],
+        "views": [
+          {
+            "key": "TEST:1d:kline:30",
+            "value": {
+              "camera": {
+                "barSpace": 7,
+                "rightOffsetBars": 2
+              }
+            }
+          }
+        ]
+      },
+      "images": [
+        {
+          "index": 0,
+          "mimeType": "image/png",
+          "reference": {
+            "sha256": "8b97c30a5f0de85feb5a2714945e3097c157b66778f7f4e47d63391ca480018f",
+            "size": 18
+          },
+          "base64": "ZmFrZS1pbWFnZS1maXh0dXJl"
+        }
+      ]
+    }
+  ]
+}

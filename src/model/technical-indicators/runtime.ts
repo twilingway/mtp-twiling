@@ -1,10 +1,20 @@
 import { atr, bollingerBands, macd, rsi, stochastic } from "./calculations.js";
+import {
+  isChannelPriceInstance,
+  channelPriceMetadata,
+  calculateChannelPrice
+} from "./channel-average-runtime.js";
 import { assertTechnicalBars, priceSource } from "./data.js";
 import { getTechnicalIndicatorDefinition } from "./definitions.js";
 import { isTechnicalIndicatorInstance } from "./instances.js";
 import { assertLength, ema, sma } from "./primitives.js";
 import { isVolumeFlowInstance, calculateVolumeIndicator } from "./volume-runtime.js";
 import { volumeFlowMetadata } from "./volume-flow/metadata.js";
+import {
+  isTrendPriceInstance,
+  trendPriceMetadata,
+  calculateTrendPrice
+} from "./trend-price-runtime.js";
 import {
   isStateOscillatorInstance,
   stateOscillatorMetadata,
@@ -53,6 +63,8 @@ import type {
 } from "./types.js";
 
 export function technicalIndicatorWarmup(instance: TechnicalIndicatorInstance): number | null {
+  if (isChannelPriceInstance(instance)) return channelPriceMetadata(instance).warmupBars;
+  if (isTrendPriceInstance(instance)) return trendPriceMetadata(instance).warmupBars;
   if (isStateOscillatorInstance(instance)) return stateOscillatorMetadata(instance).warmupBars;
   if (isVolumeFlowInstance(instance))
     return volumeFlowMetadata(instance.definitionId, instance.params).warmupBars;
@@ -117,6 +129,8 @@ export function technicalIndicatorWarmup(instance: TechnicalIndicatorInstance): 
 export function technicalIndicatorHistoryRequirement(
   instance: TechnicalIndicatorInstance
 ): TechnicalHistoryRequirement {
+  if (isChannelPriceInstance(instance)) return channelPriceMetadata(instance).historyRequirement;
+  if (isTrendPriceInstance(instance)) return trendPriceMetadata(instance).historyRequirement;
   if (isStateOscillatorInstance(instance))
     return stateOscillatorMetadata(instance).historyRequirement;
   if (isVolumeFlowInstance(instance))
@@ -227,6 +241,8 @@ export function calculateTechnicalIndicator(
     );
   }
   assertTechnicalBars(bars);
+  if (isChannelPriceInstance(instance)) return calculateChannelPrice(instance, bars);
+  if (isTrendPriceInstance(instance)) return calculateTrendPrice(instance, bars);
   if (isStateOscillatorInstance(instance)) return calculateStateOscillator(instance, bars);
   if (isVolumeFlowInstance(instance)) return calculateVolumeIndicator(instance, bars);
   let series: Record<string, NumericSeries>, present: readonly boolean[];

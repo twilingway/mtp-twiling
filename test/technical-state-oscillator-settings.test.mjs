@@ -1,3 +1,7 @@
+import {
+  EXPECTED_LIBRARY_COUNT,
+  EXPECTED_TECHNICAL_COUNT
+} from "./technical-registry-expectation.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as jsx from "react/jsx-runtime";
@@ -91,7 +95,7 @@ test("Fisher length1 is saved by actual settings with result-only flags computed
   assert.equal(result.historyRequirement.seedBars, null);
   assert.equal(result.alwaysUndefined, true);
 });
-test("actual library source exposes50 available entries including46TA and4 existing scripts", () => {
+test("actual library source exposes the reviewed technical set and4 existing scripts", () => {
   const state = { preferences: { locale: "en", indicators: {}, technicalIndicators: [] } };
   const load = createSourceLoader({
     "react/jsx-runtime": jsx,
@@ -106,10 +110,10 @@ test("actual library source exposes50 available entries including46TA and4 exist
     "screens/terminal/indicator-menu-actions.js": { changeMenuIndicator: () => {} }
   });
   const tree = load("screens/terminal/TerminalIndicatorLibrary.js").TerminalIndicatorLibrary();
-  assert.equal(tree.props.entries.filter((e) => e.available).length, 50);
+  assert.equal(tree.props.entries.filter((e) => e.available).length, EXPECTED_LIBRARY_COUNT);
   assert.equal(
     tree.props.entries.filter((e) => e.available && e.category === "technicals").length,
-    46
+    EXPECTED_TECHNICAL_COUNT
   );
   assert.equal(tree.props.entries.filter((e) => e.available && e.category === "scripts").length, 4);
 });

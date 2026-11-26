@@ -1,3 +1,7 @@
+import {
+  EXPECTED_COMPUTED_COUNT,
+  EXPECTED_TECHNICAL_COUNT
+} from "./technical-registry-expectation.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -17,11 +21,11 @@ const catalog = load("model/technical-indicators/catalog.js");
 const math = load("model/technical-indicators/trend-state/index.js");
 const publicIds = ["STD;True%1Strength%1Indicator", "STD;Know_Sure_Thing", "STD;Fisher_Transform"];
 
-test("append-only45 definitions preserve independent frozen42 Git contract exactly", () => {
-  assert.equal(core.technicalIndicatorDefinitions.length, 45);
+test("append-only definitions preserve independent frozen42 Git contract exactly", () => {
+  assert.equal(core.technicalIndicatorDefinitions.length, EXPECTED_COMPUTED_COUNT);
   assert.equal(contractHash(core), FROZEN42_SHA256);
   assert.deepEqual(
-    core.technicalIndicatorDefinitions.slice(42).map((d) => d.id),
+    core.technicalIndicatorDefinitions.slice(42, 45).map((d) => d.id),
     ids
   );
   ids.forEach((id, i) => {
@@ -39,14 +43,16 @@ test("append-only45 definitions preserve independent frozen42 Git contract exact
     assert.equal(catalog.technicalDefinitionForCatalog(publicIds[i]), id);
   });
 });
-test("catalog46 available TA and deferred state renderers remain unavailable", () => {
+test("reviewed available TA includes price renderers and keeps unsupported items unavailable", () => {
   for (const locale of ["ru", "en"]) {
     const entries = catalog.technicalCatalogEntries(locale);
     assert.equal(entries.length, 127);
-    assert.equal(entries.filter((e) => e.available).length, 46);
+    assert.equal(entries.filter((e) => e.available).length, EXPECTED_TECHNICAL_COUNT);
     for (const publicId of publicIds)
       assert.equal(entries.find((e) => e.id === publicId).available, true);
-    for (const id of ["STD;Supertrend", "STD;PSAR", "STD;DPO", "STD;Trend%1Strength%1Index"]) {
+    for (const id of ["STD;Supertrend", "STD;PSAR"])
+      assert.equal(entries.find((e) => e.id === id).available, true);
+    for (const id of ["STD;DPO", "STD;Trend%1Strength%1Index"]) {
       assert.equal(catalog.technicalDefinitionForCatalog(id), undefined);
       assert.equal(entries.find((e) => e.id === id).available, false);
     }

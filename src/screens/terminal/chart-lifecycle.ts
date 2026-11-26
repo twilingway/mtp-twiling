@@ -81,7 +81,7 @@ export function useChartCanvas(
         indicatorPaneLayout: snapshot.preferences.indicatorPaneLayout,
         technicalIndicators: technicalInputs(snapshot.preferences),
         technicalPaneLayout: snapshot.preferences.technicalPaneLayout ?? [],
-        onTechnicalPaneLayout: (layout) => {
+        onTechnicalPaneLayout: (layout, capture) => {
           const valid = () =>
             matches() &&
             owned !== null &&
@@ -89,12 +89,14 @@ export function useChartCanvas(
             !owned.retired &&
             !controller.getSnapshot().backupBusy &&
             !controller.getSnapshot().importingBackup;
-          void persistTechnicalPaneLayout(controller, layout, valid).catch((error: unknown) => {
-            if (valid())
-              controller.notify(
-                error instanceof Error ? error.message : "Не удалось сохранить панель индикатора."
-              );
-          });
+          void persistTechnicalPaneLayout(controller, layout, valid, capture).catch(
+            (error: unknown) => {
+              if (valid())
+                controller.notify(
+                  error instanceof Error ? error.message : "Не удалось сохранить панель индикатора."
+                );
+            }
+          );
         },
         onIndicatorLayout: (layout) => {
           const write = ++layoutWrite;
