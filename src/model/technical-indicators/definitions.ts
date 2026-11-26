@@ -6,6 +6,7 @@ import type {
 import { movingAveragePresets } from "./averages/metadata.js";
 import { momentumVolumePresets } from "./momentum-volume/metadata.js";
 import { volatilityIndicatorDefinitions } from "./volatility-definitions.js";
+import { trendStrengthIndicatorDefinitions } from "./trend-definitions.js";
 
 const reference = (name: string) =>
   `https://www.tradingview.com/pine-script-reference/v6/#fun_ta.${name}`;
@@ -172,7 +173,8 @@ export const technicalIndicatorDefinitions: readonly TechnicalIndicatorDefinitio
     ],
     [20, 80]
   ),
-  ...volatilityIndicatorDefinitions
+  ...volatilityIndicatorDefinitions,
+  ...trendStrengthIndicatorDefinitions
 ]);
 
 /** A real catalog limitation, not a claimed OHLCV implementation. No 224 fake calculators. */

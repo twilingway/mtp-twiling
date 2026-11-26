@@ -26,6 +26,8 @@ const labels: Readonly<Record<string, readonly [string, string]>> = {
   slowLength: ["Медленный период", "Slow length"],
   middleLength: ["Средний период", "Middle length"],
   signalLength: ["Сигнальный период", "Signal length"],
+  diLength: ["Период DI", "DI length"],
+  adxSmoothing: ["Сглаживание ADX", "ADX smoothing"],
   smoothK: ["Сглаживание K", "K smoothing"],
   smoothD: ["Сглаживание D", "D smoothing"],
   expansionLength: ["Период максимального расширения", "Highest expansion length"],
