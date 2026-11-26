@@ -118,9 +118,12 @@ export class TechnicalRenderData {
           });
         }
         if (presentation?.fills.length) {
-          const scalePlot = presentation.plots[0];
-          if (!scalePlot) throw new RangeError("TA fills require an owning plot scale");
-          for (const fill of presentation.fills)
+          for (const fill of presentation.fills) {
+            const scalePlot =
+              presentation.plots.find((plot) => plot.seriesKey === fill.toSeries) ??
+              presentation.plots.find((plot) => plot.seriesKey === fill.fromSeries) ??
+              presentation.plots[0];
+            if (!scalePlot) throw new RangeError("TA fills require an owning plot scale");
             fills.push({
               ...fill,
               key: `${instance.id}/fill/${fill.id}`,
@@ -130,6 +133,7 @@ export class TechnicalRenderData {
               timestamps: presentation.timestamps,
               scalePlotKey: `${instance.id}/${scalePlot.id}`
             });
+          }
         }
       }
     for (const key of this.cache.keys()) if (!seen.has(key)) this.cache.delete(key);

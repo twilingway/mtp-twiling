@@ -30,14 +30,16 @@ const descriptor = {
   hiddenSeries: ["body"]
 };
 const bars = [candle(10, 1, 10, 10, 0), candle(11, 1, 11, 11, 1), candle(12, 1, 12, 12, 2)];
-function fixture(presentation = descriptor) {
+function fixture(presentation = descriptor, extra = {}) {
   let calculations = 0;
   const load = createSourceLoader({
       "model/technical-indicators/definitions.js": {
         ...definitions,
         getTechnicalIndicatorDefinition(id) {
           const definition = definitions.getTechnicalIndicatorDefinition(id);
-          return id === "rsi" ? { ...definition, presentation } : definition;
+          return id === "rsi"
+            ? { ...definition, presentation, ...(extra.outputs ? { outputs: extra.outputs } : {}) }
+            : definition;
         }
       },
       "model/technical-indicators/runtime.js": {
@@ -48,7 +50,7 @@ function fixture(presentation = descriptor) {
             definitionId: instance.definitionId,
             status: "computed",
             timestamps: source.map((b) => b.timestamp),
-            series: { value: [null, 10, 11], body: [null, 12, 13] },
+            series: extra.series ?? { value: [null, 10, 11], body: [null, 12, 13] },
             warmupBars: 2,
             historyRequirement: { kind: "bars", bars: 2 }
           };
@@ -141,4 +143,27 @@ test("inconsistent declaration/output geometry or missing hidden result fails be
       instance = core.createTechnicalIndicatorInstance("rsi", "invalid");
     assert.throws(() => f.data.compile([instance]), RangeError);
   }
+});
+
+test("down-only fill prefers its own finite direction plot rather than all-null first plot", () => {
+  const d = {
+      ...descriptor,
+      precisionPolicy: "native-price",
+      plots: [
+        { ...descriptor.plots[0], id: "up", seriesKey: "up" },
+        { ...descriptor.plots[0], id: "down", seriesKey: "down" }
+      ],
+      fills: [{ ...descriptor.fills[0], toSeries: "down" }]
+    },
+    f = fixture(d, {
+      outputs: ["up", "down"].map((id) => ({ id, title: id, kind: "line", color: "#4CAF50" })),
+      series: { up: [null, null, null], down: [null, 10, 11], body: [null, 12, 13] }
+    }),
+    instance = core.createTechnicalIndicatorInstance("rsi", "direction"),
+    compiled = f.data.compile([instance]);
+  assert.equal(compiled.fills[0].scalePlotKey, "direction/down");
+  assert.equal(compiled.fills[0].precisionPolicy, "native-price");
+  assert.deepEqual(compiled.outputs[0].values, [null, null, null]);
+  assert.equal(compiled.outputs.length, 2);
+  assert.ok(compiled.outputs.every((o) => o.presentation.precisionPolicy === "native-price"));
 });

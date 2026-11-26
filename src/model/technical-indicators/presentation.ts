@@ -39,6 +39,11 @@ export function compilePresentation(
   input: PresentationInput
 ): CompiledPresentation {
   assert(definition.renderVersion === 2, "render version");
+  const precisionPolicy = definition.precisionPolicy ?? "legacy-fixed-6";
+  assert(
+    precisionPolicy === "legacy-fixed-6" || precisionPolicy === "native-price",
+    "precision policy"
+  );
   assert(typeof input.visible === "boolean" && typeof input.collapsed === "boolean", "visibility");
   const count = input.timestamps.length;
   for (let i = 0; i < count; i++)
@@ -95,6 +100,7 @@ export function compilePresentation(
       : { ...plot.color };
     const compiled: CompiledPresentationPlot = {
       ...plot,
+      precisionPolicy,
       geometry,
       color,
       width,
@@ -116,6 +122,7 @@ export function compilePresentation(
     );
     return Object.freeze({
       ...fill,
+      precisionPolicy,
       from: series(fill.fromSeries),
       to: series(fill.toSeries),
       visible,

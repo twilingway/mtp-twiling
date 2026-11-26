@@ -184,6 +184,37 @@ test("line runs preserve singleton and original adjacency; bounds never bridge u
   assert.throws(() => presentationRuns(values, undefined, 0.5, 3), RangeError);
 });
 
+test("owner and decorative fills share explicit precision policy independent of glyph/pane", () => {
+  const d = definition(
+      [plot()],
+      [
+        {
+          id: "fill",
+          fromSeries: "value",
+          toSeries: "body",
+          color: "#123456",
+          opacity: 0.1,
+          gaps: "break"
+        }
+      ],
+      ["body"]
+    ),
+    source = input([1, 1, 1], { series: { value: [1, 1, 1], body: [2, 2, 2] } });
+  for (const precisionPolicy of [undefined, "legacy-fixed-6", "native-price"]) {
+    const compiled = compilePresentation(
+        { ...d, ...(precisionPolicy ? { precisionPolicy } : {}) },
+        source
+      ),
+      expected = precisionPolicy ?? "legacy-fixed-6";
+    assert.ok(compiled.plots.every((p) => p.precisionPolicy === expected));
+    assert.ok(compiled.fills.every((f) => f.precisionPolicy === expected));
+  }
+  assert.throws(
+    () => compilePresentation({ ...d, precisionPolicy: "infer-from-pane" }, source),
+    RangeError
+  );
+});
+
 test("compiler rejects invalid graph/version/null shape/length/non-finite/timestamps without inventing data", () => {
   const d = definition(),
     source = input([1, null, 3]);

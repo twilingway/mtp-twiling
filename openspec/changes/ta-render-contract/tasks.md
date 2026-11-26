@@ -16,8 +16,11 @@ Research закончен отдельно от реализации. Runtime co
 - [x] 1.4 Документировать принятый contract/limits и точные новые ownership paths; проверить scoped
       Prettier и strict OpenSpec, обновить G decision record.
 - [x] 1.5 Подключить необязательный descriptor к общему runtime render-data без изменения
-      definitions/registry; проверить legacy shape, plots/fills/cache/instance boundary четырьмя
-      bridge tests и whole-source strict check. Контракт описан в `docs/TA_RENDER_DATA_BRIDGE.md`.
+      definitions/registry; проверить legacy shape, plots/fills/cache/instance boundary пятью bridge
+      tests и whole-source strict check. Контракт описан в `docs/TA_RENDER_DATA_BRIDGE.md`.
+- [x] 1.6 Явно передавать owner/fill precision policy независимо от pane и выбирать direction fill
+      carrier по anchor series; проверить policy validation и down-only regression, сохранить
+      прежние45 native paths suite33/33. Это не G7 для ещё не подключённых SAR/ST.
 
 ## 2. LW — L, после 1.3
 

@@ -1,6 +1,7 @@
 import type { NumericSeries, OutputStyle } from "./types.js";
 
 export type PlotSize = 1 | 2 | 3 | 4;
+export type PlotPrecisionPolicy = "legacy-fixed-6" | "native-price";
 export type PlotColorPolicy =
   | { readonly kind: "solid"; readonly color: string }
   | { readonly kind: "palette"; readonly id: "macd-sign-change-v1" | "ao-change-v1" };
@@ -29,6 +30,8 @@ export interface PresentationFill {
 /** Runtime metadata only. This version is never an instance or backup schema version. */
 export interface PresentationDefinition {
   readonly renderVersion: 2;
+  /** Semantic owner/companion policy, independent of current pane or glyph. */
+  readonly precisionPolicy?: PlotPrecisionPolicy;
   readonly plots: readonly PresentationPlot[];
   readonly fills: readonly PresentationFill[];
   readonly hiddenSeries: readonly string[];
@@ -41,6 +44,7 @@ export interface PresentationInput {
   readonly collapsed: boolean;
 }
 export interface CompiledPresentationPlot extends PresentationPlot {
+  readonly precisionPolicy: PlotPrecisionPolicy;
   readonly values: NumericSeries;
   readonly opacity: number;
   readonly lineStyle: "solid" | "dashed" | "dotted";
@@ -48,6 +52,7 @@ export interface CompiledPresentationPlot extends PresentationPlot {
   readonly scale: "include-when-visible";
 }
 export interface CompiledPresentationFill extends PresentationFill {
+  readonly precisionPolicy: PlotPrecisionPolicy;
   readonly from: NumericSeries;
   readonly to: NumericSeries;
   readonly visible: boolean;
