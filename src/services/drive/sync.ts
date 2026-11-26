@@ -34,6 +34,15 @@ export class DriveConflictError extends DriveError {
 }
 const invalid = () =>
   new DriveError("remote-invalid", "Повреждена структура снимков Google Диска.");
+const MANIFEST_READ_BATCH = 4;
+const driveVersionPattern = /^\d{1,19}$/;
+interface VerifiedManifest {
+  version: string;
+  hash: string;
+  size: number;
+  key: string;
+  text: string;
+}
 function sameSet(left: string[], right: string[]): boolean {
   const sortedRight = [...right].sort();
   return (
@@ -106,6 +115,7 @@ export interface PublishResult {
 /** No storage/controller coupling: caller owns local association and import confirmation. */
 export class DriveSync {
   private writing = false;
+  private manifestCache = new Map<string, VerifiedManifest>();
   constructor(
     private readonly store: DriveStore,
     private readonly namespace: string = DRIVE_NAMESPACE
@@ -115,23 +125,59 @@ export class DriveSync {
     const files = await this.store.list("snapshot");
     if (files.length > 10000 || files.reduce((sum, file) => sum + file.size, 0) > 64 * 1024 * 1024)
       throw new DriveError("limit", "Слишком большой каталог снимков Google Диска.");
+    const listed = new Set(files.map(({ id }) => id));
+    for (const id of this.manifestCache.keys()) if (!listed.has(id)) this.manifestCache.delete(id);
+    const previous = this.manifestCache;
+    const next = new Map<string, VerifiedManifest>();
     const snapshots: RemoteSnapshot[] = [];
-    for (const file of files) {
+    const inspectFile = async (file: DriveFile): Promise<RemoteSnapshot> => {
       const hash = fileHash(file, "snapshot", this.namespace);
-      const body = await this.store.read(file, MAX_MANIFEST_BYTES);
-      await verifyContent(body, { sha256: hash, size: file.size });
+      const { id, size, version } = file;
+      const key = file.appProperties.mtpKey;
+      const cacheable = typeof version === "string" && driveVersionPattern.test(version);
+      const cached = cacheable ? previous.get(id) : undefined;
+      const verified =
+        cached &&
+        cached.version === version &&
+        cached.hash === hash &&
+        cached.size === size &&
+        cached.key === key
+          ? cached.text
+          : await this.readManifestText(file, hash);
       let value: unknown;
       try {
-        value = JSON.parse(await body.text());
+        value = JSON.parse(verified);
       } catch {
         throw invalid();
       }
       assertReadableDriveManifest(value);
       const manifest = validateManifest(value);
-      if (file.appProperties.mtpKey !== manifest.nodeId) throw invalid();
-      snapshots.push({ manifest, file });
+      if (key !== manifest.nodeId) throw invalid();
+      if (cacheable) next.set(id, { version, hash, size, key, text: verified });
+      return { manifest, file };
+    };
+    for (let offset = 0; offset < files.length; offset += MANIFEST_READ_BATCH) {
+      const results = await Promise.allSettled(
+        files.slice(offset, offset + MANIFEST_READ_BATCH).map(inspectFile)
+      );
+      for (const result of results) {
+        if (result.status === "rejected") throw result.reason;
+        snapshots.push(result.value);
+      }
     }
-    return inspectGraph(snapshots, this.namespace);
+    const inspection = inspectGraph(snapshots, this.namespace);
+    this.manifestCache = next;
+    return inspection;
+  }
+
+  private async readManifestText(file: DriveFile, hash: string): Promise<string> {
+    const body = await this.store.read(file, MAX_MANIFEST_BYTES);
+    await verifyContent(body, { sha256: hash, size: file.size });
+    try {
+      return await body.text();
+    } catch {
+      throw invalid();
+    }
   }
 
   async download(nodeId: string, expectedInspection?: DriveInspection): Promise<Backup> {
