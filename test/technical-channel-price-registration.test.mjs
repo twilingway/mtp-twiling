@@ -32,7 +32,7 @@ const bars = (n) =>
 const make = (id, params = {}) => core.createTechnicalIndicatorInstance(id, id, { params });
 const calc = (id, b, params = {}) => core.calculateTechnicalIndicator(make(id, params), b);
 
-test("only three definitions append after old47 with exact defaults/native price/primary colors and no KC/DC registration", () => {
+test("three reviewed definitions retain their old47 append/defaults/native price/colors; separately accepted KC maps and DC stays absent", () => {
   assert.equal(core.technicalIndicatorDefinitions.length, EXPECTED_COMPUTED_COUNT);
   assert.deepEqual(
     core.technicalIndicatorDefinitions.slice(45, 50).map((d) => d.id),
@@ -66,8 +66,9 @@ test("only three definitions append after old47 with exact defaults/native price
     catalog.technicalCatalogEntries("ru").filter((e) => e.available).length,
     EXPECTED_TECHNICAL_COUNT
   );
-  for (const id of ["STD;Keltner_Channels", "STD;Donchian_Channels"])
-    assert.equal(catalog.technicalDefinitionForCatalog(id), undefined);
+  // The first50 and historical witnesses stay fixed; KC is a separately reviewed append at51.
+  assert.equal(catalog.technicalDefinitionForCatalog("STD;Keltner_Channels"), "keltner-channels");
+  assert.equal(catalog.technicalDefinitionForCatalog("STD;Donchian_Channels"), undefined);
 });
 
 test("reviewed math package is byte-identical780e9c5; old47 definitions/params/styles/results/history are exact7cc9df9 witnesses", () => {
