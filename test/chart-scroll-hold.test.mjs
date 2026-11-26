@@ -66,7 +66,7 @@ test("each frame and subscription validation reject changed owner/source/session
 });
 function componentFixture(){
  const f=fixture(),cleanups=[],window=new EventTarget(),document=new EventTarget();document.visibilityState="visible";
- const load=loadSources({react:{useRef:()=>({current:null}),useMemo:fn=>fn(),useEffect:fn=>cleanups.push(fn()),
+ const load=loadSources({react:{useRef:()=>({current:null}),useMemo:fn=>fn(),useEffect:fn=>cleanups.push(fn()),useSyncExternalStore:()=>false,
   useState:()=>[{chart:f.chart,left:400,top:500},()=>{}]},"react/jsx-runtime":{jsx:(type,props)=>({type,props}),jsxs:(type,props)=>({type,props})},
   "./context.js":{useTerminal:()=>({controller:f.controller,state:f.state})}},
   {window,document,performance:{now:f.timing.scheduler.now},requestAnimationFrame:f.timing.scheduler.frame,cancelAnimationFrame:f.timing.scheduler.cancel});
