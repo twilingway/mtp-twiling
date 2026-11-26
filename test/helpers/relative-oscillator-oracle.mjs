@@ -54,6 +54,7 @@ export function stochOracle(
   );
   let previousRsi = null;
   const rsi = up.map((v, i) => {
+    if (changes[i] === null) return previousRsi;
     const result =
       changes[i] === 0 && rsiLength > 1 && previousRsi !== null
         ? previousRsi

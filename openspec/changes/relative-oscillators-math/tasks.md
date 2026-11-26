@@ -20,6 +20,15 @@
       strict OpenSpec.
 - [x] 3.2 Зафиксировать source-only commit, clean WT и честные limits в docs/report.
 
+## 4. Canonical RSI gap follow-up
+
+- [x] 4.1 Сохранить frozen full vectors/SHA и воспроизвести шестибарный P2 плюс исходные trial47/113
+      против a906; проверить точность копий и untouched evidence.
+- [x] 4.2 Сохранить canonical RSI при missing change; проверить zero/L1/gaps/extremes/prefix и
+      независимые2200 comparisons без denominator epsilon либо изменения старой математики.
+- [x] 4.3 Повторить исходные131 checks, whole-source strict/scoped lint/format/spec и frozen340
+      witness; зафиксировать отдельный clean source-only follow-up.
+
 ## Workflow follow-up
 
 - Независимое root review перед регистрацией; Pine execution и native/UI/persistence gates отдельны.
