@@ -29,8 +29,10 @@ denominator0: все K/D равныnull. До fix последний K/D был0
 `test/fixtures/relative-invariance/manifest.json` фиксирует SHA256 exact-byte копий original full
 trial47, original minimized/six-bar vectors, independent review probes, six-bar regression и
 evidence JSON. Копии не форматируются; локальный `.gitattributes` отключает их text normalization.
-Original six-bar JSON содержит `[0,-8,-8,-6,-6,null]`, executable ledger — `[0,-4,-4,-3,-3,null]`:
-оба проверяются отдельно без подмены исходного vector.
+Для exact CRLF reviewer probe задан `cr-at-eol` вместе с обычными blank-at-eol/blank-at-eof/
+space-before-tab checks: исходные bytes сохраняются, whitespace проверки не отключаются. Original
+six-bar JSON содержит `[0,-8,-8,-6,-6,null]`, executable ledger — `[0,-4,-4,-3,-3,null]`: оба
+проверяются отдельно без подмены исходного vector.
 
 Full trial113 отдельно воспроизведён неизменённым reviewer generator (seed0x35ab10) на frozen a906
 API и сохранён как **replayed-frozen-trial113.json**, не как перезаписанный original artifact.
