@@ -34,7 +34,8 @@ function sources(overrides = {}, globals = {}) {
     let filename = path.resolve(root, relative).replace(/\.js$/, ".ts");
     if (!existsSync(filename)) filename += "x";
     const key = path.relative(root, filename).replaceAll(path.sep, "/");
-    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts"))
+      return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (cells.has(key)) return cells.get(key).exports;
     const module = { exports: {} };
@@ -404,6 +405,7 @@ test("actual search component exposes currency category and distinguishes MOEX a
     react: {
       useState: (value) => [value, () => {}],
       useEffect: () => {},
+      useMemo: (create) => create(),
       useRef: (current) => ({ current })
     },
     "react/jsx-runtime": { jsx, jsxs: jsx },
@@ -412,16 +414,29 @@ test("actual search component exposes currency category and distinguishes MOEX a
     },
     "screens/terminal/Modal.tsx": { Modal: "modal" },
     "i18n/messages.ts": { t: (value) => value, systemText: (value) => value },
-    "i18n/preferences.ts": { intlLocale: () => "ru-RU" }
+    "i18n/preferences.ts": { intlLocale: () => "ru-RU", currentDisplayPreferences: () => ({}) }
   });
   const tree = load("screens/terminal/InstrumentSearch.tsx").InstrumentSearch({});
-  const kinds = tree.props.children[1].props.children;
+  const filters = tree.props.children.find(
+    (node) => node.props.className === "instrument-search-filters"
+  );
+  const kinds = filters.props.children.find((node) => node.props.id === "instrument-kind").props
+    .children;
   assert.ok(kinds.some((item) => item.props.children === "Валюты"));
-  const results = tree.props.children[2].props.children;
-  const details = (index) => results[index].props.children[0].props.children[1].props.children;
-  assert.equal(details(0)[0].props.children[1].props.children, "Валюта");
-  assert.match(details(0)[2].props.children, /CETS · MOEX/);
-  assert.match(details(1)[2].props.children, /CNGDOTC · Дилер/);
+  const results = tree.props.children.find((node) => node.props.id === "instrument-results").props
+    .children;
+  const field = (index, className) => {
+    const select = results[index].props.children.find(
+      (node) => node.props.className === "instrument-result-select"
+    );
+    const fields = select.props.children.find(
+      (node) => node.props.className === "instrument-result-copy"
+    );
+    return fields.props.children.find((node) => node.props.className === className).props.children;
+  };
+  assert.equal(field(0, "instrument-result-title")[1].props.children, "Валюта");
+  assert.match(field(0, "instrument-result-meta"), /MOEX.*CETS/);
+  assert.match(field(1, "instrument-result-meta"), /Дилер.*CNGDOTC/);
   const english = sources()("i18n/messages-ui.ts").uiMessages;
   assert.equal(english["Валюты"], "Currencies");
   assert.equal(english["Валюта"], "Currency");

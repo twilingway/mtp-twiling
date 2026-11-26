@@ -1,6 +1,5 @@
 import { t, systemText } from "../../i18n/messages.js";
-import { providerLabel } from "./provider-label.js";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogInstrument, InstrumentSearchKind, MarketRow } from "../../model/types.js";
 import { useTerminal } from "./context.js";
 import { Modal } from "./Modal.js";
@@ -9,6 +8,20 @@ import { providerAttributes } from "../../model/market-provider.js";
 import { orderedWatchlistRows } from "../../model/watchlist-sections.js";
 import { publishWorkspaceInstrument } from "./workspace-sync-controller.js";
 import { searchInstrumentUid, searchWatchlistRow } from "../../model/instrument-search-identity.js";
+import {
+  instrumentSearchHighlight,
+  instrumentSearchSource,
+  instrumentSearchVenue,
+  INSTRUMENT_SEARCH_ORDERS,
+  sortInstrumentSearch
+} from "../../model/instrument-search-sort.js";
+import type { InstrumentSearchOrder } from "../../model/instrument-search-sort.js";
+import { bankSearchQuoteUid } from "../../services/instrument-search-prices.js";
+import { catalogInstrumentKind } from "../../model/currency-search.js";
+import { chartPriceFormat } from "../../charts/price-format.js";
+import { quotation } from "../../model/market-model.js";
+import { number } from "./state.js";
+import { useInstrumentSearchPrices } from "./use-instrument-search-prices.js";
 import type { TerminalController } from "./controller.js";
 type Kind = InstrumentSearchKind;
 const KINDS: { kind: Kind; label: string }[] = [
@@ -20,6 +33,12 @@ const KINDS: { kind: Kind; label: string }[] = [
   { kind: "crypto", label: "Криптовалюты" },
   { kind: "tokenized-stock", label: "Токенизированные акции" }
 ];
+const SORT_LABELS: Record<InstrumentSearchOrder, string> = {
+  relevance: "По релевантности",
+  ticker: "По тикеру",
+  source: "По источнику"
+};
+const noResults: CatalogInstrument[] = [];
 interface SearchRequest {
   query: string;
   kind: Kind;
@@ -51,13 +70,12 @@ function CatalogLogo({ item }: { item: CatalogInstrument }) {
 function kindLabel(item: CatalogInstrument): string {
   if (item.providerRef) {
     if (item.kind === "tokenized-stock") return t("Токенизированная акция");
-    if (item.kind === "crypto")
-      return item.productKind === "spot" ? t("Крипто · Спот") : t("Крипто · USDT perpetual");
+    if (item.kind === "crypto") return t("Криптовалюта");
     return item.assetClass === "stock" || item.assetClass === "etf"
       ? t("Контракт на акцию/ETF")
-      : t("USDT perpetual");
+      : t("Контракт");
   }
-  const kind = item.kind ?? item.instrumentType;
+  const kind = catalogInstrumentKind(item);
   return kind === "currency"
     ? t("Валюта")
     : kind === "future"
@@ -69,32 +87,50 @@ function kindLabel(item: CatalogInstrument): string {
           : t("Инструмент");
 }
 function metadata(item: CatalogInstrument): string {
-  if (item.providerRef)
-    return [
-      providerLabel(item.providerRef),
-      item.providerRef.category === "spot" ? "Spot" : "USDT perpetual",
-      item.marketRegion,
-      item.currency
-    ]
-      .filter(Boolean)
-      .join(" · ");
-  const source =
-    item.exchange === "moex_close"
-      ? t("MOEX · данные закрытия")
-      : item.exchange === "dealer_fx_otc"
-        ? t("Дилер · внебиржевой")
-        : item.realExchange === "REAL_EXCHANGE_DEALER" || item.exchange?.startsWith("dealer")
-          ? t("Дилер")
-          : item.realExchange === "REAL_EXCHANGE_MOEX" || /^(moex|forts)/i.test(item.exchange ?? "")
-            ? "MOEX"
-            : null;
-  const fields = [item.classCode, source, item.currency?.toUpperCase()].filter(Boolean);
+  const source = t(instrumentSearchSource(item));
+  const mode = item.providerRef
+    ? item.providerRef.category === "spot"
+      ? t("Спот")
+      : t("USDT perpetual")
+    : t(instrumentSearchVenue(item) ?? "Площадка не указана");
+  const fields = [source, mode, item.classCode, item.marketRegion].filter(Boolean);
   if (item.expirationDate) {
     const expiration = new Date(item.expirationDate);
     if (Number.isFinite(expiration.getTime()))
       fields.push(t("до ") + expiration.toLocaleDateString(intlLocale(), { timeZone: "UTC" }));
   }
   return fields.join(" · ");
+}
+function Highlight({ text, query }: { text: string; query: string }) {
+  return instrumentSearchHighlight(text, query).map((part, index) =>
+    index % 2 ? (
+      <mark key={index} className="instrument-search-match">
+        {part}
+      </mark>
+    ) : (
+      <Fragment key={index}>{part}</Fragment>
+    )
+  );
+}
+function priceLabel(
+  item: CatalogInstrument,
+  row: MarketRow | undefined,
+  fallback?: number
+): string {
+  const last = row?.price;
+  const price = last != null && Number.isFinite(last) && last > 0 ? last : fallback;
+  const { precision } = chartPriceFormat(
+    row
+      ? { ...row, price }
+      : {
+          symbol: item.ticker,
+          step: quotation(item.minPriceIncrement),
+          ...(item.nativePriceStep !== undefined && { nativePriceStep: item.nativePriceStep }),
+          price
+        }
+  );
+  const currency = (row?.currency || item.currency || item.quoteCoin)?.toUpperCase();
+  return `${number(price, Math.min(precision, 9))}${currency ? ` ${currency}` : ""}`;
 }
 function instrumentKey(item: CatalogInstrument): string {
   return searchInstrumentUid(item) ?? item.figi ?? `${item.ticker}:${item.classCode ?? ""}`;
@@ -132,14 +168,31 @@ export function InstrumentSearch({
       items: [],
       error: ""
     }),
-    [pending, setPending] = useState<string | null>(null);
+    [pending, setPending] = useState<string | null>(null),
+    [order, setOrder] = useState<InstrumentSearchOrder>("relevance");
   const watchlist = watchlistController ?? controller;
   const input = useRef<HTMLInputElement>(null);
   const cleanQuery = query.trim();
   const current = response.revision === revision && response.owner === state.owner;
   const busy = !!cleanQuery && !current;
   const displayed = orderedWatchlistRows(state.rows, state.preferences.watchlistSections);
-  const results = cleanQuery ? (current ? response.items : []) : displayed.map(watchlistInstrument);
+  const locale = intlLocale();
+  const matched = useMemo(
+    () =>
+      cleanQuery && current
+        ? sortInstrumentSearch(response.items, cleanQuery, order, locale)
+        : noResults,
+    [current, cleanQuery, response.items, order, locale]
+  );
+  const results = cleanQuery ? matched : displayed.map(watchlistInstrument);
+  const priceClient = cleanQuery && state.authenticated ? controller.sessionKey() : null;
+  const { list, prices } = useInstrumentSearchPrices(
+    priceClient,
+    state.owner,
+    revision,
+    matched,
+    state.rows
+  );
   const error = current ? response.error : "";
   useEffect(() => {
     if (!cleanQuery) return;
@@ -235,32 +288,48 @@ export function InstrumentSearch({
           </button>
         )}
       </div>
-      <div
-        id="instrument-kind"
-        className="instrument-search-kinds"
-        role="group"
-        aria-label={t("Тип инструмента")}
-        hidden={!cleanQuery}
-      >
-        {KINDS.map((item) => (
-          <button
-            key={item.kind}
-            type="button"
-            aria-pressed={kind === item.kind}
-            onClick={() => {
-              if (kind !== item.kind)
-                setSearch((request) => ({
-                  ...request,
-                  kind: item.kind,
-                  revision: request.revision + 1
-                }));
-            }}
-          >
-            {t(item.label)}
-          </button>
-        ))}
+      <div className="instrument-search-filters" hidden={!cleanQuery}>
+        <div
+          id="instrument-kind"
+          className="instrument-search-kinds"
+          role="group"
+          aria-label={t("Тип инструмента")}
+        >
+          {KINDS.map((item) => (
+            <button
+              key={item.kind}
+              type="button"
+              aria-pressed={kind === item.kind}
+              onClick={() => {
+                if (kind !== item.kind)
+                  setSearch((request) => ({
+                    ...request,
+                    kind: item.kind,
+                    revision: request.revision + 1
+                  }));
+              }}
+            >
+              {t(item.label)}
+            </button>
+          ))}
+        </div>
+        <select
+          className="instrument-search-order"
+          aria-label={t("Сортировка результатов")}
+          value={order}
+          onChange={(event) => {
+            const next = INSTRUMENT_SEARCH_ORDERS.find((value) => value === event.target.value);
+            if (next !== undefined) setOrder(next);
+          }}
+        >
+          {INSTRUMENT_SEARCH_ORDERS.map((value) => (
+            <option value={value} key={value}>
+              {t(SORT_LABELS[value])}
+            </option>
+          ))}
+        </select>
       </div>
-      <div id="instrument-results" aria-busy={busy}>
+      <div id="instrument-results" ref={list} aria-busy={busy}>
         {cleanQuery && error ? (
           <p role="alert">{systemText(error)}</p>
         ) : busy ? (
@@ -277,8 +346,10 @@ export function InstrumentSearch({
             const row = cleanQuery ? searchWatchlistRow(state.rows, item) : displayed[index];
             const details = metadata(item);
             const action = t(row ? "Удалить из списка котировок" : "Добавить в список котировок");
+            const quoteUid = bankSearchQuoteUid(item);
+            const price = priceLabel(item, row, quoteUid ? prices.get(quoteUid) : undefined);
             return (
-              <div key={key} className="instrument-result">
+              <div key={key} className="instrument-result" data-search-quote-uid={quoteUid}>
                 <button
                   type="button"
                   className="instrument-result-select"
@@ -289,10 +360,19 @@ export function InstrumentSearch({
                   <CatalogLogo item={item} />
                   <span className="instrument-result-copy">
                     <span className="instrument-result-title">
-                      <strong>{item.ticker}</strong>
+                      <strong>
+                        <Highlight text={item.ticker} query={cleanQuery} />
+                      </strong>
                       <span className="instrument-kind-badge">{kindLabel(item)}</span>
                     </span>
-                    <span className="instrument-result-name">{item.name}</span>
+                    <span className="instrument-result-summary">
+                      <span className="instrument-result-name">
+                        <Highlight text={item.name} query={cleanQuery} />
+                      </span>
+                      <span className="instrument-result-price" title={t("Последняя цена")}>
+                        {price}
+                      </span>
+                    </span>
                     {details && <small className="instrument-result-meta">{details}</small>}
                   </span>
                 </button>
@@ -301,7 +381,7 @@ export function InstrumentSearch({
                   className="instrument-result-action"
                   data-add-instrument={row ? undefined : index}
                   data-remove-instrument={row ? index : undefined}
-                  aria-label={`${action} · ${item.ticker} · ${item.name}`}
+                  aria-label={`${action} · ${item.ticker} · ${item.name} · ${details}`}
                   title={action}
                   aria-disabled={pending !== null || undefined}
                   aria-busy={pending === key || undefined}

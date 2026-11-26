@@ -574,9 +574,6 @@ dialog input[type="range"] {
   color: #9598a1;
   font-size: 11px;
 }
-#chart-settings-dialog {
-  width: 470px;
-}
 .instrument-icon img {
   width: 100%;
   height: 100%;

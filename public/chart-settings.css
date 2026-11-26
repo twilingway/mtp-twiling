@@ -1,0 +1,184 @@
+#chart-settings-dialog {
+  inline-size: min(680px, calc(100dvw - 24px));
+  block-size: min(590px, calc(100dvh - 24px));
+  max-inline-size: none;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: 20px;
+}
+
+#chart-settings-dialog[open],
+#chart-settings-form {
+  display: flex;
+  flex-direction: column;
+}
+
+#chart-settings-dialog > header {
+  flex: none;
+  margin-block-end: 12px;
+}
+
+#chart-settings-form {
+  flex: 1;
+  min-block-size: 0;
+}
+
+.chart-settings-sections {
+  display: grid;
+  flex: 1;
+  min-block-size: 0;
+  grid-template-columns: 160px minmax(0, 1fr);
+  border-block: 1px solid var(--line);
+}
+
+.chart-settings-tabs {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  min-inline-size: 0;
+  padding-block: 12px;
+  padding-inline-end: 12px;
+  border-inline-end: 1px solid var(--line);
+}
+
+.chart-settings-tabs > button {
+  min-inline-size: 0;
+  min-block-size: 40px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  border-inline-start: 2px solid transparent;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: start;
+  overflow-wrap: anywhere;
+}
+
+.chart-settings-tabs > button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.chart-settings-tabs > button[aria-selected="true"] {
+  border-inline-start-color: var(--accent);
+  background: var(--accent-surface);
+  color: var(--text);
+}
+
+.chart-settings-section {
+  min-block-size: 0;
+  min-inline-size: 0;
+  padding: 12px 6px 12px 14px;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.chart-settings-section[hidden] {
+  display: none;
+}
+
+#chart-settings-dialog .chart-settings-section > :first-child {
+  margin-block-start: 0;
+}
+
+#chart-settings-dialog .chart-settings-section select {
+  max-inline-size: 100%;
+}
+
+#chart-settings-dialog .drawing-style-row {
+  align-items: center;
+  gap: 8px;
+}
+
+#chart-settings-dialog .chart-candle-preset {
+  min-block-size: 36px;
+  margin-block-start: 8px;
+  padding-inline: 10px;
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  background: var(--surface-input);
+}
+
+#chart-settings-dialog .chart-candle-preset:hover {
+  background: var(--surface-hover);
+}
+
+.chart-settings-zone {
+  display: grid;
+  gap: 6px;
+  margin-block-start: 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#chart-settings-dialog .chart-settings-zone .clock-zone-trigger {
+  min-block-size: 36px;
+  padding-inline: 8px;
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  background: var(--surface-input);
+}
+
+#chart-settings-dialog .chart-settings-zone .clock-zone-trigger > span:first-child {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#chart-settings-dialog .chart-settings-zone .clock-zone-trigger > span:not(:first-child) {
+  flex: none;
+}
+
+#chart-settings-dialog .chart-settings-zone .clock-zone-popover {
+  position: static;
+  inline-size: 100%;
+  margin-block-start: 5px;
+  box-shadow: none;
+}
+
+#chart-settings-dialog .chart-settings-zone .clock-zone-list {
+  max-block-size: min(240px, 32dvh);
+}
+
+#chart-settings-form > footer {
+  flex: none;
+  margin-block-start: 12px;
+}
+
+@media (max-width: 580px) {
+  #chart-settings-dialog {
+    padding: 12px;
+  }
+
+  #chart-settings-dialog > header h2 {
+    font-size: 18px;
+  }
+
+  .chart-settings-sections {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .chart-settings-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-block: 8px;
+    padding-inline: 0;
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--line);
+  }
+
+  .chart-settings-tabs > button {
+    min-block-size: 44px;
+  }
+
+  .chart-settings-section {
+    padding-inline-start: 2px;
+  }
+
+  #chart-settings-dialog .price-axis-label-fields {
+    padding-inline: 6px;
+  }
+
+  #chart-settings-dialog .price-axis-label-field {
+    gap: 5px;
+  }
+}

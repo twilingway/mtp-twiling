@@ -27,7 +27,7 @@ export function matchesCurrencyAlias(item: CatalogInstrument, query: string): bo
 export function currencyFallbackQuery(query: string): string {
   return alias(query)?.fallback ?? query.trim();
 }
-export function catalogInstrumentKind(item: CatalogInstrument): InstrumentKind {
+export function catalogInstrumentKind(item: CatalogInstrument): InstrumentKind | undefined {
   if (item.kind) return item.kind;
   if (item.instrumentType === "currency" || item.instrumentKind === "INSTRUMENT_TYPE_CURRENCY")
     return "currency";
@@ -39,5 +39,7 @@ export function catalogInstrumentKind(item: CatalogInstrument): InstrumentKind {
     return "future";
   if (item.instrumentType === "share" || item.instrumentKind === "INSTRUMENT_TYPE_SHARE")
     return "share";
-  return "index";
+  if (item.instrumentType === "index" || item.instrumentKind === "INSTRUMENT_TYPE_INDEX")
+    return "index";
+  return undefined;
 }
