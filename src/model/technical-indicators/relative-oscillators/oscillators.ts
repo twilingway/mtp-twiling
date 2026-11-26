@@ -38,13 +38,16 @@ export function stochasticRsi(bars: readonly TechnicalBar[], options: Stochastic
   const rsi = values.map((value, index): NumericValue => {
     const previous = index === 0 ? null : values[index - 1]!;
     const change = value === null || previous === null ? null : difference(value, previous);
-    const up = gain.push(change === null ? null : change.unit > 0 ? change : ZERO);
-    const down = loss.push(change === null ? null : change.unit < 0 ? times(change, -1) : ZERO);
+    // No observation changes either RMA: carry the canonical published ratio, not a new division
+    // of rounded states that can differ by one ulp after a preceding zero-change ratio pin.
+    if (change === null) return previousRsi;
+    const up = gain.push(change.unit > 0 ? change : ZERO);
+    const down = loss.push(change.unit < 0 ? times(change, -1) : ZERO);
     if (up === null || down === null) return null;
     // With L>1 a zero change scales both RMAs by the same factor. Preserve that exact ratio;
     // independent rounding must not turn a flat RSI into a spurious stoch extremum.
     const result =
-      change?.unit === 0 && rsiLength > 1 && previousRsi !== null
+      change.unit === 0 && rsiLength > 1 && previousRsi !== null
         ? previousRsi
         : ratio(up, add(up, down), 100);
     previousRsi = result;

@@ -1,0 +1,105 @@
+import assert from "node:assert/strict";
+import { writeFileSync, readFileSync } from "node:fs";
+import { loadRelativeSource } from "./relative-oscillators-math/test/helpers/relative-oscillator-source.mjs";
+const api=loadRelativeSource(),filters=loadRelativeSource("filters"),numeric=loadRelativeSource("numeric"),groups=[],failures=[];
+const gcd=(a,b)=>{a=a<0n?-a:a;while(b){const t=a%b;a=b;b=t<0n?-t:t;}return a;};
+const q=(n,d=1n)=>{n=BigInt(n);d=BigInt(d);if(d<0n){n=-n;d=-d;}const g=gcd(n,d)||1n;return{n:n/g,d:d/g};};
+const plus=(a,b)=>q(a.n*b.d+b.n*a.d,a.d*b.d),minus=(a,b)=>q(a.n*b.d-b.n*a.d,a.d*b.d),mul=(a,b)=>q(a.n*b.n,a.d*b.d),divide=(a,b)=>b.n===0n?null:q(a.n*b.d,a.d*b.n),cmp=(a,b)=>a.n*b.d<b.n*a.d?-1:a.n*b.d>b.n*a.d?1:0;
+function double(a){if(a===null)return null;const n=a.n<0n?-a.n:a.n,bits=Math.max(n.toString(2).length,a.d.toString(2).length),shift=BigInt(Math.max(0,bits-900));return Number(a.n>>shift)/Number(a.d>>shift);}
+const total=items=>items.reduce(plus,q(0));
+function rationalMean(values,length,kind="SMA"){
+ const known=[];let state=null;
+ return values.map(value=>{
+  if(value!==null){known.push(value);if(kind==="EMA")state=state===null?value:plus(mul(state,q(length-1,length+1)),mul(value,q(2,length+1)));
+   if(kind==="RMA"&&known.length===length)state=divide(total(known),q(length));
+   else if(kind==="RMA"&&known.length>length)state=plus(mul(state,q(length-1,length)),divide(value,q(length)));}
+  if(kind==="EMA"||kind==="RMA")return state;
+  if(known.length<length)return null;const tail=known.slice(-length);
+  return kind==="WMA"?divide(total(tail.map((v,i)=>mul(v,q(i+1)))),q(length*(length+1)/2)):divide(total(tail),q(length));
+ });
+}
+const swma=v=>v.map((_,i)=>i<3||v.slice(i-3,i+1).includes(null)?null:divide(total(v.slice(i-3,i+1).map((n,k)=>mul(n,q([1,2,2,1][k])))),q(6)));
+function stoch(b,p){const changes=b.map((x,i)=>i===0||x.close===null||b[i-1].close===null?null:q(x.close-b[i-1].close));
+ const up=rationalMean(changes.map(v=>v===null?null:v.n>0n?v:q(0)),p.rsiLength,"RMA"),down=rationalMean(changes.map(v=>v===null?null:v.n<0n?q(-v.n,v.d):q(0)),p.rsiLength,"RMA");
+ const rsi=up.map((u,i)=>u===null||down[i]===null?null:divide(mul(u,q(100)),plus(u,down[i])));
+ const raw=rsi.map((r,i)=>{if(r===null)return null;const items=rsi.slice(Math.max(0,i-p.stochasticLength+1),i+1).filter(x=>x!==null);let lo=items[0],hi=lo;for(const n of items){if(cmp(n,lo)<0)lo=n;if(cmp(n,hi)>0)hi=n;}return divide(mul(minus(r,lo),q(100)),minus(hi,lo));});
+ const k=rationalMean(raw,p.smoothK);return{k:k.map(double),d:rationalMean(k,p.smoothD).map(double)};
+}
+function vigor(b,p){const diff=(a,c)=>b.map(x=>x[a]===null||x[c]===null?null:q(x[a]-x[c]));const up=rationalMean(swma(diff("close","open")),p.length),down=rationalMean(swma(diff("high","low")),p.length);const value=up.map((u,i)=>u===null||down[i]===null?null:divide(u,down[i]));return{value:value.map(double),signal:swma(value).map(double)};}
+function coppock(b,p){const roc=(i,L)=>i<L||b[i].close===null||b[i-L].close===null||b[i-L].close===0?null:q(100*(b[i].close-b[i-L].close),b[i-L].close);const combined=b.map((_,i)=>{const a=roc(i,p.longRocLength),c=roc(i,p.shortRocLength);return a===null||c===null?null:plus(a,c);});return rationalMean(combined,p.wmaLength,"WMA").map(double);}
+function bull(b,p){const ema=rationalMean(b.map(x=>x.close===null?null:q(x.close)),p.length,"EMA");return b.map((x,i)=>x.high===null||x.low===null||ema[i]===null?null:double(minus(q(x.high+x.low),mul(ema[i],q(2)))));}
+function ordinaryMean(source,L,kind="SMA"){
+ const known=[];let state=null;
+ return source.map(x=>{if(x!==null){known.push(x);if(kind==="EMA")state=state===null?x:(2*x+(L-1)*state)/(L+1);if(kind==="RMA"&&known.length===L)state=known.reduce((a,b)=>a+b,0)/L;else if(kind==="RMA"&&known.length>L)state=(x+(L-1)*state)/L;}
+ if(kind==="EMA"||kind==="RMA")return state;if(known.length<L)return null;const tail=known.slice(-L);
+ if(kind==="SD"){let squared=0;for(let i=0;i<L;i++)for(let j=0;j<i;j++)squared+=(tail[i]-tail[j])**2;return Math.sqrt(squared)/L;}
+ return tail.reduce((sum,v,i)=>sum+v*(kind==="WMA"?i+1:1),0)/(kind==="WMA"?L*(L+1)/2:L);
+ });
+}
+function volatility(b,p){const sd=ordinaryMean(b.map(x=>x.close),p.length,"SD"),upper=ordinaryMean(sd.map((v,i)=>i&&b[i].close!==null&&b[i-1].close!==null&&b[i].close<=b[i-1].close?0:v),14,"EMA"),lower=ordinaryMean(sd.map((v,i)=>i&&b[i].close!==null&&b[i-1].close!==null&&b[i].close>b[i-1].close?0:v),14,"EMA");
+ const value=upper.map((u,i)=>u===null||lower[i]===null||u+lower[i]===0?null:100*u/(u+lower[i]));let smoothing;
+ if(p.maType==="None")smoothing=b.map(()=>null);
+ else if(p.maType==="VWMA"){const top=ordinaryMean(value.map((v,i)=>v===null||b[i].volume===null?null:v*b[i].volume),p.maLength),bottom=ordinaryMean(b.map(x=>x.volume),p.maLength);smoothing=top.map((t,i)=>t===null||bottom[i]===null||bottom[i]===0?null:t/bottom[i]);}
+ else smoothing=ordinaryMean(value,p.maLength,p.maType==="SMMA (RMA)"?"RMA":p.maType==="SMA + Bollinger Bands"?"SMA":p.maType);
+ const spread=ordinaryMean(value,p.maLength,"SD"),band=sign=>value.map((_,i)=>p.maType!=="SMA + Bollinger Bands"||smoothing[i]===null||spread[i]===null?null:smoothing[i]+sign*p.bbMultiplier*spread[i]);
+ return{value,smoothing,upperBand:band(1),lowerBand:band(-1)};
+}
+function same(actual,expected,path=""){
+ if(Array.isArray(expected)){assert.equal(actual.length,expected.length,path);expected.forEach((e,i)=>same(actual[i],e,`${path}/${i}`));return;}
+ if(expected&&typeof expected==="object"){assert.deepEqual(Object.keys(actual),Object.keys(expected),path);for(const k of Object.keys(expected))same(actual[k],expected[k],path+"/"+k);return;}
+ if(expected===null){assert.equal(actual,null,path);return;}
+ assert.ok(Number.isFinite(actual),`${path} nonfinite ${actual}`);assert.ok(Math.abs(actual-expected)<=3e-11*Math.max(1,Math.abs(expected)),`${path}: ${actual} vs ${expected}`);
+}
+const row=(close,i=0)=>({timestamp:i*1973-500,open:close,high:close===null?null:close+4,low:close===null?null:close-4,close,volume:3});
+const outputs=x=>Array.isArray(x)?{value:x}:x;
+const probe=(name,fn)=>{const before=failures.length;fn();groups.push({name,pass:before===failures.length});};
+probe("independent manual rational ledgers",()=>{
+ same(api.stochasticRsi([1,3,2,4,1,5].map(row),{rsiLength:1,stochasticLength:2,smoothK:2,smoothD:3}),{k:[null,null,null,50,50,50],d:[null,null,null,null,null,50]});
+ same(api.relativeVigorIndex([3,4,5,6,7,8,2].map((close,i)=>({...row(close,i),open:2,high:8,low:0})),{length:1}),{value:[null,null,null,5/16,7/16,9/16,13/24],signal:[null,null,null,null,null,null,137/288]});
+ same(api.relativeVolatilityIndex([0,2,0].map(row),{length:2,maType:"SMA + Bollinger Bands",maLength:2}),{value:[null,100,260/3],smoothing:[null,null,280/3],upperBand:[null,null,320/3],lowerBand:[null,null,80]});
+ same(api.coppockCurve([1,2,4,5].map(row),{longRocLength:2,shortRocLength:1,wmaLength:2}),[null,null,null,250]);
+ same(api.bullBearPower([4,8,6].map((c,i)=>({...row(c,i),high:[6,10,9][i],low:[2,6,3][i]})),{length:3}),[0,4,0]);
+});
+let seed=0x35ab10;const rnd=()=>{seed=(Math.imul(seed,1103515245)+12345)>>>0;return seed/2**32;};let compared=0;
+probe("200 independent random rational/direct-window fixtures, all seven smoothing modes",()=>{
+ for(let trial=0;trial<200;trial++){
+  const b=Array.from({length:38},(_,i)=>{const close=rnd()<.13?null:Math.floor(rnd()*41)-20;const r=row(close,i);r.open=close===null||rnd()<.08?null:close+(Math.floor(rnd()*7)-3);if(rnd()<.06)r.high=null;if(rnd()<.07)r.low=null;r.volume=rnd()<.12?null:Math.floor(rnd()*10);return Object.freeze(r);});Object.freeze(b);
+  const sp={rsiLength:1+trial%6,stochasticLength:1+trial%7,smoothK:1+trial%3,smoothD:1+trial%4},vp={length:1+trial%5},cp={longRocLength:1+trial%6,shortRocLength:1+(trial*3)%5,wmaLength:1+trial%4},bp={length:1+trial%8};
+  for(const [fn,oracle,p]of [[api.stochasticRsi,stoch,sp],[api.relativeVigorIndex,vigor,vp],[api.coppockCurve,coppock,cp],[api.bullBearPower,bull,bp]]){try{same(fn(b,p),oracle(b,p),`${trial}/${fn.name}`);}catch(error){if(!failures.length)writeFileSync(new URL("./relative-oscillators-readonly-failing-vector.json",import.meta.url),JSON.stringify({trial,kernel:fn.name,options:p,bars:b,actual:fn(b,p),expected:oracle(b,p)},null,2));failures.push({trial,kernel:fn.name,options:p,error:error.message});}compared++;}
+  for(const maType of api.VOLATILITY_MA_TYPES){const p={length:1+trial%5,maLength:1+trial%6,maType,bbMultiplier:.25+(trial%5)};same(api.relativeVolatilityIndex(b,p),volatility(b,p),`${trial}/${maType}`);compared++;}
+ }
+});
+probe("exact prefix causality, dense timestamps and frozen inputs",()=>{
+ const b=Object.freeze(Array.from({length:60},(_,i)=>Object.freeze({...row(10+(i*13)%23,i),timestamp:i%5===0?-i:7,volume:i%9===0?null:i%11})));
+ const initial=JSON.stringify(b),calls=[[api.stochasticRsi,{rsiLength:3,stochasticLength:5,smoothK:2,smoothD:4}],[api.relativeVigorIndex,{length:3}],[api.relativeVolatilityIndex,{length:3,maType:"VWMA",maLength:4}],[api.coppockCurve,{longRocLength:4,shortRocLength:2,wmaLength:3}],[api.bullBearPower,{length:3}]];
+ for(const [fn,p]of calls){const full=outputs(fn(b,p));for(let cut=0;cut<=b.length;cut++){const prefix=outputs(fn(b.slice(0,cut),p));for(const key in full){assert.equal(full[key].length,b.length);assert.deepEqual(prefix[key],full[key].slice(0,cut));assert.ok(full[key].every(v=>v===null||Number.isFinite(v)));}}}assert.equal(JSON.stringify(b),initial);
+});
+probe("scale homogeneity across 1800 exponent bits and sparse nulls",()=>{
+ const b=Array.from({length:70},(_,i)=>row(i%13===0?null:10+(i*17)%31,i));
+ for(const exponent of [-900,900]){const factor=2**exponent,scaled=b.map(x=>({...x,open:x.open===null?null:x.open*factor,close:x.close===null?null:x.close*factor,high:x.high===null?null:x.high*factor,low:x.low===null?null:x.low*factor}));
+  for(const [fn,p]of [[api.stochasticRsi,{rsiLength:3,smoothK:2,smoothD:2}],[api.relativeVigorIndex,{length:3}],[api.relativeVolatilityIndex,{length:3,maType:"SMA + Bollinger Bands",maLength:4}],[api.coppockCurve,{longRocLength:4,shortRocLength:2,wmaLength:3}]])same(fn(scaled,p),fn(b,p));
+  const normal=api.bullBearPower(b,{length:4}),result=api.bullBearPower(scaled,{length:4});same(result.map(v=>v===null?null:v/factor),normal);
+ }
+});
+probe("MAX/subnormal ratios, zero denominators and inactive outputs",()=>{
+ for(const magnitude of [Number.MAX_VALUE,Number.MIN_VALUE*2]){const b=Array.from({length:12},(_,i)=>({timestamp:i,open:-magnitude,high:magnitude,low:-magnitude,close:magnitude,volume:null}));const v=api.relativeVigorIndex(b,{length:3});same(v.value.slice(5),Array(7).fill(1));}
+ assert.equal(filters.numbers(filters.deviation(filters.scalars([Number.MAX_VALUE,-Number.MAX_VALUE]),2))[1],Number.MAX_VALUE);
+ assert.equal(filters.numbers(filters.deviation(filters.scalars([0,2*Number.MIN_VALUE]),2))[1],Number.MIN_VALUE);
+ for(const maType of api.VOLATILITY_MA_TYPES){const out=api.relativeVolatilityIndex(Array.from({length:60},(_,i)=>({...row(7,i),volume:0})),{maType});assert.ok(Object.values(out).flat().every(v=>v===null));}
+ assert.ok(api.stochasticRsi(Array.from({length:50},(_,i)=>row(7,i))).k.every(v=>v===null));
+ assert.equal(numeric.ratio(numeric.scalar(0),numeric.scalar(0)),null);
+});
+probe("all price sources, output orders, defaults and actual source metadata",()=>{
+ const b=Array.from({length:70},(_,i)=>({...row(20+(i*3)%11,i),open:20+(i*3)%11-1,volume:i%9+1}));
+ for(const source of ["open","high","low","close","hl2","hlc3","ohlc4","volume"]){const out=api.stochasticRsi(b,{source});assert.deepEqual(Object.keys(out),["k","d"]);assert.equal(out.k.length,b.length);}
+ const primary=JSON.parse(readFileSync(new URL("./relative-oscillators-math/docs/RELATIVE_OSCILLATORS_PRIMARY_CAPTURE.json",import.meta.url),"utf8"));
+ api.relativeOscillatorPresets.forEach((p,i)=>{assert.equal(p.publicId,primary[i].id);assert.equal(p.verifiedVersion,primary[i].version);assert.equal(p.sourceSha256,primary[i].sha256);assert.equal(p.defaultPane,"separate");assert.equal(Object.isFrozen(p.defaults),true);});
+ assert.deepEqual(Object.keys(api.relativeVolatilityIndex(b)),["value","smoothing","upperBand","lowerBand"]);
+ assert.deepEqual(api.relativeOscillatorMetadata("relative-volatility-index").parameters,{length:10,offset:0,maType:"SMA",maLength:14,bbMultiplier:2});
+ assert.deepEqual(api.relativeOscillatorMetadata("coppock-curve").parameters,{wmaLength:10,longRocLength:14,shortRocLength:11});
+ assert.deepEqual(api.relativeOscillatorMetadata("bull-bear-power").outputs,["value"]);
+});
+const evidence={sourceSHA:"a906f02d28bd2ea2eaed08d0f5892afcc3d14b78",groups:groups.length,randomKernelComparisons:compared,rationalOracles:true,ordinaryStddevOracle:"pairwise differences, no production tree/arithmetic imports for expected",pineExecution:false,failures,results:groups};
+writeFileSync(new URL("./relative-oscillators-readonly-evidence.json",import.meta.url),JSON.stringify(evidence,null,2)+"\n","utf8");console.log(JSON.stringify(evidence));
+
+if(failures.length)process.exitCode=1;

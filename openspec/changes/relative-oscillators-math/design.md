@@ -12,6 +12,12 @@ registry/UI/persistence/native изменений и без заявления r
 
 ## Decisions
 
+- Follow-up P2 от frozen a906: при missing adjacent change RSI переносит именно ранее опубликованное
+  canonical ratio, без повторного деления округлённых gain/loss. Известный zero change при L>1
+  по-прежнему обновляет обе RMA и сохраняет ratio; L1 zero остаётся0/0→null. Stoch denominator не
+  получает epsilon и zero/50 fallback. Это соблюдение объявленной локальной invariance, не решение
+  Pine parity gate.
+
 - Общая арифметика mantissa/exponent сохраняет представимые отношения при переполнении промежуточных
   разностей/произведений и subnormal масштабе. Окна — bounded segment tree с mean, weighted mean и
   population variance: O(N log L), память O(L).

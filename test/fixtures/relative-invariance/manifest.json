@@ -1,0 +1,43 @@
+{
+  "sourceSHA": "a906f02d28bd2ea2eaed08d0f5892afcc3d14b78",
+  "copies": [
+    {
+      "file": "original-trial47.json",
+      "source": "relative-oscillators-readonly-failing-vector.json",
+      "sha256": "17d79c1b669dcc87ab8c9185d7b09e7d04b426f450f9e912a02fb19dbe834b9d"
+    },
+    {
+      "file": "original-minimal-vector.json",
+      "source": "relative-oscillators-readonly-minimal-vector.json",
+      "sha256": "0b6c1710973f374ca61d5c6bc0f722622837d139a5c4d1984e9f731382849c1e"
+    },
+    {
+      "file": "original-six-bar-vector.json",
+      "source": "relative-oscillators-readonly-six-bar-vector.json",
+      "sha256": "c2489e09e23294fabb5f286a893f58fe45be3bda794d9981fb50a618b9e9de87"
+    },
+    {
+      "file": "original-review-probes.mjs.txt",
+      "source": "relative-oscillators-readonly-probes.mjs",
+      "sha256": "cc7a1d4badbe772f077c35dc6aa7fa5b445612bd72f816baf2087b9c916cfb49"
+    },
+    {
+      "file": "original-six-bar-regression.mjs.txt",
+      "source": "relative-oscillators-readonly-six-bar-regression.mjs",
+      "sha256": "9f6122cd33ce075378d19cb406220c9918b32e5e0a6fb9ff76e7c0e0e6547451"
+    },
+    {
+      "file": "original-review-evidence.json",
+      "source": "relative-oscillators-readonly-evidence.json",
+      "sha256": "2275b8d289e688539493c29dfc896b531fe0c96c69a4dfbbc1077a15b0d2421f"
+    }
+  ],
+  "replayed": [
+    {
+      "file": "replayed-frozen-trial113.json",
+      "source": "unchanged frozen reviewer generator, seed0x35ab10, trial113, frozen a906 API",
+      "sha256": "913ffb7a016cb8cb307c875edf02cd6774c8b50f2da9a8c55d526072962188c7"
+    }
+  ],
+  "note": "Copied bytes are preserved without formatting. Trial113 is a separately labelled full-vector replay, not a replacement of original reviewer evidence. No Pine execution."
+}

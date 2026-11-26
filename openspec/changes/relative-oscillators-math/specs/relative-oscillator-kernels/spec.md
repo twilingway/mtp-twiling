@@ -45,3 +45,9 @@ execution parity.
 
 - **WHEN** превышен локальный cap свечей, периода или оценочных tree visits
 - **THEN** расчёт отклоняется до выделения больших промежуточных рядов
+
+#### Scenario: Canonical RSI after zero and missing change
+
+- **WHEN** Stoch RSI3/Stoch2/K1/D1 получает closes `[0,-4,-4,-3,-3,null]`
+- **THEN** zero-change и missing-change сохраняют canonical RSI20, все шесть K/D равны null без
+  нового экстремума из rounding RMA states

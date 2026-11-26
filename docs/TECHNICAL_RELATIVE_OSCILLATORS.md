@@ -61,8 +61,9 @@ requiresVolume, history, presentation и parityLimits. Ни одного hidden 
 ×100 → SMA K → SMA D. RSI использует отдельные RMA gain/loss; ненулевая gain с нулевой loss даёт100,
 ненулевая loss с нулевой gain —0, обе0 —null. Нулевой stochastic range —null. При L>1 zero change
 одинаково уменьшает обе RMA: прежнее RSI сохраняется точно, чтобы independent rounding не создавало
-ложный range. K `#2962FF`, D `#FF6D00`; hlines80/50/20. Никакой дополнительной MA wrapper или offset
-нет.
+ложный range. Missing adjacent change также переносит опубликованное RSI без повторного деления
+округлённых states; см. [P2 follow-up](TA_STOCH_RSI_INVARIANCE_FOLLOWUP.md). K `#2962FF`, D
+`#FF6D00`; hlines80/50/20. Никакой дополнительной MA wrapper или offset нет.
 
 **Relative Vigor:** четырёхпозиционный SWMA от close−open и high−low; независимые суммы L известных
 значений, затем отношение. В реализации обе суммы делятся на одинаковое L и этот множитель
