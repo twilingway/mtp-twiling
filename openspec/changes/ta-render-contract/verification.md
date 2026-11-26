@@ -1,4 +1,26 @@
-# Проверка research/spec-only
+# Проверки исследования и runtime compiler
+
+## Runtime compiler — отдельная implementation ветка
+
+Ветка `feat/ta-render-presentation`, base source50b5873; root decision record:
+`docs/TA_RENDER_IMPLEMENTATION_DECISIONS.md`. Добавлены только три runtime model modules и два
+source test/helper файла; definitions/adapters/registry/storage/Drive ещё не подключены. Новых
+dependencies, generated version или build нет.
+
+- `node --experimental-test-isolation=none --test test/ta-render-contract.test.mjs`: 8/8.
+- `node test/technical-trend-state-typecheck.mjs`: whole-source strict PASS с ровно одним
+  виртуальным модулем APP_VERSION/BUILD_ID string declarations; generated файл отсутствует,
+  diagnostics не подавляются.
+- Scoped ESLint/Prettier и `node scripts/spec.mjs validate --all --strict`: PASS.
+- Независимый readonly Git50b5873 baseline numeric42/v1 witness, без render definitions:
+  `7cd3515d0bf89d288c3715165c8da0d3584df81ae50525ce2681825cde507ca3`.
+
+Source tests включают explicit old default solid, MACD/PVO zero/equality/null, AO negative-rising и
+after-null policy, cross relative size/no fake values, hidden anchors/no scale, fill runs без
+мостов, malformed references/length/timestamps/non-finite. Runtime graph не является parser backup.
+Независимый compiler review, native lifecycle/actual paint/performance и G5 остаются открыты.
+
+## Исторический research/spec-only этап
 
 26.11.2026. Worktree `D:/MySource/ReactJS/vps/artifacts/ta-render-contract-research`, ветка
 `docs/ta-render-contract-research`, база `5d569c394ee3d8730af12c665aa956f290b3245e`.

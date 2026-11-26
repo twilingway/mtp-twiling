@@ -24,8 +24,10 @@
 - Числовые результаты/params/persisted v1 существующих 42 сохраняются. Изменение render metadata
   намеренное и проверяется отдельно от frozen numeric fixtures.
 
-Этот commit содержит только исследование и OpenSpec. Открытые G-gates из исследования не считаются
-разрешёнными. Реализация и миграция не запускаются этим proposal.
+Research commits содержали только исследование и OpenSpec. В отдельной implementation ветке принят
+runtime contract и добавлен source-only compiler с тестами; см.
+`docs/TA_RENDER_IMPLEMENTATION_DECISIONS.md`. Adapters/registry ещё не подключены. Persistent G5
+остаётся proposal: никакая миграция/новый writer не запускаются этим этапом.
 
 ## Capabilities
 

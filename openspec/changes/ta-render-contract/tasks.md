@@ -1,18 +1,19 @@
 # Tasks
 
-Research закончен отдельно от реализации. Ниже **будущие** задачи, каждая до двух часов либо с
-разделением по engine/fixture; все implementation tasks намеренно unchecked.
+Research закончен отдельно от реализации. Runtime compiler реализуется в отдельной ветке; решения и
+проверки: `docs/TA_RENDER_IMPLEMENTATION_DECISIONS.md`. Native и persistent gates остаются
+отдельными незавершёнными задачами.
 
 ## 1. Решения и контракт — C
 
-- [ ] 1.1 Принять implementation contract G1–G4/G6/G7 отдельным decision record: cross/linebr/
+- [x] 1.1 Принять implementation contract G1–G4/G6/G7 отдельным decision record: cross/linebr/
       fill/palette policy, renderVersion2 и Price sync; проверить primary evidence. Actual paint/
       create gates закрываются в 2.3/3.3/6, не выдавать statictrace за их выполнение.
-- [ ] 1.2 Сохранить numeric42/v1 fixture corpus и expected hashes без computed render metadata;
+- [x] 1.2 Сохранить numeric42/v1 fixture corpus и expected hashes без computed render metadata;
       проверить source-only contract test, не генерировать expected из новой реализации.
-- [ ] 1.3 После 1.1 добавить typed descriptor/compiler с graph/null/length validation и palette
+- [x] 1.3 После 1.1 добавить typed descriptor/compiler с graph/null/length validation и palette
       resolver; проверить source-only geometry/palette tests и frozen numeric42 fixtures.
-- [ ] 1.4 Документировать принятый contract/limits и точные новые ownership paths; проверить scoped
+- [x] 1.4 Документировать принятый contract/limits и точные новые ownership paths; проверить scoped
       Prettier и strict OpenSpec, обновить G decision record.
 
 ## 2. LW — L, после 1.3

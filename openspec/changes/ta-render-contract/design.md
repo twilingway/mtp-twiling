@@ -11,8 +11,10 @@ frozen. Supertrend/SAR пока math-only на reviewed `49bfcf77c9a5200f8bcaf6d
 **Goals:** проверяемый проект общих geometry/style/fill descriptors, одинаковая семантика двух
 engines, сохранение numeric42 и v1 настроек, собственные ресурсы и понятная миграционная граница.
 
-**Non-Goals:** реализация, регистрация, перенос Pine source, новые зависимости, изменение формул,
-автоматическая миграция профилей, изменение MTP, build/browser/release в research этапе.
+**Non-Goals:** перенос Pine source, новые зависимости, изменение формул, автоматическая миграция
+профилей и изменение MTP. Research этап не включал реализацию; source-only compiler принят отдельно
+в `docs/TA_RENDER_IMPLEMENTATION_DECISIONS.md`. Native регистрация, build/browser/release и
+persistent migration остаются следующими этапами.
 
 ## Decisions
 
@@ -133,10 +135,8 @@ data. Rollback после v2 записи требует согласованн�
 
 ## Open Questions
 
-Это **gated proposal**, а не разрешение apply. G1–G7 из исследования требуют review до реализации
-соответствующей ветви: cross pixels, singleton/caps, фактический fill/MTP порядок, missing palette,
-v2 export compatibility и согласие на render metadata extension. Пока gate не закрыт
-evidence/решением, соответствующий task остаётся unchecked. Отдельное approval решение фиксирует
-integrator; никакие default assumptions не выдаются за принятую persistent migration. Принятие
-implementation contract предшествует коду; actual engine paint/create evidence закрывается позднее
-на соответствующем этапе, не объявляется уже доказанным statictrace.
+Runtime решения зафиксированы integrator в `docs/TA_RENDER_IMPLEMENTATION_DECISIONS.md`. Actual
+cross pixels, singleton/caps, fill/MTP paint, native create/precision и performance требуют своей
+evidence; соответствующие native tasks остаются unchecked. G5/persistent compatibility ещё не
+принято: v2 export/reader/writer не внедряются до отдельного решения. Source-only compiler не
+закрывает actual paint/create gates и не доказывает Pine parity.
