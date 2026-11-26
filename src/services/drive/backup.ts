@@ -51,9 +51,8 @@ const backupShape: Shape = {
     technicalIndicators: [
       {
         ...scalars("schemaVersion id definitionId visible order"),
-        params: scalars(
-          "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength diLength adxSmoothing divisor emaLength oscillatorAverage signalAverage longLength shortLength roc1Length roc2Length roc3Length roc4Length sma1Length sma2Length sma3Length sma4Length atrLength factor start increment maximum offset sigma useExponentialMa bandsStyle rsiLength stochasticLength wmaLength longRocLength shortRocLength maType maLength bbMultiplier"
-        ),
+        // Definition-specific keys and scalar values are validated before projection.
+        params: { $: true },
         pane: scalars("kind id"),
         styles: { $: scalars("color width visible opacity lineStyle") }
       }

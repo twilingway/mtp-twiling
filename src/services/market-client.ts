@@ -17,6 +17,8 @@ import type {
   HistoryRange
 } from "../model/types.js";
 import type { Cache, CandleOptions, CandleResult, CandleEvent, BankSnapshot } from "./types.js";
+import type { OpenInterestObservations } from "../model/technical-indicators/ta-batch-external.js";
+import type { TurnoverInterval } from "../model/technical-indicators/ta-batch-volume-flow-turnover.js";
 export interface MarketSnapshot extends Omit<BankSnapshot, "status"> {
   marketReady: boolean;
   status: string;
@@ -272,6 +274,31 @@ export class MarketClient extends EventTarget {
   }
   settleMutations(): Promise<void> {
     return this.mutations.run(async () => {});
+  }
+  loadQuoteTurnover(
+    uid: string,
+    interval: TurnoverInterval,
+    range: HistoryRange,
+    signal: AbortSignal
+  ) {
+    if (this.closed || signal.aborted) return Promise.resolve(null);
+    const row = this.values.find((item) => item.uid === uid);
+    return row
+      ? this.publicMarket.loadQuoteTurnover(row, interval, range, signal)
+      : Promise.resolve(null);
+  }
+  loadOpenInterest(
+    uid: string,
+    timeframe: Timeframe,
+    range: HistoryRange,
+    signal: AbortSignal,
+    onPage?: (page: OpenInterestObservations) => void
+  ): Promise<OpenInterestObservations | null> {
+    if (this.closed || signal.aborted) return Promise.resolve(null);
+    const row = this.values.find((item) => item.uid === uid);
+    return row
+      ? this.publicMarket.loadOpenInterest(row, timeframe, range, signal, onPage)
+      : Promise.resolve(null);
   }
   async candles(
     symbol: string,

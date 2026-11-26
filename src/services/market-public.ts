@@ -10,6 +10,13 @@ import {
 import type { BybitCatalog, BybitCategory, BybitInstrument } from "./providers/bybit/types.js";
 import type { BybitStreamOptions } from "./providers/bybit/websocket.js";
 import type { BybitInterval } from "./providers/bybit/market.js";
+import {
+  loadBybitOpenInterest,
+  supportsBybitOpenInterestInterval
+} from "./providers/bybit/open-interest.js";
+import type { OpenInterestObservations } from "../model/technical-indicators/ta-batch-external.js";
+import type { TurnoverInterval } from "../model/technical-indicators/ta-batch-volume-flow-turnover.js";
+import { loadPublicQuoteTurnover } from "./market-turnover.js";
 import { okxNativeInterval } from "./providers/okx/market.js";
 import type { OkxInstrument } from "./providers/okx/types.js";
 import { okxCatalogInstrument, publicCatalogInstrument } from "./market-public-mapping.js";
@@ -138,6 +145,47 @@ export class PublicMarket {
   }
   private signal(signal?: AbortSignal): AbortSignal {
     return signal ? AbortSignal.any([signal, this.lifetime.signal]) : this.lifetime.signal;
+  }
+  loadQuoteTurnover(
+    row: MarketRow,
+    interval: TurnoverInterval,
+    range: HistoryRange,
+    signal: AbortSignal
+  ) {
+    if (this.cachePaused) return Promise.resolve(null);
+    return loadPublicQuoteTurnover(
+      row,
+      interval,
+      range,
+      this.signal(signal),
+      (ref, timeframe, part, active) => loadHistory(this.http, ref, timeframe, part, active),
+      (ref, timeframe, part, active) => this.okx.history(ref, timeframe, part, active)
+    );
+  }
+  loadOpenInterest(
+    row: MarketRow,
+    timeframe: Timeframe,
+    range: HistoryRange,
+    signal: AbortSignal,
+    onPage?: (page: OpenInterestObservations) => void
+  ): Promise<OpenInterestObservations | null> {
+    const ref = row.providerRef;
+    if (
+      ref?.provider !== "bybit" ||
+      ref.category !== "linear" ||
+      !row.baseCoin ||
+      !supportsBybitOpenInterestInterval(timeframe)
+    )
+      return Promise.resolve(null);
+    return loadBybitOpenInterest(
+      this.http,
+      ref,
+      row.baseCoin,
+      timeframe,
+      range,
+      this.signal(signal),
+      onPage
+    );
   }
   async search(
     query: string,

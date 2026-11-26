@@ -55,7 +55,7 @@ test("append2 price indicators occupy their reviewed slots and expose local cata
       0
     );
     for (const key of ["STD;DPO", "STD;Trend%1Strength%1Index"])
-      assert.equal(entries.find((e) => e.id === key).available, false);
+      assert.equal(entries.find((e) => e.id === key).available, true);
   }
 });
 

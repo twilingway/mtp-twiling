@@ -8,6 +8,8 @@ import type {
 import { presentationRuns } from "../model/technical-indicators/presentation-geometry.js";
 import { presentationColor } from "../model/technical-indicators/presentation.js";
 import { lineColor } from "../model/candle-palette.js";
+import { directionalFillRuns, drawStudyMarker, drawStudyRange } from "./technical-study-paint.js";
+import type { FillPoint } from "./technical-study-paint.js";
 
 export const klineTechnicalIndex = Symbol("technical-data-index");
 export type KlineTechnicalRow = Record<string, number | undefined> & {
@@ -41,6 +43,26 @@ export function klineColumnsBase(
 export function klineColumnsBaseFigure(base: KlineColumnsBase) {
   return { key: base.key, type: columnsBaseType };
 }
+const rangeAnchorType = "mtp-ta-range-anchor";
+let rangeAnchorRegistered = false;
+export function klineRangeAnchorFigures(outputs: readonly TechnicalRenderOutput[]) {
+  const anchors = outputs.flatMap((plot) =>
+    plot.style.visible && plot.presentation?.pairedValues
+      ? [{ plot, values: plot.presentation.pairedValues }]
+      : []
+  );
+  if (anchors.length && !rangeAnchorRegistered) {
+    registerFigure({ name: rangeAnchorType, draw: () => {}, checkEventOn: () => false });
+    rangeAnchorRegistered = true;
+  }
+  const keys = new Set(outputs.map((plot) => plot.outputId));
+  return anchors.map(({ plot, values }) => {
+    let key = `__mtpRangeAnchor_${plot.outputId}`;
+    while (keys.has(key)) key += "_";
+    keys.add(key);
+    return { key, type: rangeAnchorType, values };
+  });
+}
 export interface KlineTechnicalContext {
   rows: KlineTechnicalRow[];
   levels: number[];
@@ -49,6 +71,7 @@ export interface KlineTechnicalContext {
   columnsBase: KlineColumnsBase | null;
   disposed: boolean;
   references?: readonly TechnicalRenderReference[];
+  rangeAnchors?: ReturnType<typeof klineRangeAnchorFigures>;
 }
 const referenceType = "mtp-ta-reference-level";
 let referenceRegistered = false;
@@ -80,7 +103,8 @@ export function klineTechnicalContext(
 export function klineTechnicalColor(output: TechnicalRenderOutput, index: number): string {
   return lineColor(
     output.presentation
-      ? (presentationColor(output.presentation, index) ?? output.style.color)
+      ? (presentationColor(output.presentation, index) ??
+          (output.presentation.color.kind === "indexed" ? "transparent" : output.style.color))
       : output.style.color,
     output.style.opacity
   );
@@ -96,9 +120,10 @@ function clipped(params: Params, paint: () => void): void {
   ctx.restore();
 }
 function bounds(params: Params, count: number): [number, number] {
+  const end = params.visibleRange.realTo ?? params.visibleRange.to;
   return [
     Math.max(0, Math.floor(params.visibleRange.from) - 1),
-    Math.min(count - 1, Math.ceil(params.visibleRange.to))
+    Math.min(count - 1, Math.ceil(end))
   ];
 }
 function point(params: Params, index: number, value: number | null | undefined) {
@@ -130,6 +155,19 @@ function plot(params: Params, output: TechnicalRenderOutput): void {
   ctx.setLineDash(
     output.style.lineStyle === "dashed" ? [6, 4] : output.style.lineStyle === "dotted" ? [2, 3] : []
   );
+  if (geometry?.kind === "range-bars" || geometry?.kind === "marker") {
+    ctx.fillStyle = lineColor(output.style.color, output.style.opacity);
+    for (let i = first; i <= last; i++) {
+      const p = point(params, i, output.values[i]);
+      if (!p) continue;
+      if (geometry.kind === "marker") drawStudyMarker(ctx, geometry, p);
+      else {
+        const to = point(params, i, output.presentation?.pairedValues?.[i]);
+        if (to) drawStudyRange(ctx, p, to.y, params.barSpace.bar, geometry.showEqual ?? false);
+      }
+    }
+    return;
+  }
   if (geometry?.kind === "cross") {
     // A shared, relative-size profile; exact Pine pixel calibration remains an engine QA gate.
     const arm = 2 + geometry.size.value;
@@ -190,6 +228,12 @@ function plot(params: Params, output: TechnicalRenderOutput): void {
         }
         ctx.lineTo(p.x, p.y);
         drawing = true;
+      } else if (geometry?.kind === "line" && geometry.gaps === "break" && run.first === run.last) {
+        ctx.strokeStyle = klineTechnicalColor(output, i);
+        ctx.beginPath();
+        ctx.moveTo(p.x - output.style.width / 2, p.y);
+        ctx.lineTo(p.x + output.style.width / 2, p.y);
+        ctx.stroke();
       }
       previous = p;
     }
@@ -203,6 +247,8 @@ export function drawKlineTechnical(params: Params): boolean {
     (output) =>
       output.presentation?.precisionPolicy === "fixed-2" ||
       output.presentation?.geometry.kind === "cross" ||
+      output.presentation?.geometry.kind === "range-bars" ||
+      output.presentation?.geometry.kind === "marker" ||
       (output.presentation?.geometry.kind === "line" &&
         output.presentation.geometry.gaps === "break")
   );
@@ -244,15 +290,27 @@ export function drawKlineTechnicalFills(params: Params): boolean {
         continue;
       }
       for (const run of presentationRuns(fill.from, fill.to, first, last)) {
-        let points: { x: number; from: number; to: number }[] = [];
+        let points: FillPoint[] = [];
+        const polygon = (area: readonly FillPoint[]) => {
+          if (area.length < 2) return;
+          ctx.beginPath();
+          ctx.moveTo(area[0]!.x, area[0]!.from);
+          for (const p of area.slice(1)) ctx.lineTo(p.x, p.from);
+          for (let i = area.length - 1; i >= 0; i--) ctx.lineTo(area[i]!.x, area[i]!.to);
+          ctx.closePath();
+          ctx.fill();
+        };
         const finish = () => {
-          if (points.length > 1) {
-            ctx.beginPath();
-            ctx.moveTo(points[0]!.x, points[0]!.from);
-            for (const p of points.slice(1)) ctx.lineTo(p.x, p.from);
-            for (let i = points.length - 1; i >= 0; i--) ctx.lineTo(points[i]!.x, points[i]!.to);
-            ctx.closePath();
-            ctx.fill();
+          if (fill.belowColor) {
+            for (const area of directionalFillRuns(points)) {
+              ctx.fillStyle = lineColor(
+                area.fromBelow ? fill.belowColor : fill.color,
+                fill.opacity
+              );
+              polygon(area.points);
+            }
+          } else {
+            polygon(points);
           }
           points = [];
         };
@@ -263,7 +321,12 @@ export function drawKlineTechnicalFills(params: Params): boolean {
             finish();
             continue;
           }
-          points.push({ x: from.x, from: from.y, to: to.y });
+          points.push({
+            x: from.x,
+            from: from.y,
+            to: to.y,
+            fromBelow: fill.from[i]! < fill.to[i]!
+          });
         }
         finish();
       }

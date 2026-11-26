@@ -7,7 +7,7 @@ import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { snapDrawingPoint } from "../../model/drawing-magnet.js";
 import { chartBackground } from "../../model/theme.js";
 import type { Drawing, DrawingPoint, PixelPoint } from "../../model/types.js";
-import type { ChartAdapter } from "../../charts/adapter.js";
+import type { ChartAdapter, TechnicalSupplementalInputs } from "../../charts/adapter.js";
 import { isPanMovement } from "../../charts/navigation.js";
 import { useChartCanvas } from "./chart-lifecycle.js";
 import { useTerminal } from "./context.js";
@@ -23,10 +23,10 @@ export function visibleDrawings(state: TerminalState): Drawing[] {
     drawingVisibleOnInterval(drawing.visibility, state.preferences.timeframe)
   );
 }
-export function ChartCanvas() {
+export function ChartCanvas({ supplemental }: { supplemental: TechnicalSupplementalInputs }) {
   const { state } = useTerminal(),
     ref = useRef<HTMLDivElement>(null);
-  useChartCanvas(ref, visibleDrawings);
+  useChartCanvas(ref, visibleDrawings, supplemental);
   return (
     <div
       id="chart"

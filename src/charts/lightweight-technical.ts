@@ -16,9 +16,9 @@ import type {
   TechnicalIndicatorGroup,
   TechnicalPanePreference
 } from "../model/technical-indicator-layout.js";
-import type { ChartOptions, TechnicalPaneMetric } from "./adapter.js";
+import type { ChartOptions, TechnicalPaneMetric, TechnicalSupplementalInputs } from "./adapter.js";
 import { TechnicalRenderData } from "./technical-render-data.js";
-import { technicalCalculationContext } from "./technical-calculation-context.js";
+import { hasVisibleAverage, technicalCalculationContext } from "./technical-calculation-context.js";
 import type { TechnicalRenderOutput } from "./technical-render-data.js";
 import { captureTechnicalPaneLayout, technicalPaneGeometry } from "./technical-pane-geometry.js";
 import { attachTechnicalPaneEvents } from "./technical-pane-events.js";
@@ -27,6 +27,7 @@ import { chartPalette } from "../model/theme.js";
 import { presentationColor } from "../model/technical-indicators/presentation.js";
 import { LightweightTechnicalPrimitive } from "./lightweight-technical-primitives.js";
 import { lightweightCompactCrosshair } from "./technical-compact-crosshair.js";
+import { lightweightCalendarRegions } from "./lightweight-calendar-regions.js";
 
 type Series = ISeriesApi<"Line"> | ISeriesApi<"Histogram">;
 interface Entry {
@@ -44,7 +45,10 @@ export function lightweightTechnical(
   alive: () => boolean,
   primary?: () => ISeriesApi<"Candlestick"> | ISeriesApi<"Line">
 ) {
-  const calculation = new TechnicalRenderData(technicalCalculationContext(options.timeframe));
+  const calculation = new TechnicalRenderData(
+    technicalCalculationContext(options.timeframe, options.row)
+  );
+  const calendar = lightweightCalendarRegions(chart, options, alive, primary);
   const owned = new Map<string, Entry>(),
     panes = new Map<string, IPaneApi<Time>>();
   const fills = new Map<string, { primitive: LightweightTechnicalPrimitive; series: Series }>();
@@ -52,7 +56,10 @@ export function lightweightTechnical(
     layout: readonly TechnicalPanePreference[] = [];
   let groups: TechnicalIndicatorGroup[] = [],
     disposed = false,
-    lastMetrics = "";
+    lastMetrics = "",
+    candleCount = 0,
+    projected = false,
+    viewportFrame = 0;
   let events: ReturnType<typeof attachTechnicalPaneEvents> | undefined;
   const nativePanes = () => (typeof chart.panes === "function" ? chart.panes() : []);
   const referenceContext = lightweightReferenceContext(chart, () => primary?.());
@@ -152,6 +159,8 @@ export function lightweightTechnical(
   const primitivePlot = (output: TechnicalRenderOutput) =>
     output.presentation?.precisionPolicy === "fixed-2" ||
     output.presentation?.geometry.kind === "cross" ||
+    output.presentation?.geometry.kind === "range-bars" ||
+    output.presentation?.geometry.kind === "marker" ||
     (output.presentation?.geometry.kind === "line" &&
       output.presentation.geometry.gaps === "break");
   function outputOptions(output: TechnicalRenderOutput, fillCarrier = false) {
@@ -212,9 +221,24 @@ export function lightweightTechnical(
       }
     chart.removeSeries(entry.series);
   }
+  const readViewport = () => {
+    const range = chart.timeScale().getVisibleLogicalRange?.();
+    return calculation.setVisibleBars(range?.from ?? Infinity, range?.to ?? -Infinity);
+  };
+  const onViewportChange = () => {
+    if (disposed || !alive() || viewportFrame || !hasVisibleAverage(instances)) return;
+    viewportFrame = requestAnimationFrame(() => {
+      viewportFrame = 0;
+      if (!disposed && alive() && hasVisibleAverage(instances) && readViewport()) reconcile();
+    });
+  };
+  chart.timeScale().subscribeVisibleLogicalRangeChange?.(onViewportChange);
   function reconcile() {
     if (disposed || !alive()) return;
+    if (hasVisibleAverage(instances)) readViewport();
     const compiled = calculation.compile(instances, layout);
+    projected = compiled.outputs.some((output) => output.timestamps.length > candleCount);
+    calendar.update(compiled.priceRegions);
     groups = compiled.groups;
     const lower = groups.filter((group) => group.key !== "price");
     const activePanes = new Set(lower.map((group) => group.key));
@@ -277,7 +301,7 @@ export function lightweightTechnical(
           const color =
             output.presentation?.geometry.kind === "columns"
               ? output.style.visible
-                ? presentationColor(output.presentation, index)
+                ? (presentationColor(output.presentation, index) ?? "transparent")
                 : "transparent"
               : null;
           return color
@@ -390,8 +414,13 @@ export function lightweightTechnical(
     events?.schedule();
   }
   return {
+    updateInputs(inputs: TechnicalSupplementalInputs) {
+      if (!disposed && alive() && calculation.setSupplementalInputs(inputs, options.row.uid))
+        reconcile();
+    },
     setData(data: readonly Candle[]) {
       if (disposed || !alive()) return;
+      candleCount = data.length;
       calculation.setData(data);
       reconcile();
     },
@@ -406,6 +435,7 @@ export function lightweightTechnical(
       reconcile();
     },
     metrics,
+    hasProjectedPlots: () => projected,
     timeAxisTop: () => {
       if (disposed) return 0;
       const all = nativePanes();
@@ -415,9 +445,12 @@ export function lightweightTechnical(
     },
     refreshNativeMetadata: reconcile,
     dispose() {
+      calendar.dispose();
       referenceLevels.dispose();
       crosshair.dispose();
       disposed = true;
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange?.(onViewportChange);
+      if (viewportFrame) cancelAnimationFrame(viewportFrame);
       events?.dispose();
       calculation.dispose();
       for (const entry of owned.values()) removeEntry(entry);

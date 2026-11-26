@@ -75,7 +75,7 @@ test("KC follows pinned old50; primary defaults/colors/fill and local catalog ar
   assert.ok(Object.isFrozen(d) && Object.isFrozen(d.parameters) && Object.isFrozen(d.presentation));
   const catalog = load("model/technical-indicators/catalog.js");
   assert.equal(catalog.technicalDefinitionForCatalog("STD;Keltner_Channels"), "keltner-channels");
-  assert.equal(catalog.technicalDefinitionForCatalog("STD;Donchian_Channels"), undefined);
+  assert.equal(catalog.technicalDefinitionForCatalog("STD;Donchian_Channels"), "donchian-channels");
   for (const locale of ["ru", "en"]) {
     assert.equal(
       catalog.technicalCatalogEntries(locale).filter((e) => e.available).length,

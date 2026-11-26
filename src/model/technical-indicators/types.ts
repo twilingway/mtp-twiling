@@ -18,6 +18,47 @@ import type {
   StateOscillatorId,
   StateOscillatorHistoryRequirement
 } from "./state-oscillator-contract.js";
+import type { IntervalId } from "../intervals/registry.js";
+import type { OpenInterestObservations } from "./ta-batch-external.js";
+import type {
+  AnchoredIndicatorContext,
+  AnchoredStudyHistory
+} from "./catalog-expansion/anchored-context.js";
+import type { AnchoredStudyParameters } from "./catalog-expansion/anchored.js";
+import type { AverageStudyParameters } from "./catalog-expansion/averages.js";
+import type { BandStudyParameters } from "./catalog-expansion/bands.js";
+import type { BookerStudyParameters } from "./catalog-expansion/booker.js";
+import type { ExternalStudyParameters } from "./catalog-expansion/external.js";
+import type { LevelStudyParameters } from "./catalog-expansion/levels.js";
+import type { MomentumStudyParameters } from "./catalog-expansion/momentum.js";
+import type { SessionStudyParameters } from "./catalog-expansion/sessions.js";
+import type {
+  RankCorrelationWindowHistory,
+  TrendStudyParameters
+} from "./catalog-expansion/trend.js";
+import type {
+  RelativeVolumeHistoryRequirement,
+  VolumeStudyData,
+  VolumeStudyParameters
+} from "./catalog-expansion/volume.js";
+import type { QuoteTurnoverHistoryRequirement } from "./ta-batch-volume-flow-turnover.js";
+import type {
+  TechnicalPriceDecoration,
+  CalendarRegionHistoryRequirement
+} from "./catalog-expansion/calendar-geometry.js";
+
+export interface CatalogExpansionParameters
+  extends
+    AnchoredStudyParameters,
+    AverageStudyParameters,
+    BandStudyParameters,
+    BookerStudyParameters,
+    ExternalStudyParameters,
+    LevelStudyParameters,
+    MomentumStudyParameters,
+    SessionStudyParameters,
+    TrendStudyParameters,
+    VolumeStudyParameters {}
 
 export type NumericValue = number | null;
 export type NumericSeries = readonly NumericValue[];
@@ -62,7 +103,8 @@ export type TechnicalIndicatorId =
   | TrendPriceId
   | ChannelPriceId
   | "keltner-channels"
-  | RelativeRegisteredId;
+  | RelativeRegisteredId
+  | keyof CatalogExpansionParameters;
 export type PriceSource = "open" | "high" | "low" | "close" | "hl2" | "hlc3" | "ohlc4" | "volume";
 export interface TechnicalBar {
   readonly timestamp: number;
@@ -72,7 +114,8 @@ export interface TechnicalBar {
   readonly close: NumericValue;
   readonly volume: NumericValue;
 }
-export interface TechnicalParameters extends ChannelPriceParameters, RelativeRegisteredParameters {
+export interface TechnicalParameters
+  extends ChannelPriceParameters, RelativeRegisteredParameters, CatalogExpansionParameters {
   "keltner-channels": KeltnerParameters;
   "parabolic-sar": { start: number; increment: number; maximum: number };
   supertrend: { atrLength: number; factor: number };
@@ -167,6 +210,7 @@ export type TechnicalIndicatorInstance = {
 export type ParameterDefinition =
   | { key: string; type: "integer" | "number"; defaultValue: number; min: number; max: number }
   | { key: string; type: "source"; defaultValue: PriceSource }
+  | { key: string; type: "text"; defaultValue: string; maxLength: number; format?: "time" }
   | { key: string; type: "boolean"; defaultValue: boolean }
   | { key: string; type: "choice"; defaultValue: string; choices: readonly [string, ...string[]] };
 export interface TechnicalOutputDefinition {
@@ -188,6 +232,8 @@ export interface TechnicalIndicatorDefinition {
   references: readonly string[];
   /** Runtime-only drawing metadata. Never serialized as indicator instance preferences. */
   presentation?: PresentationDefinition;
+  priceRegionStyles?: readonly { id: string; title: string; color: string; opacity: number }[];
+  attribution?: { line: string; url: string };
 }
 export interface UnsupportedIndicatorDefinition {
   schemaVersion: 1;
@@ -208,12 +254,20 @@ export interface TechnicalIndicatorResult {
   /** Present only when the parameters make every output mathematically undefined. */
   alwaysUndefined?: true;
   /** Runtime only; absent from legacy and available results. Never an instance/backup field. */
-  unavailableReason?: "volume-unavailable" | "calculation-limit";
+  unavailableReason?: "volume-unavailable" | "calculation-limit" | "external-data-unavailable";
+  barOffsets?: Readonly<Record<string, number>>;
+  priceRegions?: readonly TechnicalPriceDecoration[];
   historyRequirement: TechnicalHistoryRequirement;
 }
 /** Explicit current-timeframe context; never persisted in indicator instances or inferred from bars. */
-export interface TechnicalCalculationContext {
+export interface TechnicalCalculationContext extends AnchoredIndicatorContext {
   readonly historicalVolatilityPeriodsPerYear: number;
+  readonly chartInterval?: IntervalId;
+  readonly exchangeTimeZone?: string;
+  readonly priceStep?: number;
+  readonly lastBarClosed?: boolean;
+  readonly volumeStudies?: VolumeStudyData;
+  readonly openInterest?: OpenInterestObservations;
 }
 export type LegacyRecursiveHistoryRequirement = {
   kind: "recursive";
@@ -224,7 +278,10 @@ export type LegacyRecursiveHistoryRequirement = {
     | "sma-of-first-length"
     | "adjacent-change-wilder"
     | "first-value-ema-chain"
-    | "true-range-wilder";
+    | "true-range-wilder"
+    | "prior-price-after-efficiency-window"
+    | "first-nonzero"
+    | "alternating-confirmed-extrema";
   convergence: "full-input-dependent";
 };
 export type TechnicalHistoryRequirement =
@@ -242,4 +299,9 @@ export type TechnicalHistoryRequirement =
   | TrendPriceHistoryRequirement
   | ChannelPriceHistoryRequirement
   | KeltnerHistoryRequirement
-  | RelativeRegisteredHistory;
+  | RelativeRegisteredHistory
+  | RankCorrelationWindowHistory
+  | AnchoredStudyHistory
+  | CalendarRegionHistoryRequirement
+  | RelativeVolumeHistoryRequirement
+  | QuoteTurnoverHistoryRequirement;

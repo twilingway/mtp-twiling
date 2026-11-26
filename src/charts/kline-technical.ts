@@ -6,14 +6,15 @@ import type {
   TechnicalIndicatorGroup,
   TechnicalPanePreference
 } from "../model/technical-indicator-layout.js";
-import type { ChartOptions, TechnicalPaneMetric } from "./adapter.js";
+import type { ChartOptions, TechnicalPaneMetric, TechnicalSupplementalInputs } from "./adapter.js";
 import { TechnicalRenderData } from "./technical-render-data.js";
-import { technicalCalculationContext } from "./technical-calculation-context.js";
+import { hasVisibleAverage, technicalCalculationContext } from "./technical-calculation-context.js";
 import { captureTechnicalPaneLayout } from "./technical-pane-geometry.js";
 import { klinePaneGeometry } from "./kline-pane-geometry.js";
 import { attachTechnicalPaneEvents } from "./technical-pane-events.js";
 import { klineCompactCrosshair } from "./technical-compact-crosshair.js";
 import { klineNativeMembers } from "./kline-native-members.js";
+import { klineCalendarRegions } from "./kline-calendar-regions.js";
 
 const COMPACT_AXIS = "PERSONAL_TA_COMPACT_AXIS";
 let compactAxisRegistered = false;
@@ -48,7 +49,10 @@ export function klineTechnical(
   refreshCanvases: () => void = () => {},
   onSettled: () => void = () => {}
 ) {
-  const calculation = new TechnicalRenderData(technicalCalculationContext(options.timeframe));
+  const calculation = new TechnicalRenderData(
+    technicalCalculationContext(options.timeframe, options.row)
+  );
+  const calendar = klineCalendarRegions(chart, options, alive);
   let groups: TechnicalIndicatorGroup[] = [],
     paneOrder: string[] = [];
   let instances: readonly TechnicalIndicatorInstance[] = [],
@@ -56,7 +60,8 @@ export function klineTechnical(
   let disposed = false,
     lastMetrics = "",
     applying = false,
-    settlementFrame = 0;
+    settlementFrame = 0,
+    viewportFrame = 0;
   const members = klineNativeMembers(chart, () => !disposed && alive(), technicalAxis);
   const settlement: Settlement = {
     active: true,
@@ -162,10 +167,25 @@ export function klineTechnical(
       }
     });
   }
+  const readViewport = () => {
+    const range = chart.getVisibleRange?.();
+    return calculation.setVisibleBars(range?.from ?? Infinity, (range?.to ?? -Infinity) - 1);
+  };
+  const onViewportChange = () => {
+    if (disposed || !alive() || viewportFrame || !hasVisibleAverage(instances)) return;
+    viewportFrame = requestAnimationFrame(() => {
+      viewportFrame = 0;
+      if (!disposed && alive() && hasVisibleAverage(instances) && readViewport()) reconcile();
+    });
+  };
+  if (ActionType?.OnVisibleRangeChange)
+    chart.subscribeAction?.(ActionType.OnVisibleRangeChange, onViewportChange);
   function reconcile() {
     if (disposed || !alive()) return;
+    if (hasVisibleAverage(instances)) readViewport();
     const complete = nativeSettled(weakSettlement, ++settlement.revision);
     const compiled = calculation.compile(instances, layout);
+    calendar.update(compiled.priceRegions);
     groups = compiled.groups;
     const nextOrder = groups.filter((group) => group.key !== "price").map((group) => group.key);
     const resetLower = nextOrder.join("\0") !== paneOrder.join("\0");
@@ -181,6 +201,10 @@ export function klineTechnical(
     settlement.schedule();
   }
   return {
+    updateInputs(inputs: TechnicalSupplementalInputs) {
+      if (!disposed && alive() && calculation.setSupplementalInputs(inputs, options.row.uid))
+        reconcile();
+    },
     setData(data: readonly Candle[]) {
       if (disposed || !alive()) return;
       calculation.setData(data);
@@ -207,8 +231,12 @@ export function klineTechnical(
         : options.container.clientHeight - 28;
     },
     dispose() {
+      calendar.dispose();
       crosshair.dispose();
       disposed = true;
+      if (ActionType?.OnVisibleRangeChange)
+        chart.unsubscribeAction?.(ActionType.OnVisibleRangeChange, onViewportChange);
+      if (viewportFrame) cancelAnimationFrame(viewportFrame);
       settlement.active = false;
       settlement.schedule = () => {};
       if (settlementFrame) cancelAnimationFrame(settlementFrame);

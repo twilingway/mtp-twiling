@@ -12,10 +12,11 @@ import type {
 import { presentationRuns } from "../model/technical-indicators/presentation-geometry.js";
 import { lineColor } from "../model/candle-palette.js";
 import type { TechnicalRenderFill, TechnicalRenderOutput } from "./technical-render-data.js";
+import { directionalFillRuns, drawStudyMarker, drawStudyRange } from "./technical-study-paint.js";
+import type { FillPoint } from "./technical-study-paint.js";
 
 type Target = Parameters<IPrimitivePaneRenderer["draw"]>[0];
 type Point = { x: number; y: number };
-type Pair = Point & { to: number };
 const seconds = (time: Time): number =>
   typeof time === "number"
     ? time
@@ -55,8 +56,21 @@ export class LightweightTechnicalPrimitive implements ISeriesPrimitive<Time> {
   paneViews(): readonly IPrimitivePaneView[] {
     return this.disposed ? [] : this.views;
   }
-  autoscaleInfo(): null {
-    return null;
+  autoscaleInfo() {
+    const output = this.output;
+    const paired = output?.presentation?.pairedValues;
+    if (!output?.style.visible || !paired) return null;
+    const bounds = this.bounds(output.timestamps, 0);
+    if (!bounds) return null;
+    let minValue = Infinity,
+      maxValue = -Infinity;
+    for (let i = bounds.first; i <= bounds.last; i++) {
+      const value = paired[i];
+      if (value == null) continue;
+      minValue = Math.min(minValue, value);
+      maxValue = Math.max(maxValue, value);
+    }
+    return Number.isFinite(minValue) ? { priceRange: { minValue, maxValue } } : null;
   }
   updatePlot(output: TechnicalRenderOutput, project?: (value: number) => number | null): void {
     if (this.disposed) return;
@@ -79,7 +93,10 @@ export class LightweightTechnicalPrimitive implements ISeriesPrimitive<Time> {
     this.fill = undefined;
     this.project = undefined;
   }
-  private bounds(timestamps: readonly number[]): { first: number; last: number } | undefined {
+  private bounds(
+    timestamps: readonly number[],
+    padding = 1
+  ): { first: number; last: number } | undefined {
     const visible = this.chart.timeScale().getVisibleRange();
     if (!visible || !timestamps.length) return;
     const from = seconds(visible.from) * 1000,
@@ -97,8 +114,8 @@ export class LightweightTechnicalPrimitive implements ISeriesPrimitive<Time> {
       return left;
     };
     return {
-      first: Math.max(0, search(from, false) - 1),
-      last: Math.min(timestamps.length - 1, search(to, true))
+      first: Math.max(0, search(from, false) - padding),
+      last: Math.min(timestamps.length - 1, search(to, true) - 1 + padding)
     };
   }
   private point(timestamp: number, value: number | null | undefined): Point | undefined {
@@ -130,29 +147,38 @@ export class LightweightTechnicalPrimitive implements ISeriesPrimitive<Time> {
         ctx.globalCompositeOperation = "source-over";
         if (background && fill) {
           ctx.fillStyle = lineColor(fill.color, fill.opacity);
-          const polygon = (pairs: Pair[]) => {
+          const polygon = (pairs: readonly FillPoint[]) => {
             // A singleton has no time area; never invent half-bar fill width.
             if (pairs.length < 2) return;
             ctx.beginPath();
-            ctx.moveTo(pairs[0]!.x * hx, pairs[0]!.y * vy);
-            for (let i = 1; i < pairs.length; i++) ctx.lineTo(pairs[i]!.x * hx, pairs[i]!.y * vy);
+            ctx.moveTo(pairs[0]!.x * hx, pairs[0]!.from * vy);
+            for (let i = 1; i < pairs.length; i++)
+              ctx.lineTo(pairs[i]!.x * hx, pairs[i]!.from * vy);
             for (let i = pairs.length - 1; i >= 0; i--)
               ctx.lineTo(pairs[i]!.x * hx, pairs[i]!.to * vy);
             ctx.closePath();
             ctx.fill();
           };
+          const paintFill = (pairs: FillPoint[]) => {
+            if (!fill.belowColor) return polygon(pairs);
+            for (const run of directionalFillRuns(pairs)) {
+              ctx.fillStyle = lineColor(run.fromBelow ? fill.belowColor : fill.color, fill.opacity);
+              polygon(run.points);
+            }
+          };
           for (const run of presentationRuns(fill.from, fill.to, bounds.first, bounds.last)) {
-            let pairs: Pair[] = [];
+            let pairs: FillPoint[] = [];
             for (let i = run.first; i <= run.last; i++) {
               const a = this.point(fill.timestamps[i]!, fill.from[i]),
                 b = this.point(fill.timestamps[i]!, fill.to[i]);
-              if (a && b) pairs.push({ ...a, to: b.y });
+              if (a && b)
+                pairs.push({ x: a.x, from: a.y, to: b.y, fromBelow: fill.from[i]! < fill.to[i]! });
               else {
-                polygon(pairs);
+                paintFill(pairs);
                 pairs = [];
               }
             }
-            polygon(pairs);
+            paintFill(pairs);
           }
         } else if (output?.presentation) {
           const geometry = output.presentation.geometry;
@@ -167,7 +193,21 @@ export class LightweightTechnicalPrimitive implements ISeriesPrimitive<Time> {
                 ? [2 * hx, 4 * hx]
                 : []
           );
-          if (geometry.kind === "cross") {
+          if (geometry.kind === "range-bars" || geometry.kind === "marker") {
+            ctx.fillStyle = ctx.strokeStyle;
+            const spacing =
+              geometry.kind === "range-bars" ? this.chart.timeScale().options().barSpacing : 0;
+            for (let i = bounds.first; i <= bounds.last; i++) {
+              const timestamp = output.timestamps[i]!;
+              const p = this.point(timestamp, output.values[i]);
+              if (!p) continue;
+              if (geometry.kind === "marker") drawStudyMarker(ctx, geometry, p, hx, vy);
+              else {
+                const to = this.point(timestamp, output.presentation.pairedValues?.[i]);
+                if (to) drawStudyRange(ctx, p, to.y, spacing, geometry.showEqual ?? false, hx, vy);
+              }
+            }
+          } else if (geometry.kind === "cross") {
             ctx.setLineDash([]);
             const radius = 2 + geometry.size.value;
             for (let i = bounds.first; i <= bounds.last; i++) {

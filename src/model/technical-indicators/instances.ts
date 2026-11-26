@@ -1,4 +1,5 @@
 import { getTechnicalIndicatorDefinition, PRICE_SOURCES } from "./definitions.js";
+import { catalogExpansionParamsValid } from "./catalog-expansion/registry.js";
 import type {
   IndicatorPane,
   OutputStyle,
@@ -60,7 +61,8 @@ export function technicalIndicatorStyleIds(
     ...(definition.presentation?.referenceLevels ?? []).map((level) => level.id),
     ...(definition.presentation?.fills ?? [])
       .filter((fill) => fill.extent === "pane")
-      .map((fill) => fill.id)
+      .map((fill) => fill.id),
+    ...(definition.priceRegionStyles ?? []).map(({ id }) => id)
   ];
 }
 export function isTechnicalIndicatorInstance(value: unknown): value is TechnicalIndicatorInstance {
@@ -93,6 +95,7 @@ export function isTechnicalIndicatorInstance(value: unknown): value is Technical
   if (
     !definition ||
     definition.status !== "computed" ||
+    (definition.priceRegionStyles !== undefined && value.pane.kind !== "overlay") ||
     !exact(
       params,
       definition.parameters.map((item) => item.key)
@@ -108,12 +111,15 @@ export function isTechnicalIndicatorInstance(value: unknown): value is Technical
           ? typeof entry === "boolean"
           : parameter.type === "choice"
             ? parameter.choices.some((choice) => choice === entry)
-            : typeof entry === "number" &&
-              Number.isFinite(entry) &&
-              entry >= parameter.min &&
-              entry <= parameter.max &&
-              (parameter.type !== "integer" || Number.isInteger(entry));
-    })
+            : parameter.type === "text"
+              ? typeof entry === "string" && entry.length <= parameter.maxLength
+              : typeof entry === "number" &&
+                Number.isFinite(entry) &&
+                entry >= parameter.min &&
+                entry <= parameter.max &&
+                (parameter.type !== "integer" || Number.isInteger(entry));
+    }) ||
+    !catalogExpansionParamsValid(value.definitionId, params)
   )
     return false;
   return (

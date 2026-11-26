@@ -7,10 +7,23 @@ export type PlotColorPolicy =
   | {
       readonly kind: "palette";
       readonly id: "macd-sign-change-v1" | "ao-change-v1" | "bbp-sign-v1";
+    }
+  | {
+      readonly kind: "indexed";
+      readonly seriesKey: string;
+      readonly colors: readonly string[];
+      readonly offset?: number;
     };
 export type PlotGeometry =
   | { readonly kind: "line"; readonly gaps: "legacy" | "break" }
   | { readonly kind: "columns"; readonly base: 0 }
+  | { readonly kind: "range-bars"; readonly otherSeriesKey: string; readonly showEqual?: boolean }
+  | {
+      readonly kind: "marker";
+      readonly shape: "triangle-up" | "triangle-down" | "circle";
+      readonly placement: "above" | "below" | "center";
+      readonly size: { readonly unit: "pine-relative"; readonly value: PlotSize };
+    }
   | {
       readonly kind: "cross";
       readonly size: { readonly unit: "pine-relative"; readonly value: PlotSize };
@@ -27,6 +40,7 @@ export interface PresentationFill {
   readonly fromSeries: string;
   readonly toSeries: string;
   readonly color: string;
+  readonly belowColor?: string;
   readonly opacity: number;
   readonly gaps: "break";
   readonly extent?: "pane";
@@ -66,6 +80,8 @@ export interface PresentationInput {
 export interface CompiledPresentationPlot extends PresentationPlot {
   readonly precisionPolicy: PlotPrecisionPolicy;
   readonly values: NumericSeries;
+  readonly pairedValues?: NumericSeries;
+  readonly colorIndices?: NumericSeries;
   readonly opacity: number;
   readonly lineStyle: "solid" | "dashed" | "dotted";
   readonly visible: boolean;

@@ -1,4 +1,7 @@
-import { EXPECTED_COMPUTED_COUNT } from "./technical-registry-expectation.mjs";
+import {
+  EXPECTED_EXPANSION_IDS,
+  EXPECTED_PRE_EXPANSION_IDS
+} from "./technical-registry-expectation.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { nativeFixture } from "./native-technical-fixture.mjs";
@@ -42,15 +45,17 @@ function outputs(f, instances, data = bars, layout = []) {
       })
   );
 }
-function assertValues(f, instances, data = bars, layout = []) {
-  const expected = outputs(f, instances, data, layout);
+function assertValues(f, instances, data = bars, layout = [], compiled) {
+  const expected = compiled?.outputs ?? outputs(f, instances, data, layout);
   if (f.options.container && f.allSeries.length) {
     const actual = f.activeSeries().slice(4);
     const { getTechnicalIndicatorDefinition } = api(f);
-    const references = instances.flatMap(
-      (item) =>
-        getTechnicalIndicatorDefinition(item.definitionId).presentation?.referenceLevels ?? []
-    );
+    const references =
+      compiled?.references ??
+      instances.flatMap(
+        (item) =>
+          getTechnicalIndicatorDefinition(item.definitionId).presentation?.referenceLevels ?? []
+      );
     assert.equal(actual.length, expected.length + references.length);
     // Output identity survives reorder; locate by its actual data rather than creation position.
     for (const output of expected) {
@@ -69,13 +74,14 @@ function assertValues(f, instances, data = bars, layout = []) {
       );
     }
     for (const reference of references) {
+      const timestamps = reference.timestamps ?? data.map(({ timestamp }) => timestamp);
       assert.ok(
         actual.some(
           (series) =>
-            series.data.length === data.length &&
+            series.data.length === timestamps.length &&
             series.data.every(
               (point, index) =>
-                point.value === reference.value && point.time === data[index].timestamp / 1000
+                point.value === reference.value && point.time === timestamps[index] / 1000
             )
         )
       );
@@ -84,7 +90,10 @@ function assertValues(f, instances, data = bars, layout = []) {
     const active = f.activeIndicators(),
       companions = active.filter((item) => item.name.startsWith("PERSONAL_TA_FILL_")),
       actual = active.filter(
-        (item) => item.name.startsWith("PERSONAL_TA_") && !item.name.startsWith("PERSONAL_TA_FILL_")
+        (item) =>
+          item.name.startsWith("PERSONAL_TA_") &&
+          !item.name.startsWith("PERSONAL_TA_FILL_") &&
+          item.name !== "PERSONAL_TA_PRICE_REGIONS"
       );
     const { getTechnicalIndicatorDefinition } = api(f);
     assert.equal(
@@ -99,8 +108,10 @@ function assertValues(f, instances, data = bars, layout = []) {
       assert.deepEqual(companion.figures, []);
       assert.deepEqual(companion.result, []);
     }
-    assert.equal(actual.length, new Set(expected.map((item) => item.instanceId)).size);
+    const plotted = new Set(expected.map((item) => item.instanceId));
+    assert.equal(actual.length, plotted.size);
     for (const instance of instances.filter((item) => item.visible)) {
+      if (!plotted.has(instance.id)) continue;
       const values = expected.filter((item) => item.instanceId === instance.id);
       const rows = (values[0]?.timestamps ?? []).map((_time, i) =>
         Object.fromEntries(values.map((output) => [output.outputId, output.values[i] ?? undefined]))
@@ -217,10 +228,13 @@ for (const engine of ["lightweight", "kline"]) {
     const f = nativeFixture(engine),
       { createTechnicalIndicatorInstance: create, technicalIndicatorDefinitions: definitions } =
         api(f);
-    const instances = definitions.map((definition, i) =>
-      create(definition.id, `instance-${i}`, { order: i })
+    assert.deepEqual(
+      definitions.slice(0, EXPECTED_PRE_EXPANSION_IDS.length).map(({ id }) => id),
+      EXPECTED_PRE_EXPANSION_IDS
     );
-    assert.equal(instances.length, EXPECTED_COMPUTED_COUNT);
+    const instances = EXPECTED_PRE_EXPANSION_IDS.map((id, i) =>
+      create(id, `instance-${i}`, { order: i })
+    );
     f.adapter.setData(bars);
     const writes = f.primaryWrites(),
       camera = f.camera();
@@ -307,6 +321,69 @@ for (const engine of ["lightweight", "kline"]) {
           )
       );
     f.adapter.destroy();
+  });
+
+  test(`${engine}: expanded studies send their full projected rows, including true gaps, to the native panes`, (t) => {
+    const f = nativeFixture(engine);
+    t.after(() => f.adapter.destroy());
+    const { createTechnicalIndicatorInstance: create } = api(f);
+    const { TechnicalRenderData } = f.load("charts/technical-render-data.ts");
+    const { technicalCalculationContext } = f.load("charts/technical-calculation-context.ts");
+    const context = technicalCalculationContext(f.options.timeframe, f.options.row);
+    const instances = EXPECTED_EXPANSION_IDS.map((id, order) => create(id, id, { order }));
+    f.adapter.setData(bars);
+    f.ready();
+    const camera = f.adapter.getView()?.camera;
+    assert.ok(camera);
+    const writes = f.primaryWrites();
+    const visible =
+      engine === "lightweight"
+        ? f.native.timeScale().getVisibleLogicalRange()
+        : f.native.getVisibleRange();
+    const render = new TechnicalRenderData(context);
+    render.setData(bars);
+    render.setVisibleBars(visible.from, visible.to - (engine === "kline" ? 1 : 0));
+    const compiled = render.compile(instances);
+    assert.ok(
+      compiled.outputs.some(
+        (output) => output.instanceId === "ichimoku-cloud" && output.timestamps.length > bars.length
+      )
+    );
+    const specialK = compiled.outputs.filter((output) => output.instanceId === "pring-special-k");
+    assert.deepEqual(
+      specialK.map(({ outputId }) => outputId),
+      ["specialK", "signal"]
+    );
+    assert.ok(specialK.every(({ values }) => values.every((value) => value === null)));
+    for (const id of ["gaps", "trading-sessions"]) {
+      assert.ok(instances.some((instance) => instance.id === id));
+      assert.equal(
+        compiled.outputs.some((output) => output.instanceId === id),
+        false
+      );
+    }
+    assert.ok(
+      compiled.outputs.some(
+        ({ instanceId, values }) =>
+          instanceId === "williams-fractals" &&
+          values.some(Number.isFinite) &&
+          values.includes(null)
+      )
+    );
+    f.adapter.updateTechnicalIndicators(instances, []);
+    f.ready();
+    assertValues(f, instances, bars, [], compiled);
+    assert.deepEqual(
+      f.adapter.technicalPaneMetrics().map(({ key }) => key),
+      [
+        "price",
+        ...instances.flatMap(({ pane }) => (pane.kind === "pane" ? [`pane:${pane.id}`] : []))
+      ]
+    );
+    assert.equal(f.creations(), 1);
+    assert.equal(f.primaryWrites(), writes);
+    assert.deepEqual(f.adapter.getView()?.camera, camera);
+    assert.deepEqual(f.changes, []);
   });
 
   test(`${engine}: independent same-pane RSI, live styles, collapse, visibility and legacy identity`, () => {

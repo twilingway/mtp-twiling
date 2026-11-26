@@ -9,6 +9,7 @@ import { technicalIndicatorGroups } from "../../model/technical-indicator-layout
 import type { TechnicalIndicatorGroup } from "../../model/technical-indicator-layout.js";
 import type { TechnicalPaneMetric } from "../../charts/adapter.js";
 import { VisibilityIcon } from "./VisibilityIcon.js";
+import { SupplementalStudyStatus } from "./SupplementalStudyStatus.js";
 import { useIndicatorMenuAction } from "./useIndicatorMenuAction.js";
 import {
   changeTechnicalPane,
@@ -147,6 +148,9 @@ function TechnicalRows({ group }: { group: TechnicalIndicatorGroup }) {
             >
               {label}
               {limited && <span role="status"> · {calculationLimitMessage(english)}</span>}
+              {instance.visible && (
+                <SupplementalStudyStatus definitionId={instance.definitionId} english={english} />
+              )}
             </button>
             <span className="technical-row-actions">
               <button

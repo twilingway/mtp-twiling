@@ -23,3 +23,13 @@ Licensed under the Apache License, Version 2.0. The license and original notices
 ## TradingView reference materials
 
 Downloaded public TradingView HTML/JavaScript is retained only in ignored local reference artifacts. It is not incorporated into this application's implementation or served to clients.
+
+## Lunar phase ephemeris
+
+Moon Phases Table courtesy of Fred Espenak, www.Astropixels.com
+
+https://www.astropixels.com/ephemeris/moon/phases2001gmt.html
+
+The source permits reproduction of the data with the link and credit above. Only the event times for
+new and full moons are included. `scripts/import-moon-phases.mjs` validates and converts the public
+table for the application.

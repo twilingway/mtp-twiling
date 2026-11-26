@@ -24,6 +24,8 @@ interface PivotWindow {
   readonly radius: number;
 }
 
+type ExtremaTies = "none" | "right" | "both";
+
 function* completePriceRuns(bars: readonly TechnicalBar[], start: number, radius: number) {
   for (let index = start; index < bars.length; index++) {
     const { high, low } = bars[index]!;
@@ -38,7 +40,7 @@ function centeredExtrema(
   bars: readonly TechnicalBar[],
   { start, end, radius }: PivotWindow,
   kind: ConfirmedPivot["kind"],
-  allowRightTies: boolean
+  ties: ExtremaTies
 ): ReadonlySet<number> {
   const candidates: number[] = [];
   const extrema = new Set<number>();
@@ -54,9 +56,13 @@ function centeredExtrema(
     }
     candidates.push(index);
     const center = index - radius;
-    if (left >= start && candidates[head] === center) {
+    const strongest = candidates[head]!;
+    const centerIsExtreme =
+      left >= start &&
+      (ties === "both" ? bars[strongest]![kind] === bars[center]![kind] : strongest === center);
+    if (centerIsExtreme) {
       const next = candidates[head + 1];
-      if (allowRightTies || next === undefined || bars[next]![kind] !== bars[center]![kind])
+      if (ties !== "none" || next === undefined || bars[next]![kind] !== bars[center]![kind])
         extrema.add(center);
     }
     if (head > 1024 && head * 2 > candidates.length) {
@@ -83,8 +89,8 @@ export function williamsFractals(bars: readonly TechnicalBar[], radius = 2): Con
   assertTechnicalBars(bars);
   const points: ConfirmedPivot[] = [];
   for (const run of completePriceRuns(bars, 0, radius)) {
-    const highs = centeredExtrema(bars, run, "high", false);
-    const lows = centeredExtrema(bars, run, "low", false);
+    const highs = centeredExtrema(bars, run, "high", "none");
+    const lows = centeredExtrema(bars, run, "low", "none");
     for (let index = run.start + radius; index < run.end - radius; index++) {
       if (highs.has(index)) points.push(pivot(bars, "high", index, radius));
       if (lows.has(index)) points.push(pivot(bars, "low", index, radius));
@@ -96,21 +102,26 @@ export function williamsFractals(bars: readonly TechnicalBar[], radius = 2): Con
 interface SwingOptions {
   readonly radius: number;
   readonly fromIndex?: number;
+  readonly ties?: Exclude<ExtremaTies, "none">;
   readonly canUse?: (point: ConfirmedPivot) => boolean;
-  readonly acceptsReversal: (previous: ConfirmedPivot, distance: number) => boolean;
+  readonly acceptsReversal: (
+    previous: ConfirmedPivot,
+    distance: number,
+    next: ConfirmedPivot
+  ) => boolean;
 }
 
 /** Shared alternating-extrema calculation. Gaps split independent runs. */
 export function swingPivotRuns(
   bars: readonly TechnicalBar[],
-  { radius, fromIndex = 0, canUse = () => true, acceptsReversal }: SwingOptions
+  { radius, fromIndex = 0, ties = "right", canUse = () => true, acceptsReversal }: SwingOptions
 ): ConfirmedPivot[][] {
   assertLength(radius);
   assertTechnicalBars(bars);
   const result: ConfirmedPivot[][] = [];
   for (const run of completePriceRuns(bars, fromIndex, radius)) {
-    const highs = centeredExtrema(bars, run, "high", true);
-    const lows = centeredExtrema(bars, run, "low", true);
+    const highs = centeredExtrema(bars, run, "high", ties);
+    const lows = centeredExtrema(bars, run, "low", ties);
     const points: ConfirmedPivot[] = [];
     for (let index = run.start + radius; index < run.end - radius; index++) {
       const previous = points.at(-1);
@@ -129,7 +140,7 @@ export function swingPivotRuns(
           points[points.length - 1] = next;
           break;
         }
-        if (acceptsReversal(previous, distance)) {
+        if (acceptsReversal(previous, distance, next)) {
           points.push(next);
           break;
         }

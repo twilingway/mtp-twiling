@@ -26,7 +26,7 @@ export function klineNativeDomain(chart: Chart): NativeDomain | null {
     data = chart.getDataList();
   return {
     first: Number.isInteger(range.realFrom) ? Math.max(0, range.realFrom) : 0,
-    end: Number.isInteger(range.realTo) ? Math.min(data.length, range.realTo) : 0,
+    end: Number.isInteger(range.realTo) ? range.realTo : 0,
     data,
     pricePrecision: chart.getPriceVolumePrecision().price
   };
@@ -71,7 +71,7 @@ export function neutralKlinePrecision(
   const precisions: number[] = [];
   if (paneId === "candle_pane") {
     const candle = chart.getStyles().candle;
-    for (let i = domain.first; i < domain.end; i++) {
+    for (let i = domain.first; i < Math.min(domain.end, domain.data.length); i++) {
       const bar = domain.data[i];
       if (
         bar &&

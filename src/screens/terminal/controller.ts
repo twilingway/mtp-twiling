@@ -127,7 +127,7 @@ export class TerminalController {
     return this.session.client;
   }
   getSnapshot = (): TerminalState => this.state;
-  sessionKey = (): unknown => this.client;
+  sessionKey = (): MarketClient | null => this.client;
   marketNow = (): number => this.client?.serverNow?.() ?? Date.now();
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);

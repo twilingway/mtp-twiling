@@ -10,6 +10,11 @@ import type {
   CompiledPresentationPlot
 } from "../model/technical-indicators/presentation-types.js";
 import type { CompiledReferenceLevel } from "../model/technical-indicators/presentation-types.js";
+import { compileTechnicalPriceRegions } from "./technical-calendar-paint.js";
+import type { RenderedPriceDecoration } from "./technical-calendar-paint.js";
+import { technicalPlotData } from "./technical-plot-offsets.js";
+import type { TechnicalSupplementalInputs } from "./adapter.js";
+import type { VisibleAverageRange } from "../model/technical-indicators/ta-batch-anchored.js";
 import type {
   OutputStyle,
   TechnicalCalculationContext,
@@ -45,17 +50,43 @@ export interface TechnicalRenderReference extends CompiledReferenceLevel {
   readonly order: number;
   readonly timestamps: readonly number[];
 }
-/** Per-adapter cache: formulas depend on complete real input, never on the visible chart range. */
+/** Per-adapter cache, keyed by the independent asynchronous and viewport inputs used by a study. */
 export class TechnicalRenderData {
   private bars: readonly Candle[] = [];
   private readonly cache = new Map<string, TechnicalIndicatorResult>();
   private readonly context: TechnicalCalculationContext | undefined;
+  private visibleRange: VisibleAverageRange | undefined;
+  private supplemental: TechnicalSupplementalInputs = {};
+  private openInterestRevision = 0;
+  private volumeRevision = 0;
   constructor(context?: TechnicalCalculationContext) {
     this.context = context ? { ...context } : undefined;
   }
   setData(bars: readonly Candle[]): void {
     this.bars = bars;
     this.cache.clear();
+  }
+  setSupplementalInputs(
+    inputs: TechnicalSupplementalInputs,
+    instrumentUid: string | null
+  ): boolean {
+    const { openInterest, ...remaining } = inputs;
+    const scoped: TechnicalSupplementalInputs =
+      openInterest?.instrumentKey === instrumentUid ? inputs : remaining;
+    const interestChanged = scoped.openInterest !== this.supplemental.openInterest;
+    const volumeChanged = inputs.volumeStudies !== this.supplemental.volumeStudies;
+    if (interestChanged) this.openInterestRevision++;
+    if (volumeChanged) this.volumeRevision++;
+    this.supplemental = scoped;
+    return interestChanged || volumeChanged;
+  }
+  setVisibleBars(first: number, last: number): boolean {
+    const from = this.bars[Math.max(0, Math.ceil(first))]?.timestamp;
+    const to = this.bars[Math.min(this.bars.length - 1, Math.floor(last))]?.timestamp;
+    const next = from !== undefined && to !== undefined && from <= to ? { from, to } : undefined;
+    if (next?.from === this.visibleRange?.from && next?.to === this.visibleRange?.to) return false;
+    this.visibleRange = next;
+    return true;
   }
   compile(
     instances: readonly TechnicalIndicatorInstance[],
@@ -66,22 +97,48 @@ export class TechnicalRenderData {
     const outputs: TechnicalRenderOutput[] = [];
     const fills: TechnicalRenderFill[] = [];
     const references: TechnicalRenderReference[] = [];
+    const priceRegions: RenderedPriceDecoration[] = [];
     let order = 0;
     for (const group of groups)
       for (const instance of group.instances) {
         const definition = getTechnicalIndicatorDefinition(instance.definitionId);
         if (definition?.status !== "computed") continue;
-        const key = JSON.stringify([instance.definitionId, instance.params]);
+        const range =
+          instance.definitionId === "visible-average-price" ? this.visibleRange : undefined;
+        const externalKey =
+          instance.definitionId === "open-interest"
+            ? this.openInterestRevision
+            : instance.definitionId === "relative-volume-at-time" ||
+                instance.definitionId === "volume-24-hours"
+              ? this.volumeRevision
+              : null;
+        const key = JSON.stringify([instance.definitionId, instance.params, range, externalKey]);
         seen.add(key);
         let result = this.cache.get(key);
         if (!result) {
-          result = calculateTechnicalIndicator(instance, this.bars, this.context);
+          const context =
+            this.context && (range || externalKey !== null)
+              ? { ...this.context, ...this.supplemental, ...(range ? { visibleRange: range } : {}) }
+              : this.context;
+          result = calculateTechnicalIndicator(instance, this.bars, context);
           this.cache.set(key, result);
         }
+        if (instance.visible && group.key === "price" && result.priceRegions?.length)
+          priceRegions.push(
+            ...compileTechnicalPriceRegions(
+              result.priceRegions,
+              definition.priceRegionStyles ?? [],
+              instance.styles
+            )
+          );
+        const plotted =
+          instance.visible && !group.preference?.collapsed
+            ? technicalPlotData(result, this.context)
+            : result;
         const presentation = definition.presentation
           ? compilePresentation(definition.presentation, {
-              timestamps: result.timestamps,
-              series: result.series,
+              timestamps: plotted.timestamps,
+              series: plotted.series,
               ...(instance.styles ? { styles: instance.styles } : {}),
               visible: instance.visible,
               collapsed: group.preference?.collapsed ?? false
@@ -121,8 +178,8 @@ export class TechnicalRenderData {
                 plot?.visible ??
                 (instance.visible && (custom?.visible ?? true) && !group.preference?.collapsed)
             },
-            timestamps: result.timestamps,
-            values: plot?.values ?? result.series[output.id] ?? [],
+            timestamps: plotted.timestamps,
+            values: plot?.values ?? plotted.series[output.id] ?? [],
             ...(plot ? { presentation: plot } : {})
           });
         }
@@ -155,7 +212,7 @@ export class TechnicalRenderData {
           });
       }
     for (const key of this.cache.keys()) if (!seen.has(key)) this.cache.delete(key);
-    return { groups, outputs, fills, references };
+    return { groups, outputs, fills, references, priceRegions };
   }
   dispose(): void {
     this.bars = [];

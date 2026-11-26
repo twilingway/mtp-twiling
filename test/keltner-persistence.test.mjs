@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { EXPECTED_DRIVE_PARAMETER_KEYS } from "./technical-registry-expectation.mjs";
+import {
+  EXPECTED_COMPUTED_IDS,
+  EXPECTED_DRIVE_PARAMETER_KEYS,
+  EXPECTED_PRE_EXPANSION_DRIVE_PARAMETER_KEYS
+} from "./technical-registry-expectation.mjs";
 import {
   core,
   load,
@@ -115,14 +118,34 @@ test("malformed boolean/choice/numeric/unknown/runtime data rejects before JSON/
   }
 });
 
-test("Drive allowlist retains every exact pinned old key followed by the KC bool/choice keys", () => {
-  const source = readFileSync(new URL("../src/services/drive/backup.ts", import.meta.url), "utf8"),
-    keys = source.match(/params:\s*scalars\(\s*"([^"]+)"/)[1].split(" ");
-  assert.deepEqual(keys.slice(0, BASE_DRIVE_KEYS.length), BASE_DRIVE_KEYS);
-  assert.deepEqual(keys.slice(BASE_DRIVE_KEYS.length, BASE_DRIVE_KEYS.length + 2), [
-    "useExponentialMa",
-    "bandsStyle"
-  ]);
-  assert.deepEqual(keys, EXPECTED_DRIVE_PARAMETER_KEYS);
-  assert.equal(keys.length, new Set(keys).size);
+test("Drive preserves exact parameter keys across the previous and expanded registry", () => {
+  const instances = EXPECTED_COMPUTED_IDS.map((id) =>
+    core.createTechnicalIndicatorInstance(id, id)
+  );
+  const restored = [];
+  for (let i = 0; i < instances.length; i += 50) {
+    const batch = instances.slice(i, i + 50);
+    const projected = sanitizeDriveBackup(backup(batch)).layout.technicalIndicators;
+    assert.deepEqual(projected, batch);
+    restored.push(...projected);
+  }
+  const keys = new Set(restored.flatMap(({ params }) => Object.keys(params)));
+  assert.deepEqual([...keys].sort(), [...EXPECTED_DRIVE_PARAMETER_KEYS].sort());
+
+  const previous = new Set(EXPECTED_PRE_EXPANSION_DRIVE_PARAMETER_KEYS);
+  assert.ok(BASE_DRIVE_KEYS.every((key) => previous.has(key) && keys.has(key)));
+  for (const key of ["useExponentialMa", "bandsStyle"]) {
+    assert.ok(
+      Object.hasOwn(
+        restored.find(({ definitionId }) => definitionId === "keltner-channels").params,
+        key
+      )
+    );
+  }
+  const keltner = make();
+  assert.throws(
+    () =>
+      sanitizeDriveBackup(backup([{ ...keltner, params: { ...keltner.params, centered: true } }])),
+    (error) => error.code === "remote-invalid"
+  );
 });

@@ -84,7 +84,10 @@ function stochasticVote(
   );
 }
 
-function movingAverageVotes({ close, averages }: TechnicalRatingInputs): (Vote | null)[] {
+function movingAverageVotes({
+  close,
+  averages
+}: Pick<TechnicalRatingInputs, "close" | "averages">): (Vote | null)[] {
   const { conversion, base, leadingA, leadingB } = averages.cloud;
   return [
     ...RATING_AVERAGE_LENGTHS.map((length) => compare(close, averages.sma[length])),
@@ -162,14 +165,34 @@ export function technicalRatingCategory(score: number): TechnicalRatingCategory 
   return "neutral";
 }
 
+export function technicalAverageScore(
+  close: NumericValue,
+  averages: TechnicalRatingInputs["averages"]
+): NumericValue {
+  return average(movingAverageVotes({ close, averages }));
+}
+
+export function technicalOscillatorScore(
+  oscillators: TechnicalRatingInputs["oscillators"]
+): NumericValue {
+  return average(oscillatorVotes(oscillators));
+}
+
+export function technicalOverallScore(
+  averages: NumericValue,
+  oscillators: NumericValue
+): NumericValue {
+  return averages === null || oscillators === null ? null : (averages + oscillators) / 2;
+}
+
 export function technicalRatings(input: TechnicalRatingInputs) {
-  const averages = average(movingAverageVotes(input));
-  const oscillators = average(oscillatorVotes(input.oscillators));
+  const averages = technicalAverageScore(input.close, input.averages);
+  const oscillators = technicalOscillatorScore(input.oscillators);
   const score = (value: NumericValue) =>
     value === null ? null : { value, category: technicalRatingCategory(value) };
   return {
     averages: score(averages),
     oscillators: score(oscillators),
-    overall: score(averages === null || oscillators === null ? null : (averages + oscillators) / 2)
+    overall: score(technicalOverallScore(averages, oscillators))
   };
 }

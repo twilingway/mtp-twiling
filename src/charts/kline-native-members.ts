@@ -10,7 +10,8 @@ import {
   klineTechnicalIndex,
   klineTechnicalColor,
   klineColumnsBase,
-  klineColumnsBaseFigure
+  klineColumnsBaseFigure,
+  klineRangeAnchorFigures
 } from "./kline-technical-geometry.js";
 import { klineReferenceFigures } from "./kline-technical-geometry.js";
 import type {
@@ -98,6 +99,7 @@ function primary(plan: Plan, active: boolean, precision: number): IndicatorCreat
           }))
         : []),
       ...(active && context.columnsBase ? [klineColumnsBaseFigure(context.columnsBase)] : []),
+      ...(active ? (context.rangeAnchors ?? []).map(({ key, type }) => ({ key, type })) : []),
       ...visible.map((output) => ({
         key: output.outputId,
         title: "",
@@ -391,6 +393,7 @@ export function klineNativeMembers(chart: Chart, alive: () => boolean, axisName:
           (level) => level.instanceId === instance.id
         );
         context.columnsBase = klineColumnsBase(outputs);
+        context.rangeAnchors = klineRangeAnchorFigures(outputs);
         context.rows = outputs[0]!.timestamps.map((_timestamp, index) => {
           const row = Object.assign(
             Object.fromEntries(
@@ -406,6 +409,10 @@ export function klineNativeMembers(chart: Chart, alive: () => boolean, axisName:
             });
           if (base && base.plots.some((output) => Number.isFinite(output.values[index])))
             Object.defineProperty(row, base.key, { value: base.value, enumerable: false });
+          for (const anchor of context.rangeAnchors ?? []) {
+            const value = anchor.values[index];
+            if (value != null) Object.defineProperty(row, anchor.key, { value, enumerable: false });
+          }
           return row;
         });
         context.levels = [

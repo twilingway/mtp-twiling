@@ -1,4 +1,5 @@
 import { technicalCatalogData } from "./catalog-data.js";
+import { catalogExpansionDefinitionId } from "./catalog-expansion/registry.js";
 import type { IndicatorLibraryEntry } from "../indicator-library.js";
 import type { TechnicalIndicatorId } from "./types.js";
 
@@ -62,7 +63,7 @@ const implemented: Readonly<Record<string, TechnicalIndicatorId>> = {
 };
 
 export function technicalDefinitionForCatalog(id: string): TechnicalIndicatorId | undefined {
-  return Object.hasOwn(implemented, id) ? implemented[id] : undefined;
+  return Object.hasOwn(implemented, id) ? implemented[id] : catalogExpansionDefinitionId(id);
 }
 
 /** Named entries remain searchable even while their actual calculation is not implemented. */
