@@ -6,6 +6,8 @@
       empty/occupied/repeat/abort/quota/secret boundaries.
 - [x] 1.2 Подключить public bootstrap; проверить actual session fences и отсутствие банковского
       переноса.
+- [x] 1.3 Восстановить чтение и сохранение настроек при пустом выборе инструмента. Проверить запуск,
+      перезагрузку и экспорт через `node --test test/guest-recovery-session.test.mjs`.
 
 ## 2. Recovery UI
 

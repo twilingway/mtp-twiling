@@ -26,6 +26,7 @@ import {
   historyRecord,
   imageAsset,
   list,
+  normalizeLocalProfileSelection,
   normaliseCatalog,
   normaliseMarket,
   normaliseRows,
@@ -45,10 +46,14 @@ function validatePart(part: Record<string, unknown>) {
 }
 export async function loadPreferences(owner = "guest"): Promise<ProfilePreferences> {
   const record = object(await get("preferences", `layout:${owner}`));
-  return validatePart({ layout: record?.value ?? {} }).layout ?? {};
+  return validatePart({ layout: normalizeLocalProfileSelection(record?.value ?? {}) }).layout ?? {};
 }
 export function savePreferences(owner: string, value: ProfilePreferences): Promise<void> {
-  return put("preferences", { id: `layout:${owner}`, owner, value });
+  return put("preferences", {
+    id: `layout:${owner}`,
+    owner,
+    value: normalizeLocalProfileSelection(value)
+  });
 }
 export async function loadDrawings(owner: string, symbol: string): Promise<Drawing[]> {
   const record = object(await get("drawings", `${owner}:${symbol}`));

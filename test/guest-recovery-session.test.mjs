@@ -67,6 +67,123 @@ test("actual TerminalSession public bootstrap adopts legacy settings before clie
   }
 });
 
+test("the public controller opens a v2 layout that already contains an empty selection", async () => {
+  const f = await createGuestFixture();
+  const storage = f.load("services/storage-v2.ts");
+  const { TerminalController } = f.load("screens/terminal/controller.ts");
+  await storage.prepareProfileV2("public");
+  const id = "layout:profile-v2:public";
+  const value = { ...oldLayout, symbol: "", instrumentUid: null };
+  f.database.stores.preferences.set(id, { id, owner: "profile-v2:public", value });
+
+  const controller = new TerminalController();
+  try {
+    await controller.start();
+    const state = controller.getSnapshot();
+    assert.equal(state.marketReady, true);
+    assert.equal(state.owner, "public");
+    assert.equal(state.preferences.symbol, "");
+    assert.equal(state.preferences.chartSettings.theme, "light");
+    assert.equal(state.preferences.engine, "kline");
+    assert.deepEqual(await storage.loadPreferences("public"), {
+      ...oldLayout,
+      instrumentUid: null
+    });
+    assert.deepEqual(f.database.stores.preferences.get(id).value, value);
+  } finally {
+    controller.dispose();
+  }
+});
+
+test("guest settings with no selection survive reload and export as a valid portable backup", async () => {
+  const f = await createGuestFixture();
+  const { TerminalController } = f.load("screens/terminal/controller.ts");
+  const { validateBackup } = f.load("model/backup-format.ts");
+  const { sanitizeDriveBackup } = f.load("services/drive/backup.ts");
+  const first = new TerminalController();
+  try {
+    await first.start();
+    assert.equal(first.getSnapshot().preferences.symbol, "");
+    await first.setChartSettings({ theme: "light" });
+    await first.setPreferences({ locale: "en", engine: "kline" });
+    await first.toggleIndicator("ma");
+
+    const layout = f.database.stores.preferences.get("layout:profile-v2:public").value;
+    assert.equal(Object.hasOwn(layout, "symbol"), false);
+    assert.equal(layout.instrumentUid, null);
+    const backup = validateBackup(await first.exportBackup(false));
+    assert.equal(Object.hasOwn(backup.layout, "symbol"), false);
+    assert.equal(backup.layout.locale, "en");
+    assert.equal(backup.layout.engine, "kline");
+    assert.equal(sanitizeDriveBackup(backup).layout.chartSettings.theme, "light");
+  } finally {
+    first.dispose();
+  }
+
+  const reloaded = new TerminalController();
+  try {
+    await reloaded.start();
+    const state = reloaded.getSnapshot();
+    assert.equal(state.marketReady, true);
+    assert.equal(state.preferences.symbol, "");
+    assert.equal(state.preferences.locale, "en");
+    assert.equal(state.preferences.engine, "kline");
+    assert.equal(state.preferences.chartSettings.theme, "light");
+    assert.equal(state.preferences.indicators.ma, true);
+  } finally {
+    reloaded.dispose();
+  }
+});
+
+test("raw public migration normalizes only the local empty selection and preserves the source", async () => {
+  const f = await createGuestFixture();
+  const storage = f.load("services/storage-v2.ts");
+  const value = { ...oldLayout, symbol: "" };
+  f.database.stores.preferences.set("layout:public", {
+    id: "layout:public",
+    owner: "public",
+    value
+  });
+  await storage.prepareProfileV2("public");
+  assert.deepEqual(await storage.loadPreferences("public"), oldLayout);
+  assert.deepEqual(f.database.stores.preferences.get("layout:public").value, value);
+});
+
+test("local empty selection normalization preserves strict preferences, file and Drive validation", async () => {
+  const f = await createGuestFixture();
+  const storage = f.load("services/storage-v2.ts");
+  const { validateBackup } = f.load("model/backup-format.ts");
+  const { sanitizeDriveBackup } = f.load("services/drive/backup.ts");
+  const id = "layout:profile-v2:public";
+  await storage.prepareProfileV2("public");
+
+  for (const value of [
+    { symbol: "", instrumentUid: "uid" },
+    {
+      symbol: "",
+      instrumentUid: null,
+      providerRef: { provider: "bybit", category: "spot", symbol: "BTCUSDT" }
+    },
+    { symbol: "", instrumentUid: null, locale: "invalid" },
+    { symbol: " ", instrumentUid: null }
+  ]) {
+    await storage.savePreferences("public", value);
+    const record = f.database.stores.preferences.get(id);
+    await assert.rejects(storage.loadPreferences("public"), /Некорректная структура/);
+    assert.equal(record, f.database.stores.preferences.get(id));
+  }
+
+  const external = {
+    application: "personal-terminal",
+    schemaVersion: 2,
+    layout: { symbol: "", instrumentUid: null },
+    drawings: [],
+    images: []
+  };
+  assert.throws(() => validateBackup(external), /Некорректная структура/);
+  assert.throws(() => sanitizeDriveBackup(external));
+});
+
 test("download guard survives owner/import/profile/session bounces and never invokes stale download after async DB reads", async () => {
   for (const boundary of [
     "none",

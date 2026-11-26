@@ -18,6 +18,19 @@ export function object(value: unknown): Record<string, unknown> | undefined {
     ? (value as Record<string, unknown>)
     : undefined;
 }
+/** Older local layouts may contain the runtime's empty-selection symbol. */
+export function normalizeLocalProfileSelection(value: unknown): unknown {
+  const layout = object(value);
+  if (
+    layout?.symbol !== "" ||
+    (layout.instrumentUid !== undefined && layout.instrumentUid !== null) ||
+    layout.providerRef !== undefined
+  )
+    return value;
+  const normalized = { ...layout };
+  delete normalized.symbol;
+  return normalized;
+}
 export function list(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
