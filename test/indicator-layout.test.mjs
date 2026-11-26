@@ -349,6 +349,7 @@ test("legend collapse exposes an accessible compact count without toggling indic
   let toggles = 0;
   const controller = {
     getSnapshot: () => state,
+    sessionKey: () => null,
     setPreferences: async (patch, _reload, valid) => {
       await Promise.resolve();
       if (!valid || valid()) state = { ...state, preferences: { ...state.preferences, ...patch } };
@@ -359,7 +360,15 @@ test("legend collapse exposes an accessible compact count without toggling indic
     notify: (message) => assert.fail(message)
   };
   const load = sources({
-    react: { memo: (component) => component, useState: (value) => [value, () => {}], useEffect() {} },
+    react: {
+      createContext: (defaultValue) => ({ defaultValue, Provider: Symbol("context-provider") }),
+      useContext: (context) => context.defaultValue,
+      memo: (component) => component,
+      useState: (value) => [value, () => {}],
+      useRef: (value) => ({ current: value }),
+      useMemo: (compute) => compute(),
+      useEffect() {}
+    },
     "react-dom": { createPortal: () => assert.fail("legend test must not open a list menu") },
     "react/jsx-runtime": { jsx, jsxs: jsx },
     "services/storage-db.ts": {},
@@ -380,6 +389,9 @@ test("legend collapse exposes an accessible compact count without toggling indic
   const Panel = load("screens/terminal/ChartPanel.tsx").ChartPanel,
     tree = Panel();
   const heading = tree.props.children.find((child) => child?.props?.className === "chart-heading");
-  assert.equal(heading.props.children.at(-1).type, Legend);
+  const legendProvider = heading.props.children.at(-1),
+    { SupplementalStudyStatusContext } = load("screens/terminal/SupplementalStudyStatus.tsx");
+  assert.equal(legendProvider.type, SupplementalStudyStatusContext.Provider);
+  assert.equal(legendProvider.props.children.type, Legend);
   assert.equal(heading.props.children.at(-2).props.className, "chart-price");
 });

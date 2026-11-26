@@ -34,7 +34,7 @@ test("native registered cross draws disconnected orthogonal glyphs and contribut
   assert.ok(f.range().from > 0 && f.range().to >= 4);
 });
 
-test("linebr preserves indexed null gaps, singleton masks, projection failures and visible clipping", async (t) => {
+test("linebr preserves indexed null gaps, singleton caps, projection failures and visible clipping", async (t) => {
   const f = klineFixture();
   t.after(() => f.dispose());
   const plot = output("trend", [null, 1, 2, null, 4, 5, null, 8]);
@@ -43,12 +43,21 @@ test("linebr preserves indexed null gaps, singleton masks, projection failures a
   const owner = nativeOwners(f)[0],
     params = f.params(owner);
   owner.draw(params);
-  assert.equal(params.ctx.calls.filter((value) => value[0] === "stroke").length, 2);
+  assert.equal(params.ctx.calls.filter((value) => value[0] === "stroke").length, 3);
+  assert.deepEqual(
+    params.ctx.calls.filter((value) => value[0] === "moveTo"),
+    [
+      ["moveTo", 10, 90],
+      ["moveTo", 40, 60],
+      ["moveTo", 69.5, 20]
+    ]
+  );
   assert.deepEqual(
     params.ctx.calls.filter((value) => value[0] === "lineTo"),
     [
       ["lineTo", 20, 80],
-      ["lineTo", 50, 50]
+      ["lineTo", 50, 50],
+      ["lineTo", 70.5, 20]
     ]
   );
   assert.ok(
@@ -57,7 +66,14 @@ test("linebr preserves indexed null gaps, singleton masks, projection failures a
   const invalid = f.params(owner);
   invalid.yAxis.convertToPixel = (value) => (value === 4 ? NaN : 100 - value * 10);
   owner.draw(invalid);
-  assert.equal(invalid.ctx.calls.filter((value) => value[0] === "stroke").length, 1);
+  assert.equal(invalid.ctx.calls.filter((value) => value[0] === "stroke").length, 2);
+  assert.deepEqual(
+    invalid.ctx.calls.filter((value) => value[0] === "lineTo"),
+    [
+      ["lineTo", 20, 80],
+      ["lineTo", 70.5, 20]
+    ]
+  );
   const clipped = f.params(owner);
   clipped.visibleRange = { from: 2, to: 3 };
   owner.draw(clipped);

@@ -161,6 +161,7 @@ export async function routingFixture() {
       },
       setView: () => {},
       updateTechnicalIndicators: () => {},
+      updateTechnicalInputs: () => {},
       destroy() {
         this.retired = true;
       }
@@ -261,8 +262,9 @@ export async function routingFixture() {
     cleanup?.();
     refIndex = 0;
     effects = [];
-    canvas(container, () => []);
-    cleanup = effects[0]();
+    canvas(container, () => [], {});
+    const cleanups = effects.map((effect) => effect());
+    cleanup = () => cleanups.forEach((dispose) => dispose?.());
   }
   remount();
   await until(() => controller.chart !== null, "initial actual lifecycle mount");

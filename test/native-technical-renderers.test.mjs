@@ -87,14 +87,29 @@ function assertValues(f, instances, data = bars, layout = [], compiled) {
       );
     }
   } else {
+    const decorationLayers = [
+      ["PERSONAL_TA_PRICE_REGIONS", "regions", (region) => !("kind" in region)],
+      ["PERSONAL_TA_MOON_PHASES", "decorations", (region) => "kind" in region]
+    ];
     const active = f.activeIndicators(),
       companions = active.filter((item) => item.name.startsWith("PERSONAL_TA_FILL_")),
       actual = active.filter(
         (item) =>
           item.name.startsWith("PERSONAL_TA_") &&
           !item.name.startsWith("PERSONAL_TA_FILL_") &&
-          item.name !== "PERSONAL_TA_PRICE_REGIONS"
+          !decorationLayers.some(([name]) => item.name === name)
       );
+    for (const [name, field, select] of decorationLayers) {
+      const layer = active.filter((item) => item.name === name);
+      const decorations = (compiled?.priceRegions ?? []).filter(select);
+      assert.equal(layer.length, decorations.length ? 1 : 0, name);
+      if (layer.length) {
+        assert.equal(layer[0].paneId, "candle_pane");
+        assert.deepEqual(layer[0].figures, []);
+        assert.deepEqual(layer[0].result, []);
+        assert.deepEqual(layer[0].extendData[field], decorations);
+      }
+    }
     const { getTechnicalIndicatorDefinition } = api(f);
     assert.equal(
       companions.length,
