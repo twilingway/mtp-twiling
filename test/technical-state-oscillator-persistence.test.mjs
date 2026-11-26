@@ -100,7 +100,7 @@ test("raw root/JSON/Drive reject array/null/unknown/extra params and styles befo
     );
   }
 });
-test("Drive parameter allowlist adds exactly10 authorized scalar keys", () => {
+test("Drive parameter allowlist adds exactly10 state and5 trend-price authorized scalar keys", () => {
   const source = readFileSync(new URL("../src/services/drive/backup.ts", import.meta.url), "utf8");
   const keys = source.match(/params:\s*scalars\(\s*"([^"]+)"/)[1].split(" ");
   const previous =
@@ -119,7 +119,12 @@ test("Drive parameter allowlist adds exactly10 authorized scalar keys", () => {
       "sma1Length",
       "sma2Length",
       "sma3Length",
-      "sma4Length"
+      "sma4Length",
+      "atrLength",
+      "factor",
+      "start",
+      "increment",
+      "maximum"
     ]
   );
   assert.ok(previous.every((k) => keys.includes(k)));

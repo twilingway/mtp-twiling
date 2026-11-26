@@ -45,8 +45,8 @@ const equalSeries = (actual, expected) => {
   );
 };
 
-test("all42 registry definitions create validated instances with independently verified presets", () => {
-  assert.equal(core.technicalIndicatorDefinitions.length, 45);
+test("all47 registry definitions create validated instances with independently verified presets", () => {
+  assert.equal(core.technicalIndicatorDefinitions.length, 47);
   const defaults = { wma: 9, vwma: 20, dema: 9, tema: 9, hma: 9, smma: 7 };
   for (const [id, length] of Object.entries(defaults)) {
     const instance = make(id, `instance-${id}`);

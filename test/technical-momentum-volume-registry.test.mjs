@@ -72,9 +72,9 @@ function series(actual, expected) {
   });
 }
 
-test("all42 immutable definitions create independent instances; eight momentum-volume defaults are exact", () => {
-  assert.equal(core.technicalIndicatorDefinitions.length, 45);
-  assert.equal(new Set(core.technicalIndicatorDefinitions.map((item) => item.id)).size, 45);
+test("all47 immutable definitions create independent instances; eight momentum-volume defaults are exact", () => {
+  assert.equal(core.technicalIndicatorDefinitions.length, 47);
+  assert.equal(new Set(core.technicalIndicatorDefinitions.map((item) => item.id)).size, 47);
   for (const id of ids) {
     const instance = make(id, `first-${id}`),
       second = make(id, `second-${id}`);
@@ -94,11 +94,11 @@ test("all42 immutable definitions create independent instances; eight momentum-v
   assert.equal(core.isTechnicalIndicatorInstanceList(ids.map((id) => make(id, id))), true);
 });
 
-test("exact public catalog IDs expose42 plus Volume and CCI describes only its available core output", () => {
+test("exact public catalog IDs expose47 plus Volume and CCI describes only its available core output", () => {
   for (const locale of ["ru", "en"]) {
     const entries = catalog.technicalCatalogEntries(locale);
     assert.equal(entries.length, 127);
-    assert.equal(entries.filter((entry) => entry.available).length, 46);
+    assert.equal(entries.filter((entry) => entry.available).length, 48);
     for (const [publicId, definitionId] of Object.entries(catalogIds)) {
       assert.equal(catalog.technicalDefinitionForCatalog(publicId), definitionId);
       assert.equal(entries.find((entry) => entry.id === publicId).available, true);

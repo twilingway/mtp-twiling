@@ -47,8 +47,8 @@ function series(actual, expected) {
   );
 }
 
-test("45 definitions retain seven exact volume presets after an unchanged frozen35 contract", () => {
-  assert.equal(core.technicalIndicatorDefinitions.length, 45);
+test("47 definitions retain seven exact volume presets after an unchanged frozen35 contract", () => {
+  assert.equal(core.technicalIndicatorDefinitions.length, 47);
   assert.deepEqual(
     core.technicalIndicatorDefinitions.slice(35, 42).map((item) => item.id),
     ids
@@ -86,11 +86,11 @@ test("45 definitions retain seven exact volume presets after an unchanged frozen
   assert.ok(Object.isFrozen(choice.choices));
 });
 
-test("catalog retains all127 entries and exposes43 available TA with exact public IDs/search", () => {
+test("catalog retains all127 entries and exposes48 available TA with exact public IDs/search", () => {
   for (const locale of ["ru", "en"]) {
     const entries = catalog.technicalCatalogEntries(locale);
     assert.equal(entries.length, 127);
-    assert.equal(entries.filter((entry) => entry.available).length, 46);
+    assert.equal(entries.filter((entry) => entry.available).length, 48);
     for (const [i, publicId] of publicIds.entries()) {
       assert.equal(catalog.technicalDefinitionForCatalog(publicId), ids[i]);
       const entry = entries.find((item) => item.id === publicId);
