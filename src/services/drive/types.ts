@@ -38,6 +38,7 @@ export interface DriveFile {
   id: string;
   name: string;
   size: number;
+  version?: string;
   appProperties: Record<string, string>;
 }
 export type DriveKind = "blob" | "snapshot";

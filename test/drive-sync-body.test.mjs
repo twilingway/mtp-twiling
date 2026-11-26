@@ -28,7 +28,13 @@ function load(relative) {
 const { DriveError, DRIVE_NAMESPACE, DRIVE_SCOPE } = load("services/drive/types.ts");
 const { DriveAuth: RealDriveAuth } = load("services/drive/auth.ts");
 class DriveAuth extends RealDriveAuth {
-  constructor(loader, now) { super(loader, now, { load: async () => undefined, save: async () => {}, remove: async () => {} }); }
+  constructor(loader, now) {
+    super(loader, now, {
+      load: async () => undefined,
+      save: async () => {},
+      remove: async () => {}
+    });
+  }
 }
 const { DriveTransport } = load("services/drive/transport.ts");
 const expectCode = (code) => (error) => {
@@ -93,15 +99,20 @@ function perform(operation, transport) {
 }
 
 for (const operation of ["binary", "json-list", "create-result", "403-reason"]) {
-  for (const failure of ["abort", "offline"]) {
+  for (const failure of ["abort", "offline", "timeout"]) {
     test(`${operation} body stream ${failure} preserves typed error after HTTP headers`, async () => {
       const auth = authorization(),
         stream = streaming(operation === "403-reason" ? 403 : 200);
+      let bodyRequests = 0;
       const transport = new DriveTransport(auth, {
+        ...(failure === "timeout" ? { timeoutMs: 25 } : {}),
+        sleep: async () => {},
         fetch: async (url) => {
           if (new URL(url).pathname.endsWith("generateIds"))
             return new Response(JSON.stringify({ ids: ["generated-id"] }));
-          return stream.response;
+          return ++bodyRequests === 1
+            ? stream.response
+            : new Response(JSON.stringify({ files: [] }));
         }
       });
       const pending = perform(operation, transport);
@@ -111,12 +122,112 @@ for (const operation of ["binary", "json-list", "create-result", "403-reason"]) 
       );
       await stream.reading;
       if (failure === "abort") auth.invalidate();
-      else stream.controller.error(new TypeError("private-network-detail"));
+      if (failure === "offline") stream.controller.error(new TypeError("private-network-detail"));
       await rejected;
-      if (failure === "abort") assert.equal(stream.cancelled, true);
+      if (failure !== "offline") assert.equal(stream.cancelled, true);
+      if (failure === "timeout") {
+        assert.equal(auth.signal.aborted, false);
+        assert.equal(bodyRequests, 1);
+        assert.deepEqual(await transport.list("snapshot"), []);
+      }
     });
   }
 }
+
+function stall(signal) {
+  return new Promise((_, reject) => {
+    signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+  });
+}
+
+test("A response header timeout aborts one fetch and allows reuse of the same authorization", async () => {
+  const auth = authorization();
+  let attempts = 0,
+    timedOutSignal;
+  const transport = new DriveTransport(auth, {
+    timeoutMs: 25,
+    sleep: async () => {},
+    fetch: async (_url, init) => {
+      if (++attempts > 1) return new Response(JSON.stringify({ files: [] }));
+      timedOutSignal = init.signal;
+      return stall(timedOutSignal);
+    }
+  });
+
+  await assert.rejects(transport.list("snapshot"), expectCode("network"));
+  assert.equal(attempts, 1);
+  assert.equal(timedOutSignal.aborted, true);
+  assert.equal(auth.signal.aborted, false);
+  assert.deepEqual(await transport.list("snapshot"), []);
+});
+
+test("A resumable chunk header timeout stops the operation without an automatic probe", async () => {
+  const auth = authorization();
+  const methods = [];
+  const transport = new DriveTransport(auth, {
+    timeoutMs: 25,
+    sleep: async () => {},
+    fetch: async (url, init) => {
+      methods.push(init.method ?? "GET");
+      if (new URL(url).pathname.endsWith("generateIds"))
+        return new Response(JSON.stringify({ ids: ["generated-id"] }));
+      if (init.method === "POST")
+        return new Response(null, {
+          headers: { Location: "https://www.googleapis.com/upload/drive/v3/files?upload_id=test" }
+        });
+      return stall(init.signal);
+    }
+  });
+  const body = new Blob([new Uint8Array(6 * 1024 * 1024)]);
+  await assert.rejects(transport.create("blob", hash, hash, body), expectCode("network"));
+  assert.deepEqual(methods, ["GET", "POST", "PUT"]);
+  assert.equal(auth.signal.aborted, false);
+});
+
+test("Receiving bytes renews the idle timer during a longer download", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const stream = streaming();
+  const transport = new DriveTransport(authorization(), {
+    timeoutMs: 20,
+    fetch: async () => stream.response
+  });
+  const completion = transport.read(file, 10);
+  await stream.reading;
+  await new Promise(setImmediate);
+  t.mock.timers.tick(19);
+  stream.controller.enqueue(new TextEncoder().encode("}"));
+  await new Promise(setImmediate);
+  t.mock.timers.tick(19);
+  stream.controller.close();
+  assert.equal(await (await completion).text(), "{}");
+});
+
+test("Drive listing preserves decimal server versions and permits their absence", async () => {
+  const version = "9007199254740993";
+  const listed = {
+    ...file,
+    appProperties: { ...file.appProperties, mtpKind: "snapshot" }
+  };
+  const transport = new DriveTransport(authorization(), {
+    fetch: async (url) => {
+      assert.match(new URL(url).searchParams.get("fields"), /files\([^)]*\bversion\b/);
+      return new Response(
+        JSON.stringify({
+          files: [
+            { ...listed, version },
+            { ...listed, id: "unversioned" },
+            { ...listed, id: "malformed-version", version: 42 }
+          ]
+        })
+      );
+    }
+  });
+  const files = await transport.list("snapshot");
+  assert.deepEqual(
+    files.map((item) => item.version),
+    [version, undefined, undefined]
+  );
+});
 
 for (const operation of ["binary", "json-list"]) {
   for (const failure of ["expiry", "reconnect"]) {
