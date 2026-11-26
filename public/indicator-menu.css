@@ -88,9 +88,6 @@
   background: transparent;
   cursor: default;
 }
-.indicator-control > .indicator-menu-dismiss:hover {
-  background: transparent;
-}
 .indicator-control > .indicator-quick-panel {
   z-index: 102;
   inset-inline-start: 0;

@@ -7,7 +7,8 @@
   background: #131722;
 }
 .workspace {
-  grid-template-columns: 48px minmax(0, 1fr) var(--right-panel-width, 380px);
+  --drawing-rail-width: 54px;
+  grid-template-columns: var(--drawing-rail-width) minmax(0, 1fr) var(--right-panel-width, 380px);
 }
 .panel-divider {
   position: absolute;
@@ -40,12 +41,12 @@
 }
 @media (min-width: 1700px) {
   .workspace {
-    grid-template-columns: 50px minmax(0, 1fr) var(--right-panel-width, 420px);
+    grid-template-columns: var(--drawing-rail-width) minmax(0, 1fr) var(--right-panel-width, 420px);
   }
 }
 @media (min-width: 801px) and (max-width: 1200px) {
   .workspace {
-    grid-template-columns: 44px minmax(0, 1fr) var(--right-panel-width, 340px);
+    grid-template-columns: var(--drawing-rail-width) minmax(0, 1fr) var(--right-panel-width, 340px);
   }
 }
 .right-panel-view {
