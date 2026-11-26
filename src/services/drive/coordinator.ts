@@ -215,7 +215,9 @@ export class DriveCoordinator {
     this.update({
       phase: "idle",
       connected: true,
+      connectedThisSession: true,
       automatic: record.automatic,
+      automaticBlockedByFormat: undefined,
       pendingChanges: this.status.pendingChanges || record.pendingChanges === true,
       authorizationStored: authorization.stored === true,
       credentialSaveError: authorization.persistenceError === true,
@@ -239,6 +241,8 @@ export class DriveCoordinator {
     this.update({
       phase: "disconnected",
       connected: false,
+      connectedThisSession: undefined,
+      automaticBlockedByFormat: undefined,
       conflict: undefined,
       error: undefined,
       authorizationStored: false,
@@ -265,6 +269,7 @@ export class DriveCoordinator {
     if (
       unreadableDrivePause(
         error,
+        this.status,
         this.authorization,
         this.dependencies.auth,
         () => {
@@ -307,12 +312,7 @@ export class DriveCoordinator {
       revision = this.revision;
     this.busy = true;
     this.preview = undefined;
-    this.update({
-      phase: "syncing",
-      error: undefined,
-      conflict: undefined,
-      pauseReason: undefined
-    });
+    this.update({ phase: "syncing", error: undefined, conflict: undefined });
     try {
       const backup = sanitizeDriveBackup(await this.bridge.exportBackup());
       this.check(epoch, revision);
@@ -376,7 +376,7 @@ export class DriveCoordinator {
       () => this.check(epoch, revision)
     );
     this.preview = next.preview;
-    this.update({ phase: "conflict", conflict: next.conflict });
+    this.update({ phase: "conflict", conflict: next.conflict, pauseReason: undefined });
   }
   async choose(nodeId: string): Promise<void> {
     const preview = this.preview,
@@ -492,7 +492,8 @@ export class DriveCoordinator {
       lastSyncedAt,
       pendingChanges: revision !== this.revision,
       conflict: undefined,
-      error: undefined
+      error: undefined,
+      pauseReason: undefined
     });
   }
 }

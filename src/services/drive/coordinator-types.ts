@@ -29,7 +29,9 @@ export interface DriveStatus {
   prepared: boolean;
   preparing: boolean;
   connected: boolean;
+  connectedThisSession?: boolean | undefined;
   automatic: boolean;
+  automaticBlockedByFormat?: boolean | undefined;
   pendingChanges: boolean;
   pauseReason?: "offline" | "auth-required" | "network" | undefined;
   authorizationStored: boolean;

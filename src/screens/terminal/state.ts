@@ -131,6 +131,7 @@ export interface TerminalState {
   preview: DrawingDraft | null;
   selectedObject: string | null;
   dialog: TerminalDialog;
+  initialAccountSection?: "drive" | undefined;
   contextMenu: ContextMenu | null;
   objectPanel: boolean;
   toast: string;

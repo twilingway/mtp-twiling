@@ -1,3 +1,37 @@
+.drive-pause-banner[data-active="true"] {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 14px;
+  padding: 8px 12px;
+  background: var(--accent-surface);
+  border-bottom: 1px solid var(--control-line);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.drive-pause-banner button {
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 5px;
+  color: var(--accent);
+}
+#root:has(> .drive-pause-banner[data-active="true"]) {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+}
+#root:has(> .drive-pause-banner[data-active="true"]) > .topbar {
+  flex: none;
+}
+#root:has(> .drive-pause-banner[data-active="true"]) > .workspace {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
 #google-drive-settings {
   display: grid;
   gap: 16px;

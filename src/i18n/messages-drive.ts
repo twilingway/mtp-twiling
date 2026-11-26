@@ -1,4 +1,20 @@
 export const driveMessages = {
+  "Автосинхронизация с Google Диском приостановлена.": "Google Drive auto-sync is paused.",
+  "Изменения ещё не синхронизированы.": "Changes haven't synced yet.",
+  "Открыть настройки Google Диска": "Open Google Drive settings",
+  "Войдите в Google повторно.": "Sign in to Google again.",
+  "Нет интернета. Проверим Google Диск при восстановлении связи.":
+    "You're offline. We'll check Google Drive when you're back online.",
+  "Связь восстановлена. Ожидаем проверки Google Диска.":
+    "You're back online. Google Drive still needs to be checked.",
+  "Нет связи с Google Диском. Можно повторить синхронизацию в настройках.":
+    "Google Drive is unreachable. You can retry sync in settings.",
+  "Откройте Google Диск и выберите версию рабочего пространства.":
+    "Open Google Drive settings and choose a workspace version.",
+  "Откройте Google Диск и проверьте снимки старого формата.":
+    "Open Google Drive settings to review older-format snapshots.",
+  "Обновите приложение, чтобы прочитать данные Google Диска.":
+    "Update the app to read your Google Drive data.",
   "Синхронизация на паузе. Сохранённый вход Google не удаляется, срок доступа остаётся прежним.":
     "Sync is paused. Saved Google sign-in is retained and its expiry stays unchanged.",
   "Завершите восстановление профиля, чтобы изменять настройки.":

@@ -50,6 +50,7 @@ export async function restoreReadableDriveProfile(
 }
 export function unreadableDrivePause(
   error: unknown,
+  status: DriveStatus,
   authorization: DriveAuthorization | undefined,
   auth: DriveDependencies["auth"],
   reset: () => void,
@@ -63,6 +64,9 @@ export function unreadableDrivePause(
     error: error.code,
     connected: false,
     automatic: false,
+    automaticBlockedByFormat:
+      status.automaticBlockedByFormat ||
+      (status.automatic && !!(status.connectedThisSession || status.lastSyncedAt)),
     conflict: undefined,
     pauseReason: undefined,
     authorizationStored: authorization?.stored === true,

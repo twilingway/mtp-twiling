@@ -202,7 +202,10 @@ export class TerminalController {
   logout = (): Promise<void> => {
     return this.session.logout();
   };
-  setDialog = (dialog: TerminalDialog): void => this.drawingSettings.setDialog(dialog);
+  setDialog = (
+    dialog: TerminalDialog,
+    initialAccountSection?: TerminalState["initialAccountSection"]
+  ): void => this.drawingSettings.setDialog(dialog, initialAccountSection);
   mergePublicProfile = (): Promise<void> => this.session.mergePublicProfile();
   setContext = (contextMenu: ContextMenu | null): void => this.update({ contextMenu });
   selectObject = (id: string | null): void => this.update({ selectedObject: id });

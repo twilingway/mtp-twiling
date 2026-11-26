@@ -44,7 +44,12 @@ export class LegacyDriveMigration {
     const legacy = await reader.inspect();
     this.check(context);
     if (!legacy.heads.length) return false;
-    this.operations.update({ legacyAvailable: true, phase: "conflict", conflict: undefined });
+    this.operations.update({
+      legacyAvailable: true,
+      phase: "conflict",
+      conflict: undefined,
+      pauseReason: undefined
+    });
     return true;
   }
   private check(context: Context): void {

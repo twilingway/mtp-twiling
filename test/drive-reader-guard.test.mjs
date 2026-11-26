@@ -134,6 +134,7 @@ for (const dirty of [false, true]) {
     assert.equal(f.record().pendingChanges, true);
     assert.deepEqual(f.record(), { ...beforeAutomatic, pendingChanges: true });
     assert.equal(f.coordinator.getSnapshot().automatic, false);
+    assert.equal(f.coordinator.getSnapshot().automaticBlockedByFormat, true);
   });
 }
 for (const schemaVersion of [1, 2])

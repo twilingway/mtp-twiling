@@ -59,9 +59,16 @@ interface Bridge {
 }
 export class TerminalDrawingPreview {
   constructor(private readonly bridge: Bridge) {}
-  setDialog = (dialog: TerminalState["dialog"]): void => {
+  setDialog = (
+    dialog: TerminalState["dialog"],
+    initialAccountSection?: TerminalState["initialAccountSection"]
+  ): void => {
     if (dialog === "drawing-settings") this.bridge.cancelGesture();
-    this.bridge.update({ dialog, contextMenu: null });
+    this.bridge.update({
+      dialog,
+      contextMenu: null,
+      initialAccountSection: dialog === "account" ? initialAccountSection : undefined
+    });
   };
   begin = (id: string): string | null => {
     this.bridge.cancelGesture();

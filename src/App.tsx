@@ -3,6 +3,7 @@ import { useState } from "react";
 import { TerminalContext, useTerminal } from "./screens/terminal/context.js";
 import { TerminalController } from "./screens/terminal/controller.js";
 import { Toolbar } from "./screens/terminal/Toolbar.js";
+import { DrivePauseBanner } from "./screens/terminal/DrivePauseBanner.js";
 import { RightPanel } from "./screens/terminal/RightPanel.js";
 import { ChartPanel } from "./screens/terminal/ChartPanel.js";
 import { DrawingToolbar } from "./screens/terminal/DrawingToolbar.js";
@@ -27,6 +28,7 @@ function Terminal() {
       <ThemeEffect />
       <LocaleEffect />
       <Toolbar />
+      <DrivePauseBanner />
       <main
         className="workspace"
         data-right-panel-collapsed={!!state.preferences.rightPanelCollapsed}
