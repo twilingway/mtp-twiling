@@ -43,7 +43,7 @@
     <section>
       <h2>Данные на устройстве и источники котировок</h2>
       <p>
-        Терминал — клиентское PWA. Настройки, рисунки, изображения и история свечей хранятся в
+        Терминал работает в браузере. Настройки, рисунки, изображения и история свечей хранятся в
         локальном хранилище устройства. Личный API-ключ используется для прямых запросов к Т‑Банку.
         При выборе «Запомнить ключ» зашифрованный AES-GCM ключ и локальный ключ расшифрования
         сохраняются на устройстве; шифрование не защищает от человека или программы с доступом к
@@ -128,11 +128,11 @@
       <p>Updated November 25, 2026. Applies to mtp.twiling.ru and mtp-test.twiling.ru.</p>
       <h2>Device data and T-Bank</h2>
       <p>
-        This client-side PWA stores settings, drawings, images and candle history in browser
-        IndexedDB. Your personal bank API key is used for direct T-Bank requests. If you select
-        “Remember key”, the AES-GCM encrypted key and the local decryption key stay on the device.
-        This does not protect against access to your unlocked browser profile. Otherwise the
-        encrypted record is scoped to the browser session.
+        This web terminal stores settings, drawings, images and candle history in browser IndexedDB.
+        Your personal bank API key is used for direct T-Bank requests. If you select “Remember key”,
+        the AES-GCM encrypted key and the local decryption key stay on the device. This does not
+        protect against access to your unlocked browser profile. Otherwise the encrypted record is
+        scoped to the browser session.
       </p>
       <p>
         The application server serves static files and does not receive your bank key, quote history

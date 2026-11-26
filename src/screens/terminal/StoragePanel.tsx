@@ -104,7 +104,7 @@ export function StoragePanel() {
               ? t("Оценка недоступна")
               : bytes(stats.browser.usage)}
             {stats.browser.quota ? ` / ${bytes(stats.browser.quota)}` : ""}.{" "}
-            {t("Это приблизительная оценка, включая изображения и файлы PWA.")}
+            {t("Это приблизительная оценка, включая изображения и кэш сайта.")}
           </>
         ) : view.phase === "loading" ? (
           t("Считаем…")

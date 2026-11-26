@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Подключение Т‑Банка на Android · MTP TWILING</title>
+    <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="./android-certificate.css" />
+  </head>
+  <body>
+    <main>
+      <a href="./">← Вернуться в MTP</a>
+      <h1>Т‑Банк на Android</h1>
+      <section aria-labelledby="yandex">
+        <h2 id="yandex">Если есть Яндекс Браузер</h2>
+        <p>Откройте Яндекс Браузер и наберите в адресной строке <strong>mtp.twiling.ru</strong>.</p>
+      </section>
+      <section aria-labelledby="chrome">
+        <h2 id="chrome">Если пользуетесь Chrome</h2>
+        <p>
+          Скачайте официальный корневой сертификат Минцифры с сайта Т‑Банка. Android добавит его в
+          список доверенных сертификатов телефона после вашего подтверждения.
+        </p>
+        <p>
+          <a
+            class="download"
+            href="https://help-static2.tbank-online.com/certs/Android/Root/Russian_Trusted_Root_CA.cer"
+          >
+            Скачать сертификат (.cer)
+          </a>
+        </p>
+        <ol>
+          <li>
+            Откройте <strong>Настройки</strong> телефона. В поиске введите
+            <strong>Сертификат</strong>.
+          </li>
+          <li>
+            Выберите <strong>Сертификат ЦС</strong> или
+            <strong>Сертификат центра сертификации</strong>. Подтвердите установку. Если телефон
+            попросит PIN, введите код разблокировки.
+          </li>
+          <li>
+            В папке <strong>Загрузки</strong> выберите <strong>Russian_Trusted_Root_CA.cer</strong>.
+          </li>
+          <li>
+            Откройте <a href="./">MTP</a> в Chrome и снова нажмите
+            <strong>Подключить котировки</strong>.
+          </li>
+        </ol>
+        <p>
+          Если меню выглядит иначе или ошибка сохранилась, откройте
+          <a href="https://www.tbank.ru/bank/help/certificates/">инструкцию Т‑Банка</a>
+          и выберите раздел Android.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

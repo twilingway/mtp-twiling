@@ -202,7 +202,6 @@ export const uiMessages = {
   "Сохранения останутся на устройстве.": "Saved data stays on this device.",
   Обновить: "Update",
   "Напомнить позже": "Remind me later",
-  Установить: "Install",
   "Найти инструмент": "Find symbol",
   Таймфрейм: "Interval",
   "Период истории": "History range",

@@ -18,11 +18,7 @@ import { ChartNavigation } from "./ChartNavigation.js";
 import { TechnicalIndicatorPanels } from "./TechnicalIndicatorPanels.js";
 import { useTechnicalPaneMetrics } from "./use-technical-pane-metrics.js";
 const Version = memo(function Version() {
-  return (
-    <span id="app-version" hidden>
-      PWA
-    </span>
-  );
+  return <span id="app-version" hidden />;
 });
 export function ChartPanel() {
   const [scrollTop, setScrollTop] = useState(0);
