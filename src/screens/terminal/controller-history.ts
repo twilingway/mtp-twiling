@@ -323,7 +323,8 @@ export class TerminalHistory {
       this.startReached ||
       this.clearing ||
       !state.candles.length ||
-      (volumeAverage && (!navigator.onLine || !this.volumeAverageDeficit()))
+      (volumeAverage &&
+        (!state.historyViewReady || !navigator.onLine || !this.volumeAverageDeficit()))
     )
       return;
     if (this.olderTimer !== null) clearTimeout(this.olderTimer);
@@ -374,13 +375,16 @@ export class TerminalHistory {
     }
     this.olderBusy = true;
     this.bridge.update({ historyHelp: "Подгружаем более ранние свечи…" });
+    let addedEarlier = false;
     try {
       const options = { uid: row.uid, ...(this.abort ? { signal: this.abort.signal } : {}) };
       const result = await client.candles(p.symbol, p.timeframe, { from, to: until }, options);
       if (!this.current(id, client, owner) || this.clearing) return;
       this.cursor = from;
       this.startReached = from <= earliest || (!navigator.onLine && !result.candles.length);
-      const candles = mergeCandles(result.candles, this.bridge.getState().candles);
+      const loaded = this.bridge.getState().candles,
+        candles = mergeCandles(result.candles, loaded);
+      addedEarlier = candles.length > loaded.length;
       this.bridge.update({
         candles,
         historyHelp: `${candles.length} свечей · история слева · ${result.requests} новых запросов`
@@ -388,7 +392,10 @@ export class TerminalHistory {
     } catch (error) {
       if (!isAbort(error) && this.current(id, client, owner)) this.bridge.notify(errorText(error));
     } finally {
-      if (this.current(id, client, owner)) this.olderBusy = false;
+      if (this.current(id, client, owner)) {
+        this.olderBusy = false;
+        if (addedEarlier) this.scheduleOlder(true);
+      }
     }
   }
   async clear(uid: string | null, timeframe: Timeframe | null): Promise<void> {

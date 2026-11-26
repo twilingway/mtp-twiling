@@ -203,6 +203,7 @@ export function IndicatorSettingsDialog() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          const form = e.currentTarget;
           if (key === "volume" && !isVolumeAveragePeriod(volumeAverage.period)) return;
           void controller
             .setChartSettings({
@@ -219,7 +220,8 @@ export function IndicatorSettingsDialog() {
                 current.preferences.chartSettings.volumeAverage === volumeAverage
               )
                 controller.scheduleOlderHistory(true);
-              if (current.dialog === "indicator-settings") controller.setDialog(null);
+              if (form.isConnected && current.dialog === "indicator-settings")
+                controller.setDialog(null);
             })
             .catch((error: unknown) =>
               controller.notify(

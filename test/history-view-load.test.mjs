@@ -343,6 +343,24 @@ test("volume SMA backfill cannot hide a covered saved window", async () => {
   }
 });
 
+test("volume SMA keeps loading productive older windows until the average has enough bars", async () => {
+  const left = NOW - 3 * DAY,
+    right = left + DAY;
+  const f = fixture({
+    view: { from: left / 1000, to: right / 1000 },
+    volumeAverage: { enabled: true, period: 4 },
+    provider: ({ call, range }) => ({
+      candles: call === 1 ? [bar(left), bar(right)] : [bar(range.to - DAY)],
+      requests: 1
+    })
+  });
+  await f.history.load();
+  for (let i = 0; i < 4; i++) await tick();
+  assert.equal(f.calls.length, 3);
+  assert.equal(f.state().candles.length, 4);
+  assert.equal(f.state().historyViewReady, true);
+});
+
 test("offline restored view remains pending when coverage misses its right side; proven closed-market gaps are allowed", async () => {
   const left = Date.parse("2022-05-31"),
     right = Date.parse("2025-10-12"),

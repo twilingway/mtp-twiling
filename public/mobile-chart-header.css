@@ -107,11 +107,19 @@
   }
 
   .topbar .account-button {
+    position: relative;
     grid-row: 1;
     grid-column: 5;
+    justify-content: center;
     width: 32px;
     height: 32px;
     padding: 0;
+  }
+
+  .topbar .account-connection {
+    position: absolute;
+    right: 1px;
+    bottom: 1px;
   }
 
   .topbar :is(#engine, .top-spacer, .divider, .engine-label) {

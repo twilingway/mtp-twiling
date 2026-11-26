@@ -18,6 +18,21 @@
     min-width: 0;
   }
 }
+@media (max-width: 420px) {
+  .chart-range-control .clock-zone-trigger {
+    gap: 4px;
+    padding-inline: 2px;
+    font-size: 11px;
+  }
+  .chart-range-control .clock-zone-trigger > span:first-of-type {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chart-range-control .clock-zone-trigger > :not(span:first-of-type) {
+    flex: none;
+  }
+}
 .clock-zone-trigger {
   display: flex;
   gap: 8px;
