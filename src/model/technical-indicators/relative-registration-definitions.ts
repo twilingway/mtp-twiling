@@ -1,4 +1,6 @@
-import type { TechnicalIndicatorDefinition } from "./types.js";
+import type { PresentationReferenceLevel } from "./presentation-types.js";
+import type { TechnicalIndicatorDefinition, TechnicalOutputDefinition } from "./types.js";
+import { VOLATILITY_MA_TYPES } from "./relative-oscillators/volatility.js";
 
 const length = (key: string, defaultValue: number) => ({
   key,
@@ -14,6 +16,29 @@ const plot = (id: string, color: string) => ({
   color: { kind: "solid" as const, color },
   width: 1 as const
 });
+const line = (id: string, title: string, color: string): TechnicalOutputDefinition => ({
+  id,
+  title,
+  kind: "line",
+  color
+});
+const referenceLevels: readonly PresentationReferenceLevel[] = [
+  { id: "upperBand", title: "Upper Band", value: 80 },
+  { id: "middleBand", title: "Middle Band", value: 50 },
+  { id: "lowerBand", title: "Lower Band", value: 20 }
+].map((level) => ({
+  ...level,
+  color: "#787B86",
+  opacity: level.value === 50 ? 0.5 : 1,
+  width: 1,
+  lineStyle: "dashed"
+}));
+const volatilityOutputs = [
+  line("value", "Relative Volatility Index", "#7E57C2"),
+  line("smoothing", "Smoothing", "#D9AC16"),
+  line("upperBand", "Upper Bollinger Band", "#168755"),
+  line("lowerBand", "Lower Bollinger Band", "#168755")
+];
 export const relativeRegisteredDefinitions: readonly TechnicalIndicatorDefinition[] = [
   {
     schemaVersion: 1,
@@ -34,7 +59,9 @@ export const relativeRegisteredDefinitions: readonly TechnicalIndicatorDefinitio
       { id: "d", title: "D", kind: "line", color: "#FF6D00" }
     ],
     levels: [],
-    references: ["https://pine-facade.tradingview.com/pine-facade/get/STD%3BStochastic_RSI/last"],
+    references: [
+      "https://www.tradingview.com/support/solutions/43000502333-stochastic-rsi-stoch-rsi/"
+    ],
     presentation: {
       renderVersion: 2,
       precisionPolicy: "fixed-2",
@@ -44,15 +71,7 @@ export const relativeRegisteredDefinitions: readonly TechnicalIndicatorDefinitio
         { seriesKey: "$stoch:upper80", value: 80 },
         { seriesKey: "$stoch:lower20", value: 20 }
       ],
-      referenceLevels: [80, 50, 20].map((value) => ({
-        id: value === 80 ? "upperBand" : value === 50 ? "middleBand" : "lowerBand",
-        title: value === 80 ? "Upper Band" : value === 50 ? "Middle Band" : "Lower Band",
-        value,
-        color: "#787B86",
-        opacity: value === 50 ? 0.5 : 1,
-        width: 1,
-        lineStyle: "dashed"
-      })),
+      referenceLevels,
       fills: [
         {
           id: "background",
@@ -80,11 +99,102 @@ export const relativeRegisteredDefinitions: readonly TechnicalIndicatorDefinitio
     ],
     outputs: [{ id: "value", title: "Coppock Curve", kind: "line", color: "#2196F3" }],
     levels: [],
-    references: ["https://pine-facade.tradingview.com/pine-facade/get/STD%3BCoppock%251Curve/last"],
+    references: ["https://www.tradingview.com/support/solutions/43000589114-coppock-curve/"],
     presentation: {
       renderVersion: 2,
       precisionPolicy: "native-price",
       plots: [plot("value", "#2196F3")],
+      fills: [],
+      hiddenSeries: []
+    }
+  },
+  {
+    schemaVersion: 1,
+    id: "relative-vigor-index",
+    title: "Relative Vigor Index",
+    shortTitle: "RVGI",
+    status: "computed",
+    defaultPane: "pane",
+    parameters: [length("length", 10)],
+    outputs: [line("value", "RVGI", "#168755"), line("signal", "Signal", "#D14343")],
+    levels: [],
+    references: ["https://www.tradingview.com/support/solutions/43000591593-relative-vigor-index/"]
+  },
+  {
+    schemaVersion: 1,
+    id: "relative-volatility-index",
+    title: "Relative Volatility Index",
+    shortTitle: "RVI",
+    status: "computed",
+    defaultPane: "pane",
+    parameters: [
+      length("length", 10),
+      { key: "maType", type: "choice", defaultValue: "SMA", choices: VOLATILITY_MA_TYPES },
+      length("maLength", 14),
+      { key: "bbMultiplier", type: "number", defaultValue: 2, min: 0.001, max: 50 }
+    ],
+    outputs: volatilityOutputs,
+    levels: [],
+    references: [
+      "https://www.tradingview.com/support/solutions/43000594684-relative-volatility-index/"
+    ],
+    presentation: {
+      renderVersion: 2,
+      precisionPolicy: "fixed-2",
+      plots: volatilityOutputs.map((output) => plot(output.id, output.color)),
+      hiddenSeries: ["$rvi:upper80", "$rvi:lower20"],
+      constantSeries: [
+        { seriesKey: "$rvi:upper80", value: 80 },
+        { seriesKey: "$rvi:lower20", value: 20 }
+      ],
+      referenceLevels: referenceLevels.map((level) => ({
+        ...level,
+        id: `reference-${level.value}`
+      })),
+      fills: [
+        {
+          id: "background",
+          fromSeries: "$rvi:upper80",
+          toSeries: "$rvi:lower20",
+          color: "#7E57C2",
+          opacity: 0.1,
+          gaps: "break",
+          extent: "pane"
+        },
+        {
+          id: "bollinger-fill",
+          fromSeries: "upperBand",
+          toSeries: "lowerBand",
+          color: "#168755",
+          opacity: 0.1,
+          gaps: "break"
+        }
+      ]
+    }
+  },
+  {
+    schemaVersion: 1,
+    id: "bull-bear-power",
+    title: "Bull Bear Power",
+    shortTitle: "BBP",
+    status: "computed",
+    defaultPane: "pane",
+    parameters: [length("length", 13)],
+    outputs: [{ id: "value", title: "Bull Bear Power", kind: "histogram", color: "#089981" }],
+    levels: [0],
+    references: ["https://www.tradingview.com/support/solutions/43000717955-bull-bear-power/"],
+    presentation: {
+      renderVersion: 2,
+      precisionPolicy: "native-price",
+      plots: [
+        {
+          id: "value",
+          seriesKey: "value",
+          geometry: { kind: "columns", base: 0 },
+          color: { kind: "palette", id: "bbp-sign-v1" },
+          width: 1
+        }
+      ],
       fills: [],
       hiddenSeries: []
     }

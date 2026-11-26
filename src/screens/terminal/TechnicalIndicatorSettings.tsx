@@ -28,6 +28,9 @@ const labels: Readonly<Record<string, readonly [string, string]>> = {
   wmaLength: ["Период WMA", "WMA Length"],
   longRocLength: ["Длинный период ROC", "Long ROC Length"],
   shortRocLength: ["Короткий период ROC", "Short ROC Length"],
+  maType: ["Тип сглаживания", "Smoothing type"],
+  maLength: ["Период сглаживания", "Smoothing length"],
+  bbMultiplier: ["Множитель полос Боллинджера", "Bollinger Bands multiplier"],
   length: ["Период", "Length"],
   source: ["Источник", "Source"],
   useExponentialMa: ["Экспоненциальная средняя", "Use Exponential MA"],
@@ -134,7 +137,14 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
     visible: true,
     opacity: 1,
     lineStyle: "solid",
-    ...(definition.presentation?.referenceLevels?.some((level) => level.id === id) ? { opacity: definition.presentation.referenceLevels.find(level=>level.id===id)!.opacity, lineStyle: definition.presentation.referenceLevels.find(level=>level.id===id)!.lineStyle }: {}),
+    ...(definition.presentation?.referenceLevels?.some((level) => level.id === id)
+      ? {
+          opacity: definition.presentation.referenceLevels.find((level) => level.id === id)!
+            .opacity,
+          lineStyle: definition.presentation.referenceLevels.find((level) => level.id === id)!
+            .lineStyle
+        }
+      : {}),
     ...(id === "background"
       ? { opacity: definition.presentation?.fills.find((fill) => fill.id === id)?.opacity ?? 1 }
       : {}),

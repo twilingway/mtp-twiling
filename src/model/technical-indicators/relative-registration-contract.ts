@@ -1,6 +1,7 @@
 import type { PriceSource } from "./types.js";
+import type { VolatilityMaType } from "./relative-oscillators/volatility.js";
 
-export type RelativeRegisteredId = "stochastic-rsi" | "coppock-curve";
+export type RelativeRegisteredId = keyof RelativeRegisteredParameters;
 export interface RelativeRegisteredParameters {
   "stochastic-rsi": {
     rsiLength: number;
@@ -10,6 +11,14 @@ export interface RelativeRegisteredParameters {
     source: PriceSource;
   };
   "coppock-curve": { wmaLength: number; longRocLength: number; shortRocLength: number };
+  "relative-vigor-index": { length: number };
+  "relative-volatility-index": {
+    length: number;
+    maType: VolatilityMaType;
+    maLength: number;
+    bbMultiplier: number;
+  };
+  "bull-bear-power": { length: number };
 }
 export type RelativeRegisteredHistory =
   | {
@@ -29,4 +38,20 @@ export type RelativeRegisteredHistory =
       seedPolicy: "exact-index-roc;wma-last-known";
       convergence: "sparse-full-input-dependent";
       firstPossibleIndex: { value: number };
+    }
+  | {
+      kind: "finite-observation-window";
+      lookbackBars: null;
+      denseLookbackBars: number;
+      seedPolicy: "swma-four-positional;rolling-last-known;same-index-ratio";
+      convergence: "sparse-full-input-dependent";
+      firstPossibleIndex: { value: number; signal: number };
+    }
+  | {
+      kind: "recursive";
+      lookbackBars: null;
+      seedBars: number;
+      seedPolicy: "directional-deviation;first-known-ema";
+      convergence: "full-input-dependent";
+      firstPossibleIndex: { value: number | null; smoothing: number | null };
     };

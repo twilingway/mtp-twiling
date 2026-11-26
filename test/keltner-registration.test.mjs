@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { EXPECTED_COMPUTED_IDS } from "./technical-registry-expectation.mjs";
+import {
+  EXPECTED_COMPUTED_IDS,
+  EXPECTED_TECHNICAL_COUNT
+} from "./technical-registry-expectation.mjs";
 import {
   core,
   load,
@@ -17,8 +20,7 @@ import {
 const math = load("model/technical-indicators/channel-average/index.js"),
   { keltnerMetadata } = load("model/technical-indicators/keltner-runtime.js");
 
-test("only KC appends after pinned old50; primary defaults/colors/fill and local catalog are exact", () => {
-  assert.equal(core.technicalIndicatorDefinitions.length, 51);
+test("KC follows pinned old50; primary defaults/colors/fill and local catalog are exact", () => {
   assert.deepEqual(
     core.technicalIndicatorDefinitions.slice(0, 50).map((d) => d.id),
     EXPECTED_COMPUTED_IDS.slice(0, 50)
@@ -75,7 +77,10 @@ test("only KC appends after pinned old50; primary defaults/colors/fill and local
   assert.equal(catalog.technicalDefinitionForCatalog("STD;Keltner_Channels"), "keltner-channels");
   assert.equal(catalog.technicalDefinitionForCatalog("STD;Donchian_Channels"), undefined);
   for (const locale of ["ru", "en"]) {
-    assert.equal(catalog.technicalCatalogEntries(locale).filter((e) => e.available).length, 52);
+    assert.equal(
+      catalog.technicalCatalogEntries(locale).filter((e) => e.available).length,
+      EXPECTED_TECHNICAL_COUNT
+    );
     assert.equal(
       catalog.technicalCatalogEntries(locale, "blocked").filter((e) => e.available).length,
       0

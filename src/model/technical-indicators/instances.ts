@@ -2,6 +2,7 @@ import { getTechnicalIndicatorDefinition, PRICE_SOURCES } from "./definitions.js
 import type {
   IndicatorPane,
   OutputStyle,
+  TechnicalIndicatorDefinition,
   TechnicalIndicatorId,
   TechnicalIndicatorInstance,
   TechnicalParameters
@@ -50,6 +51,17 @@ function style(value: unknown): value is OutputStyle {
       (typeof value.lineStyle === "string" &&
         ["solid", "dashed", "dotted"].includes(value.lineStyle)))
   );
+}
+export function technicalIndicatorStyleIds(
+  definition: TechnicalIndicatorDefinition
+): readonly string[] {
+  return [
+    ...definition.outputs.map((output) => output.id),
+    ...(definition.presentation?.referenceLevels ?? []).map((level) => level.id),
+    ...(definition.presentation?.fills ?? [])
+      .filter((fill) => fill.extent === "pane")
+      .map((fill) => fill.id)
+  ];
 }
 export function isTechnicalIndicatorInstance(value: unknown): value is TechnicalIndicatorInstance {
   if (
@@ -107,13 +119,7 @@ export function isTechnicalIndicatorInstance(value: unknown): value is Technical
   return (
     value.styles === undefined ||
     (record(value.styles) &&
-      exact(value.styles, [
-        ...definition.outputs.map((output) => output.id),
-        ...(definition.presentation?.referenceLevels ?? []).map((level) => level.id),
-        ...(definition.presentation?.fills ?? [])
-          .filter((fill) => fill.extent === "pane")
-          .map((fill) => fill.id)
-      ]) &&
+      exact(value.styles, technicalIndicatorStyleIds(definition)) &&
       Object.values(value.styles).every(style))
   );
 }

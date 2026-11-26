@@ -46,7 +46,12 @@ function assertValues(f, instances, data = bars, layout = []) {
   const expected = outputs(f, instances, data, layout);
   if (f.options.container && f.allSeries.length) {
     const actual = f.activeSeries().slice(4);
-    assert.equal(actual.length, expected.length);
+    const { getTechnicalIndicatorDefinition } = api(f);
+    const references = instances.flatMap(
+      (item) =>
+        getTechnicalIndicatorDefinition(item.definitionId).presentation?.referenceLevels ?? []
+    );
+    assert.equal(actual.length, expected.length + references.length);
     // Output identity survives reorder; locate by its actual data rather than creation position.
     for (const output of expected) {
       const values = output.timestamps.map((timestamp, i) =>
@@ -55,8 +60,24 @@ function assertValues(f, instances, data = bars, layout = []) {
           : { time: timestamp / 1000, value: output.values[i] }
       );
       assert.ok(
-        actual.some((series) => JSON.stringify(series.data) === JSON.stringify(values)),
+        actual.some(
+          (series) =>
+            JSON.stringify(series.data.map(({ color, ...point }) => point)) ===
+            JSON.stringify(values)
+        ),
         output.key
+      );
+    }
+    for (const reference of references) {
+      assert.ok(
+        actual.some(
+          (series) =>
+            series.data.length === data.length &&
+            series.data.every(
+              (point, index) =>
+                point.value === reference.value && point.time === data[index].timestamp / 1000
+            )
+        )
       );
     }
   } else {
@@ -246,7 +267,12 @@ for (const engine of ["lightweight", "kline"]) {
       "pvi",
       "tsi",
       "kst",
-      "fisher-transform"
+      "fisher-transform",
+      "stochastic-rsi",
+      "coppock-curve",
+      "relative-vigor-index",
+      "relative-volatility-index",
+      "bull-bear-power"
     ]);
     assert.deepEqual(
       f.adapter.technicalPaneMetrics().map((item) => item.key),
@@ -329,9 +355,9 @@ for (const engine of ["lightweight", "kline"]) {
         : f.activeIndicators().filter((item) => item.name.startsWith("PERSONAL_TA_"));
     assert.deepEqual(after, owned, "same native objects on parameter/style changes");
     if (engine === "lightweight") {
-      assert.equal(owned[0].options.color, "rgba(17,34,51,0.4)");
-      assert.equal(owned[0].options.lineStyle, 1);
-      assert.equal(owned[0].options.lineWidth, 3);
+      assert.equal(owned[0].options().color, "rgba(17,34,51,0.4)");
+      assert.equal(owned[0].options().lineStyle, 1);
+      assert.equal(owned[0].options().lineWidth, 3);
     } else {
       assert.equal(owned[0].styles.lines[0].color, "rgba(17,34,51,0.4)");
       assert.deepEqual(owned[0].styles.lines[0].dashedValue, [2, 3]);
@@ -344,7 +370,7 @@ for (const engine of ["lightweight", "kline"]) {
     );
     assert.ok(
       (engine === "lightweight"
-        ? owned.map((item) => item.options.visible)
+        ? owned.map((item) => item.options().visible)
         : owned.map((item) => item.visible)
       ).every((value) => value === false)
     );
@@ -359,7 +385,7 @@ for (const engine of ["lightweight", "kline"]) {
     );
     assert.ok(
       (engine === "lightweight"
-        ? owned.map((item) => item.options.visible)
+        ? owned.map((item) => item.options().visible)
         : owned.map((item) => item.visible)
       ).every((value) => value === false)
     );

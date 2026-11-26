@@ -4,7 +4,10 @@ export type PlotSize = 1 | 2 | 3 | 4;
 export type PlotPrecisionPolicy = "legacy-fixed-6" | "native-price" | "fixed-2";
 export type PlotColorPolicy =
   | { readonly kind: "solid"; readonly color: string }
-  | { readonly kind: "palette"; readonly id: "macd-sign-change-v1" | "ao-change-v1" };
+  | {
+      readonly kind: "palette";
+      readonly id: "macd-sign-change-v1" | "ao-change-v1" | "bbp-sign-v1";
+    };
 export type PlotGeometry =
   | { readonly kind: "line"; readonly gaps: "legacy" | "break" }
   | { readonly kind: "columns"; readonly base: 0 }

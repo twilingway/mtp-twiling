@@ -227,10 +227,11 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
   }
   function addSeries(definition, options = {}, index = 0) {
     const pane = panes[index],
-      first = definition?.type === "Candlestick";
+      first = definition?.type === "Candlestick",
+      seriesOptions = { ...options };
     const entry = {
       type: definition?.type,
-      options: { ...options },
+      options: () => ({ ...seriesOptions }),
       data: [],
       pane,
       order: pane.series.length,
@@ -252,9 +253,9 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
         if (first) data = entry.data;
       },
       applyOptions(value) {
-        Object.assign(entry.options, value);
+        Object.assign(seriesOptions, value);
       },
-      priceScale: () => entry.pane.priceScale(entry.options.priceScaleId ?? "right"),
+      priceScale: () => entry.pane.priceScale(seriesOptions.priceScaleId ?? "right"),
       getPane: () => entry.pane,
       moveToPane(index) {
         entry.pane.series.splice(entry.pane.series.indexOf(entry), 1);
@@ -511,6 +512,7 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
           removed = true;
         },
         registerIndicator: (descriptor) => registry.set(descriptor.name, descriptor),
+        registerFigure() {},
         registerXAxis: (descriptor) => axisRegistry.push(descriptor),
         registerYAxis: (descriptor) => yAxisRegistry.push(descriptor),
         IndicatorSeries: { Normal: "normal", Price: "price" },

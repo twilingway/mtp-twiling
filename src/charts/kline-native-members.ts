@@ -293,7 +293,9 @@ export function klineNativeMembers(chart: Chart, alive: () => boolean, axisName:
             ? cached.value
             : eligiblePublicPlots(plan.outputs, domain) ||
               (domain.end > domain.first &&
-                (plan.context.references ?? []).some((level) => level.visible && level.timestamps.length>domain.first)));
+                (plan.context.references ?? []).some(
+                  (level) => level.visible && level.timestamps.length > domain.first
+                )));
         if (domain) eligibility.set(plan, { first: domain.first, end: domain.end, value });
         active.set(plan, value);
       }

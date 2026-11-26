@@ -2,6 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as jsx from "react/jsx-runtime";
 import { readFileSync } from "node:fs";
+import {
+  EXPECTED_LIBRARY_COUNT,
+  EXPECTED_TECHNICAL_COUNT
+} from "./technical-registry-expectation.mjs";
 import { settings, walk, text } from "./technical-state-oscillator-settings-fixture.mjs";
 import { core, defaults, createSourceLoader } from "./keltner-fixture.mjs";
 const instance = (f) => f.controller.getSnapshot().preferences.technicalIndicators[0];
@@ -170,7 +174,7 @@ test("KC live cost status recovers and never encodes the transient limit in save
   }
 });
 
-test("actual local library contains only one new KC:51 computed+Volume+4 scripts; blocked state stays unavailable", () => {
+test("actual local library includes KC and the reviewed implementation set; blocked state stays unavailable", () => {
   for (const locale of ["ru", "en"])
     for (const importingBackup of [false, true]) {
       const state = {
@@ -197,10 +201,13 @@ test("actual local library contains only one new KC:51 computed+Volume+4 scripts
       const entries = reader(
         "screens/terminal/TerminalIndicatorLibrary.js"
       ).TerminalIndicatorLibrary().props.entries;
-      assert.equal(entries.filter((e) => e.available).length, importingBackup ? 0 : 56);
+      assert.equal(
+        entries.filter((e) => e.available).length,
+        importingBackup ? 0 : EXPECTED_LIBRARY_COUNT
+      );
       assert.equal(
         entries.filter((e) => e.available && e.category === "technicals").length,
-        importingBackup ? 0 : 52
+        importingBackup ? 0 : EXPECTED_TECHNICAL_COUNT
       );
     }
 });

@@ -231,7 +231,9 @@ test("all definitions are immutable serializable data; independent instances and
       Object.keys(result.series).sort(),
       [
         ...definition.outputs.map((output) => output.id),
-        ...(definition.presentation?.hiddenSeries ?? [])
+        ...(definition.presentation?.hiddenSeries ?? []).filter(
+          (key) => !definition.presentation?.constantSeries?.some((item) => item.seriesKey === key)
+        )
       ].sort()
     );
     assert.deepEqual(

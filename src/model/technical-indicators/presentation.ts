@@ -22,7 +22,9 @@ function validColor(policy: PlotColorPolicy): boolean {
   return policy.kind === "solid"
     ? hex(policy.color)
     : policy.kind === "palette" &&
-        (policy.id === "macd-sign-change-v1" || policy.id === "ao-change-v1");
+        (policy.id === "macd-sign-change-v1" ||
+          policy.id === "ao-change-v1" ||
+          policy.id === "bbp-sign-v1");
 }
 function validGeometry(geometry: PlotGeometry): boolean {
   return geometry.kind === "line"
@@ -152,8 +154,8 @@ export function compilePresentation(
             ["solid", "dashed", "dotted"].includes(custom.lineStyle)),
         "reference custom style"
       );
-    const width=custom?.width??level.width;
-    assert(size(width),"resolved reference width");
+    const width = custom?.width ?? level.width;
+    assert(size(width), "resolved reference width");
     return Object.freeze({
       ...level,
       ...custom,
@@ -205,6 +207,7 @@ export function presentationColor(plot: CompiledPresentationPlot, index: number)
   const current = plot.values[index];
   if (current === null || current === undefined) return null;
   if (plot.color.kind === "solid") return plot.color.color;
+  if (plot.color.id === "bbp-sign-v1") return current >= 0 ? "#089981" : "#F23645";
   const previous = index > 0 ? plot.values[index - 1] : null,
     rising = previous !== null && previous !== undefined && current > previous;
   if (plot.color.id === "ao-change-v1")

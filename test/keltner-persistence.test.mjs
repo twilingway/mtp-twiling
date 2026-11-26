@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { EXPECTED_DRIVE_PARAMETER_KEYS } from "./technical-registry-expectation.mjs";
 import {
   core,
   load,
@@ -114,10 +115,14 @@ test("malformed boolean/choice/numeric/unknown/runtime data rejects before JSON/
   }
 });
 
-test("Drive allowlist retains every exact pinned old key and adds only bool/choice KC keys", () => {
+test("Drive allowlist retains every exact pinned old key followed by the KC bool/choice keys", () => {
   const source = readFileSync(new URL("../src/services/drive/backup.ts", import.meta.url), "utf8"),
     keys = source.match(/params:\s*scalars\(\s*"([^"]+)"/)[1].split(" ");
   assert.deepEqual(keys.slice(0, BASE_DRIVE_KEYS.length), BASE_DRIVE_KEYS);
-  assert.deepEqual(keys.slice(BASE_DRIVE_KEYS.length), ["useExponentialMa", "bandsStyle"]);
+  assert.deepEqual(keys.slice(BASE_DRIVE_KEYS.length, BASE_DRIVE_KEYS.length + 2), [
+    "useExponentialMa",
+    "bandsStyle"
+  ]);
+  assert.deepEqual(keys, EXPECTED_DRIVE_PARAMETER_KEYS);
   assert.equal(keys.length, new Set(keys).size);
 });

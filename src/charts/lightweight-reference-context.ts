@@ -44,9 +44,14 @@ export function lightweightReferenceContext(chart: IChartApi, primary: () => Ser
     if (!range) return null;
     const from = seconds(range.from) * 1000,
       to = seconds(range.to) * 1000;
-    let low=0,high=timestamps.length;
-    while(low<high){const middle=Math.floor((low+high)/2);if(timestamps[middle]!<from)low=middle+1;else high=middle;}
-    for (let i = low; i < timestamps.length && (!visibleOnly || timestamps[i]!<=to); i++)
+    let low = 0,
+      high = timestamps.length;
+    while (low < high) {
+      const middle = Math.floor((low + high) / 2);
+      if (timestamps[middle]! < from) low = middle + 1;
+      else high = middle;
+    }
+    for (let i = low; i < timestamps.length && (!visibleOnly || timestamps[i]! <= to); i++)
       if (
         timestamps[i]! >= from &&
         (!visibleOnly || timestamps[i]! <= to) &&
@@ -59,18 +64,19 @@ export function lightweightReferenceContext(chart: IChartApi, primary: () => Ser
     const range = chart.timeScale().getVisibleRange(),
       owner = primary();
     if (!range || !owner) return null;
-    const logical=chart.timeScale().getVisibleLogicalRange();if(!logical)return null;
+    const logical = chart.timeScale().getVisibleLogicalRange();
+    if (!logical) return null;
     // Same floor(left)/nearest-right rule as installed TimeScaleVisibleRange + Series.firstBar,
     // plus the missing upper-bound eligibility check. Public O(log N) lookup, no data() copy.
-    const row=owner.dataByIndex(Math.floor(logical.from),1);
-    if(row && seconds(row.time)<=seconds(range.to)){
-      const value="close" in row?row.close:"value" in row?row.value:null;
-      if(typeof value==="number"&&Number.isFinite(value))return value;
+    const row = owner.dataByIndex(Math.floor(logical.from), 1);
+    if (row && seconds(row.time) <= seconds(range.to)) {
+      const value = "close" in row ? row.close : "value" in row ? row.value : null;
+      if (typeof value === "number" && Number.isFinite(value)) return value;
     }
     return null;
   }
   function owner(instanceId: string, paneKey: string, fallback?: Series) {
-    if (paneKey === "price") return primaryBase()===null?undefined:primary();
+    if (paneKey === "price") return primaryBase() === null ? undefined : primary();
     const output = outputs.find(
       (item) =>
         item.instanceId === instanceId &&
