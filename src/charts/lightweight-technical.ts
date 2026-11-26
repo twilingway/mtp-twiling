@@ -24,6 +24,7 @@ import { lineColor } from "../model/candle-palette.js";
 import { chartPalette } from "../model/theme.js";
 import { presentationColor } from "../model/technical-indicators/presentation.js";
 import { LightweightTechnicalPrimitive } from "./lightweight-technical-primitives.js";
+import { lightweightCompactCrosshair } from "./technical-compact-crosshair.js";
 
 type Series = ISeriesApi<"Line"> | ISeriesApi<"Histogram">;
 interface Entry {
@@ -78,10 +79,22 @@ export function lightweightTechnical(
       return key ? [{ key, top: y, height, width }] : [];
     });
   };
+  const crosshair = lightweightCompactCrosshair(
+    chart,
+    options.container,
+    metrics,
+    alive,
+    (index) => {
+      if (index === 0) return "price";
+      const pane = nativePanes()[index];
+      return [...panes].find(([, value]) => value === pane)?.[0];
+    }
+  );
   const changed = () => {
     if (disposed || !alive()) return;
     const next = metrics(),
       key = JSON.stringify(next);
+    crosshair.refresh(next);
     if (key !== lastMetrics) {
       lastMetrics = key;
       options.onTechnicalPaneMetrics?.(next);
@@ -361,6 +374,7 @@ export function lightweightTechnical(
         : options.container.clientHeight - timeHeight();
     },
     dispose() {
+      crosshair.dispose();
       disposed = true;
       events?.dispose();
       calculation.dispose();

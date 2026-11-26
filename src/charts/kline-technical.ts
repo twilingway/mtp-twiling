@@ -1,4 +1,5 @@
 import {
+  ActionType,
   DomPosition,
   IndicatorSeries,
   LineType,
@@ -21,6 +22,7 @@ import type { TechnicalRenderOutput } from "./technical-render-data.js";
 import { captureTechnicalPaneLayout } from "./technical-pane-geometry.js";
 import { klinePaneGeometry } from "./kline-pane-geometry.js";
 import { attachTechnicalPaneEvents } from "./technical-pane-events.js";
+import { klineCompactCrosshair } from "./technical-compact-crosshair.js";
 import { lineColor } from "../model/candle-palette.js";
 import {
   drawKlineTechnical,
@@ -152,10 +154,19 @@ export function klineTechnical(
       return value;
     });
   };
+  const crosshair = klineCompactCrosshair(
+    chart,
+    options.container,
+    metrics,
+    alive,
+    ActionType?.OnCrosshairChange,
+    DomPosition.YAxis
+  );
   const changed = () => {
     if (disposed || !alive()) return;
     const next = metrics(),
       signature = JSON.stringify(next);
+    crosshair.refresh(next);
     if (signature !== lastMetrics) {
       lastMetrics = signature;
       options.onTechnicalPaneMetrics?.(next);
@@ -427,6 +438,7 @@ export function klineTechnical(
         : options.container.clientHeight - timeHeight();
     },
     dispose() {
+      crosshair.dispose();
       disposed = true;
       settlement.active = false;
       settlement.schedule = () => {};
