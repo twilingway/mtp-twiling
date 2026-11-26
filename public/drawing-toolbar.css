@@ -396,16 +396,27 @@
     flex-basis: 34px;
   }
   .drawing-tool-split .drawing-tool-main {
-    width: 36px;
     height: 34px;
-    flex-basis: 36px;
   }
-  .drawing-tool-main svg {
-    width: 26px;
-    height: 26px;
+  .drawing-toolbar > .tool > svg,
+  .drawing-tool-split .drawing-tool-main > svg {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+  .drawing-tool-split .drawing-tool-main > svg {
+    translate: 6px 0;
+    pointer-events: none;
   }
   .drawing-tool-arrow {
+    width: 12px;
+    flex-basis: 12px;
     min-height: 34px;
+  }
+  .drawing-tool-arrow > .drawing-chevron {
+    width: 12px;
+    height: 12px;
+    flex-basis: 12px;
   }
   .drawing-toolbar .rail-spacer {
     display: block;
