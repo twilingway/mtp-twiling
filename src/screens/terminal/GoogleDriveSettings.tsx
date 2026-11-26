@@ -40,13 +40,19 @@ function date(value?: string): string {
       )
     : t("Ещё не выполнялась");
 }
-function Summary({ summary }: { summary: DriveSummary }) {
+function Summary({ summary, dateLabel }: { summary: DriveSummary; dateLabel?: string }) {
   return (
     <p>
       {t("Инструментов")}: {summary.instruments} · {t("Рисунки")}: {summary.drawings} ·{" "}
       {t("Изображения")}: {summary.images}
-      <br />
-      <small>{date(summary.date)}</small>
+      {summary.date ? (
+        <small>
+          {dateLabel ? `${t(dateLabel)}: ` : null}
+          <time dateTime={summary.date}>{date(summary.date)}</time>
+        </small>
+      ) : dateLabel ? null : (
+        <small>{date()}</small>
+      )}
     </p>
   );
 }
@@ -55,6 +61,7 @@ export function GoogleDriveSettings() {
     [legacyChoices, setLegacyChoices] = useState<DriveChoice[] | null>(null),
     drive = terminalDrive(controller),
     status = useSyncExternalStore(drive.subscribe, drive.getSnapshot, drive.getSnapshot),
+    conflict = status.conflict,
     busy =
       status.phase === "connecting" ||
       status.phase === "syncing" ||
@@ -246,48 +253,62 @@ export function GoogleDriveSettings() {
           )}
         </div>
       )}
-      {status.conflict && (
+      {conflict && (
         <div id="google-drive-conflict" className="drive-conflict">
-          <h4>{t("Выберите сохраняемую версию")}</h4>
-          <p>
-            {status.conflict.remotes.length === 0
-              ? t(
-                  "В подключённом Google Диске нет ранее синхронизированной версии. Подтвердите отправку копии настроек, рисунков и изображений с этого устройства."
-                )
-              : t(
-                  "Облачная версия заменит настройки, рисунки и изображения этого профиля. История котировок, ключ и прежние облачные снимки сохранятся."
-                )}
-          </p>
-          <strong>{t("На этом устройстве")}</strong>
-          <Summary summary={status.conflict.local} />
-          <button
-            id="google-drive-choose-local"
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              void drive.choose("local");
-            }}
-          >
-            {t("Отправить версию устройства на Google Диск")}
-          </button>
-          {status.conflict.remotes.map((remote, index) => (
+          <h4>{t("Выберите версию рабочего пространства")}</h4>
+          {conflict.remotes.length === 0 ? (
+            <p>{t("На подключённом Google Диске пока нет снимков этого профиля.")}</p>
+          ) : (
+            <p id="google-drive-receive-effect">
+              {t(
+                "Получение заменит настройки, список инструментов, индикаторы, виды графиков, рисунки и изображения этого профиля. Облачные снимки сохранятся."
+              )}
+              {conflict.remotes.length > 1
+                ? ` ${t("Выбранная версия станет текущей и на Google Диске.")}`
+                : null}
+            </p>
+          )}
+          {conflict.remotes.map((remote, index) => (
             <div key={remote.nodeId}>
-              <strong>
-                {t("Google Диск")} {status.conflict!.remotes.length > 1 ? index + 1 : ""}
-              </strong>
-              <Summary summary={remote} />
+              <h5>
+                {t("Версия на Google Диске")}
+                {conflict.remotes.length > 1 ? ` ${index + 1}` : null}
+              </h5>
+              <Summary summary={remote} dateLabel="Снимок создан" />
               <button
                 type="button"
                 data-drive-remote={index}
+                aria-describedby="google-drive-receive-effect"
                 disabled={busy}
                 onClick={() => {
                   void drive.choose(remote.nodeId);
                 }}
               >
-                {t("Использовать эту версию Google Диска")}
+                <span aria-hidden="true">↓</span> {t("Получить из Google Диска")}
               </button>
             </div>
           ))}
+          <div>
+            <h5>{t("Версия на этом устройстве")}</h5>
+            <Summary summary={conflict.local} dateLabel="Версия проверена" />
+            <p id="google-drive-send-effect">
+              {t(
+                "Отправка сохранит настройки, список инструментов, индикаторы, виды графиков, рисунки и изображения этого профиля как новую текущую версию на Google Диске."
+              )}
+              {conflict.remotes.length > 0 ? ` ${t("Облачные снимки сохранятся.")}` : null}
+            </p>
+            <button
+              id="google-drive-choose-local"
+              type="button"
+              aria-describedby="google-drive-send-effect"
+              disabled={busy}
+              onClick={() => {
+                void drive.choose("local");
+              }}
+            >
+              <span aria-hidden="true">↑</span> {t("Отправить на Google Диск")}
+            </button>
+          </div>
         </div>
       )}
       {status.credentialSaveError && (

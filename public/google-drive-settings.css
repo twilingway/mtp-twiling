@@ -113,6 +113,10 @@
   padding: 12px 0;
   border-top: 1px solid var(--line);
 }
+#google-drive-conflict h5 {
+  margin: 0;
+  font-size: 14px;
+}
 #google-drive-settings .drive-auth-note {
   padding-top: 12px;
   border-top: 1px solid var(--line);

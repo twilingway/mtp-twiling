@@ -29,15 +29,23 @@ export const driveMessages = {
   "Повторить загрузку входа": "Retry loading sign-in",
   "Автоматическая синхронизация": "Automatic sync",
   "Не удалось сохранить настройку синхронизации": "Could not save the sync preference",
-  "Выберите сохраняемую версию": "Choose the version to keep",
-  "В подключённом Google Диске нет ранее синхронизированной версии. Подтвердите отправку копии настроек, рисунков и изображений с этого устройства.":
-    "The connected Google Drive has no previously synced version. Confirm that you want to send a copy of this device's settings, drawings and images.",
-  "Облачная версия заменит настройки, рисунки и изображения этого профиля. История котировок, ключ и прежние облачные снимки сохранятся.":
-    "The cloud version replaces this profile's settings, drawings and images. Quote history, your key and previous cloud snapshots are retained.",
-  "На этом устройстве": "On this device",
-  "Отправить версию устройства на Google Диск": "Send this device's version to Google Drive",
+  "Выберите версию рабочего пространства": "Choose a workspace version",
+  "На подключённом Google Диске пока нет снимков этого профиля.":
+    "The connected Google Drive has no snapshots for this profile yet.",
+  "Версия на Google Диске": "Google Drive version",
+  "Версия на этом устройстве": "Version on this device",
+  "Снимок создан": "Snapshot created",
+  "Версия проверена": "Version checked",
+  "Получение заменит настройки, список инструментов, индикаторы, виды графиков, рисунки и изображения этого профиля. Облачные снимки сохранятся.":
+    "Getting a cloud version replaces this profile's settings, watchlist, indicators, chart views, drawings and images. Existing cloud snapshots are kept.",
+  "Выбранная версия станет текущей и на Google Диске.":
+    "The selected version also becomes the current version on Google Drive.",
+  "Отправка сохранит настройки, список инструментов, индикаторы, виды графиков, рисунки и изображения этого профиля как новую текущую версию на Google Диске.":
+    "Sending saves this profile's settings, watchlist, indicators, chart views, drawings and images as the new current version on Google Drive.",
+  "Облачные снимки сохранятся.": "Existing cloud snapshots are kept.",
   "Google Диск": "Google Drive",
-  "Использовать эту версию Google Диска": "Use this Google Drive version",
+  "Получить из Google Диска": "Get from Google Drive",
+  "Отправить на Google Диск": "Send to Google Drive",
   "Вход Google действует до истечения сессии или перезагрузки приложения. После этого войдите повторно; сохранённые данные останутся.":
     "Google sign-in lasts until the session expires or the app reloads. Sign in again afterwards; saved data is retained.",
   "Подключение Google отменено": "Google sign-in cancelled",
