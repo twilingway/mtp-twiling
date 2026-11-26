@@ -13,9 +13,14 @@
   направленные fills выше grid и ниже price; direction не влияет на ось.
 - MACD/PVO получают четырёхцветные default columns, AO — два цвета по изменению значения.
 - Явный старый custom color сохраняет solid; возврат к palette требует явного reset.
-- Предлагается отдельная версия persistent instance для явных default/custom modes и fill styles.
-  **BREAKING**, только если позднее утверждено: старые readers не понимают новую instance version;
-  миграция и backup envelope version требуют отдельного решения.
+- Автор рекомендует narrow instance2: сохранённый legacy styles bag + discriminated presentation
+  outputs/fills с auto/solid modes и point settings. V1 не хранит auto+width/opacity без потери
+  намерения; period-only edit не материализует style/color. Reset-to-auto сохраняет patches в v2.
+- **BREAKING**, только после root contract review: предлагается envelope3 при наличии instance2;
+  старые v1 не переписываются на read/import/period/sync. Unknown newer отклоняется до write/sync,
+  без lossy projection/downgrade. Это конкретный compatibility trade-off, не внедрённая миграция.
+- KLine companion наследует effective owner/native Series.Price precision policy с первого
+  create/sync, не вводит default4/min/max/shouldOhlc; native range equality — обязательный gate.
 - Числовые результаты/params/persisted v1 существующих 42 сохраняются. Изменение render metadata
   намеренное и проверяется отдельно от frozen numeric fixtures.
 

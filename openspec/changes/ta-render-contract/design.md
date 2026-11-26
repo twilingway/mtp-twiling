@@ -45,6 +45,20 @@ KLine fill companion figures=[] с negative zLevel=-3 рисует destination-o
 поведение; фактическое сочетание с fill требует browser review. Линии остаются выше цены/под
 курсором.
 
+Обязательное дополнение после independent review: companion нейтрален не только по figures, но и по
+effective precision/scale policy. New SAR/ST owner+companion регистрируются Series.Price до create
+sync, без explicit precision overrides; оба следуют native price precision. Поздний override Price
+не исправляет create/sync-before-override. Explicit precision ставит private flag только при
+фактическом изменении числа; одинаковый descriptor6 может дать разные future sync. Читать/менять
+private flag запрещено. Legacy42 explicit6 path не менять попутно; companion к legacy pinned owner
+требует отдельного протокола. Companion не задаёт min/max/shouldOhlc.
+
+Доказательство: [probe](probes/kline-precision-probe.mjs) исполняет extracted installed calcRange,
+setPrecision/sync и sequence model. Default4 даёт flat range≈8e-4 против baseline6≈8e-6, matching6/8
+сохраняет range даже hidden/collapsed. Это не actual create/canvas. G7 требует native
+registration/create→sync→override→precision6→8→6→reconcile tests и browser range equality при
+hide/collapse/remove. figures=[]/visible=false/options equality сами не доказывают neutrality.
+
 Fill строится только между соседними полностью известными anchor pairs одного направления. Нет моста
 через null/reversal, нет extrapolation на полбара; singleton/cap semantics — G2 gate. Первый бар и
 sparse masks сохраняются из math. Скрытые anchors не расширяют scale.
@@ -55,10 +69,22 @@ sparse masks сохраняются из math. Скрытые anchors не ра�
 сохраняет solid. Старый form сохранял defaultcolor при редактировании period, поэтому эвристика по
 равенству цвета не восстанавливает намерение пользователя.
 
-Предпочтительный будущий instance v2 использует tagged default/solid modes и отдельные fillStyles.
-Весь путь exact validators → JSON/storage → Drive whitelist → UI обновляет один integrator атомарно.
-До одобрения export/old-reader/rollback решения v2 не внедряется. Альтернатива v1 delete-style reset
-явно теряет остальные per-output изменения и требует отдельного выбора.
+Period/source/params-only submit сохраняет schema и отсутствие output style; preview defaults не
+становятся persisted color. Такой edit не отключает auto palette. Actual form→JSON→read проверяется
+отдельно от resolver. Любой старый explicit color остаётся solid.
+
+Автор рекомендует **instance2 с сохранённым legacy styles bag и presentation.outputs/fills** из
+исследования §4: discriminated geometry и auto/solid mode, point size1..4, fill visibility/opacity/
+color. Незаданные properties наследуют legacy/default; auto color обходит legacy solid и возвращает
+descriptor palette. Per-output reset меняет только colorMode, сохраняя остальные patches. Два уровня
+оформления — явный compatibility trade-off ради сохранения исходных v1 полей без потерь. Новый
+validator ограничивает geometry/IDs/keys и scalar bounds; расширять schema1 нельзя.
+
+Текущий v1 с requiredcolor не способен сохранить auto+width/opacity и полный fill/point scope. V2 —
+только proposal до root contract review, хотя функциональный scope авторизован. Один integrator
+атомарно обновляет exact validators → JSON/storage → Drive whitelist → UI. Первый advanced edit
+может повысить только редактируемый instance; period/read/import/sync v1 не переписывают. Bounded v1
+delete-style reset теряет независимые patches и не выдаётся за полную функциональность.
 
 ### 5. Владельцы и зависимости
 
@@ -80,6 +106,8 @@ sparse masks сохраняются из math. Скрытые anchors не ра�
 - [Sparse palette не исполнялась в Pine] → тестируемая локальная branch policy, отдельный parity
   gate.
 - [KLine hidden figure остаётся в scale] → hidden outputs не создают figures вообще.
+- [KLine empty companion меняет flat range через precision4] → effective owner/native Price sync
+  policy с первого create, G7 native range equality tests; visible=false недостаточно.
 - [Coordinate/heap cost] → visible-range painting, invalidation по data/style/camera/DPR, bounded
   resources.
 - [Runtime objects попадают в backup] → strict scalar-only serializers и negative roundtrip
@@ -87,11 +115,17 @@ sparse masks сохраняются из math. Скрытые anchors не ра�
 
 ## Migration Plan
 
-Только план. Сначала сохранить v1 fixture corpus и numeric42 baseline. После одобрения G5 внедрить
-v2 union/validators/serialization вместе с UI, продолжить чтение v1. Не переписывать data при
-чтении; преобразование перед записью только после успешной полной validation. Backup envelope
-version и old-reader policy должны быть зафиксированы отдельным решением. До этого v2 export
-запрещён.
+Только план до G5/root contract review. Сначала v1 fixtures/numeric42; затем v1|v2 reader, strict
+presentation validation, UI и JSON/Drive paths одним интегратором. Старые v1 остаются v1 на read/
+import/period/sync. Для явного advanced edit — instance2 с точной копией legacy fields и новым
+patch, без миграции остальных экземпляров. Рекомендуемый export: envelope2 для v1-only, envelope3
+при любом instance2; reader1/2 принимает v1, reader3 — v1|v2. Это новое compatibility решение, а не
+нынешний формат. Old-reader reject и sync fencing проверяются до production.
+
+Unknown newer envelope/instance/fields отклоняются **до** projection/write/apply/upload/checkpoint;
+sync сообщает unsupported/review-needed и не заменяет local/remote известным subset. Нельзя
+продолжать sync, отбросив неизвестные поля. JSON/Drive projection roundtrip и zero-write spies
+обязательны; live Drive не нужен. До принятия G5 ни v2 writer, ни envelope3 не внедряются.
 
 Rollback render-only части удаляет owned resources/descriptor feature, оставляет numeric/profile
 data. Rollback после v2 записи требует согласованного reader либо явного обратного export; молча
@@ -99,8 +133,10 @@ data. Rollback после v2 записи требует согласованн�
 
 ## Open Questions
 
-Это **gated proposal**, а не разрешение apply. G1–G6 из исследования требуют review до реализации
+Это **gated proposal**, а не разрешение apply. G1–G7 из исследования требуют review до реализации
 соответствующей ветви: cross pixels, singleton/caps, фактический fill/MTP порядок, missing palette,
 v2 export compatibility и согласие на render metadata extension. Пока gate не закрыт
 evidence/решением, соответствующий task остаётся unchecked. Отдельное approval решение фиксирует
-integrator; никакие default assumptions не выдаются за принятую persistent migration.
+integrator; никакие default assumptions не выдаются за принятую persistent migration. Принятие
+implementation contract предшествует коду; actual engine paint/create evidence закрывается позднее
+на соответствующем этапе, не объявляется уже доказанным statictrace.

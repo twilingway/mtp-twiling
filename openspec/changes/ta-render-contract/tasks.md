@@ -5,8 +5,9 @@ Research закончен отдельно от реализации. Ниже *
 
 ## 1. Решения и контракт — C
 
-- [ ] 1.1 Закрыть G1–G4/G6 отдельным decision record: reference cross/linebr/fill/palette fixtures,
-      разрешённая sparse policy и renderVersion2; проверить ссылками и наблюдаемыми результатами.
+- [ ] 1.1 Принять implementation contract G1–G4/G6/G7 отдельным decision record: cross/linebr/
+      fill/palette policy, renderVersion2 и Price sync; проверить primary evidence. Actual paint/
+      create gates закрываются в 2.3/3.3/6, не выдавать statictrace за их выполнение.
 - [ ] 1.2 Сохранить numeric42/v1 fixture corpus и expected hashes без computed render metadata;
       проверить source-only contract test, не генерировать expected из новой реализации.
 - [ ] 1.3 После 1.1 добавить typed descriptor/compiler с graph/null/length validation и palette
@@ -30,19 +31,30 @@ Research закончен отдельно от реализации. Ниже *
       current/prev-null colors, scale, no connectors и bounded registry slots в native tests.
 - [ ] 3.2 Добавить fill companion runtime context и отрицательный layer, без hidden figures;
       проверить reverse/gap geometry, stale calc callbacks, teardown/owner isolation; обновить docs.
+- [ ] 3.2a Обеспечить Series.Price class defaults owner+companion до create sync, без explicit
+      precision/min/max/shouldOhlc overrides; сохранить legacy42 path. Проверить sequence/flag trap
+      из probes/kline-precision-probe.mjs, фактическую effective policy, не только descriptor.
+- [ ] 3.2b Выполнить actual SDK create/sync/override и native calcRange tests: native6/8, flat/узкие
+      цены, precision6→8→6, повторный reconcile, hide/show/collapse/remove, без/с companion;
+      сравнить весь range/axis object. Проверить отсутствие SAR/ST figure values при hide/collapse.
 - [ ] 3.3 Проверить tiny-fixture actual KLine paint с negative layers/grid/MTP и singleton gap;
       сохранить SHA/version/screenshots и закрыть engine-specific G2/G3 evidence.
 
 ## 4. Persistent/UI — P, после 1.3 и отдельного G5 approval
 
-- [ ] 4.1 Зафиксировать instance-v2/export-envelope/old-reader/rollback решение; проверить
-      compatibility matrix и явный запрет silent migration/defaultcolor equality heuristic.
+- [ ] 4.1 Зафиксировать instance-v2/export-envelope/old-reader/rollback решение; проверить exact
+      discriminated contract из исследования §4 и compatibility trade-off legacy bag + presentation.
+      V1-auto+patch gap назвать явно; до root review writer не внедрять.
 - [ ] 4.2 Атомарно обновить union/exact validators/JSON/storage/Drive whitelist с сохранением v1
       reader; проверить v1/v2 roundtrip, unknown keys/versions/accessors/non-finite negative
-      fixtures до записи.
+      fixtures до записи. Для unknown newer sync — zero projection/write/upload/checkpoint.
 - [ ] 4.3 Добавить явные default/solid/reset и fill controls в settings/actions без implicit
       rewrite; проверить period-only старый style остаётся solid, customcolor отключает palette,
       reset сохраняет остальные настройки; обновить migration docs и UI evidence.
+- [ ] 4.4 Проверить actual form→JSON→read: period-only absent-style остаётся absent/auto и v1,
+      explicit oldcolor остаётся solid; auto+width/opacity и crosssize/fill patches roundtrip v2;
+      per-output reset меняет только colorMode. Добавить JSON/Drive whitelist fixtures для v1-only
+      envelope2, mixed v1/v2 envelope3, old-reader rejection и неизвестного newer remote до sync.
 
 ## 5. Registry — R, после 1.3, 2.3 и 3.3
 

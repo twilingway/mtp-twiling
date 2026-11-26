@@ -25,10 +25,15 @@ Lightweight Charts **5.0.9** и KLineChart **9.8.12** (`package.json:24–25`). 
 
 ## 2. Первичные public Pine источники
 
-Анонимный текстовый GET26.11.2026, SHA256 от UTF-8 поля source; полные source/bundles в Git не
-копируются. `last` изменяемый. Процесс унаследовал отключённую TLS verification: retrieval не
-является самостоятельной гарантией подлинности транспорта. SAR/ST hashes совпали также с независимым
-review. Аккаунт, Chrome, cookies и credentials не использовались.
+Версии/SHA ниже независимо подтверждены26.11.2026 через verified TLS: Python
+ssl.create_default_context()/HTTPSHandler, CERT_REQUIRED, check_hostname=True, HTTP200, без
+proxy/auth/cookies/аккаунта и redirects. [Review](../../ta-render-contract-readonly-review.md),
+[probe](../../ta-render-contract-verified-sources.py),
+[метаданные](../../ta-render-contract-verified-sources.json), HTTP Date01:01:07–08 GMT.
+Первоначальный авторский Node GET наследовал отключённую TLS verification и сам по себе не доказывал
+подлинность транспорта; этот исторический предел сохраняется. Теперь независимые verified hashes
+совпали для всех пяти sources. SHA256 относится к UTF-8 полю source; полные source/bundles не
+копируются. `last` изменяемый; Pine execution этим не подтверждён.
 
 | Public source                                                                              | Версия | SHA256 source                                                      | Строки source                              |
 | ------------------------------------------------------------------------------------------ | ------ | ------------------------------------------------------------------ | ------------------------------------------ |
@@ -143,6 +148,40 @@ gap probe; fallback — общий indexed segment renderer. Fill companion: fig
 переиспользуемые/ограниченные. Callbacks читают extendData, не захватывают chart. Сохраняются
 существующие weak-settlement/dispose правила (`src/charts/kline-technical.ts:39–49,69–86`).
 
+### Обязательная scale-neutral precision policy KLine
+
+Пустые figures/calc и visible=false **недостаточны**. Installed SDK задаёт default Normal/precision4
+(`index.esm.js:1040–1041`), а calcRange учитывает precision/min/max каждого indicator без visible
+guard (`:10307–10329,10394–10408`). В независимом extracted-native calcRange flat price1,
+native/owner precision6: baseline range≈8e-6; default4 companion расширяет его до≈8e-4 даже hidden/
+collapsed. Matching6 сохраняет весь range object. При native8 matching8 сохраняет≈8e-8. См.
+[review probe](../../ta-render-contract-review-probe.mjs),
+[результат](../../ta-render-contract-review-probe-output.json) и
+[собственную probe](../openspec/changes/ta-render-contract/probes/kline-precision-probe.mjs).
+
+Create сначала конструирует зарегистрированный class, вызывает synchronizeSeriesPrecision, затем
+_overrideInstance (`:4199–4201`). Поздний override series:Price не исправляет первый sync.
+setPrecision explicit меняет _precisionFlag только при фактическом изменении числа (`:1070–1077`);
+future native sync с flag=true пропускает pinned instance (`:4307–4328`). Поэтому explicit6 после
+native6 может остаться auto-sync, а тот же explicit6 после native8 закрепляет6. Проверять только
+последний descriptor/options недостаточно. Собственная probe исполняет extracted setPrecision/sync/
+calcRange и моделирует порядок create; actual native create/canvas она не выполняет.
+
+**Рекомендация автора для новых SAR/ST:** owner и companion регистрируются как Series.Price уже в
+class defaults, до первого create/sync; оба используют native-price sync policy без explicit
+precision в create/override. Одна native setPriceVolumePrecision обновляет обоих. Companion не
+задаёт minValue/maxValue/shouldOhlc/свою precision. Если owner policy меняется, companion обязан
+повторить его effective policy, а не просто текущее число. Нельзя читать/править private flag.
+Прежние42 и их current explicit6 path (`kline-technical.ts:80,251–252`) не менять попутно. Companion
+к legacy pinned owner не подключать без отдельного доказанного create/sync protocol.
+
+G7: actual registered owner/companion create→sync→override→native precision6→8→6→reconcile должны
+давать тот же native range/axis, что соответствующий owner без companion, при flat/узких ценах,
+visible/hidden/collapsed/remove. На hide/collapse SAR/ST figure values убираются из scale; одного
+native visible=false недостаточно. Companion precision остаётся нейтральной во всех этих состояниях.
+Нужны actual SDK create/sync integration tests и отдельный browser scale gate; extracted probe —
+доказательство риска и методов, не замена этим tests.
+
 ## 4. Предлагаемый typed контракт
 
 Только runtime, если явно не указано иное. Sketch предназначен для review; shared types здесь не
@@ -185,19 +224,6 @@ interface RenderDefinitionV2 {
   fills: readonly RenderFillV2[];
   internalSeriesKeys: readonly string[];
 }
-type ColorModeV2 = { kind: "default" } | { kind: "solid"; color: string };
-interface PersistedPlotStyleV2 {
-  colorMode?: ColorModeV2;
-  width?: number;
-  visible?: boolean;
-  opacity?: number;
-  lineStyle?: "solid" | "dashed" | "dotted";
-}
-interface PersistedFillStyleV2 {
-  colorMode?: ColorModeV2;
-  visible?: boolean;
-  opacity?: number;
-}
 ```
 
 TechnicalOutputDefinition и42 numeric results остаются допустимыми. Typed descriptor рядом с numeric
@@ -225,13 +251,76 @@ math cache остаётся по definition+params+полный вход и не
 output style.color → solid этого цвета, даже равного старому default. Width/opacity/visibility
 сохраняются. Reset к default должен быть явным; эвристика по равенству цвета запрещена.
 
-Предлагаемая будущая persistent instance v2, после отдельного review: сохранить
-ID/definitionId/params/pane/order; per-output style задаёт tagged
-`colorMode: {kind:"default"}|{kind:"solid",color:hex}`, optional width/opacity/visible/lineStyle;
-отдельные fillStyles по объявленным fill IDs. Cross size сначала использует existing width1..4 как
-относительный Pine размер с корректным названием UI; больший диапазон требует нового validator. Все
-tags — JSON scalars; defaults разрешаются при render, resolved palette не сохраняется. Новые v2 поля
-не добавляются в schemaVersion1.
+Новый period/source/params-only submit сохраняет исходный schemaVersion и точное отсутствие
+styles/output style. Defaults разрешаются для preview и не сериализуются. Такой edit не
+материализует defaultcolor и не превращает auto palette в solid. Для любого старого explicit color
+тот же edit сохраняет исходный style/solid. Проверяется actual form submit→JSON→read, не только
+resolver. Текущий form этому ещё не соответствует; это будущая обязательная UI правка.
+
+**Рекомендация автора: принять narrow instance v2 ниже после root contract review.** v1 требует
+color/width/visible у присутствующего output style (`instances.ts:34–48`), поэтому auto+width/
+opacity, независимый reset-to-auto с сохранением patches и полноценные fill/point settings в нём не
+представимы. Отсутствующий style даёт auto только без этих patches. Нельзя скрыть gap фиктивным
+defaultcolor, sidecar runtime state или расширением schemaVersion1. Полная TA функциональность
+авторизована; решение формата всё равно сначала предъявляется для review, а не внедряется здесь.
+
+```ts
+type ColorModeV2 = { mode: "auto" } | { mode: "solid"; color: string };
+type Size1To4 = 1 | 2 | 3 | 4;
+interface CommonPlotPatchV2 {
+  colorMode: ColorModeV2;
+  visible?: boolean;
+  opacity?: number;
+}
+type PlotPatchV2 = CommonPlotPatchV2 &
+  (
+    | { kind: "line"; width?: Size1To4; lineStyle?: "solid" | "dashed" | "dotted" }
+    | { kind: "columns" }
+    | { kind: "cross"; size?: Size1To4 }
+  );
+interface FillPatchV2 {
+  kind: "fill";
+  colorMode: ColorModeV2;
+  visible?: boolean;
+  opacity?: number;
+}
+interface PresentationV2 {
+  outputs?: Readonly<Record<string, PlotPatchV2>>;
+  fills?: Readonly<Record<string, FillPatchV2>>;
+}
+type ProposedInstanceV2 = {
+  [K in TechnicalIndicatorId]: Omit<
+    Extract<TechnicalIndicatorInstance, { definitionId: K }>,
+    "schemaVersion"
+  > & { schemaVersion: 2; presentation: PresentationV2 };
+}[TechnicalIndicatorId];
+```
+
+Это sketch нового union рядом с неизменным v1, не текущие shared types. V2 сохраняет прежние
+params/pane/id/order и необязательный **legacy styles bag** без изменения его значений. Новый
+presentation содержит только намеренные patches. Это минимальная добавка к v1, сохраняющая даже
+старые width/opacity/visibility/lineStyle, не применимые к новой geometry, без lossy conversion. V2
+validator требует хотя бы один output/fill patch; пустой v2 специально не создаётся. Цена решения —
+два явно определённых уровня оформления; отказ от legacy bag означал бы отдельную потерю/конверсию
+старых полей. Это конкретный compatibility trade-off для root review.
+
+Порядок разрешения: descriptor defaults → legacy styles → presentation fields. Для colorMode auto
+берётся **descriptor** color/palette независимо от legacy color; solid использует hex. Все
+неуказанные в patch независимые properties остаются из legacy/default. Auto для line/cross —
+статический defaultcolor; для columns — palette; auto fill — собственный direction-color descriptor,
+а не текущий ручной цвет линии. Color линии не перекрашивает fill без отдельного действия. Columns
+width задаётся bar spacing; cross size — Pine-relative1..4, glyph фиксирован cross, CSS stroke/arm
+profile runtime-only. Типизированные point controls: colorMode/size/visible/opacity; fill controls:
+colorMode/visible/opacity. Новые unsupported shape/gradient/radius поля отклоняются.
+
+Per-output reset-to-auto меняет только colorMode на `{mode:"auto"}`. Width/opacity/visible/
+lineStyle/size остальных outputs и fills не меняются. При legacy style создаётся минимальный
+geometry-specific auto patch поверх него; отсутствие legacy/output patch при уже auto остаётся
+отсутствием. Это отличается от явного отдельного полного reset plot. Первый **advanced style edit**
+после принятия v2 может повысить только редактируемый instance до2, копируя legacy bag; чтение,
+import, period edit и sync старые v1 не повышают/не переписывают. Manual v1 solid edits могут
+оставаться v1. UI должен показывать факт повышения совместимости перед его записью по принятой root
+policy; в research никакого повышения нет.
 
 Один migration owner атомарно меняет union/exact-key validator, settings/actions, JSON
 export/import, portable/storage paths и Drive whitelist с сохранением v1 reader. Текущие границы:
@@ -240,11 +329,29 @@ export/import, portable/storage paths и Drive whitelist с сохранение
 независим от TypeScript: правка только types теряет поля. Validation не пишет данные; unknown
 versions/keys, accessors/prototypes, invalid fill IDs и non-finite numbers отвергаются до import.
 
-Альтернатива без v2: reset удаляет целый v1 output style, теряя независимые width/visibility edits.
-Это допустимо только как явно выбранный ограниченный scope. Предпочтительный v2 сохраняет эти edits.
-Old readers не обязаны читать v2; export version/old-reader/rollback policy требует product
-approval. Текущий top-level backup schema1|2 относится к envelope и не решает эту задачу
-автоматически. В исследовании миграция не применяется.
+Exact validation нового предложения: mode auto принимает только mode; solid — mode+hex6; geometry
+kind должен совпадать с объявленным plot; output/fill IDs разрешены только descriptor. Width/size —
+integer1..4, opacity — finite0..1, visible — boolean, lineStyle — enum. Никаких
+NaN/Infinity/coercion/clamping. Legacy bag проверяется существующим v1 OutputStyle validator.
+Unknown instance>2, неизвестные discriminants/keys/schema не проектируются на известный subset.
+
+**Рекомендация export:** envelope3, если есть хотя бы один instance2; v1-only writer сохраняет
+existing envelope2. New reader поддерживает envelope1/2 с v1 и envelope3 с v1|v2; прежний envelope2
+не принимает instance2. Старый reader envelope3 обязан отказать без частичного import; фактические
+old-reader sync пути проверяются до выпуска. Это breaking export compatibility, не silent downgrade.
+Unsupported newer remote/schema переводит sync в unsupported/review-needed состояние: без import,
+apply, projection, local overwrite, upload/remote overwrite или изменения sync checkpoint. Raw
+данные не теряются и не заменяются «последней известной» v1 копией. Strict reject проходит **до**
+write/sync. Backup envelope1|2 сейчас не решает versioning instance автоматически. Envelope3 здесь
+предложение.
+
+Bounded альтернатива без v2: auto только при отсутствии output style; manualcolor solid; reset
+удаляет этот output style с явной потерей его width/opacity/visibility/lineStyle. Fill/point
+controls не сохраняются как полная функциональность, auto+width не предлагается как сохраняемый
+режим. Автор её не рекомендует для полного scope, но она допустима как честно ограниченный этап
+после root решения. До root contract review v2/envelope3 остаются исключительно proposal. Rollback
+после v2 записи требует v2-capable reader или явного lossy export с перечислением потерь;
+автоматического downgrade нет, старые v1 fixtures/профили не переписываются.
 
 ## 5. Владение и зависимости
 
@@ -295,9 +402,19 @@ options/ownership/input, но не доказывает paint библиотек
 - Ownership: hide/show/remove/reorder, pane move/collapse, duplicates/last instance, dispose до
   async calc; stale callback не рисует/не воссоздаёт pane. Нет global chart/timer retention/fill
   leak. Style edit не пересчитывает math и не сбрасывает camera.
+- KLine precision: actual registered Price owner/companion, create/sync-before-override, native6/8,
+  flat и очень узкие цены,6→8→6 и повторный reconcile, show/hide/collapse/remove. Сравнивать весь
+  native range/axis с baseline без companion. Воспроизвести equal/different explicit6 flag trap;
+  matching number на одном шаге не доказывает sync policy. Legacy42 frozen.
 - Persistence после approval: старые bytes/shape неизменны, strict v1/v2 roundtrip, unknown keys/
   accessors/NaN/Infinity rejected; JSON+Drive whitelist fixture staging до записи. Runtime graph не
   сериализуется. Live Drive для проверки fixture не используется.
+- Минимум JSON/Drive/UI: v1 absent-style period-submit остаётся v1 auto; old explicit color solid;
+  v2 auto+line width/opacity, crosssize и fill controls roundtrip с сохранением legacy bag; reset
+  одного output сохраняет остальные patches. Mixed envelope3 сохраняет v1+v2, envelope2 не принимает
+  instance2; old-reader unsupported envelope3 и unknown newer remote дают zero projection/apply/
+  write/upload/checkpoint. Проверить actual strict validator + Drive whitelist + sync spies, не
+  только JSON.stringify и не live Drive.
 
 ### Обязательная будущая actual browser matrix
 
@@ -335,6 +452,10 @@ Budget требует review; benchmark PASS здесь не заявлен.
    Tasks остаются gated; explicit v1 color solid, без equality heuristic и переписывания профилей.
 6. **Render metadata:** одобрить renderVersion2 при frozen numeric42/instance shape. Это намеренное
    изменение представления; выполнение всех TradingView TA/alerts не заявляется.
+
+7. **KLine companion precision:** empty/hidden companion сохраняет effective Price owner policy от
+   registration до первого sync/override и всех precision changes. Extracted probe подтверждает
+   риск/методы; actual registered create/sync + range/axis/browser gates не выполнены.
 
 ## 8. Проверки исследования и ограничения
 

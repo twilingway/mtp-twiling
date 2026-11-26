@@ -59,6 +59,18 @@ hidden anchor как самостоятельный plot.
 - **THEN** старый fill заканчивается на последнем валидном центре старой ветви
 - **AND** новый fill начинается на первом валидном центре новой ветви без диагонального моста
 
+### Requirement: Нейтральность fill для шкалы
+
+Система MUST сохранять одинаковый price range и precision при добавлении декоративного fill к тому
+же owner. Это правило действует для flat/узких цен, после смены native price precision,
+hide/collapse/remove; пустые или скрытые декоративные данные не изменяют шкалу.
+
+#### Scenario: Flat price и смена precision
+
+- **WHEN** при native precision6 затем8 добавляется fill к неизменному Supertrend owner
+- **THEN** весь native range/axis совпадает с соответствующим состоянием owner без fill
+- **AND** скрытие/collapse owner не добавляет scale effect от fill или hidden anchors
+
 ### Requirement: Порядок слоёв и существующий MTP
 
 Система SHALL рисовать grid ниже TA fills, fills ниже price, а cursor выше price/TA. Система MUST
@@ -100,11 +112,24 @@ hidden anchor как самостоятельный plot.
 - **WHEN** v1 instance содержит прежний default color после изменения period
 - **THEN** сохранённый цвет остаётся solid до явного reset пользователя
 
+#### Scenario: Новый period-only edit с auto
+
+- **WHEN** пользователь меняет только period у instance с отсутствующим output style
+- **THEN** actual submit и JSON roundtrip сохраняют отсутствие style и auto palette
+- **AND** defaultcolor не материализуется, schemaVersion не повышается из-за изменения period
+
 #### Scenario: Ручной цвет и возврат к default
 
 - **WHEN** пользователь выбирает ручной цвет, затем явно возвращает default palette
 - **THEN** ручной режим отключает palette, а явный reset включает её
 - **AND** остальные независимые настройки сохраняются в принятой версии оформления
+
+#### Scenario: Per-output reset в полном v2 оформлении
+
+- **WHEN** после принятия формата пользователь возвращает отдельный output из solid в auto
+- **THEN** меняется только его color mode, descriptor default/palette снова применяется
+- **AND** width/opacity/visibility/lineStyle/point size и оформление остальных plots/fills
+  сохраняются
 
 ### Requirement: Числовая и persistent совместимость
 
@@ -123,6 +148,24 @@ backup.
 
 - **WHEN** backup содержит runtime callback, неизвестную версию/ключ либо нечисловой style parameter
 - **THEN** импорт отклоняется до записи и текущие пользовательские данные сохраняются
+
+### Requirement: Безопасный отказ для newer формата
+
+Система MUST отклонять неизвестные newer envelope/instance/discriminants до projection, записи,
+apply или upload. Sync SHALL сообщать unsupported состояние без изменения local/remote data и
+checkpoint; отбрасывание неизвестных полей или silent downgrade запрещено.
+
+#### Scenario: Newer remote backup
+
+- **WHEN** sync получает backup с неподдерживаемой instance или envelope version
+- **THEN** локальные данные, remote backup и sync checkpoint не изменяются
+- **AND** неизвестные поля не проецируются на старый subset и не заменяются v1 копией
+
+#### Scenario: Старый v1 и явный advanced edit
+
+- **WHEN** v1 backup читается/importируется либо меняется только period
+- **THEN** v1 instances/styles не переписываются в v2
+- **AND** повышение конкретного instance возможно только по принятому контракту advanced style edit
 
 ### Requirement: Владение и проверка реального paint
 
