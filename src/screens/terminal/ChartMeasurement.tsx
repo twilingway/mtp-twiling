@@ -212,9 +212,10 @@ export function ChartMeasurementOverlay({
     result && result.percent !== null
       ? `${formatNumber(result.percent, 2, true, { locale })}%`
       : "—";
-  const cardWidth = Math.max(0, Math.min(188, width - 8));
-  const left = Math.max(4, Math.min(width - cardWidth - 4, midX - cardWidth / 2));
-  const top = Math.max(4, Math.min(height - 66, maxY + 10));
+  const inset = Math.min(6, width / 4, height / 4);
+  const cardWidth = Math.min(254, width - 2 * inset);
+  const left = Math.max(inset, Math.min(width - cardWidth - inset, midX - cardWidth / 2));
+  const top = Math.max(inset, Math.min(height - inset, maxY + 9));
   return (
     <div
       className="chart-measurement"
@@ -239,21 +240,34 @@ export function ChartMeasurementOverlay({
       </svg>
       <div
         className="chart-measurement-card"
-        style={{ left, top, width: cardWidth }}
+        data-compact={cardWidth < 185 || height < 110 ? "true" : undefined}
+        style={{
+          left,
+          top,
+          width: cardWidth,
+          maxHeight: height - 2 * inset,
+          // The translate percentage uses the card's actual height, including wrapped lines.
+          transform: `translateY(min(0px, calc(${height - inset - top}px - 100%)))`
+        }}
         role={selection.phase === "result" || !result ? "status" : undefined}
         aria-label={selection.phase === "result" ? text.result : undefined}
       >
         {result ? (
           <>
-            <strong>
-              {amount} <span>{percent}</span>
+            <strong className="chart-measurement-change">
+              <span>{amount}</span>
+              <span>{percent}</span>
             </strong>
-            <span>
-              {text.bars} {formatNumber(result.bars, 0, false, { locale })}
-            </span>
-            <span>
-              {text.elapsed} {elapsedText(result.elapsed, locale)}
-            </span>
+            <dl className="chart-measurement-stats">
+              <div>
+                <dt>{text.bars}</dt>
+                <dd>{formatNumber(result.bars, 0, false, { locale })}</dd>
+              </div>
+              <div>
+                <dt>{text.elapsed}</dt>
+                <dd>{elapsedText(result.elapsed, locale)}</dd>
+              </div>
+            </dl>
           </>
         ) : (
           text.second

@@ -19,7 +19,10 @@ function priceScaleApi() {
   });
   const module = { exports: {} };
   new vm.Script(`(function(require,module,exports){${output}\n})`).runInContext(context)(
-    () => ({ DomPosition: { YAxis: "yAxis", Main: "main" } }),
+    (name) =>
+      name === "klinecharts"
+        ? { DomPosition: { YAxis: "yAxis", Main: "main" } }
+        : { resetKlineSelectionPrice: () => false },
     module,
     module.exports
   );

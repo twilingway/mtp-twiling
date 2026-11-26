@@ -64,6 +64,7 @@
   }
 
   .topbar > .chart-layout-control,
+  .topbar > .chart-layout-picker,
   .workspace .chart-range-control[data-placement="footer"],
   .workspace .right-panel-tools {
     display: none;
@@ -175,6 +176,10 @@
   .mobile-workspace-layout summary {
     padding: 9px 8px;
     cursor: pointer;
+  }
+
+  .mobile-workspace-layout .chart-layout-variant-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .topbar

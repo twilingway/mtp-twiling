@@ -24,7 +24,8 @@ export function historyFirstDate(row: MarketRow, timeframe: Timeframe): number |
   const daily = timeframe === "1d" || timeframe === "1w" || timeframe === "1M";
   for (const value of [
     daily ? row.first1dayCandleDate : row.first1minCandleDate,
-    row.firstTradeDate
+    // OKX listTime can be later than the earliest candle in the public archive.
+    row.providerRef?.provider === "okx" ? undefined : row.firstTradeDate
   ]) {
     const timestamp = value ? Date.parse(value) : NaN;
     if (Number.isFinite(timestamp))

@@ -34,10 +34,12 @@ const Version = memo(function Version() {
 export function ChartPanel({
   slot = 1,
   active = true,
+  gridDepth = false,
   activate
 }: {
   slot?: number;
   active?: boolean;
+  gridDepth?: boolean;
   activate?: () => void;
 } = {}) {
   const [scrollTop, setScrollTop] = useState(0);
@@ -122,60 +124,70 @@ export function ChartPanel({
     >
       <div
         className="chart-heading"
-        style={{ maxHeight: headingHeight, visibility: headingHeight === 0 ? "hidden" : undefined }}
+        data-grid-depth={gridDepth || undefined}
+        style={{
+          maxHeight: headingHeight,
+          visibility: headingHeight === 0 ? "hidden" : undefined,
+          ...(gridDepth && price?.width && { width: price.width, right: "auto" })
+        }}
       >
-        <div className="instrument-title">
-          <button
-            type="button"
-            className="chart-instrument-button"
-            aria-haspopup="dialog"
-            aria-label={`${t("Инструмент графика")} ${slot} · ${row?.ticker ?? t("Найти инструмент")}`}
-            onClick={() =>
-              controller.setDialog(slot === 1 && !state.ready ? "account" : "instruments")
-            }
-          >
-            {row && (
-              <InstrumentIcon
-                key={row.uid ?? row.symbol}
-                row={row}
-                {...(slot === 1 ? { id: "chart-icon" } : {})}
+        <div className="chart-instrument-heading">
+          <div className="instrument-title">
+            <button
+              type="button"
+              className="chart-instrument-button"
+              aria-haspopup="dialog"
+              aria-label={`${t("Инструмент графика")} ${slot} · ${row?.ticker ?? t("Найти инструмент")}`}
+              onClick={() =>
+                controller.setDialog(slot === 1 && !state.ready ? "account" : "instruments")
+              }
+            >
+              {row && (
+                <InstrumentIcon
+                  key={row.uid ?? row.symbol}
+                  row={row}
+                  {...(slot === 1 ? { id: "chart-icon" } : {})}
+                />
+              )}
+              <span id={slot === 1 ? "instrument-name" : undefined}>
+                {row?.name ?? (p.symbol || t("Выберите инструмент"))}
+              </span>
+            </button>
+            <span
+              className="market-tag"
+              title={
+                row?.type === "currency"
+                  ? `${t("Валюта")} · ${
+                      row.exchange === "moex_close"
+                        ? t("MOEX · данные закрытия")
+                        : row.exchange === "dealer_fx_otc"
+                          ? t("Дилер · внебиржевой")
+                          : (row.classCode ?? row.exchange ?? "MOEX")
+                    }`
+                  : undefined
+              }
+            >
+              {row?.exchange === "dealer_fx_otc" || row?.realExchange === "REAL_EXCHANGE_DEALER"
+                ? t("Дилер")
+                : row?.providerRef
+                  ? `${providerLabel(row.providerRef)} · ${row.productKind === "spot" ? "Spot" : "USDT perpetual"}`
+                  : "MOEX"}
+            </span>
+            <span id={slot === 1 ? "chart-period" : undefined}>
+              {t(PERIOD_LABELS[p.timeframe])}
+            </span>
+            <SelectedDrawingLock />
+            {ohlcMode === "icon" && (
+              <OhlcLegendIcon
+                key={JSON.stringify([state.owner, p.symbol, p.instrumentUid, p.timeframe])}
+                bar={state.candles[barIndex]}
+                previousClose={state.candles[barIndex - 1]?.close}
+                digits={digits}
+                settings={p.chartSettings}
               />
             )}
-            <span id={slot === 1 ? "instrument-name" : undefined}>
-              {row?.name ?? (p.symbol || t("Выберите инструмент"))}
-            </span>
-          </button>
-          <span
-            className="market-tag"
-            title={
-              row?.type === "currency"
-                ? `${t("Валюта")} · ${
-                    row.exchange === "moex_close"
-                      ? t("MOEX · данные закрытия")
-                      : row.exchange === "dealer_fx_otc"
-                        ? t("Дилер · внебиржевой")
-                        : (row.classCode ?? row.exchange ?? "MOEX")
-                  }`
-                : undefined
-            }
-          >
-            {row?.exchange === "dealer_fx_otc" || row?.realExchange === "REAL_EXCHANGE_DEALER"
-              ? t("Дилер")
-              : row?.providerRef
-                ? `${providerLabel(row.providerRef)} · ${row.productKind === "spot" ? "Spot" : "USDT perpetual"}`
-                : "MOEX"}
-          </span>
-          <span id={slot === 1 ? "chart-period" : undefined}>{t(PERIOD_LABELS[p.timeframe])}</span>
-          <SelectedDrawingLock />
-          {ohlcMode === "icon" && (
-            <OhlcLegendIcon
-              key={JSON.stringify([state.owner, p.symbol, p.instrumentUid, p.timeframe])}
-              bar={state.candles[barIndex]}
-              previousClose={state.candles[barIndex - 1]?.close}
-              digits={digits}
-              settings={p.chartSettings}
-            />
-          )}
+          </div>
+          {gridDepth && <ChartRangeControl slot={slot} placement="plot" />}
         </div>
         {ohlcMode === "corner" && (
           <OhlcLegend
@@ -298,7 +310,7 @@ export function ChartPanel({
         </ChartGestures>
       </div>
       {slot === 1 && <ChartNavigation />}
-      <ChartRangeControl slot={slot} />
+      {!gridDepth && <ChartRangeControl slot={slot} />}
       {slot === 1 && <Version />}
     </section>
   );

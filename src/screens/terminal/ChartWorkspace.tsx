@@ -108,7 +108,7 @@ function ComparisonPanel({
     >
       <WorkspacePanelRuntime controller={controller} row={row} parentState={parentState}>
         {row ? (
-          <ChartPanel slot={slot} active={activeSlot === slot} />
+          <ChartPanel slot={slot} active={activeSlot === slot} gridDepth />
         ) : (
           <EmptyChartTitle slot={slot} open={() => controller.setDialog("instruments")} />
         )}
@@ -170,7 +170,7 @@ export function ChartWorkspace({
           />
         </section>
       ) : (
-        <ChartPanel active={activeSlot === 1} activate={activatePrimary} />
+        <ChartPanel active={activeSlot === 1} activate={activatePrimary} gridDepth={count > 1} />
       )}
       {layout.panes.slice(1).map((pane, index) => {
         return (

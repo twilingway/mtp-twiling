@@ -15,6 +15,7 @@ import type { WorkspaceSyncFlags } from "./workspace-sync.js";
 export interface ChartLayoutPickerProps {
   layoutId: ChartLayoutId;
   flags: WorkspaceSyncFlags;
+  disabled?: boolean;
   onLayoutChange: (id: ChartLayoutId) => void;
   onFlagChange: (key: keyof WorkspaceSyncFlags, enabled: boolean) => void;
 }
@@ -62,6 +63,7 @@ export function ChartLayoutThumbnail({ layout }: { layout: ChartLayoutDefinition
 export function ChartLayoutOptions({
   layoutId,
   flags,
+  disabled,
   onLayoutChange,
   onFlagChange
 }: ChartLayoutPickerProps) {
@@ -74,7 +76,7 @@ export function ChartLayoutOptions({
   const count = browsing?.fromLayoutId === layoutId ? browsing.count : currentCount;
   return (
     <div className="chart-layout-options">
-      <fieldset className="chart-layout-counts">
+      <fieldset className="chart-layout-counts" disabled={disabled}>
         <legend>{t("Число графиков")}</legend>
         <div className="chart-layout-count-grid">
           {CHART_LAYOUT_COUNTS.map((choice) => (
@@ -91,7 +93,7 @@ export function ChartLayoutOptions({
           ))}
         </div>
       </fieldset>
-      <fieldset className="chart-layout-variants">
+      <fieldset className="chart-layout-variants" disabled={disabled}>
         <legend>{t("Варианты раскладки")}</legend>
         <div className="chart-layout-variant-grid">
           {CHART_LAYOUTS.filter((layout) => layout.count === count).map((layout) => (
@@ -109,7 +111,7 @@ export function ChartLayoutOptions({
           ))}
         </div>
       </fieldset>
-      <fieldset className="chart-layout-sync-flags">
+      <fieldset className="chart-layout-sync-flags" disabled={disabled}>
         <legend>{t("Синхронизация графиков")}</legend>
         {syncOptions.map(([key, label]) => (
           <label key={key}>
@@ -168,6 +170,7 @@ export function ChartLayoutPicker(props: ChartLayoutPickerProps) {
         aria-label={`${label} · ${t("Число графиков")} ${count}`}
         aria-controls={id}
         aria-expanded={open}
+        disabled={props.disabled}
         title={label}
         onClick={() => setOpen(!open)}
       >

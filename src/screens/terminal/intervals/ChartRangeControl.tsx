@@ -15,17 +15,38 @@ const RANGE_OPTIONS = [
 export function ChartRangeControl({
   slot = 1,
   placement = "footer"
-}: { slot?: number; placement?: "footer" | "toolbar" } = {}) {
+}: { slot?: number; placement?: "footer" | "toolbar" | "plot" } = {}) {
   const { controller, state } = useTerminal();
   const days = state.preferences.rangeDays;
+  const plot = placement === "plot";
   const id =
-    placement === "toolbar" ? "mobile-chart-range" : slot === 1 ? "range" : `range-${slot}`;
+    placement === "toolbar"
+      ? "mobile-chart-range"
+      : plot
+        ? `range-plot-${slot}`
+        : slot === 1
+          ? "range"
+          : `range-${slot}`;
+  const label = plot ? `${t("Глубина загрузки")} · ${t("График")} ${slot}` : t("Период истории");
   return (
-    <div className="chart-range-control" data-placement={placement}>
-      <label htmlFor={id}>{t("История")}</label>
+    <div
+      className="chart-range-control"
+      data-placement={placement}
+      {...(plot && { title: `${label} · ${days} ${t("дн.")}` })}
+    >
+      {plot ? (
+        <label className="chart-depth-pill" htmlFor={id} aria-hidden="true">
+          <span className="chart-depth-icon" />
+          <span className="chart-depth-days">
+            {days} <span>{t("дн.")}</span>
+          </span>
+        </label>
+      ) : (
+        <label htmlFor={id}>{t("История")}</label>
+      )}
       <select
         id={id}
-        aria-label={t("Период истории")}
+        aria-label={label}
         value={days}
         disabled={
           state.loading ||

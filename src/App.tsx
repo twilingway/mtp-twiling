@@ -51,6 +51,7 @@ function Terminal() {
       : undefined;
   const editor = active?.editor ?? controller;
   const activeSlot = active?.slot ?? 1;
+  const layoutDisabled = !state.ready || !!state.profileTransition || !!state.importingBackup;
   useLayoutEffect(() => setActiveWorkspaceChart(controller, editor), [controller, editor]);
   useLayoutEffect(() => () => sync.reset(), [sync]);
   useLayoutEffect(
@@ -66,6 +67,14 @@ function Terminal() {
     setSelection(slot === 1 ? undefined : { owner: state.owner, slot, editor: next });
   };
   const updatePresentation = (next: WorkspacePresentation) => {
+    const current = controller.getSnapshot();
+    if (
+      layoutDisabled ||
+      current.owner !== owner ||
+      current.profileTransition ||
+      current.importingBackup
+    )
+      return;
     saveWorkspacePresentation(owner, next);
     setUpdated({ owner, presentation: next });
   };
@@ -84,7 +93,12 @@ function Terminal() {
       <LocaleEffect />
       <TerminalContext value={editor}>
         <Toolbar
-          layout={{ ...presentation, onLayoutChange: chooseLayout, onFlagChange: changeFlag }}
+          layout={{
+            ...presentation,
+            disabled: layoutDisabled,
+            onLayoutChange: chooseLayout,
+            onFlagChange: changeFlag
+          }}
           accountController={controller}
         />
       </TerminalContext>

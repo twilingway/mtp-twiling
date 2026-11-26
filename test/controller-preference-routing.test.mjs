@@ -2,6 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { routingFixture, deferred, until, find } from "./controller-preference-routing-fixture.mjs";
 
+test("switching the timeframe leaves the instrument drawings available during history loading", async (t) => {
+  const f = await routingFixture();
+  t.after(() => f.close());
+  const drawings = [{ id: "support", name: "horizontalStraightLine", points: [{ timestamp: 1, value: 10 }] }];
+  const view = deferred();
+  f.controller.update({ drawings });
+  f.hooks.loadView = async () => view.promise;
+  const switching = f.controller.setTimeframe("4h");
+  await until(() => f.controller.getSnapshot().preferences.timeframe === "4h");
+  assert.deepEqual(f.controller.getSnapshot().drawings, drawings);
+  view.resolve();
+  await switching;
+});
+
 for (const boundary of ["saveView", "editing.flush"]) {
   test(`independent TF/engine intents compose while ${boundary} waits, with old camera origin`, async (t) => {
     const f = await routingFixture();

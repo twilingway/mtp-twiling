@@ -75,6 +75,19 @@ test("first candle metadata clamps only valid dates, with UTC day normalization"
   assert.equal(planHistoryViewRange({ ...options, first: null }).earliest, HISTORY_FALLBACK_FIRST);
 });
 
+test("OKX catalog listing time does not truncate candles in the public archive", () => {
+  const row = {
+    providerRef: { provider: "okx", category: "spot", symbol: "BTC-USDT" },
+    firstTradeDate: "2021-01-29T08:00:00Z"
+  };
+  assert.equal(historyFirstDate(row, "1w"), null);
+  assert.equal(historyFirstDate(row, "5m"), null);
+  assert.equal(
+    historyFirstDate({ ...row, first1dayCandleDate: "2018-01-08T00:00:00Z" }, "1d"),
+    Date.parse("2018-01-08")
+  );
+});
+
 test("cross-symbol shared camera has no stale calendar target; legacy anchor counts actual viewport bars", () => {
   const shared = planHistoryViewRange({
     ...options,

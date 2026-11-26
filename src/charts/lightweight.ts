@@ -20,6 +20,7 @@ import { UserCameraEvents } from "./camera-events.js";
 import { lightweightLegacy } from "./lightweight-legacy.js";
 import { observeWorkspaceTouchScroll } from "./workspace-touch.js";
 import { lightweightTechnical } from "./lightweight-technical.js";
+import { lightweightDrawingX } from "./lightweight-drawing-projection.js";
 import { lightweightLink } from "./lightweight-link.js";
 import {
   preserveLightweightCamera,
@@ -212,11 +213,10 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     camera.nativeChanged();
   });
   function pointToPixel(point: DrawingPoint) {
-    const x = chart
-        .timeScale()
-        .logicalToCoordinate(
-          logicalForTime(data, point.timestamp, TIMEFRAMES[timeframe].ms) as Logical
-        ),
+    const x = lightweightDrawingX(
+        chart.timeScale(),
+        logicalForTime(data, point.timestamp, TIMEFRAMES[timeframe].ms)
+      ),
       y = series.priceToCoordinate(point.value);
     return x == null || y == null ? null : { x, y };
   }

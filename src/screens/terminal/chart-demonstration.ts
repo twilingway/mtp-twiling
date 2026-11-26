@@ -192,6 +192,8 @@ export function startChartDemonstration(
     const point = plot ? demonstrationPoint(event.clientX, event.clientY, plot) : null;
     if (!point) return;
     consumes(event);
+    const cursor = host.querySelector<HTMLElement>(":scope > .drawing-pointer");
+    if (cursor) cursor.style.display = "none";
     const stroke = { points: [point] };
     strokes = [...strokes.slice(-(maxStrokes - 1)), stroke];
     live = { pointer: event.pointerId, stroke };

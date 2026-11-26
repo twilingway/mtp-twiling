@@ -43,13 +43,20 @@ test("empty projected times do not invent candles and zero reference omits the p
   );
 });
 
-function renderMeasurement(start, end, from, to, preview = false) {
+function renderMeasurement(
+  start,
+  end,
+  from,
+  to,
+  preview = false,
+  { width = 400, height = 200, locale = "en" } = {}
+) {
   const jsx = (type, props) => ({ type, ...props });
   const load = createSourceLoader({
     react: {
       useEffect() {},
       useLayoutEffect() {},
-      useState: () => [{ from, to, width: 400, height: 200 }],
+      useState: () => [{ from, to, width, height }],
       useSyncExternalStore: (_subscribe, get) => get()
     },
     "react/jsx-runtime": { jsx, jsxs: jsx },
@@ -64,7 +71,7 @@ function renderMeasurement(start, end, from, to, preview = false) {
     if (preview) session.preview(end);
     else session.select(end);
   }
-  const state = { preferences: { locale: "en" }, rows: [], candles };
+  const state = { preferences: { locale }, rows: [], candles };
   const overlay = ChartMeasurementOverlay({ controller, state });
   const [svg, card] = overlay.children;
   const shapes = svg.children.filter(Boolean);
@@ -129,6 +136,33 @@ test("the ruler omits zero-length axes and keeps the other arrow and result", ()
   assert.deepEqual(samePoint.arrows, []);
   assert.equal(samePoint.points.length, 1);
   assert.equal(samePoint.card["aria-label"], "Measurement");
+});
+
+test("the card keeps a separate headline and stats and fits a narrow pane at its lower edge", () => {
+  const { card } = renderMeasurement(
+    point(fridayClose, 80),
+    point(mondayOpen, 120),
+    { x: 10, y: 38 },
+    { x: 89, y: 79 },
+    false,
+    { width: 92, height: 82, locale: "ru" }
+  );
+  assert.equal(card["data-compact"], "true");
+  assert.equal(card.style.width, 80);
+  assert.equal(card.style.left, 6);
+  assert.equal(card.style.top, 76);
+  assert.equal(card.style.maxHeight, 70);
+  assert.equal(card.style.transform, "translateY(min(0px, calc(0px - 100%)))");
+  const [change, stats] = card.children.children;
+  assert.equal(change.type, "strong");
+  assert.equal(change.children.length, 2);
+  assert.match(change.children[0].children, /40,00/);
+  assert.match(change.children[1].children, /50,00%/);
+  assert.equal(stats.type, "dl");
+  assert.deepEqual(
+    stats.children.map(({ children: [label] }) => label.children),
+    ["Свечи", "Время"]
+  );
 });
 
 function setup() {
