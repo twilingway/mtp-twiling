@@ -2,6 +2,7 @@ import type { CumulativeHistoryRequirement } from "./momentum-volume/metadata.js
 import type { VolumeFlowHistoryRequirement, VolumeFlowId } from "./volume-flow/metadata.js";
 import type { VolumeAverage } from "./volume-flow/parameters.js";
 import type { PresentationDefinition } from "./presentation-types.js";
+import type { TrendPriceId, TrendPriceHistoryRequirement } from "./trend-price-contract.js";
 import type {
   StateOscillatorId,
   StateOscillatorHistoryRequirement
@@ -46,7 +47,8 @@ export type TechnicalIndicatorId =
   | "vortex"
   | "choppiness-index"
   | VolumeFlowId
-  | StateOscillatorId;
+  | StateOscillatorId
+  | TrendPriceId;
 export type PriceSource = "open" | "high" | "low" | "close" | "hl2" | "hlc3" | "ohlc4" | "volume";
 export interface TechnicalBar {
   readonly timestamp: number;
@@ -57,6 +59,8 @@ export interface TechnicalBar {
   readonly volume: NumericValue;
 }
 export interface TechnicalParameters {
+  "parabolic-sar": { start: number; increment: number; maximum: number };
+  supertrend: { atrLength: number; factor: number };
   tsi: { longLength: number; shortLength: number; signalLength: number };
   kst: {
     roc1Length: number;
@@ -218,4 +222,5 @@ export type TechnicalHistoryRequirement =
   /** Reviewed accumulation policy; never substitute an EMA/recursive seed. */
   | CumulativeHistoryRequirement
   | VolumeFlowHistoryRequirement
-  | StateOscillatorHistoryRequirement;
+  | StateOscillatorHistoryRequirement
+  | TrendPriceHistoryRequirement;

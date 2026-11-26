@@ -9,6 +9,7 @@ import { volatilityIndicatorDefinitions } from "./volatility-definitions.js";
 import { trendStrengthIndicatorDefinitions } from "./trend-definitions.js";
 import { volumeIndicatorDefinitions } from "./volume-definitions.js";
 import { stateOscillatorDefinitions } from "./state-oscillator-definitions.js";
+import { trendPriceDefinitions } from "./trend-price-definitions.js";
 
 const reference = (name: string) =>
   `https://www.tradingview.com/pine-script-reference/v6/#fun_ta.${name}`;
@@ -178,7 +179,8 @@ export const technicalIndicatorDefinitions: readonly TechnicalIndicatorDefinitio
   ...volatilityIndicatorDefinitions,
   ...trendStrengthIndicatorDefinitions,
   ...volumeIndicatorDefinitions,
-  ...stateOscillatorDefinitions
+  ...stateOscillatorDefinitions,
+  ...trendPriceDefinitions
 ]);
 
 /** A real catalog limitation, not a claimed OHLCV implementation. No 224 fake calculators. */

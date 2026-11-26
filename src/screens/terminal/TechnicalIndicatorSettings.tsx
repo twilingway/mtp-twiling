@@ -21,6 +21,11 @@ import {
 const labels: Readonly<Record<string, readonly [string, string]>> = {
   length: ["Период", "Length"],
   source: ["Источник", "Source"],
+  atrLength: ["Период ATR", "ATR length"],
+  factor: ["Множитель", "Factor"],
+  start: ["Начальное ускорение", "Start"],
+  increment: ["Шаг ускорения", "Increment"],
+  maximum: ["Максимальное ускорение", "Maximum"],
   multiplier: ["Множитель", "Multiplier"],
   fastLength: ["Быстрый период", "Fast length"],
   slowLength: ["Медленный период", "Slow length"],
@@ -192,6 +197,9 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
           <legend>{text("Стиль", "Style")}</legend>
           {definition.outputs.map((output) => {
             const value = displayStyle(output.id, styles);
+            const cross = definition.presentation?.plots.some(
+              (plot) => plot.id === output.id && plot.geometry.kind === "cross"
+            );
             return (
               <div key={output.id} className="technical-output-style">
                 <label>
@@ -200,7 +208,11 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                     checked={value.visible}
                     onChange={(event) => style(output.id, { visible: event.target.checked })}
                   />
-                  {output.title}
+                  {output.id === "upTrend"
+                    ? text("Восходящий тренд", "Up Trend")
+                    : output.id === "downTrend"
+                      ? text("Нисходящий тренд", "Down Trend")
+                      : output.title}
                 </label>
                 <label>
                   {text("Цвет", "Color")}
@@ -211,7 +223,7 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                   />
                 </label>
                 <label>
-                  {text("Толщина", "Width")}
+                  {cross ? text("Размер", "Size") : text("Толщина", "Width")}
                   <input
                     type="number"
                     min="1"
@@ -221,21 +233,23 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                     onChange={(event) => style(output.id, { width: Number(event.target.value) })}
                   />
                 </label>
-                <label>
-                  {text("Линия", "Line")}
-                  <select
-                    value={value.lineStyle}
-                    onChange={(event) =>
-                      style(output.id, {
-                        lineStyle: event.target.value as NonNullable<OutputStyle["lineStyle"]>
-                      })
-                    }
-                  >
-                    <option value="solid">━━━━</option>
-                    <option value="dashed">╍ ╍ ╍</option>
-                    <option value="dotted">· · · · ·</option>
-                  </select>
-                </label>
+                {!cross && (
+                  <label>
+                    {text("Линия", "Line")}
+                    <select
+                      value={value.lineStyle}
+                      onChange={(event) =>
+                        style(output.id, {
+                          lineStyle: event.target.value as NonNullable<OutputStyle["lineStyle"]>
+                        })
+                      }
+                    >
+                      <option value="solid">━━━━</option>
+                      <option value="dashed">╍ ╍ ╍</option>
+                      <option value="dotted">· · · · ·</option>
+                    </select>
+                  </label>
+                )}
                 <label className="technical-opacity">
                   {text("Непрозрачность", "Opacity")}
                   <input
@@ -249,16 +263,25 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                   />
                   <output>{Math.round((value.opacity ?? 1) * 100)}%</output>
                 </label>
-                <svg width="100%" height="12" aria-hidden="true">
+                <svg width="100%" height={cross ? 16 : 12} aria-hidden="true">
                   <path
-                    d="M2 6H220"
+                    d={
+                      cross
+                        ? [12, 40, 68]
+                            .map((x) => {
+                              const arm = 2 + value.width;
+                              return `M${x - arm} 8H${x + arm}M${x} ${8 - arm}V${8 + arm}`;
+                            })
+                            .join("")
+                        : "M2 6H220"
+                    }
                     stroke={value.color}
-                    strokeWidth={value.width}
+                    strokeWidth={cross ? Math.max(1, value.width / 2) : value.width}
                     opacity={value.opacity}
                     strokeDasharray={
-                      value.lineStyle === "dashed"
+                      !cross && value.lineStyle === "dashed"
                         ? "8 5"
-                        : value.lineStyle === "dotted"
+                        : !cross && value.lineStyle === "dotted"
                           ? "2 4"
                           : undefined
                     }
