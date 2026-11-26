@@ -123,6 +123,7 @@ export interface TerminalState {
   authenticated: boolean;
   status: string;
   error: string | null;
+  watchlistStartup?: "loading" | "ready" | "error";
   rows: MarketRow[];
   pricesDirection: ReadonlyMap<string, "positive" | "negative">;
   preferences: TerminalPreferences;

@@ -60,6 +60,7 @@ export class TerminalController {
     marketReady: false,
     status: "offline",
     error: null,
+    watchlistStartup: "loading",
     rows: resolveWatchlist([], [], []),
     pricesDirection: new Map(),
     preferences: defaultPreferences(),

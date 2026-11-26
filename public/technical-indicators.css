@@ -103,11 +103,24 @@
   position: absolute;
   inset-block-start: 0;
   inset-inline-end: 4px;
-  pointer-events: auto;
+  opacity: 0;
+  pointer-events: none;
   border: 1px solid var(--control-line);
   border-radius: 5px;
   background: var(--surface-input);
   color: var(--text);
+}
+.technical-pane-legend:is([data-pane-hover="true"], [data-pane-touch="true"], :has(:focus-visible))
+  > .technical-pane-actions,
+.technical-pane-actions[data-menu-open="true"] {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: hover) and (pointer: fine) {
+  .technical-pane-actions:hover {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 .technical-pane-actions button {
   display: grid;
@@ -122,6 +135,10 @@
 }
 .technical-pane-actions button:is(:hover, :focus-visible, [aria-pressed="true"]) {
   background: var(--surface-hover);
+}
+.technical-pane-actions button[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
 }
 .technical-pane-actions svg {
   width: 14px;

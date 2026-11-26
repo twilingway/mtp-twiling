@@ -8,6 +8,7 @@ import { ChartLayoutPicker } from "./ChartLayoutPicker.js";
 import type { ChartLayoutPickerProps } from "./ChartLayoutPicker.js";
 import { publishWorkspaceTimeframe } from "./workspace-sync-controller.js";
 import type { TerminalController } from "./controller.js";
+import { TerminalBrandMenu } from "./TerminalBrandMenu.js";
 import { TerminalFullscreenControl } from "./TerminalFullscreenControl.js";
 import { TerminalIndicatorControls } from "./TerminalIndicatorControls.js";
 import { MobileChartTools } from "./MobileChartTools.js";
@@ -38,12 +39,12 @@ export function Toolbar({
   const accountState = account === controller ? state : account.getSnapshot();
   return (
     <header className="topbar">
-      <a className="brand" href="./" aria-label="MTP TWILING" title="MTP TWILING">
-        <img className="brand-icon" src="./icon.svg" width={25} height={25} alt="" />
-        <span>
-          MTP <b>TWILING</b>
-        </span>
-      </a>
+      <TerminalBrandMenu
+        key={accountState.owner}
+        account={account}
+        accountState={accountState}
+        editor={controller}
+      />
       <div className="divider" />
       <div className="chart-symbol-controls">
         <button
