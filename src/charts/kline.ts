@@ -12,6 +12,7 @@ import { PendingChartView, signedRightOffset } from "./view-camera.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { stablePriceAxisWidth } from "./price-axis-layout.js";
 import { chartPalette } from "../model/theme.js";
+import { lastPriceStyle } from "../model/last-price-style.js";
 import { attachCalendarXAxis } from "./kline-calendar-axis.js";
 import { klineDateFormatter } from "../i18n/chart-formatters.js";
 import { intlLocale } from "../i18n/preferences.js";
@@ -46,6 +47,9 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     container.clientWidth
   );
   const palette = chartPalette(settings);
+  const lastPriceUp = lastPriceStyle(settings, true);
+  const lastPriceDown = lastPriceStyle(settings, false);
+  let lastPriceText = lastPriceUp.text;
   const model = new MtpModel();
   if (settings.indicatorOptions) model.styles = settings.indicatorOptions;
   model.styleKey = indicators.mtpAll ? "mtpAll" : undefined;
@@ -108,11 +112,12 @@ export function makeKline(options: ChartOptions): ChartAdapter {
         tooltip: { showRule: TooltipShowRule.None },
         priceMark: {
           last: {
-            show: settings.priceLine !== false,
-            upColor: settings.upColor ?? "#53b987",
-            downColor: settings.downColor ?? "#eb4d5c",
-            noChangeColor: settings.upColor ?? "#53b987",
-            text: { color: "#fff", paddingLeft: 4, paddingRight: 4 }
+            show: true,
+            line: { show: settings.priceLine !== false },
+            upColor: lastPriceUp.color,
+            downColor: lastPriceDown.color,
+            noChangeColor: lastPriceUp.color,
+            text: { color: lastPriceText, paddingLeft: 4, paddingRight: 4 }
           }
         }
       },
@@ -131,6 +136,13 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     }
   });
   if (!chart) throw new Error("Не удалось создать KLineChart.");
+  const updateLastPriceText = () => {
+    const latest = data.at(-1);
+    const text = latest && latest.close < latest.open ? lastPriceDown.text : lastPriceUp.text;
+    if (text === lastPriceText) return;
+    lastPriceText = text;
+    chart.setStyles({ candle: { priceMark: { last: { text: { color: text } } } } });
+  };
   const detachCalendarXAxis = attachCalendarXAxis(
     chart,
     () => data,
@@ -284,6 +296,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       if (live.retired) return;
       dataReady = false;
       data = [...next];
+      updateLastPriceText();
       model.reset(data, activeMtpPeriods(indicators));
       technical?.setData(data);
       chart.applyNewData(data);
@@ -309,6 +322,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       }
       if (historical) model.reset(data, activeMtpPeriods(indicators));
       else model.update(data);
+      updateLastPriceText();
       technical?.setData(data);
       if (historical) {
         camera.programmatic(() => preserveKlineCamera(chart, () => chart.applyNewData(data)));

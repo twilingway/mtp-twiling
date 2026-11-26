@@ -262,7 +262,22 @@ const turnover = defineCatalogStudy<"volume-24-hours", VolumeStudyParameters["vo
       "https://www.tradingview.com/support/solutions/43000668584-24-hour-volume/",
       "https://bybit-exchange.github.io/docs/v5/market/kline",
       "https://app.okx.com/docs-v5/en/#rest-api-market-data-get-candlesticks-history"
-    ]
+    ],
+    presentation: {
+      renderVersion: 2,
+      precisionPolicy: "compact-number",
+      hiddenSeries: [],
+      fills: [],
+      plots: [
+        {
+          id: "value",
+          seriesKey: "value",
+          geometry: { kind: "line", gaps: "legacy" },
+          color: { kind: "solid", color: "#396bce" },
+          width: 1
+        }
+      ]
+    }
   },
   history: () => ({
     warmupBars: 1,

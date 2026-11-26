@@ -10,6 +10,7 @@ import { focusRange } from "./navigation.js";
 import { PendingChartView } from "./view-camera.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { chartPalette } from "../model/theme.js";
+import { lastPriceStyle } from "../model/last-price-style.js";
 import { hasCalendarAxis } from "../model/intervals/axis-ticks.js";
 import { paintCalendarAxis, paintCalendarGrid } from "./lightweight-calendar-grid.js";
 import { lightweightDateFormatters } from "../i18n/chart-formatters.js";
@@ -235,13 +236,12 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       lastPriceLabel = null;
       return;
     }
-    const color =
-      bar.close >= bar.open ? (settings.upColor ?? "#53b987") : (settings.downColor ?? "#eb4d5c");
+    const { color, text } = lastPriceStyle(settings, bar.close >= bar.open);
     const label = {
       price: bar.close,
       color,
       axisLabelColor: color,
-      axisLabelTextColor: "#fff",
+      axisLabelTextColor: text,
       axisLabelVisible: true,
       lineVisible: settings.priceLine !== false,
       lineWidth: 1 as const,

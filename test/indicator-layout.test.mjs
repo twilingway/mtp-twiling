@@ -9,7 +9,7 @@ import ts from "typescript";
 const root = fileURLToPath(new URL("../src/", import.meta.url));
 function sources(overrides = {}, globals = {}) {
   const cells = new Map(),
-    context = vm.createContext({ console, Date, Map, Math, Promise, queueMicrotask, ...globals });
+    context = vm.createContext({ console, Date, EventTarget, Map, Math, Promise, queueMicrotask, ...globals });
   function load(relative) {
     let filename = path.resolve(root, relative).replace(/\.js$/, ".ts");
     if (!existsSync(filename) && filename.endsWith(".ts")) filename = filename + "x";

@@ -1,4 +1,7 @@
 import { intlLocale } from "../i18n/preferences.js";
+import { paintLineText } from "./drawing-line-text.js";
+import { rectangleBounds, rectangleEdges } from "./drawing-screen-geometry.js";
+import type { DrawingRectangle } from "./drawing-screen-geometry.js";
 import type {
   DrawingDraft,
   DrawingPoint,
@@ -15,6 +18,7 @@ export const TOOL_NAMES: Record<DrawingTool, string> = {
   horizontalStraightLine: "Горизонтальная линия",
   horizontalRayLine: "Горизонтальный луч",
   verticalStraightLine: "Вертикальная линия",
+  rectangle: "Прямоугольник",
   fibonacciLine: "Коррекция Фибоначчи",
   fibonacciExtension: "Расширение Фибоначчи по тренду"
 };
@@ -77,7 +81,15 @@ export type ResolvedDrawingStyle = Required<
   Omit<DrawingSettings, "levelStyles" | "oneColor" | "extend">
 > &
   Pick<DrawingSettings, "levelStyles" | "oneColor" | "extend">;
-export function drawingStyle(d: { settings?: DrawingSettings }): ResolvedDrawingStyle {
+export function drawingHasLineText(name: DrawingTool): boolean {
+  return name !== "rectangle" && !name.startsWith("fibonacci");
+}
+
+export function drawingStyle(d: {
+  name?: DrawingTool;
+  settings?: DrawingSettings;
+}): ResolvedDrawingStyle {
+  const lineText = d.name !== undefined && drawingHasLineText(d.name);
   return {
     color: "#f4df30",
     width: 2,
@@ -102,8 +114,8 @@ export function drawingStyle(d: { settings?: DrawingSettings }): ResolvedDrawing
     fontSize: 12,
     textEnabled: true,
     text: "",
-    textAlign: "center",
-    textVertical: "center",
+    textAlign: lineText ? "left" : "center",
+    textVertical: lineText ? "top" : "center",
     ...d.settings
   };
 }
@@ -130,18 +142,27 @@ export function lineEnds(
       { x: 0, y: a.y },
       { x: width, y: a.y }
     ];
-  if (kind === "horizontalRayLine") return [a, { x: width, y: a.y }];
+  if (kind === "horizontalRayLine") return a.x <= width ? [a, { x: width, y: a.y }] : null;
   if (kind === "verticalStraightLine")
     return [
       { x: a.x, y: 0 },
       { x: a.x, y: height }
     ];
-  if (!b) return null;
+  if (!b || kind === "rectangle") return null;
   if (kind === "segment") return [a, b];
   const dx = b.x - a.x,
     dy = b.y - a.y;
-  if (Math.abs(dx) < 0.01) return [a, { x: a.x, y: dy >= 0 ? height : 0 }];
+  if (Math.abs(dx) < 0.01) {
+    if (kind === "straightLine")
+      return [
+        { x: a.x, y: 0 },
+        { x: a.x, y: height }
+      ];
+    if (dy >= 0 ? a.y > height : a.y < 0) return null;
+    return [a, { x: a.x, y: dy >= 0 ? height : 0 }];
+  }
   const at = (x: number) => ({ x, y: a.y + ((x - a.x) * dy) / dx });
+  if (kind === "rayLine" && (dx >= 0 ? a.x > width : a.x < 0)) return null;
   return kind === "rayLine" ? [a, at(dx >= 0 ? width : 0)] : [at(0), at(width)];
 }
 export function segmentDistance(p: PixelPoint, a: PixelPoint, b: PixelPoint): number {
@@ -158,6 +179,7 @@ interface BaseGeometry {
   points: PixelPoint[];
   style: ResolvedDrawingStyle;
   lines: [PixelPoint, PixelPoint][];
+  rectangle?: DrawingRectangle;
 }
 interface FibGeometry extends BaseGeometry {
   levels: {
@@ -192,6 +214,11 @@ export function drawingGeometry(
     a = points[0],
     b = points[1];
   if (!a) return null;
+  if (d.name === "rectangle") {
+    if (!b) return { points, style, lines: [] };
+    const rectangle = rectangleBounds(a, b);
+    return { points, style, rectangle, lines: rectangleEdges(rectangle) };
+  }
   if (!d.name.startsWith("fibonacci")) {
     const line = lineEnds(a, b, width, height, d.name);
     return { points, style, lines: line ? [line] : [] };
@@ -390,13 +417,25 @@ export function paintDrawings(
           y
         );
       }
-    } else
+    } else if (g.rectangle) {
+      const { left, top, right, bottom } = g.rectangle;
+      if (g.style.fill) {
+        ctx.globalAlpha = g.style.opacity;
+        ctx.fillStyle = g.style.color;
+        ctx.fillRect(left, top, right - left, bottom - top);
+        ctx.globalAlpha = g.style.lineOpacity;
+      }
+      ctx.strokeRect(left, top, right - left, bottom - top);
+    } else {
       for (const [a, b] of g.lines) {
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
         ctx.stroke();
       }
+      const line = g.lines[0];
+      if (line && drawingHasLineText(d.name)) paintLineText(ctx, line, g.style, width, height);
+    }
     ctx.globalAlpha = 1;
     ctx.setLineDash([]);
     if (d.id === selected)
@@ -434,6 +473,17 @@ export function hitDrawing(
       );
       if (handle >= 0) return { id: drawing.id, handle };
       if (geometry.lines.some(([a, b]) => segmentDistance(point, a, b) < 7))
+        return { id: drawing.id, handle: -1 };
+      const rectangle = geometry.rectangle;
+      if (
+        rectangle &&
+        geometry.style.fill &&
+        geometry.style.opacity > 0 &&
+        point.x >= rectangle.left &&
+        point.x <= rectangle.right &&
+        point.y >= rectangle.top &&
+        point.y <= rectangle.bottom
+      )
         return { id: drawing.id, handle: -1 };
     }
   }

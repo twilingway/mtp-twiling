@@ -164,10 +164,11 @@ export function lightweightTechnical(
     (output.presentation?.geometry.kind === "line" &&
       output.presentation.geometry.gaps === "break");
   function outputOptions(output: TechnicalRenderOutput, fillCarrier = false) {
+    const policy = output.presentation?.precisionPolicy;
     const original: AutoscaleInfoProvider = (original) =>
       !disposed && alive() && output.style.visible ? original() : null;
     const autoscaleInfoProvider =
-      output.presentation?.precisionPolicy === "fixed-2"
+      policy === "fixed-2"
         ? referenceContext.autoscale(
             output.instanceId,
             output.paneKey,
@@ -177,11 +178,13 @@ export function lightweightTechnical(
           )
         : original;
     return {
-      ...(output.presentation?.precisionPolicy === "fixed-2"
+      ...(policy === "fixed-2"
         ? { priceFormat: { type: "price" as const, precision: 2, minMove: 0.01 } }
-        : output.presentation?.precisionPolicy === "native-price" && primary
-          ? { priceFormat: primary().options().priceFormat }
-          : {}),
+        : policy === "compact-number" && output.paneKey !== "price"
+          ? { priceFormat: { type: "volume" as const, precision: 2, minMove: 0.01 } }
+          : (policy === "native-price" || policy === "compact-number") && primary
+            ? { priceFormat: primary().options().priceFormat }
+            : {}),
       color: lineColor(output.style.color, output.style.opacity),
       visible: output.style.visible || fillCarrier,
       priceScaleId: "right",

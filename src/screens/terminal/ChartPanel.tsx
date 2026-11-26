@@ -11,6 +11,7 @@ import { InstrumentIcon } from "./Watchlist.js";
 import { ChartCanvas, ChartGestures } from "./ChartSurface.js";
 import { ImageLayer } from "./ImageLayer.js";
 import { DrawingAxisLabels } from "./DrawingAxisLabels.js";
+import { SelectedDrawingLock } from "./SelectedDrawingLock.js";
 import { CandleCountdown } from "./CandleCountdown.js";
 import { IndicatorLegend } from "./IndicatorLegend.js";
 import { OhlcLegend } from "./OhlcLegend.js";
@@ -26,6 +27,7 @@ const Version = memo(function Version() {
 });
 export function ChartPanel() {
   const [scrollTop, setScrollTop] = useState(0);
+  const drawingProjection = useMemo(() => new EventTarget(), []);
   const { controller, state } = useTerminal(),
     metrics = useTechnicalPaneMetrics(controller),
     price = metrics.find((metric) => metric.key === "price"),
@@ -87,6 +89,7 @@ export function ChartPanel() {
                 : "MOEX"}
           </span>
           <span id="chart-period">{t(PERIOD_LABELS[p.timeframe])}</span>
+          <SelectedDrawingLock />
         </div>
         <OhlcLegend
           bar={bar}
@@ -111,9 +114,9 @@ export function ChartPanel() {
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       >
         <ChartGestures>
-          <ChartCanvas supplemental={supplemental} />
+          <ChartCanvas supplemental={supplemental} drawingProjection={drawingProjection} />
           <ImageLayer />
-          <DrawingAxisLabels />
+          <DrawingAxisLabels drawingProjection={drawingProjection} />
           <CandleCountdown />
           <SupplementalStudyStatusContext.Provider value={studyStatus}>
             <TechnicalIndicatorPanels metrics={metrics} />

@@ -21,6 +21,7 @@ import type {
 import {
   eligiblePublicPlots,
   klineNativeDomain,
+  klinePlotPrecision,
   neutralKlinePrecision
 } from "./kline-native-domain.js";
 
@@ -57,10 +58,16 @@ function memberSettled(weak: WeakRef<Completion>, epoch: number) {
   };
 }
 const registered = new Set<string>();
+const familyPrefixes: Record<PlotPrecisionPolicy, string> = {
+  "legacy-fixed-6": "",
+  "native-price": "PRICE_",
+  "fixed-2": "FIXED2_",
+  "compact-number": "COMPACT_"
+};
 function family(slot: number, policy: PlotPrecisionPolicy, fill: boolean, active: boolean): string {
   if (slot >= 100) throw new RangeError("Too many native TA slots");
   const price = active && policy === "native-price";
-  const name = `PERSONAL_TA_${fill ? "FILL_" : ""}${active ? (price ? "PRICE_" : policy === "fixed-2" ? "FIXED2_" : "") : "IDLE_"}${slot}`;
+  const name = `PERSONAL_TA_${fill ? "FILL_" : ""}${active ? familyPrefixes[policy] : "IDLE_"}${slot}`;
   if (!registered.has(name)) {
     registered.add(name);
     registerIndicator<Row>({
@@ -85,6 +92,9 @@ function primary(plan: Plan, active: boolean, precision: number): IndicatorCreat
     name: family(plan.slot, policy, false, active),
     shortName: "",
     ...(!active || policy !== "native-price" ? { precision } : {}),
+    ...(active && policy === "compact-number" && plan.paneId !== "candle_pane"
+      ? { shouldFormatBigNumber: true }
+      : {}),
     series:
       active && policy !== "fixed-2" && (policy === "native-price" || plan.paneId === "candle_pane")
         ? IndicatorSeries.Price
@@ -315,7 +325,9 @@ export function klineNativeMembers(chart: Chart, alive: () => boolean, axisName:
         install(
           plan,
           eligible,
-          eligible ? (plan.policy === "fixed-2" ? 2 : 6) : (precisions.get(plan.paneId) ?? 0),
+          eligible
+            ? klinePlotPrecision(plan.policy, plan.paneId)
+            : (precisions.get(plan.paneId) ?? 0),
           force
         );
       }

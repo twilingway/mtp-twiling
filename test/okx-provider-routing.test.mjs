@@ -351,7 +351,7 @@ test("keeps mixed exchanges subscribed and delivers only selected OKX candles an
     const okxStream = f.streams.find((stream) => stream.provider === "okx");
     const bybitStream = f.streams.find((stream) => stream.provider === "bybit");
     assert.deepEqual(okxStream.subscriptions.tickers, [row.providerRef]);
-    assert.deepEqual(okxStream.subscriptions.candle, { ref: row.providerRef, timeframe: "1m" });
+    assert.deepEqual(okxStream.subscriptions.candles, [{ ref: row.providerRef, timeframe: "1m" }]);
     assert.deepEqual(bybitStream.subscriptions, { tickers: ["BTCUSDT"], candles: [] });
     const tick = {
       timestamp: start,
@@ -373,7 +373,7 @@ test("keeps mixed exchanges subscribed and delivers only selected OKX candles an
     assert.deepEqual(f.reconnects, [{ provider: "okx", category: "spot" }]);
     f.client.subscribeCandles(bybit.uid, "1m");
     okxStream.options.onReconnect();
-    assert.equal(okxStream.subscriptions.candle, null);
+    assert.deepEqual(okxStream.subscriptions.candles, []);
     assert.equal(f.reconnects.length, 1);
     bybitStream.options.onState("open");
     bybitStream.options.onState("open");

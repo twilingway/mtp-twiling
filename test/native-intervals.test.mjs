@@ -37,7 +37,8 @@ function sources(globals = {}, overrides = {}) {
     const filename = path.resolve(root, relative).replace(/\.js$/, ".ts");
     const key = path.relative(root, filename).replaceAll(path.sep, "/");
     assert.ok(!key.startsWith("../"));
-    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts"))
+      return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (modules.has(key)) return modules.get(key).exports;
     const module = { exports: {} };
@@ -138,7 +139,8 @@ function bankFixture() {
     writes,
     reads,
     cached,
-    deliver: (message) => transports[0].callbacks.data(message)
+    deliver: (message) => transports[0].callbacks.data(message),
+    open: () => transports[0].callbacks.open()
   };
 }
 
@@ -212,6 +214,82 @@ test("same UID subscription change cannot save a late old-interval bar into the 
   });
   await f.client.flush();
   assert.equal(f.writes.length, 1);
+});
+test("multiple bank candle views share subscriptions and reconnect with exact surviving topics", async () => {
+  const f = bankFixture();
+  const price = (units) => ({ units });
+  const deliver = (uid, timeframe, close) =>
+    f.deliver({
+      candle: {
+        instrumentUid: uid,
+        interval: codec.TIMEFRAMES[timeframe].stream,
+        time: "2024-03-01T00:00:00Z",
+        open: price(10),
+        high: price(12),
+        low: price(9),
+        close: price(close),
+        volume: "3"
+      }
+    });
+  const received = [];
+  let reconnects = 0;
+  f.client.addEventListener("candle", ({ detail }) => received.push(detail));
+  f.client.addEventListener("reconnect", () => reconnects++);
+  f.client.subscribeCandles("uid-a", "2m");
+  const releasePrimaryPeer = f.client.retainCandle("uid-a", "2m");
+  const releaseOther = f.client.retainCandle("uid-b", "1h");
+  const releaseOtherPeer = f.client.retainCandle("uid-b", "1h");
+  assert.equal(f.subscriptions.length, 2);
+  const history = await f.client.candles(
+    "SAME",
+    "1h",
+    { from: at("2024-03-01T00:00:00Z"), to: now },
+    { uid: "uid-a" },
+    false
+  );
+  assert.equal(history.candles.length, 1);
+  assert.equal(f.subscriptions.length, 2);
+  f.writes.length = 0;
+  f.open();
+  assert.deepEqual(plain(f.subscriptions.at(-1).subscribeCandlesRequest.instruments), [
+    { instrumentId: "uid-a", interval: codec.TIMEFRAMES["2m"].stream },
+    { instrumentId: "uid-b", interval: codec.TIMEFRAMES["1h"].stream }
+  ]);
+  assert.equal(reconnects, 0);
+  f.client.subscribeCandles("uid-a", "1M");
+  releaseOther();
+  deliver("uid-a", "2m", 10);
+  deliver("uid-a", "1M", 11);
+  deliver("uid-b", "1h", 12);
+  deliver("uid-b", "1d", 99);
+  await f.client.flush();
+  assert.deepEqual(
+    received.map(({ uid, bar }) => [uid, bar.close]),
+    [
+      ["uid-a", 10],
+      ["uid-a", 11],
+      ["uid-b", 12]
+    ]
+  );
+  assert.deepEqual(
+    f.writes.map(({ uid, timeframe }) => [uid, timeframe]),
+    [
+      ["uid-a", "2m"],
+      ["uid-a", "1M"],
+      ["uid-b", "1h"]
+    ]
+  );
+  releasePrimaryPeer();
+  releaseOtherPeer();
+  releaseOtherPeer();
+  deliver("uid-a", "2m", 12);
+  deliver("uid-b", "1h", 12);
+  f.open();
+  assert.equal(reconnects, 1);
+  assert.deepEqual(plain(f.subscriptions.at(-1).subscribeCandlesRequest.instruments), [
+    { instrumentId: "uid-a", interval: codec.TIMEFRAMES["1M"].stream }
+  ]);
+  assert.equal(received.length, 3);
 });
 test("every native stream persists its own actual interval", async () => {
   const f = bankFixture();

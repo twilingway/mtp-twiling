@@ -1,6 +1,7 @@
 import type { BybitInstrument } from "./providers/bybit/types.js";
 import type { OkxInstrument } from "./providers/okx/types.js";
 import { providerSeriesId } from "../model/market-provider.js";
+import type { OkxProviderRef } from "../model/market-provider.js";
 import type { CatalogInstrument, InstrumentKind, MarketRow } from "../model/types.js";
 
 export interface PublicQuote {
@@ -9,6 +10,19 @@ export interface PublicQuote {
   lastPrice: number | null;
   previousPrice24h: number | null;
   changePercent24h: number | null;
+}
+
+export function marketTuple(item: BybitInstrument | OkxInstrument): string {
+  return JSON.stringify([
+    item.ref.category,
+    item.baseCoin.toUpperCase(),
+    item.quoteCoin.toUpperCase(),
+    item.settleCoin?.toUpperCase() ?? null
+  ]);
+}
+
+export function okxRefs(rows: readonly MarketRow[]): OkxProviderRef[] {
+  return rows.flatMap((row) => (row.providerRef?.provider === "okx" ? [row.providerRef] : []));
 }
 
 export function publicCatalogInstrument(item: BybitInstrument): CatalogInstrument {

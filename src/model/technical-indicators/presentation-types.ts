@@ -1,7 +1,7 @@
 import type { NumericSeries, OutputStyle } from "./types.js";
 
 export type PlotSize = 1 | 2 | 3 | 4;
-export type PlotPrecisionPolicy = "legacy-fixed-6" | "native-price" | "fixed-2";
+export type PlotPrecisionPolicy = "legacy-fixed-6" | "native-price" | "fixed-2" | "compact-number";
 export type PlotColorPolicy =
   | { readonly kind: "solid"; readonly color: string }
   | {

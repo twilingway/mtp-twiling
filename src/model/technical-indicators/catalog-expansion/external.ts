@@ -159,6 +159,7 @@ const openInterest = defineCatalogStudy<"open-interest", ExternalStudyParameters
     ],
     presentation: {
       renderVersion: 2,
+      precisionPolicy: "fixed-2",
       hiddenSeries: [],
       fills: [],
       plots: [

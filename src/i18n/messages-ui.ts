@@ -142,6 +142,8 @@ export const uiMessages = {
   "Линии сетки": "Grid lines",
   "Названия индикаторов": "Indicator names",
   "Линия последней цены": "Last price line",
+  "Свой цвет последней цены": "Custom last price color",
+  "Цвет последней цены": "Last price color",
   "Отсчёт до закрытия свечи": "Countdown to candle close",
   "Размер шрифта шкал": "Scale font size",
   Ок: "OK",

@@ -18,6 +18,7 @@ import type { DraftSettings, SettingsDraft } from "./drawing-settings-model.js";
 import { DrawingStyleFields } from "./DrawingStyleFields.js";
 import { DrawingCoordinatesFields } from "./DrawingCoordinatesFields.js";
 import { DrawingVisibilityFields } from "./DrawingVisibilityFields.js";
+import { LockIcon } from "../VisibilityIcon.js";
 
 export function DrawingSettingsDialog() {
   const { state } = useTerminal();
@@ -43,6 +44,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
   const [error, setError] = useState("");
   const [colorTarget, setColorTarget] = useState<ColorTarget | null>(null);
   const settings = draft.settings;
+  const drawingLockLabel = draft.lock ? t("Разблокировать объект") : t("Заблокировать объект");
   const close = () => {
     if (token.current) controller.drawingSettings.cancel(token.current);
     controller.setDialog(null);
@@ -69,10 +71,16 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
   const change = <K extends keyof DraftSettings>(key: K, value: DraftSettings[K]) =>
     setDraft((previous) => ({ ...previous, settings: { ...previous.settings, [key]: value } }));
   const point = (index: number, patch: Partial<DrawingPoint>) =>
-    setDraft((previous) => ({
-      ...previous,
-      points: previous.points.map((value, i) => (i === index ? { ...value, ...patch } : value))
-    }));
+    setDraft((previous) =>
+      previous.lock
+        ? previous
+        : {
+            ...previous,
+            points: previous.points.map((value, i) =>
+              i === index ? { ...value, ...patch } : value
+            )
+          }
+    );
   const level = (index: number, patch: Partial<FibLevelStyle>) =>
     change(
       "levelStyles",
@@ -114,7 +122,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
   const applyTemplate = (template: DrawingTemplate) =>
     setDraft((previous) => ({
       ...previous,
-      settings: initialSettings(template),
+      settings: initialSettings({ ...template, name: previous.name }),
       visibility: { ...defaultVisibility(), ...structuredClone(template.visibility) }
     }));
   const setColor = (color: string) => {
@@ -132,6 +140,16 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
       >
         <header>
           <h2>{t(TOOL_NAMES[draft.name])}</h2>
+          <button
+            type="button"
+            className="selected-drawing-lock"
+            aria-label={drawingLockLabel}
+            title={drawingLockLabel}
+            aria-pressed={!!draft.lock}
+            onClick={() => setDraft((previous) => ({ ...previous, lock: !previous.lock }))}
+          >
+            <LockIcon locked={!!draft.lock} />
+          </button>
           <button type="button" aria-label={t("Закрыть настройки")} onClick={close}>
             ×
           </button>
@@ -182,7 +200,12 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
           />
         </section>
         <section data-settings-page="coordinates" hidden={tab !== "coordinates"}>
-          <DrawingCoordinatesFields points={draft.points} point={point} setError={setError} />
+          <DrawingCoordinatesFields
+            points={draft.points}
+            point={point}
+            setError={setError}
+            disabled={!!draft.lock}
+          />
         </section>
         <section data-settings-page="visibility" hidden={tab !== "visibility"}>
           <DrawingVisibilityFields value={draft.visibility} visibility={visibility} />
@@ -194,7 +217,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
           <DrawingTemplateMenu
             getDrawing={candidate}
             onApply={applyTemplate}
-            onReset={() => setDraft({ ...draft, settings: initialSettings({}) })}
+            onReset={() => setDraft({ ...draft, settings: initialSettings({ name: draft.name }) })}
           />
           <span />
           <button type="button" onClick={close}>
