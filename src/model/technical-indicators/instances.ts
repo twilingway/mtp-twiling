@@ -92,13 +92,15 @@ export function isTechnicalIndicatorInstance(value: unknown): value is Technical
       const entry = params[parameter.key];
       return parameter.type === "source"
         ? PRICE_SOURCES.some((source) => source === entry)
-        : parameter.type === "choice"
-          ? parameter.choices.some((choice) => choice === entry)
-          : typeof entry === "number" &&
-            Number.isFinite(entry) &&
-            entry >= parameter.min &&
-            entry <= parameter.max &&
-            (parameter.type !== "integer" || Number.isInteger(entry));
+        : parameter.type === "boolean"
+          ? typeof entry === "boolean"
+          : parameter.type === "choice"
+            ? parameter.choices.some((choice) => choice === entry)
+            : typeof entry === "number" &&
+              Number.isFinite(entry) &&
+              entry >= parameter.min &&
+              entry <= parameter.max &&
+              (parameter.type !== "integer" || Number.isInteger(entry));
     })
   )
     return false;

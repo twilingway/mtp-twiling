@@ -1,5 +1,5 @@
 import { get, all, transaction } from "./storage-db.js";
-import { object, normaliseRows, imageAsset } from "./types.js";
+import { object, normaliseRows, imageAsset, normalizeLocalProfileSelection } from "./types.js";
 import { validateBackup, isDrawing, isChartView } from "../model/backup-format.js";
 import { isBankIdentity, providerRefFromId } from "../model/market-provider.js";
 import { isInstrumentViewKey } from "../model/instrument-symbol.js";
@@ -54,7 +54,7 @@ async function migrate(owner: string, valid: () => boolean, signal?: AbortSignal
         schemaVersion: 1,
         drawings: [],
         images: [],
-        layout: raw.value
+        layout: normalizeLocalProfileSelection(raw.value)
       }).layout;
       writes.push({
         store: "preferences",

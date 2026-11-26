@@ -11,6 +11,7 @@ import { volumeIndicatorDefinitions } from "./volume-definitions.js";
 import { stateOscillatorDefinitions } from "./state-oscillator-definitions.js";
 import { trendPriceDefinitions } from "./trend-price-definitions.js";
 import { channelPriceDefinitions } from "./channel-average-definitions.js";
+import { keltnerDefinition } from "./keltner-definition.js";
 
 const reference = (name: string) =>
   `https://www.tradingview.com/pine-script-reference/v6/#fun_ta.${name}`;
@@ -182,7 +183,8 @@ export const technicalIndicatorDefinitions: readonly TechnicalIndicatorDefinitio
   ...volumeIndicatorDefinitions,
   ...stateOscillatorDefinitions,
   ...trendPriceDefinitions,
-  ...channelPriceDefinitions
+  ...channelPriceDefinitions,
+  keltnerDefinition
 ]);
 
 /** A real catalog limitation, not a claimed OHLCV implementation. No 224 fake calculators. */

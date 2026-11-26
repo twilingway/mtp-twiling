@@ -30,10 +30,12 @@ export const driveMessages = {
   "Автоматическая синхронизация": "Automatic sync",
   "Не удалось сохранить настройку синхронизации": "Could not save the sync preference",
   "Выберите сохраняемую версию": "Choose the version to keep",
-  "Выбранная версия заменит настройки, рисунки и изображения этого профиля. История котировок и ключ сохранятся. Прежние облачные снимки останутся на Google Диске.":
-    "The selected version replaces this profile's settings, drawings and images. Quote history and your key are retained. Previous cloud snapshots remain in Google Drive.",
+  "В подключённом Google Диске нет ранее синхронизированной версии. Подтвердите отправку копии настроек, рисунков и изображений с этого устройства.":
+    "The connected Google Drive has no previously synced version. Confirm that you want to send a copy of this device's settings, drawings and images.",
+  "Облачная версия заменит настройки, рисунки и изображения этого профиля. История котировок, ключ и прежние облачные снимки сохранятся.":
+    "The cloud version replaces this profile's settings, drawings and images. Quote history, your key and previous cloud snapshots are retained.",
   "На этом устройстве": "On this device",
-  "Сохранить версию устройства": "Keep this device's version",
+  "Отправить версию устройства на Google Диск": "Send this device's version to Google Drive",
   "Google Диск": "Google Drive",
   "Использовать эту версию Google Диска": "Use this Google Drive version",
   "Вход Google действует до истечения сессии или перезагрузки приложения. После этого войдите повторно; сохранённые данные останутся.":

@@ -50,13 +50,14 @@ export const EXPECTED_COMPUTED_IDS = Object.freeze([
   "supertrend",
   "alma",
   "lsma",
-  "chandelier-exit"
+  "chandelier-exit",
+  "keltner-channels"
 ]);
 export const EXPECTED_COMPUTED_COUNT = EXPECTED_COMPUTED_IDS.length;
 export const EXPECTED_TECHNICAL_COUNT = EXPECTED_COMPUTED_COUNT + 1; // Existing Volume.
 export const EXPECTED_LIBRARY_COUNT = EXPECTED_TECHNICAL_COUNT + 4; // Existing MTP scripts.
 export const EXPECTED_DRIVE_PARAMETER_KEYS = Object.freeze(
-  "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength diLength adxSmoothing divisor emaLength oscillatorAverage signalAverage longLength shortLength roc1Length roc2Length roc3Length roc4Length sma1Length sma2Length sma3Length sma4Length atrLength factor start increment maximum offset sigma".split(
+  "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength diLength adxSmoothing divisor emaLength oscillatorAverage signalAverage longLength shortLength roc1Length roc2Length roc3Length roc4Length sma1Length sma2Length sma3Length sma4Length atrLength factor start increment maximum offset sigma useExponentialMa bandsStyle".split(
     " "
   )
 );

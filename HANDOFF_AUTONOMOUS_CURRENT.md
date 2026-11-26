@@ -2,12 +2,49 @@
 
 Обновление 26.11.2026. Этот файл важнее исторических статусов в HANDOFF_NEXT_SESSION.md. Цель
 остаётся активной: привычный интерфейс и функции TradingView, без потери пользовательских данных.
-Пользователь спит и разрешил автономный отдельный Chrome. Обычный Chrome не трогать; ручной Google
-login отложить. Ответы коротко по-русски. Реальный cap — четыре агента с root.
+Приоритет текущей сессии — реальная проверка Google Drive, перевод OAuth в Production и выпуск PWA.
+Для Google пользователь разрешил обычный Chrome и участвует при входе. Тесты установки ведутся в
+отдельном профиле. Остальные TA остаются в очереди после выпуска.
 
-## Опубликовано
+## Текущий проверенный срез — выпуск 0.3.23
 
-### Текущий проверенный статус — 26.11.2026, выпуск 0.3.22
+- Public/canonical main `62a1a36f2409911f6bdb029f37e0bfe14e852489`, build `4f05a9f589fb0222`. PR10
+  merged; PR CI run28 и main CI run29 success. Full 1112/1112, strict specs 57/57. Штатный timer
+  выпустил .23 UTC 04:49:22.998, wall 13.143s, peak 192.2MiB. Все 67 canonical/native/public HTTPS
+  hashes совпали; CSP/UTF-8/лимиты/соседи/таймер сохранены.
+- Публично 50 вычисляемых TA + объём + 4 MTP. SAR/Supertrend/ALMA/LSMA/Chandelier, pane
+  order/collapse/height intent и Drive reader guard включены. Полные standalone/combined native и
+  product checks описаны в `docs/RELEASE_0323_INTEGRATION.md`.
+- Public .22→.23 прошла одним штатным Update: старые 11 TA/параметры/styles/панели/рисунки/rawGuest
+  и камера сохранены reload/offline. Оба SDK, SAR/ST, compact crosshair, RU/EN light/dark mobile; 35
+  PNG просмотрены, page errors 0. У 65 offline ресурсов совпали body/MIME hashes. Own Chrome закрыт,
+  исходный профиль 404/404 файлов не изменён; canonical 5210/PID9604 сохранён.
+- Evidence в локальном workspace `vps/artifacts`:
+  `deploy-release-readiness/auto-release-0323-proof.json`, `public-0323-pwa-qa/report.json`.
+  Реальный Google/телефон/установленное окно PWA не проверены.
+
+## Текущие независимые задачи
+
+- Кандидат .24 KC: 51 вычисляемый TA. На `8306dd6` прошли CI и проверки обоих SDK. `43b210d` закрыл
+  замечание о мобильной форме. Детали, границы проверок Drive и PWA — в
+  `docs/RELEASE_0324_INTEGRATION.md`.
+- Pure пять relative oscillators: fixed `e08f4662399dfb634bc41d00909419213041af4b`, independent
+  2200/2200 + 139 tests PASS, source-only. Stoch RSI/Coppock pre-registration contract выполняется;
+  остальные требуют offset/palette. Precision/default colors сверяются по primary, не угадываются.
+- Plot-offset native prototype и lifecycle follow-up приняты как source evidence. K past-domain
+  zero-gap, camera/base-index/relative scale и production consumer gates остаются открытыми.
+- Crowded mobile: 11 панелей могут исчерпать collapsed-only minimum. A/B proof готов, но меняется
+  смысл heightRatio/capture; production/migration не реализованы и решение ещё не принято.
+- Остальные drawing tools/Fib, custom intervals, OKX и настоящая Google sync остаются открытыми.
+  Новые instance2/envelope3/DB3 writers не разрешены и не реализованы; G5 proposal отдельно.
+
+Ниже сохранён **исторический** реестр до выпуска .23. Его старые active/source/public пометки не
+являются текущей приёмкой. Актуальные машинные checkpoints и подробные QA находятся в локальных
+артефактах; они не включают реальные ключи или пользовательские профили в Git.
+
+## Исторический реестр публикаций
+
+### Исторический проверенный статус — выпуск 0.3.22
 
 - Public/canonical main `131e38e81fe8b10a53132806c3ccbac29f4d33d6`, build `59e00dca6d4d2d16`. PR9
   merged; PR CI45741077445/run25 и main CI45741596672/run26 success. Full842/842, strict specs49/49.
@@ -28,7 +65,7 @@ login отложить. Ответы коротко по-русски. Реал�
 - Canonical main чистый и собран; server.mjs прежний, managed own5210/session24824 не
   перезапускался.
 
-### Следующая рабочая ветка 0.3.23 — не опубликовано
+### История подготовки 0.3.23 до публикации
 
 Актуальный срез описан в `docs/RELEASE_0323_INTEGRATION.md`:50 computed TA, исправление queued pane
 intent16a8601, reader guard8315/6651 с сохранением Google credential. Source50 без guard прошёл

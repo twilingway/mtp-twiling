@@ -30,6 +30,8 @@ export function technicalCalculationUnavailableReason(
   instance: TechnicalIndicatorInstance,
   barCount: number
 ): "calculation-limit" | undefined {
+  if (instance.definitionId === "keltner-channels")
+    return barCount > MAX_CHANNEL_AVERAGE_BARS ? "calculation-limit" : undefined;
   if (!isChannelPriceInstance(instance)) return undefined;
   if (barCount > MAX_CHANNEL_AVERAGE_BARS) return "calculation-limit";
   if (

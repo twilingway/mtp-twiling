@@ -234,7 +234,29 @@ for(const phase of ["owner","session","logout"]){
     const {driveBackupDigest}=f.load("services/drive/backup.ts");
     let state={owner:"A",name:"Test",authenticated:true,preferences:{},chartRevision:0};
     let client={rows:[],start:async()=>({})}, profile={owner:"A",session:client,authenticated:true,blocked:false};
-    const initial=backup(1),incoming=backup(100),base=crypto.randomUUID(),head=crypto.randomUUID();
+    const initial = backup(1), incoming = backup(100);
+    const { DriveSync } = f.load("services/drive/sync.ts");
+    const { DRIVE_NAMESPACE } = f.load("services/drive/types.ts");
+    const files = new Map();
+    const remote = new DriveSync({
+      list: async kind => [...files.values()]
+        .map(entry => entry.file)
+        .filter(file => file.appProperties.mtpKind === kind),
+      read: async file => files.get(file.id).body,
+      create: async (kind, key, hash, body) => {
+        const file = {
+          id: crypto.randomUUID(),
+          name: key,
+          size: body.size,
+          appProperties: { mtpNamespace: DRIVE_NAMESPACE, mtpKind: kind, mtpKey: key, mtpHash: hash }
+        };
+        files.set(file.id, { file, body });
+        return file;
+      }
+    });
+    const deviceId = crypto.randomUUID();
+    const { nodeId: base } = await remote.publish(initial, { deviceId, parents: [] });
+    const { nodeId: head } = await remote.publish(incoming, { deviceId, parents: [base] });
     let importedSignal,commits=0,authorized=false;
     const transfers=new TerminalBackups({
       getState:()=>state,getClient:()=>client,getChart:()=>null,isAlive:()=>true,
@@ -247,8 +269,16 @@ for(const phase of ["owner","session","logout"]){
       importBackup:async(data,options)=>{importedSignal=options.signal;await transfers.import(data,options);}
     },{
       auth:{prepare:async()=>{},restore:async()=>undefined,suspend:()=>{if(authorized)a.controller.abort();},connectFromUserGesture:()=>{authorized=true;return Promise.resolve({connectionId:crypto.randomUUID(),signal:a.signal,getAccessToken:()=>"fake",invalidate:()=>a.controller.abort()});},disconnect:async()=>{if(authorized)a.controller.abort();}},
-      sync:()=>({inspect:async()=>({heads:[head],snapshots:[],conflict:false}),download:async()=>incoming,validateHeads:async()=>{},
-        publish:async()=>assert.fail("must pull"),resolve:async()=>assert.fail("must pull")}),
+      sync: () => ({
+        inspect: () => remote.inspect(),
+        download: (nodeId, inspection) => {
+          assert.equal(nodeId, head);
+          return remote.download(nodeId, inspection);
+        },
+        validateHeads: inspection => remote.validateHeads(inspection),
+        publish: async () => assert.fail("must pull"),
+        resolve: async () => assert.fail("must pull")
+      }),
       load:async()=>({schemaVersion:1,deviceId:crypto.randomUUID(),markerId:crypto.randomUUID(),baseHeads:[base],lastSyncedDigest:await driveBackupDigest(initial),automatic:false}),
       save:async()=>assert.fail("aborted import cannot be accepted")
     });

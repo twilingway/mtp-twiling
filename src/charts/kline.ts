@@ -270,6 +270,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       if (!changed) return;
       camera.programmatic(() => {
         chart.setPriceVolumePrecision(next.precision, 0);
+        technical?.refreshNativeMetadata();
         // KLine 9.8 updates only its precision store; invalidate native labels via public API.
         chart.setStyles({});
       });

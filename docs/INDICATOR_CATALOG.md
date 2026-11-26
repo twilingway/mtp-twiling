@@ -6,16 +6,16 @@ options. RU/EN имена, IDs, версии и категории взяты и
 строки. Каталог может отличаться между версиями и тарифами. Приватные, купленные и community scripts
 в снимок не включены. Metadata каталога сама по себе не содержит формулы и input defaults.
 
-В версии 0.3.23 реализованы **50 вычисляемых TA-индикаторов**, объём и четыре пользовательских
-MTP-скрипта. Это 51 доступный встроенный индикатор и 55 доступных записей всей библиотеки.
+В кандидате 0.3.24 реализован **51 вычисляемый TA-индикатор**, объём и четыре пользовательских
+MTP-скрипта. Это 52 доступных встроенных индикатора и 56 доступных записей всей библиотеки.
 Вычисляемые IDs закреплены в `test/technical-registry-expectation.mjs`: ожидания меняются только
 после приёмки новой регистрации, а исторические witnesses сохраняются.
 
 Доступны средние SMA/EMA/WMA/VWMA/DEMA/TEMA/HMA/SMMA/ALMA/LSMA; RSI, Stochastic, MACD, Momentum,
 ROC, CCI, Williams %R, CMO, Ultimate Oscillator, TRIX, Awesome Oscillator, Balance of Power, TSI,
-KST и Fisher Transform; ATR, Bollinger Bands/%B/Bandwidth, Historical Volatility; Aroon/Aroon
-Oscillator, DMI/ADX, Vortex, Choppiness, Parabolic SAR, Supertrend и Chandelier Exit; MFI, OBV, ADL,
-PVT, CMF, Chaikin Oscillator, EFI, EOM, Volume Oscillator, NVI и PVI.
+KST и Fisher Transform; ATR, Bollinger Bands/%B/Bandwidth, Historical Volatility, Keltner Channels;
+Aroon/Aroon Oscillator, DMI/ADX, Vortex, Choppiness, Parabolic SAR, Supertrend и Chandelier Exit;
+MFI, OBV, ADL, PVT, CMF, Chaikin Oscillator, EFI, EOM, Volume Oscillator, NVI и PVI.
 
 Отображение на ценовом графике или в отдельной панели задаётся определением индикатора и может
 меняться пользователем. Политика native scale сохраняется при переносе. Доступность записи каталога

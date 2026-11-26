@@ -75,8 +75,10 @@ export function needsDriveConflict(
   record: DriveRecord,
   digest: string
 ): boolean {
+  const knownNodes = new Set(inspection.snapshots.map(({ manifest }) => manifest.nodeId));
   return (
     inspection.conflict ||
+    record.baseHeads.some((nodeId) => !knownNodes.has(nodeId)) ||
     (!!inspection.heads.length &&
       [...inspection.heads].sort().join() !== [...record.baseHeads].sort().join() &&
       digest !== record.lastSyncedDigest)
