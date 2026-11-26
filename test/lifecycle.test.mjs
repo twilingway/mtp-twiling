@@ -540,6 +540,10 @@ function pwaElements() {
 
 test("browser shell advertises an installable web app", () => {
   const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+  const capture = '<script src="./pwa-install-entry.js"></script>';
+  assert.ok(html.includes(capture));
+  assert.ok(html.indexOf(capture) < html.indexOf('rel="manifest"'));
+  assert.ok(html.indexOf(capture) < html.indexOf('src="./app-entry.js"'));
   assert.match(html, /<link\b[^>]*\brel="manifest"[^>]*\bhref="\.\/manifest\.webmanifest"/);
   const manifest = JSON.parse(
     readFileSync(new URL("../public/manifest.webmanifest", import.meta.url), "utf8")
@@ -608,7 +612,7 @@ test("browser shell offers updates after saving", async (t) => {
   assert.deepEqual(calls, ["save", "save", "ACTIVATE_UPDATE", "reload"]);
 });
 
-test("PWA installation consumes one prompt, shows a replacement and clears the actions on dispose", async (t) => {
+test("PWA installation keeps an early prompt, offers a replacement and disposes its listeners", async (t) => {
   const { nodes, window, document, Element, Button } = pwaElements();
   const actions = nodes.get("install-actions"),
     install = nodes.get("install-app"),
@@ -616,7 +620,7 @@ test("PWA installation consumes one prompt, shows a replacement and clears the a
     calls = [],
     notices = [];
   serviceWorker.register = async () => new TrackedTarget();
-  const { setupPwa } = sourceModules(
+  const modules = sourceModules(
     {
       HTMLElement: Element,
       HTMLButtonElement: Button,
@@ -627,12 +631,7 @@ test("PWA installation consumes one prompt, shows a replacement and clears the a
       clearInterval: () => {}
     },
     { "generated/app-version.ts": { APP_VERSION: "source-only", BUILD_ID: "source-only" } }
-  ).load("services/pwa.ts");
-  const dispose = await setupPwa({
-    notify: (notice) => notices.push(notice),
-    flush: async () => {}
-  });
-  t.after(dispose);
+  );
   const capturePrompt = (name) => {
     const choice = deferred();
     const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
@@ -644,8 +643,19 @@ test("PWA installation consumes one prompt, shows a replacement and clears the a
   };
   const click = () => install.dispatchEvent(new Event("click"));
 
-  assert.equal(actions.hidden, true);
+  modules.load("pwa-install-entry.ts");
+  capturePrompt("superseded");
   const first = capturePrompt("first");
+  assert.equal(actions.hidden, true);
+  assert.equal(window.listenerCount, 2);
+  const { setupPwa } = modules.load("services/pwa.ts");
+  const dispose = await setupPwa({
+    notify: (notice) => notices.push(notice),
+    flush: async () => {}
+  });
+  t.after(dispose);
+  assert.equal(window.takeMtpInstallPrompt, undefined);
+  assert.equal(window.listenerCount, 3);
   assert.equal(actions.hidden, false);
   click();
   click();
@@ -683,6 +693,20 @@ test("PWA installation consumes one prompt, shows a replacement and clears the a
   window.dispatchEvent(new Event("appinstalled"));
   assert.deepEqual(calls, ["first", "second", "fresh"]);
   assert.deepEqual(notices, ["Приложение установлено."]);
+});
+
+test("installation before React mounts clears the buffered prompt", () => {
+  const window = new TrackedTarget();
+  sourceModules({ window }).load("pwa-install-entry.ts");
+  const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+    prompt: () => {},
+    userChoice: Promise.resolve({ outcome: "accepted" })
+  });
+  assert.equal(window.dispatchEvent(event), false);
+  window.dispatchEvent(new Event("appinstalled"));
+  assert.equal(window.takeMtpInstallPrompt(), null);
+  assert.equal(window.takeMtpInstallPrompt, undefined);
+  assert.equal(window.listenerCount, 0);
 });
 
 test("aborting PWA setup during registration removes listeners and prevents late checks", async () => {

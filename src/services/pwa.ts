@@ -1,16 +1,11 @@
 import { APP_VERSION, BUILD_ID } from "../generated/app-version.js";
+import { isInstallPrompt, type InstallPrompt } from "./install-prompt.js";
 
 interface PwaOptions {
   notify: (message: string) => void;
   flush: () => Promise<unknown>;
   appBase?: string | URL;
   signal?: AbortSignal;
-}
-
-type InstallPrompt = Event & { prompt: () => unknown; userChoice: unknown };
-
-function isInstallPrompt(event: Event): event is InstallPrompt {
-  return "prompt" in event && typeof event.prompt === "function" && "userChoice" in event;
 }
 
 function element<T extends HTMLElement>(id: string, constructor: new () => T): T {
@@ -59,13 +54,16 @@ export async function setupPwa({
     if (!signal.aborted && registration?.waiting && navigator.serviceWorker.controller)
       banner.hidden = false;
   };
+  const offerInstall = (prompt: InstallPrompt) => {
+    installPrompt = prompt;
+    installActions.hidden = installPromptPending;
+  };
   window.addEventListener(
     "beforeinstallprompt",
     (event) => {
       if (!isInstallPrompt(event)) return;
       event.preventDefault();
-      installPrompt = event;
-      installActions.hidden = installPromptPending;
+      offerInstall(event);
     },
     { signal }
   );
@@ -78,6 +76,8 @@ export async function setupPwa({
     },
     { signal }
   );
+  const earlyPrompt = window.takeMtpInstallPrompt?.();
+  if (earlyPrompt) offerInstall(earlyPrompt);
   installButton.addEventListener(
     "click",
     () => {
