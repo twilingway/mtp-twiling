@@ -1,4 +1,5 @@
 import { TOOL_NAMES } from "./drawing-model.js";
+import { validNativeChartTypeField } from "./native-chart-type.js";
 import { isInstrumentSymbol, isInstrumentViewKey } from "./instrument-symbol.js";
 import { validBackupProviders, validLayoutProvider, validRowProvider } from "./backup-provider.js";
 import { isProviderRef, isMarketAssetClass } from "./market-provider.js";
@@ -224,6 +225,7 @@ export function isPriceAxisLabelThemes(value: unknown): boolean {
 export function isChartSettings(value: unknown): value is ChartSettings {
   return (
     isRecord(value) &&
+    validNativeChartTypeField(value) &&
     fields(value, {
       theme: member(["dark", "light"]),
       drawingTools: isDrawingToolbarSettings,

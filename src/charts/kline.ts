@@ -6,7 +6,7 @@ import type { Candle, ChartView, DrawingPoint } from "../model/types.js";
 import { logicalForTime, timeForLogical } from "./adapter.js";
 import { chartPriceFormat } from "./price-format.js";
 import type { ChartAdapter, ChartOptions } from "./adapter.js";
-import { beginKlinePan, freezeKlinePriceScale, resetKlinePriceScale } from "./kline-price-scale.js";
+import { beginKlinePan, freezeKlinePriceScale } from "./kline-price-scale.js";
 import { focusRange } from "./navigation.js";
 import { PendingChartView, signedRightOffset } from "./view-camera.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
@@ -33,8 +33,13 @@ import type { KlineDrawingContext } from "./kline-drawing-indicators.js";
 import { klineTechnical } from "./kline-technical.js";
 import { preserveKlineCamera } from "./kline-preserve-camera.js";
 import { klineLink } from "./kline-link.js";
-import { zoomKlineSelection } from "./kline-selection-zoom.js";
+import {
+  getKlineManualPriceRange,
+  setKlineManualPriceRange,
+  zoomKlineSelection
+} from "./kline-selection-zoom.js";
 import { selectionZoomBounds } from "./selection-zoom.js";
+import { klineMainStyle } from "./kline-main-style.js";
 
 export function makeKline(options: ChartOptions): ChartAdapter {
   const camera = new UserCameraEvents(options);
@@ -43,14 +48,17 @@ export function makeKline(options: ChartOptions): ChartAdapter {
   let priceHint = options.row.price;
   const { container, settings, timeframe, indicators } = options;
   let data: Candle[] = [],
-    dataReady = false;
+    dataReady = false,
+    fittingLoaded = false;
   const pendingView = new PendingChartView();
+  let pendingPriceRange: { from: number; to: number } | undefined;
   let axisWidth = stablePriceAxisWidth(
     options.row,
     settings.scaleFontSize ?? 11,
     container.clientWidth
   );
   const palette = chartPalette(settings);
+  const candleStyle = klineMainStyle(settings);
   const lastPrice = klineLastPrice(settings);
   const model = new MtpModel();
   if (settings.indicatorOptions) model.styles = settings.indicatorOptions;
@@ -86,6 +94,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       },
       indicator: { tooltip: { showRule: TooltipShowRule.None } },
       candle: {
+        ...candleStyle,
         bar: {
           noChangeColor:
             settings.bodyVisible === false ? "transparent" : (settings.upColor ?? "#53b987"),
@@ -109,7 +118,8 @@ export function makeKline(options: ChartOptions): ChartAdapter {
           upWickColor:
             settings.wickVisible === false ? "transparent" : (settings.wickUpColor ?? "#336854"),
           downWickColor:
-            settings.wickVisible === false ? "transparent" : (settings.wickDownColor ?? "#7f323f")
+            settings.wickVisible === false ? "transparent" : (settings.wickDownColor ?? "#7f323f"),
+          ...candleStyle.bar
         },
         tooltip: { showRule: TooltipShowRule.None },
         priceMark: {
@@ -208,7 +218,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
   });
   resize.observe(container);
   chart.subscribeAction(ActionType.OnVisibleRangeChange, (range: { from: number }) => {
-    if (range.from < 80) options.onNearStart();
+    if (!fittingLoaded && range.from < 80) options.onNearStart();
     paintFront();
   });
   function restoreView(view: ChartView) {
@@ -228,10 +238,15 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     paintFront();
   }
   function flushView() {
-    const view = pendingView.take(
-      dataReady && (chart?.getSize("candle_pane", DomPosition.Main)?.width ?? 0) > 0
-    );
+    if (!chart || !dataReady || !chart.getSize("candle_pane", DomPosition.Main)?.width) return;
+    const view = pendingView.take(true);
     if (view) restoreView(view);
+    if (pendingPriceRange) {
+      const range = pendingPriceRange;
+      pendingPriceRange = undefined;
+      setKlineManualPriceRange(chart, range);
+      paintFront();
+    }
   }
   chart.subscribeAction(ActionType.OnDataReady, () => {
     dataReady = data.length > 0 && chart.getDataList().length > 0;
@@ -262,6 +277,11 @@ export function makeKline(options: ChartOptions): ChartAdapter {
   bindKlineDrawingIndicators(chart, drawingContext);
   volumeLayout.apply();
   const detachCanvasResize = attachKlineCanvasResize(chart, () => axisWidth);
+  const navigation = klineNavigation(
+    chart,
+    () => data.length,
+    () => dataReady
+  );
   const adapter: ChartAdapter = {
     setLastPriceLabelColors(colors) {
       if (live.retired) return;
@@ -299,11 +319,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
         chart.setStyles({ yAxis: { size: axisWidth } });
       });
     },
-    ...klineNavigation(
-      chart,
-      () => data.length,
-      () => dataReady
-    ),
+    ...navigation,
     setData(next, fit) {
       if (live.retired) return;
       dataReady = false;
@@ -374,6 +390,13 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       pendingView.stage(view);
       flushView();
     },
+    getManualPriceRange: () =>
+      dataReady && !live.retired ? getKlineManualPriceRange(chart) : null,
+    setManualPriceRange(range) {
+      if (live.retired) return;
+      pendingPriceRange = range;
+      camera.programmatic(flushView);
+    },
     setLinkedCrosshair(timestamp) {
       if (!live.retired) link.setCrosshair(dataReady ? data : [], timestamp);
     },
@@ -440,9 +463,13 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       };
     },
     fit() {
-      resetKlinePriceScale(chart);
-      chart.setBarSpace(6);
-      chart.scrollToRealTime();
+      if (live.retired) return;
+      fittingLoaded = true;
+      try {
+        navigation.fit();
+      } finally {
+        fittingLoaded = false;
+      }
     },
     redrawDrawings() {
       redrawKlineDrawingIndicator(chart, drawingContext);

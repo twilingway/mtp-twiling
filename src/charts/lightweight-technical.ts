@@ -37,6 +37,7 @@ import { presentationColor } from "../model/technical-indicators/presentation.js
 import { LightweightTechnicalPrimitive } from "./lightweight-technical-primitives.js";
 import { lightweightCompactCrosshair } from "./technical-compact-crosshair.js";
 import { lightweightCalendarRegions } from "./lightweight-calendar-regions.js";
+import type { LightweightMainSeries } from "./lightweight-main-series.js";
 
 type Series = ISeriesApi<"Line"> | ISeriesApi<"Histogram">;
 interface Entry {
@@ -52,7 +53,7 @@ export function lightweightTechnical(
   chart: IChartApi,
   options: ChartOptions,
   alive: () => boolean,
-  primary?: () => ISeriesApi<"Candlestick"> | ISeriesApi<"Line">
+  primary?: () => LightweightMainSeries
 ) {
   const calculation = new TechnicalRenderData(
     technicalCalculationContext(options.timeframe, options.row)

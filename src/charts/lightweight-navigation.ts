@@ -1,4 +1,5 @@
-import type { IChartApi, ISeriesApi, Logical } from "lightweight-charts";
+import type { IChartApi, Logical } from "lightweight-charts";
+import type { LightweightMainSeries } from "./lightweight-main-series.js";
 import type { ChartAdapter } from "./adapter.js";
 import { TIMEFRAMES } from "../model/history-codec.js";
 import { logicalForTime } from "../model/intervals/projected-time.js";
@@ -9,7 +10,7 @@ import type { SelectionZoomSource } from "./selection-zoom.js";
 
 export function lightweightNavigation(
   chart: Pick<IChartApi, "timeScale">,
-  series: Pick<ISeriesApi<"Candlestick">, "priceScale">,
+  series: Pick<LightweightMainSeries, "priceScale">,
   count: () => number,
   ready: () => boolean,
   projectionDelta: () => number = () => 0,

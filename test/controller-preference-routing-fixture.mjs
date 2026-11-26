@@ -26,6 +26,7 @@ const clone = (value) => structuredClone(value);
 function sourceModules(overrides, react) {
   const root = `${target}/src`;
   const cache = new Map();
+  const local = new Map();
   const context = vm.createContext({
     console,
     URL,
@@ -43,6 +44,10 @@ function sourceModules(overrides, react) {
     clearInterval,
     window: new EventTarget(),
     navigator: { onLine: true },
+    localStorage: {
+      getItem: (key) => local.get(key) ?? null,
+      setItem: (key, value) => local.set(key, value)
+    },
     requestAnimationFrame: () => 1,
     cancelAnimationFrame: () => {},
     structuredClone
@@ -149,9 +154,11 @@ export async function routingFixture() {
     useMemo: (fn) => fn(),
     useEffect: (effect) => effects.push(effect)
   };
-  const factory = () => {
+  const factory = (options) => {
     let hasData = false;
+    let priceRange = null;
     return {
+      options,
       retired: false,
       persistView: true,
       getView: () => (hasData ? clone(VIEW) : null),
@@ -160,6 +167,10 @@ export async function routingFixture() {
         hasData = data.length > 0;
       },
       setView: () => {},
+      getManualPriceRange: () => priceRange,
+      setManualPriceRange: (range) => {
+        priceRange = range;
+      },
       updateTechnicalIndicators: () => {},
       updateTechnicalInputs: () => {},
       destroy() {
@@ -181,6 +192,7 @@ export async function routingFixture() {
       },
       "screens/terminal/ClockZoneControl.tsx": { ClockZoneControl: () => null },
       "screens/terminal/TerminalIndicatorControls.tsx": { TerminalIndicatorControls: () => null },
+      "screens/terminal/NativeChartTypeMenu.tsx": { NativeChartTypeMenu: () => null },
       "screens/terminal/intervals/TimeframeMenu.tsx": {
         TimeframeMenu: function TimeframeMenuStub() {}
       },

@@ -2,7 +2,8 @@ import { mergeCandles, updateCandleList } from "../../model/history-codec.js";
 import { historyRequestWindow } from "../../model/intervals/calendar.js";
 import { nativeTimeframe } from "../../model/intervals/native-timeframes.js";
 import { withTheme } from "../../model/theme.js";
-import type { Candle, HistoryRange, MarketRow } from "../../model/types.js";
+import { retainNativeChartType } from "../../model/native-chart-type.js";
+import type { Candle, ChartSettings, HistoryRange, MarketRow } from "../../model/types.js";
 import type { MarketClient } from "../../services/market-client.js";
 import type { PublicMarketReconnect } from "../../services/market-public.js";
 import { nativeInterval } from "../../services/providers/bybit/market.js";
@@ -102,7 +103,6 @@ export class WorkspacePanelController extends TerminalController {
 
   override sessionKey = () => this.parent.sessionKey();
   override marketNow = () => this.parent.marketNow();
-  override saveView = () => Promise.resolve();
   override loadCandleCalendar: TerminalController["loadCandleCalendar"] = (...args) =>
     this.parent.loadCandleCalendar(...args);
 
@@ -205,7 +205,10 @@ export class WorkspacePanelController extends TerminalController {
         contextMenu: null,
         activeTool: null,
         preview: null,
-        dialog: null,
+        dialog:
+          state.dialog === "instruments" && importWritable(parent, state.owner)
+            ? state.dialog
+            : null,
         historyViewReady: true,
         loading: !!route,
         historyHelp: route ? "Загружаем историю…" : "Выберите инструмент"
@@ -229,7 +232,6 @@ export class WorkspacePanelController extends TerminalController {
     this.disconnect = () => route.market.removeEventListener(name, reconnect);
     void this.loadHistory();
   }
-
   private current(route: PanelRoute): boolean {
     const parent = this.parent.getSnapshot();
     return (
@@ -240,17 +242,23 @@ export class WorkspacePanelController extends TerminalController {
       parent.rows.some((row) => row.uid === route.row.uid && row.symbol === route.row.symbol)
     );
   }
-
   private canEdit(state: TerminalState): boolean {
     return !!this.route && this.current(this.route) && importWritable(state) && !state.backupBusy;
   }
-
   override setDialog: TerminalController["setDialog"] = (dialog, section) => {
     if (dialog === "account") this.parent.setDialog(dialog, section);
     else this.drawingSettings.setDialog(dialog, section);
   };
 
-  override setPreferences: TerminalController["setPreferences"] = async (patch, _force, valid) => {
+  override setPreferences: TerminalController["setPreferences"] = (patch, _force, valid) =>
+    this.applyPanelPreferences(patch, valid);
+  protected override applyChartSettings = (chartSettings: ChartSettings, changingType = false) =>
+    this.applyPanelPreferences({ chartSettings }, undefined, changingType);
+  private async applyPanelPreferences(
+    patch: Partial<TerminalPreferences>,
+    valid?: () => boolean,
+    changingType = false
+  ): Promise<void> {
     const state = this.getSnapshot();
     const local = this.local;
     if (!local || (valid && !valid()) || !importWritable(this.parent.getSnapshot(), state.owner))
@@ -293,7 +301,11 @@ export class WorkspacePanelController extends TerminalController {
       ...(technicalIndicators && { technicalIndicators }),
       ...(technicalPaneLayout && { technicalPaneLayout }),
       ...(indicatorPaneLayout && { indicatorPaneLayout }),
-      ...(chartSettings && { chartSettings: panelChartSettings(chartSettings) }),
+      ...(chartSettings && {
+        chartSettings: panelChartSettings(
+          changingType ? chartSettings : retainNativeChartType(local.chartSettings, chartSettings)
+        )
+      }),
       ...(timeframe && { timeframe }),
       ...(rangeDays !== undefined && { rangeDays }),
       ...(engine && { engine }),
@@ -301,7 +313,8 @@ export class WorkspacePanelController extends TerminalController {
     };
     const parent = this.parent.getSnapshot();
     this.update({
-      preferences: this.combinedPreferences(parent.preferences, this.local, this.row)
+      preferences: this.combinedPreferences(parent.preferences, this.local, this.row),
+      ...(changingType && { crosshairBar: null })
     });
     savePanelPreferences(state.owner, this.slot, this.local);
     if (timeframe !== undefined || rangeDays !== undefined) this.configure(this.row, parent);
@@ -315,7 +328,7 @@ export class WorkspacePanelController extends TerminalController {
         })
     };
     if (Object.keys(displayPatch).length) await this.parent.setPreferences(displayPatch);
-  };
+  }
 
   private validateTimeframe(timeframe: TerminalPreferences["timeframe"]): void {
     nativeTimeframe(timeframe);
@@ -326,7 +339,6 @@ export class WorkspacePanelController extends TerminalController {
 
   override setTimeframe: TerminalController["setTimeframe"] = (timeframe) =>
     this.setPreferences({ timeframe });
-
   override searchInstruments: TerminalController["searchInstruments"] = (...args) =>
     this.parent.searchInstruments(...args);
 
@@ -346,11 +358,6 @@ export class WorkspacePanelController extends TerminalController {
     this.selectInstrument(row.uid);
     this.setDialog(null);
   };
-
-  override setChartSettings: TerminalController["setChartSettings"] = (patch) =>
-    this.setPreferences({
-      chartSettings: { ...this.getSnapshot().preferences.chartSettings, ...patch }
-    });
 
   override toggleIndicator: TerminalController["toggleIndicator"] = (key) =>
     key === "mtpAll" && this.getSnapshot().preferences.indicators.mtpAll

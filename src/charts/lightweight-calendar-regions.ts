@@ -1,7 +1,6 @@
 import type {
   IChartApi,
   IPrimitivePaneRenderer,
-  ISeriesApi,
   ISeriesPrimitive,
   Logical,
   Time,
@@ -21,7 +20,7 @@ import type { RenderedPriceDecoration } from "./technical-calendar-paint.js";
 import { paintTechnicalMoon } from "./technical-moon-paint.js";
 import { paintTechnicalSloped, slopedViewportX } from "./technical-sloped-paint.js";
 
-type Primary = ISeriesApi<"Candlestick"> | ISeriesApi<"Line">;
+import type { LightweightMainSeries as Primary } from "./lightweight-main-series.js";
 
 export function lightweightCalendarRegions(
   chart: IChartApi,

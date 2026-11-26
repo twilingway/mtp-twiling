@@ -182,6 +182,9 @@ export const uiMessages = {
     "Enter part of a ticker or name, for example NG or gas.",
   "Не удалось добавить": "Could not add",
   Добавление: "Adding",
+  "Добавить в список котировок": "Add to watchlist",
+  "Удалить из списка котировок": "Remove from watchlist",
+  "Очистить поиск": "Clear search",
   Открыть: "Open",
   Добавить: "Add",
   "Каталог Т‑Банка · для фьючерса выбирайте срок контракта.":

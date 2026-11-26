@@ -103,7 +103,8 @@ test("Lightweight links native position without replaying it or wiping a new loc
     "1m",
     () => 200,
     () => 3,
-    (bar) => published.push(bar?.close ?? null)
+    (bar) => published.push(bar?.close ?? null),
+    () => data
   );
   link.setCrosshair(data, start + minute + 20);
   assert.deepEqual(actions, [["set", 48, (start + minute) / 1000, series]]);

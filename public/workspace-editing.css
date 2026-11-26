@@ -84,6 +84,55 @@
   font-size: 12px;
 }
 
+.chart-timeframe-inline {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  inline-size: 38px;
+  min-block-size: 24px;
+  padding-inline: 4px;
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  background: var(--surface-input);
+  color: var(--text);
+  font-size: 11px;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.chart-timeframe-inline::after {
+  inline-size: 4px;
+  block-size: 4px;
+  margin-block-start: -2px;
+  border: solid currentColor;
+  border-width: 0 1px 1px 0;
+  content: "";
+  transform: rotate(45deg);
+}
+
+.chart-timeframe-inline:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.chart-timeframe-inline:has(select:disabled) {
+  opacity: 0.6;
+}
+
+.chart-timeframe-inline select {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  min-block-size: 0;
+  max-inline-size: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .chart-instrument-heading .chart-range-control[data-placement="plot"] {
   position: relative;
   flex: none;
@@ -183,6 +232,7 @@
 }
 
 @media (pointer: coarse) {
+  .chart-timeframe-inline,
   .chart-instrument-heading .chart-range-control[data-placement="plot"] {
     min-block-size: 32px;
   }

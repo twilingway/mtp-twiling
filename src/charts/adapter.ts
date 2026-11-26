@@ -74,6 +74,9 @@ export interface ChartAdapter {
   timeAxisTop?(): number;
   getView(): ChartView | null;
   setView(view: ChartView): void;
+  /** Transient range used when replacing the native chart for the same instrument. */
+  getManualPriceRange?(): { from: number; to: number } | null;
+  setManualPriceRange?(range: { from: number; to: number }): void;
   setLinkedCrosshair?(timestamp: number | null): void;
   setLinkedTimeWindow?(window: LinkedTimeWindow): void;
   fit(): void;

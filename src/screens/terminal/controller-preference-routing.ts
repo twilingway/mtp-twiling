@@ -1,10 +1,16 @@
 import { pinSelectedInstrument, selectedMarketRow } from "../../model/selected-instrument.js";
+import { retainNativeChartType } from "../../model/native-chart-type.js";
 import { viewKey } from "./controller-bridge.js";
 import { importWritable } from "./controller-transfer-guard.js";
 import type { TerminalPreferences, TerminalState } from "./state.js";
 
 export function mergeRoutingPreferences(state: TerminalState, patch: Partial<TerminalPreferences>) {
   const next = { ...state.preferences, ...patch };
+  if (patch.chartSettings)
+    next.chartSettings = retainNativeChartType(
+      state.preferences.chartSettings,
+      patch.chartSettings
+    );
   if ("symbol" in patch && !("instrumentUid" in patch)) delete next.instrumentUid;
   const pinned = pinSelectedInstrument(state.rows, next),
     selected = selectedMarketRow(state.rows, pinned);

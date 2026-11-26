@@ -14,7 +14,7 @@ export function IndicatorLegend({ slot = 1 }: { slot?: number } = {}) {
     count =
       keys.length +
       (p.technicalIndicators ?? []).filter((item) => item.pane.kind === "overlay").length,
-    collapsed = p.chartSettings.legendCollapsed === true;
+    collapsed = p.chartSettings.legendCollapsed !== false;
   const itemsId = slot === 1 ? "indicator-legend-items" : `indicator-legend-items-${slot}`;
   const blocked = !!(state.backupBusy || state.importingBackup || state.importRecoveryRequired);
   const indicatorsHidden = drawingToolbarSettings(p.chartSettings).indicatorsHidden;

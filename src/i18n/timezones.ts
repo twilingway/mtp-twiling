@@ -1,5 +1,8 @@
 import { DEFAULT_TIME_ZONE, intlLocale, isTimeZone } from "./preferences.js";
 import type { Locale, TimeZoneChoice } from "./preferences.js";
+import { intlCache } from "./intl-cache.js";
+
+const offsetFormatter = intlCache<Intl.DateTimeFormat>();
 
 const cities: Readonly<Record<string, string>> = {
   "Europe/Moscow": "Москва",
@@ -73,10 +76,11 @@ export function resolveTimeZone(choice: TimeZoneChoice = DEFAULT_TIME_ZONE): str
   return isTimeZone(choice) ? choice : DEFAULT_TIME_ZONE;
 }
 export function timeZoneOffset(zone: TimeZoneChoice, instant: number): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: resolveTimeZone(zone),
-    timeZoneName: "longOffset"
-  }).formatToParts(instant);
+  const timeZone = resolveTimeZone(zone);
+  const parts = offsetFormatter(
+    timeZone,
+    () => new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longOffset" })
+  ).formatToParts(instant);
   return (parts.find((part) => part.type === "timeZoneName")?.value ?? "GMT")
     .replace("GMT", "UTC")
     .replace(/^UTC[+-]00:00$/, "UTC");

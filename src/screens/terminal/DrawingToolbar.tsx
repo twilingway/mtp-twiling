@@ -4,7 +4,7 @@ import { drawingToolbarSettings, type DrawingTarget } from "../../model/drawing-
 import { useTerminal } from "./context.js";
 import { DrawingToolIcon, type DrawingIconName } from "./DrawingToolIcon.js";
 import { ChartMeasurementButton } from "./ChartMeasurement.js";
-import { ChartRangeZoomButton } from "./ChartRangeZoom.js";
+import { ChartRangeZoomButton, ChartZoomOutButton } from "./ChartRangeZoom.js";
 import {
   DrawingToolbarMenu,
   DrawingToolbarSplit,
@@ -409,7 +409,7 @@ export function DrawingToolbar() {
       <span className="tool-divider" />
       <ChartMeasurementButton onChoose={closeMenu} />
       <ChartRangeZoomButton onChoose={closeMenu} />
-      {button("zoom-out", t("Уменьшить масштаб"), "zoomOut", () => {}, false, true)}
+      <ChartZoomOutButton onChoose={closeMenu} />
       <span className="tool-divider" />
       {utility(
         "magnet",

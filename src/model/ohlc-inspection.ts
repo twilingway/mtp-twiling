@@ -20,7 +20,14 @@ export function createOhlcInspection(
   let pending: (() => void) | undefined;
   let hovered: number | null = null;
   let pinned = false;
-  let press: (Press & { shown: boolean; dismiss: boolean }) | null = null;
+  let visible: number | null = null;
+  let press: (Press & { timestamp: number; shown: boolean; dismiss: boolean }) | null = null;
+
+  function publish(timestamp: number | null) {
+    if (visible === timestamp) return;
+    visible = timestamp;
+    show(timestamp);
+  }
 
   function stopTimer() {
     pending?.();
@@ -32,7 +39,7 @@ export function createOhlcInspection(
     hovered = null;
     pinned = false;
     press = null;
-    show(null);
+    publish(null);
   }
 
   function moved(start: PixelPoint, point: PixelPoint) {
@@ -49,44 +56,50 @@ export function createOhlcInspection(
       stopTimer();
       hovered = timestamp;
       if (onHold && timestamp !== null) {
-        show(null);
-        pending = schedule(() => show(timestamp), OHLC_HOLD_MS);
-      } else show(timestamp);
+        publish(null);
+        pending = schedule(() => publish(timestamp), OHLC_HOLD_MS);
+      } else publish(timestamp);
     },
     down(input: Press, timestamp: number | null) {
-      if (press) {
+      if (press || timestamp === null) {
         clear();
         return;
       }
       stopTimer();
       hovered = null;
-      const current = { ...input, shown: false, dismiss: pinned };
+      const current = { ...input, timestamp, shown: false, dismiss: pinned };
       press = current;
-      if (!pinned) show(null);
-      if (onHold && timestamp !== null && !current.dismiss) {
+      if (!pinned) publish(null);
+      if (onHold && !current.dismiss) {
         pending = schedule(() => {
           current.shown = true;
           pinned = input.touch;
-          show(timestamp);
+          publish(timestamp);
         }, OHLC_HOLD_MS);
       }
     },
-    move(id: number, point: PixelPoint) {
-      if (press?.id === id && moved(press.point, point)) clear();
+    hasPress: (id: number) => press?.id === id,
+    move(id: number, point: PixelPoint, sample: () => number | null) {
+      if (press?.id === id && (moved(press.point, point) || sample() !== press.timestamp)) clear();
     },
     up(id: number, point: PixelPoint, timestamp: number | null, endedAt: number) {
       if (press?.id !== id) return;
       const current = press;
       press = null;
       stopTimer();
-      if (!current.touch || moved(current.point, point) || current.dismiss) {
+      if (
+        !current.touch ||
+        moved(current.point, point) ||
+        current.dismiss ||
+        current.timestamp !== timestamp
+      ) {
         clear();
         return;
       }
       if (current.shown || (!onHold && endedAt - current.startedAt < OHLC_HOLD_MS)) {
         if (!current.shown) {
-          pinned = timestamp !== null;
-          show(timestamp);
+          pinned = true;
+          publish(timestamp);
         }
       }
     },

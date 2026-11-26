@@ -147,7 +147,7 @@ function TechnicalPaneCommands({
         }}
       >
         <svg viewBox="0 0 14 14" aria-hidden="true">
-          <path d={collapsed && !focused ? "m3 5 4 4 4-4" : "m3 9 4-4 4 4"} />
+          <path d={collapsed && !focused ? "m3 9 4-4 4 4" : "m3 5 4 4 4-4"} />
         </svg>
       </button>
       <button

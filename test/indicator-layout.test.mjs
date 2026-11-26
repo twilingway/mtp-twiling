@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import ts from "typescript";
+import { CandleType } from "../node_modules/klinecharts/dist/index.esm.js";
 
 const root = fileURLToPath(new URL("../src/", import.meta.url));
 function sources(overrides = {}, globals = {}) {
@@ -206,6 +207,7 @@ function nativeFixture({ ratio = 0.3, volume = true } = {}) {
     getVisibleRange: () => ({ from: 0, to: data.length })
   };
   const api = {
+    CandleType,
     ActionType: {
       OnPaneDrag: "drag",
       OnDataReady: "ready",
@@ -377,6 +379,12 @@ test("legend collapse exposes an accessible compact count without toggling indic
     "screens/terminal/context.tsx": { useTerminal: () => ({ state, controller }) }
   });
   const Legend = load("screens/terminal/IndicatorLegend.tsx").IndicatorLegend;
+  const initial = Legend();
+  assert.equal(initial.props.children[0].props.hidden, true);
+  assert.equal(initial.props.children[1].props["aria-expanded"], false);
+  initial.props.children[1].props.onClick();
+  await new Promise(setImmediate);
+  assert.equal(state.preferences.chartSettings.legendCollapsed, false);
   const expanded = Legend(),
     button = expanded.props.children[1];
   assert.equal(button.props["aria-expanded"], true);

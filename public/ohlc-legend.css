@@ -6,7 +6,6 @@
   max-width: 100%;
   color: var(--ohlc-label-color, var(--chart-muted, var(--muted)));
 }
-.ohlc-candle-card,
 .chart-heading .ohlc-icon-content .ohlc-legend {
   box-sizing: border-box;
   padding: 6px 8px;
@@ -21,11 +20,56 @@
   left: 0;
   width: max-content;
   max-width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
   overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--chart-background, var(--surface));
+  box-shadow: 0 2px 12px #0003;
+  font-size: 12px;
+  line-height: 1.35;
   pointer-events: none;
   visibility: hidden;
 }
-.ohlc-candle-card .ohlc-legend,
+.ohlc-card-fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 3px 14px;
+  align-items: baseline;
+  margin: 0;
+}
+.ohlc-card-fields > div {
+  display: contents;
+}
+.ohlc-card-fields dt {
+  color: var(--ohlc-card-muted);
+}
+.ohlc-card-fields dd {
+  margin: 0;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  overflow-wrap: anywhere;
+}
+.ohlc-card-change dd {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  column-gap: 4px;
+  color: var(--ohlc-card-change);
+}
+.ohlc-card-change dd > span {
+  min-width: 0;
+}
+.ohlc-candle-card[data-compact] {
+  padding: 5px 7px;
+  font-size: 11px;
+  line-height: 1.25;
+}
+.ohlc-candle-card[data-compact] .ohlc-card-fields {
+  gap: 1px 7px;
+}
 .chart-heading .ohlc-icon-content .ohlc-legend {
   margin: 0;
 }

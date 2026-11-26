@@ -20,7 +20,7 @@ export function klineNavigation(
   chart: NativeChart,
   count: () => number,
   ready: () => boolean
-): Pick<ChartAdapter, "zoom" | "scroll" | "resetView"> {
+): Pick<ChartAdapter, "zoom" | "scroll" | "resetView" | "fit"> {
   function geometry() {
     if (!ready() || !count()) return null;
     const size = chart.getSize("candle_pane", DomPosition.Main),
@@ -62,6 +62,17 @@ export function klineNavigation(
       resetKlinePriceScale(chart);
       chart.setBarSpace(6);
       chart.scrollToRealTime(0);
+    },
+    fit() {
+      const before = geometry();
+      if (!before) return;
+      resetKlinePriceScale(chart);
+      // KLine 9.8 rejects barSpace outside [1, 50]; fit as many newest bars as possible.
+      chart.setBarSpace(Math.max(1, Math.min(50, before.width / count())));
+      const after = geometry();
+      if (!after) return;
+      const distance = after.width - chart.getBarSpace() / 2 - after.lastX;
+      if (Math.abs(distance) > 0.5) chart.scrollByDistance(distance, 0);
     }
   };
 }
