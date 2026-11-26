@@ -276,10 +276,10 @@ html[data-theme]
   scrollbar-color: var(--control-line) transparent;
 }
 
-html[data-theme] button:hover:not(:disabled):where(:not(.indicator-menu-dismiss)),
+html[data-theme]
+  button:hover:not(:disabled):where(:not(.indicator-menu-dismiss, .drawing-toolbar button)),
 html[data-theme] .quote-row:hover,
 html[data-theme] .right-panel .object-row:hover,
-html[data-theme] .drawing-toolbar button:hover:not(:disabled),
 html[data-theme] .drawing-toolbar-popup button:hover:not([aria-disabled="true"]) {
   background-color: var(--surface-hover);
 }
@@ -287,8 +287,6 @@ html[data-theme] .drawing-toolbar-popup button:hover:not([aria-disabled="true"])
 html[data-theme]
   :is(
     .timeframes button.active,
-    .tool.active,
-    .drawing-tool-split.active,
     .quote-row.selected,
     .object-row.selected,
     .right-panel-tools button[aria-selected="true"]

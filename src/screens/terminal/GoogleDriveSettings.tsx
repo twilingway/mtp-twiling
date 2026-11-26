@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { t } from "../../i18n/messages.js";
 import { intlLocale } from "../../i18n/preferences.js";
 import type {
+  DriveChoiceAction,
   DriveStatus,
   DriveSummary,
   DriveChoice
@@ -24,6 +25,8 @@ const errors: Record<NonNullable<DriveStatus["error"]>, string> = {
   "not-ready": "Авторизация Google ещё загружается",
   busy: "Синхронизация уже выполняется",
   network: "Нет связи с Google. Повторите попытку.",
+  "local-save":
+    "Не удалось сохранить отметку синхронизации на этом устройстве. Повторите синхронизацию.",
   quota: "Google временно ограничил запросы. Повторите позже.",
   permission: "Google не предоставил доступ к данным приложения",
   "remote-invalid": "Данные Google Диска повреждены. Локальные данные сохранены.",
@@ -33,6 +36,27 @@ const errors: Record<NonNullable<DriveStatus["error"]>, string> = {
   limit: "Превышен лимит данных синхронизации",
   "local-changed": "Локальные данные изменились. Проверяем заново."
 };
+function choiceMessage(action: DriveChoiceAction, loading: boolean, editing: boolean): string {
+  const sending = action.nodeId === "local";
+  switch (action.state) {
+    case "running":
+      return sending ? "Отправляем версию устройства…" : "Получаем версию с Google Диска…";
+    case "confirmed":
+      return sending
+        ? "Версия устройства отправлена на Google Диск."
+        : "Версия с Google Диска применена на устройстве.";
+    case "review":
+      return "Версии изменились. Сравните их и повторите выбор.";
+    case "blocked":
+      if (loading) return "Дождитесь загрузки графика и повторите выбор.";
+      if (editing) return "Завершите или отмените разметку и повторите выбор.";
+      return "Дождитесь завершения операции в рабочем пространстве и повторите выбор.";
+    case "unconfirmed":
+      return sending
+        ? "Отправка на Google Диск не подтверждена."
+        : "Получение версии с Google Диска не подтверждено.";
+  }
+}
 function date(value?: string): string {
   return value
     ? new Intl.DateTimeFormat(intlLocale(), { dateStyle: "short", timeStyle: "medium" }).format(
@@ -62,6 +86,8 @@ export function GoogleDriveSettings() {
     drive = terminalDrive(controller),
     status = useSyncExternalStore(drive.subscribe, drive.getSnapshot, drive.getSnapshot),
     conflict = status.conflict,
+    choice = status.choiceAction,
+    activeChoice = choice?.state === "running" ? choice.nodeId : undefined,
     busy =
       status.phase === "connecting" ||
       status.phase === "syncing" ||
@@ -132,7 +158,11 @@ export function GoogleDriveSettings() {
               void drive.sync();
             }}
           >
-            {t("Синхронизировать сейчас")}
+            {t(
+              choice?.state === "unconfirmed" && !conflict
+                ? "Повторить синхронизацию"
+                : "Синхронизировать сейчас"
+            )}
           </button>
           <button id="google-drive-disconnect" type="button" onClick={drive.disconnect}>
             {t("Отключить Google Диск")}
@@ -184,7 +214,11 @@ export function GoogleDriveSettings() {
           {t(
             !status.prepared && status.error === "network"
               ? "Не удалось загрузить вход Google. Нажмите «Повторить загрузку входа»."
-              : errors[status.error]
+              : status.pauseReason === "offline"
+                ? "Нет интернета. Подключитесь и повторите синхронизацию."
+                : choice?.state === "unconfirmed" && status.error === "local-changed"
+                  ? "Локальные данные изменились. Повторите синхронизацию, чтобы проверить версии."
+                  : errors[status.error]
           )}
         </p>
       )}
@@ -253,8 +287,18 @@ export function GoogleDriveSettings() {
           )}
         </div>
       )}
+      {choice && (
+        <p
+          id="google-drive-choice-result"
+          className="drive-choice-result"
+          data-state={choice.state}
+          role={choice.state === "unconfirmed" || choice.state === "blocked" ? "alert" : "status"}
+        >
+          {t(choiceMessage(choice, state.loading, !!(state.preview || state.activeTool)))}
+        </p>
+      )}
       {conflict && (
-        <div id="google-drive-conflict" className="drive-conflict">
+        <div id="google-drive-conflict" className="drive-conflict" aria-busy={!!activeChoice}>
           <h4>{t("Выберите версию рабочего пространства")}</h4>
           {conflict.remotes.length === 0 ? (
             <p>{t("На подключённом Google Диске пока нет снимков этого профиля.")}</p>
@@ -279,12 +323,14 @@ export function GoogleDriveSettings() {
                 type="button"
                 data-drive-remote={index}
                 aria-describedby="google-drive-receive-effect"
+                aria-busy={activeChoice === remote.nodeId}
                 disabled={busy}
                 onClick={() => {
                   void drive.choose(remote.nodeId);
                 }}
               >
-                <span aria-hidden="true">↓</span> {t("Получить из Google Диска")}
+                <span aria-hidden="true">↓</span>{" "}
+                {t(activeChoice === remote.nodeId ? "Получаем…" : "Получить из Google Диска")}
               </button>
             </div>
           ))}
@@ -301,12 +347,14 @@ export function GoogleDriveSettings() {
               id="google-drive-choose-local"
               type="button"
               aria-describedby="google-drive-send-effect"
+              aria-busy={activeChoice === "local"}
               disabled={busy}
               onClick={() => {
                 void drive.choose("local");
               }}
             >
-              <span aria-hidden="true">↑</span> {t("Отправить на Google Диск")}
+              <span aria-hidden="true">↑</span>{" "}
+              {t(activeChoice === "local" ? "Отправляем…" : "Отправить на Google Диск")}
             </button>
           </div>
         </div>

@@ -149,6 +149,7 @@ export class TerminalHistory {
     this.bridge.update({
       loading: true,
       historyViewReady: false,
+      historyViewFallback: false,
       historyHelp: "Загружаем историю…"
     });
     try {
@@ -203,10 +204,14 @@ export class TerminalHistory {
       );
       if (!current()) return;
       available = mergeCandles(available, result.candles);
+      const probeSpotDailyStart =
+        !plan.knownFirst && row.providerRef?.category === "spot" && p.timeframe === "1d";
       let coverage = historyViewCoverage(plan, available, from),
         requests = result.requests,
+        rangeCovered = result.requestedRangeCovered === true,
         emptySpan = available.length ? 0 : until - from,
         backfillMultiplier = 1,
+        historyViewFallback = false,
         incomplete = "";
       while (!coverage.complete) {
         if (!navigator.onLine) {
@@ -214,7 +219,18 @@ export class TerminalHistory {
           break;
         }
         if (from <= plan.earliest) {
-          incomplete = "Достигнута граница истории, но сохранённое окно покрыто не полностью.";
+          const first = available[0];
+          if (probeSpotDailyStart && rangeCovered && first) {
+            coverage = { ...coverage, complete: true };
+            historyViewFallback =
+              plan.visibleTo < first.timestamp ||
+              (plan.mode === "anchor" && plan.target < first.timestamp);
+            if (historyViewFallback)
+              incomplete =
+                "Сохранённое окно раньше первой свечи Bybit. Показана доступная история.";
+          } else {
+            incomplete = "Достигнута граница истории, но сохранённое окно покрыто не полностью.";
+          }
           break;
         }
         if (!plan.knownFirst && emptySpan >= 365 * 86400000) {
@@ -223,7 +239,9 @@ export class TerminalHistory {
         }
         const nextFrom = Math.max(
             plan.earliest,
-            historyViewBackfillFrom(plan, from, coverage.missingBars, backfillMultiplier)
+            probeSpotDailyStart && rangeCovered && available.length
+              ? plan.earliest
+              : historyViewBackfillFrom(plan, from, coverage.missingBars, backfillMultiplier)
           ),
           previousFrom = from;
         this.bridge.update({ historyHelp: "Восстанавливаем левый край сохранённого окна…" });
@@ -236,6 +254,7 @@ export class TerminalHistory {
         if (!current()) return;
         from = nextFrom;
         requests += older.requests;
+        rangeCovered &&= older.requestedRangeCovered === true;
         const earlier = older.candles.filter((bar) => bar.timestamp < previousFrom);
         available = mergeCandles(earlier, available);
         coverage = historyViewCoverage(plan, available, from);
@@ -258,14 +277,17 @@ export class TerminalHistory {
       }
       this.cursor = from;
       this.startReached = from <= plan.earliest;
-      const candles = refresh ? mergeCandles(available, this.bridge.getState().candles) : available;
+      const candles = refresh ? mergeCandles(available, this.bridge.getState().candles) : available,
+        provider = row.providerRef ? "Bybit" : "Т‑Банк";
       this.bridge.update({
         candles,
         historyViewReady: coverage.complete,
+        historyViewFallback,
         historyHelp:
           incomplete ||
-          `${candles.length} свечей · ${requests ? "Т‑Банк" : "IndexedDB"} · ${requests} новых запросов`
+          `${candles.length} свечей · ${requests ? provider : "IndexedDB"} · ${requests} новых запросов`
       });
+      if (historyViewFallback) this.bridge.notify(incomplete);
     } catch (error) {
       if (!isAbort(error) && current()) {
         this.bridge.notify(errorText(error));

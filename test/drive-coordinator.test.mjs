@@ -59,7 +59,7 @@ function fixture(store = new Store(), options = {}) {
     local.layout.rangeDays ??= 365; // prepareProfile fills defaults.
     await hooks.postcommit?.();
   } };
-  const coordinator = new DriveCoordinator(bridge, { auth, online: () => online, sync: () => new DriveSync(store), load: async () => structuredClone(record), save: async (owner, value) => { writes.push({ owner, value: structuredClone(value) }); record = structuredClone(value); } });
+  const coordinator = new DriveCoordinator(bridge, { auth, online: () => online, sync: () => new DriveSync(store), load: async () => structuredClone(record), save: async (owner, value) => { await hooks.save?.(value); writes.push({ owner, value: structuredClone(value) }); record = structuredClone(value); } });
   coordinator.profileChanged();
   return { coordinator, store, hooks, imports, writes, events, local: () => local, record: () => record, authorization: () => authorization, disconnects: () => disconnects,
     edit(patch) { local = { ...local, ...patch }; coordinator.localChanged(); },
@@ -186,6 +186,145 @@ test("stale conflict preview cannot erase edits made after the preview", async t
   const node = f.coordinator.getSnapshot().conflict.remotes[0].nodeId;
   f.edit({ layout: { ...f.local().layout, locale: "ru" } }); await f.coordinator.choose(node);
   assert.equal(f.imports.length, 0); assert.equal(f.local().layout.locale, "ru"); assert.equal(f.coordinator.getSnapshot().phase, "conflict");
+  assert.deepEqual(f.coordinator.getSnapshot().choiceAction, { nodeId: node, state: "review" });
+});
+
+test("a blocked or missing choice is explained without writing or hiding the verified versions", async t => {
+  const f = fixture(undefined, { automatic: false });
+  t.after(() => f.coordinator.disconnect());
+  await f.remote(backup("light"));
+  await f.connect();
+  const preview = f.coordinator.getSnapshot().conflict;
+  f.changeProfile({ blocked: true });
+  await f.coordinator.choose("local");
+  assert.deepEqual(f.coordinator.getSnapshot().choiceAction, { nodeId: "local", state: "blocked" });
+  assert.equal(f.coordinator.getSnapshot().conflict, preview);
+  assert.equal(f.store.count(), 1);
+
+  f.changeProfile({ blocked: false });
+  await f.coordinator.choose("unavailable-version");
+  assert.equal(f.coordinator.getSnapshot().phase, "conflict");
+  assert.equal(f.coordinator.getSnapshot().choiceAction.state, "review");
+  assert.equal(f.store.count(), 1);
+
+  await f.coordinator.choose("local");
+  assert.deepEqual(f.coordinator.getSnapshot().choiceAction, { nodeId: "local", state: "confirmed" });
+  assert.equal(f.coordinator.getSnapshot().conflict, undefined);
+  assert.equal(f.store.count(), 2);
+});
+
+test("a selected direction stays pending until transfer and local association are confirmed", async t => {
+  for (const direction of ["send", "receive"]) {
+    await t.test(direction, async t => {
+      const f = fixture(undefined, { automatic: false });
+      t.after(() => f.coordinator.disconnect());
+      await f.remote(backup("light"));
+      await f.connect();
+      const cloud = f.coordinator.getSnapshot().conflict.remotes[0];
+      const nodeId = direction === "send" ? "local" : cloud.nodeId;
+      const transferring = deferred(), transfer = deferred(), saving = deferred(), save = deferred();
+      if (direction === "send") {
+        f.store.hooks.create = async kind => {
+          if (kind !== "snapshot") return;
+          transferring.resolve();
+          await transfer.promise;
+        };
+      } else f.hooks.beforeCommit = async () => {
+        transferring.resolve();
+        await transfer.promise;
+      };
+      f.hooks.save = async () => {
+        saving.resolve();
+        await save.promise;
+      };
+      const choosing = f.coordinator.choose(nodeId);
+      await transferring.promise;
+      assert.deepEqual(f.coordinator.getSnapshot().choiceAction, { nodeId, state: "running" });
+      assert.ok(f.coordinator.getSnapshot().conflict);
+      assert.equal(f.store.count(), 1);
+      assert.equal(f.imports.length, 0);
+      await f.coordinator.choose(nodeId);
+      transfer.resolve();
+      await saving.promise;
+      assert.deepEqual(f.coordinator.getSnapshot().choiceAction, { nodeId, state: "running" });
+      assert.equal(f.coordinator.getSnapshot().lastSyncedAt, undefined);
+      save.resolve();
+      await choosing;
+      assert.deepEqual(f.coordinator.getSnapshot().choiceAction, { nodeId, state: "confirmed" });
+      assert.equal(f.coordinator.getSnapshot().phase, "idle");
+      assert.equal(f.coordinator.getSnapshot().conflict, undefined);
+      assert.equal(f.coordinator.getSnapshot().lastSyncedAt, f.record().lastSyncedAt);
+      assert.equal(f.store.count(), direction === "send" ? 2 : 1);
+      assert.equal(f.imports.length, direction === "receive" ? 1 : 0);
+    });
+  }
+});
+
+test("a failed choice reports its reason and a later recheck can complete the upload", async t => {
+  const f = fixture(undefined, { automatic: false });
+  t.after(() => f.coordinator.disconnect());
+  await f.remote(backup("light"));
+  await f.connect();
+  const { DriveError } = load("services/drive/types.ts");
+  f.store.hooks.create = async kind => {
+    if (kind === "snapshot") throw new DriveError("quota", "fake limit");
+  };
+  await f.coordinator.choose("local");
+  assert.equal(f.store.count(), 1);
+  assert.equal(f.coordinator.getSnapshot().error, "quota");
+  assert.deepEqual(f.coordinator.getSnapshot().choiceAction, { nodeId: "local", state: "unconfirmed" });
+  assert.equal(f.coordinator.getSnapshot().lastSyncedAt, undefined);
+
+  f.store.hooks.create = undefined;
+  await f.coordinator.sync();
+  assert.equal(f.coordinator.getSnapshot().phase, "conflict");
+  assert.equal(f.coordinator.getSnapshot().choiceAction, undefined);
+  await f.coordinator.choose("local");
+  assert.equal(f.coordinator.getSnapshot().choiceAction.state, "confirmed");
+  assert.equal(f.store.count(), 2);
+});
+
+test("a verified cloud write still has no success receipt when saving the local association fails", async t => {
+  const f = fixture(undefined, { automatic: false });
+  t.after(() => f.coordinator.disconnect());
+  await f.remote(backup("light"));
+  await f.connect();
+  f.hooks.save = async () => {
+    throw new DOMException("fake local quota failure", "QuotaExceededError");
+  };
+
+  await f.coordinator.choose("local");
+  const status = f.coordinator.getSnapshot();
+  assert.equal(f.store.count(), 2);
+  assert.equal(status.error, "local-save");
+  assert.deepEqual(status.choiceAction, { nodeId: "local", state: "unconfirmed" });
+  assert.equal(status.lastSyncedAt, undefined);
+  assert.deepEqual(f.record().baseHeads, []);
+});
+
+test("authorization expiry during a selected download stops confirmation and preserves local data", async t => {
+  const f = fixture(undefined, { automatic: false });
+  t.after(() => f.coordinator.disconnect());
+  await f.remote(backup("light"));
+  await f.connect();
+  const nodeId = f.coordinator.getSnapshot().conflict.remotes[0].nodeId;
+  const entered = deferred(), release = deferred();
+  f.hooks.beforeCommit = async () => {
+    entered.resolve();
+    await release.promise;
+  };
+
+  const choice = f.coordinator.choose(nodeId);
+  await entered.promise;
+  f.authorization().invalidate();
+  release.resolve();
+  await choice;
+  const status = f.coordinator.getSnapshot();
+  assert.equal(status.phase, "auth-required");
+  assert.deepEqual(status.choiceAction, { nodeId, state: "unconfirmed" });
+  assert.equal(status.lastSyncedAt, undefined);
+  assert.equal(f.imports.length, 0);
+  assert.equal(f.store.count(), 1);
 });
 
 test("a local edit during remote pull or waiting for commit prevents replacement", async t => {

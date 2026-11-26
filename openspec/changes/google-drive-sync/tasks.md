@@ -28,6 +28,9 @@
       несвязанное непустое облако, явный выбор и автоматическое применение известного потомка через
       `node --test test/drive-coordinator.test.mjs`.
 
+- [x] 3.8 Проверить направление, ожидание, подтверждение и повтор явного выбора через
+      `node --test test/drive-coordinator.test.mjs test/drive-choice-directions.test.mjs`.
+
 ## Workflow follow-up
 
 - Архивировать после независимого review и реальной интеграционной проверки.

@@ -323,6 +323,8 @@ export interface CandleResult {
   source: string;
   cached: boolean;
   requests: number;
+  /** The provider or its coverage cache completed the requested historical range. */
+  requestedRangeCovered?: boolean;
 }
 export interface CandleEvent {
   uid: string;

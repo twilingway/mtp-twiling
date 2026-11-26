@@ -22,6 +22,16 @@ export interface DriveConflict {
   local: DriveSummary;
   remotes: DriveChoice[];
 }
+export interface DriveChoiceAction {
+  nodeId: string;
+  state: "running" | "confirmed" | "review" | "blocked" | "unconfirmed";
+}
+export interface DriveChoicePreview {
+  heads: string[];
+  digest: string;
+  revision: number;
+  identity: string;
+}
 export interface DriveStatus {
   legacyAvailable?: boolean;
   phase:
@@ -39,6 +49,7 @@ export interface DriveStatus {
   lastSyncedAt?: string | undefined;
   error?: DriveErrorCode | "local-changed" | undefined;
   conflict?: DriveConflict | undefined;
+  choiceAction?: DriveChoiceAction | undefined;
 }
 export interface DriveBridge {
   profile(): { owner: string; session: unknown; authenticated: boolean; blocked: boolean };

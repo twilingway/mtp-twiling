@@ -1,7 +1,7 @@
 import { marketAvailable } from "./market-readiness.js";
 import { useEffect, useMemo, useRef } from "react";
 import type { RefObject } from "react";
-import type { Candle, Drawing } from "../../model/types.js";
+import type { Candle, ChartView, Drawing } from "../../model/types.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import type { ChartAdapter, ChartOptions } from "../../charts/adapter.js";
 import { drawingLayer, paintDrawings } from "../../model/drawing-model.js";
@@ -30,6 +30,8 @@ export function useChartCanvas(
 ): void {
   const { controller, state } = useTerminal(),
     dataRef = useRef<Candle[]>([]),
+    pendingSavedView = useRef<ChartView | undefined>(undefined),
+    dataFallback = useRef(false),
     adapterRef = useRef<ChartAdapter | null>(null);
   const p = state.preferences,
     available = marketAvailable(state),
@@ -150,9 +152,11 @@ export function useChartCanvas(
       if (!matches()) return;
       owned = factory(options);
       owned.source = { owner, viewKey: key, uid };
-      owned.persistView =
-        !controller.getSnapshot().importingBackup &&
-        controller.getSnapshot().historyViewReady !== false;
+      const current = controller.getSnapshot(),
+        ready = !current.importingBackup && current.historyViewReady !== false,
+        candles = current.candles,
+        showingFallback = ready && candles.length > 0 && current.historyViewFallback === true;
+      owned.persistView = ready && !showingFallback;
       adapterRef.current = owned;
       controller.chart = owned;
       const currentPreferences = controller.getSnapshot().preferences;
@@ -161,11 +165,12 @@ export function useChartCanvas(
         currentPreferences.technicalPaneLayout ?? []
       );
       stopPriceMetadata = watchChartPriceMetadata(controller, owned, matches);
-      // Adapters retain this request until nonempty data has completed its initial fit.
-      if (view) owned.setView(view);
-      const candles = controller.getSnapshot().candles;
-      dataRef.current = owned.persistView ? candles : [];
-      if (candles.length && owned.persistView) owned.setData([...candles], true);
+      dataRef.current = ready ? candles : [];
+      dataFallback.current = showingFallback;
+      if (ready && candles.length) {
+        if (view && !showingFallback) owned.setView(view);
+        owned.setData([...candles], true);
+      } else pendingSavedView.current = view;
     };
     void initialize().catch((error: unknown) => {
       if (matches())
@@ -189,6 +194,8 @@ export function useChartCanvas(
       if (controller.chart === owned) controller.chart = null;
       adapterRef.current = null;
       dataRef.current = [];
+      dataFallback.current = false;
+      pendingSavedView.current = undefined;
     };
   }, [
     controller,
@@ -211,9 +218,11 @@ export function useChartCanvas(
   useEffect(() => {
     const adapter = adapterRef.current,
       next = state.candles,
-      previous = dataRef.current;
+      previous = dataRef.current,
+      fallback = state.historyViewFallback === true;
     if (adapter?.retired || state.importRecoveryRequired) return;
-    if (adapter) adapter.persistView = !state.importingBackup && state.historyViewReady !== false;
+    if (adapter)
+      adapter.persistView = !fallback && !state.importingBackup && state.historyViewReady !== false;
     if (state.importingBackup || state.historyViewReady === false) return;
     if (!adapter || !next.length || next === previous) return;
     const incremental =
@@ -221,16 +230,27 @@ export function useChartCanvas(
       next.length >= previous.length &&
       next.length <= previous.length + 1 &&
       previous.every((bar, i) => i >= previous.length - 1 || bar === next[i]);
-    if (incremental && previous[0]?.timestamp === next[0]?.timestamp) {
+    if (fallback && !dataFallback.current) {
+      adapter.setData([...next], true);
+    } else if (incremental && previous[0]?.timestamp === next[0]?.timestamp) {
       const last = next.at(-1);
       if (last) adapter.updateBar(last);
     } else {
       const view = previous.length ? adapter.getView() : null;
+      if (!fallback && pendingSavedView.current) adapter.setView(pendingSavedView.current);
       adapter.setData([...next], !previous.length);
       if (view) adapter.setView(view);
     }
     dataRef.current = next;
-  }, [state.candles, state.historyViewReady, state.importingBackup, state.importRecoveryRequired]);
+    dataFallback.current = fallback;
+    pendingSavedView.current = undefined;
+  }, [
+    state.candles,
+    state.historyViewReady,
+    state.historyViewFallback,
+    state.importingBackup,
+    state.importRecoveryRequired
+  ]);
   useEffect(() => {
     const adapter = adapterRef.current;
     if (!adapter || adapter.retired || state.importingBackup || state.importRecoveryRequired)

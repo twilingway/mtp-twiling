@@ -111,6 +111,11 @@
   opacity: 0.55;
   cursor: default;
 }
+#google-drive-settings button[aria-busy="true"] {
+  opacity: 1;
+  cursor: progress;
+  border-color: var(--accent);
+}
 #google-drive-settings .drive-automatic {
   display: flex;
   align-items: flex-start;
@@ -132,6 +137,16 @@
   color: var(--text);
 }
 #google-drive-settings :is(#google-drive-error, .drive-storage-error) {
+  border-color: var(--danger);
+}
+#google-drive-settings .drive-choice-result {
+  padding: 10px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--surface-input);
+  color: var(--text);
+}
+#google-drive-settings .drive-choice-result[data-state="unconfirmed"] {
   border-color: var(--danger);
 }
 #google-drive-settings .drive-conflict {

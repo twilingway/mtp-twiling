@@ -111,6 +111,8 @@ export interface TerminalState {
   backupBusy?: boolean;
   /** False while restoring a saved viewport whose data is not covered yet. */
   historyViewReady?: boolean;
+  /** The available candles can be shown, but the saved camera is outside their history. */
+  historyViewFallback?: boolean;
   mobilePanelOpen?: boolean;
   chartRevision: number;
   ready: boolean;
