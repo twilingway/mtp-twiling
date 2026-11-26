@@ -9,6 +9,7 @@ import type {
   CompiledPresentationFill,
   CompiledPresentationPlot
 } from "../model/technical-indicators/presentation-types.js";
+import type { CompiledReferenceLevel } from "../model/technical-indicators/presentation-types.js";
 import type {
   OutputStyle,
   TechnicalCalculationContext,
@@ -37,6 +38,13 @@ export interface TechnicalRenderFill extends CompiledPresentationFill {
   readonly timestamps: readonly number[];
   readonly scalePlotKey: string;
 }
+export interface TechnicalRenderReference extends CompiledReferenceLevel {
+  readonly key: string;
+  readonly instanceId: string;
+  readonly paneKey: string;
+  readonly order: number;
+  readonly timestamps: readonly number[];
+}
 /** Per-adapter cache: formulas depend on complete real input, never on the visible chart range. */
 export class TechnicalRenderData {
   private bars: readonly Candle[] = [];
@@ -57,6 +65,7 @@ export class TechnicalRenderData {
     const groups = technicalIndicatorGroups(instances.filter(isTechnicalIndicatorInstance), layout);
     const outputs: TechnicalRenderOutput[] = [];
     const fills: TechnicalRenderFill[] = [];
+    const references: TechnicalRenderReference[] = [];
     let order = 0;
     for (const group of groups)
       for (const instance of group.instances) {
@@ -135,9 +144,18 @@ export class TechnicalRenderData {
             });
           }
         }
+        for (const level of presentation?.referenceLevels ?? [])
+          references.push({
+            ...level,
+            key: `${instance.id}/reference/${level.id}`,
+            instanceId: instance.id,
+            paneKey: group.key,
+            order: order++,
+            timestamps: result.timestamps
+          });
       }
     for (const key of this.cache.keys()) if (!seen.has(key)) this.cache.delete(key);
-    return { groups, outputs, fills };
+    return { groups, outputs, fills, references };
   }
   dispose(): void {
     this.bars = [];

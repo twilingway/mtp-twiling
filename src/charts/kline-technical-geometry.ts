@@ -1,6 +1,10 @@
 import { registerFigure } from "klinecharts";
 import type { Indicator, IndicatorDrawParams } from "klinecharts";
-import type { TechnicalRenderFill, TechnicalRenderOutput } from "./technical-render-data.js";
+import type {
+  TechnicalRenderFill,
+  TechnicalRenderOutput,
+  TechnicalRenderReference
+} from "./technical-render-data.js";
 import { presentationRuns } from "../model/technical-indicators/presentation-geometry.js";
 import { presentationColor } from "../model/technical-indicators/presentation.js";
 import { lineColor } from "../model/candle-palette.js";
@@ -44,6 +48,26 @@ export interface KlineTechnicalContext {
   fills: readonly TechnicalRenderFill[];
   columnsBase: KlineColumnsBase | null;
   disposed: boolean;
+  references?: readonly TechnicalRenderReference[];
+}
+const referenceType = "mtp-ta-reference-level";
+let referenceRegistered = false;
+export function klineReferenceFigures(
+  references: readonly TechnicalRenderReference[],
+  outputs: readonly TechnicalRenderOutput[]
+) {
+  if (!references.some((level) => level.visible)) return [];
+  if (!referenceRegistered) {
+    registerFigure({ name: referenceType, draw: () => {}, checkEventOn: () => false });
+    referenceRegistered = true;
+  }
+  return references
+    .filter((level) => level.visible)
+    .map((level) => {
+      let key = `__mtpReference_${level.id}`;
+      while (outputs.some((output) => output.outputId === key)) key += "_";
+      return { key, type: referenceType, level };
+    });
 }
 export function klineTechnicalContext(
   indicator: Indicator<KlineTechnicalRow>
@@ -136,7 +160,10 @@ function plot(params: Params, output: TechnicalRenderOutput): void {
     }
     return;
   }
-  for (const run of presentationRuns(output.values, undefined, first, last)) {
+  const connect = geometry?.kind === "line" && geometry.gaps === "legacy";
+  for (const run of connect
+    ? [{ first, last }]
+    : presentationRuns(output.values, undefined, first, last)) {
     let previous: ReturnType<typeof point> = null,
       color = "",
       drawing = false;
@@ -147,6 +174,7 @@ function plot(params: Params, output: TechnicalRenderOutput): void {
     for (let i = run.first; i <= run.last; i++) {
       const p = point(params, i, output.values[i]);
       if (!p) {
+        if (connect) continue;
         finish();
         previous = null;
         continue;
@@ -173,12 +201,27 @@ export function drawKlineTechnical(params: Params): boolean {
   if (!context || context.disposed) return true;
   const custom = context.outputs.some(
     (output) =>
+      output.presentation?.precisionPolicy === "fixed-2" ||
       output.presentation?.geometry.kind === "cross" ||
       (output.presentation?.geometry.kind === "line" &&
         output.presentation.geometry.gaps === "break")
   );
   clipped(params, () => {
     levels(params, context.levels);
+    for (const level of context.references ?? []) {
+      if (!level.visible) continue;
+      const y = params.yAxis.convertToPixel(level.value);
+      if (!Number.isFinite(y)) continue;
+      params.ctx.strokeStyle = lineColor(level.color, level.opacity);
+      params.ctx.lineWidth = level.width;
+      params.ctx.setLineDash(
+        level.lineStyle === "solid" ? [] : level.lineStyle === "dotted" ? [2, 3] : [6, 4]
+      );
+      params.ctx.beginPath();
+      params.ctx.moveTo(0, y);
+      params.ctx.lineTo(params.bounding.width, y);
+      params.ctx.stroke();
+    }
     if (custom) for (const output of context.outputs) plot(params, output);
   });
   return custom;
@@ -193,6 +236,13 @@ export function drawKlineTechnicalFills(params: Params): boolean {
       if (!fill.visible || fill.opacity === 0) continue;
       const [first, last] = bounds(params, fill.from.length);
       ctx.fillStyle = lineColor(fill.color, fill.opacity);
+      if (fill.extent === "pane") {
+        const from = params.yAxis.convertToPixel(fill.from[0]!),
+          to = params.yAxis.convertToPixel(fill.to[0]!);
+        if (fill.from.length && Number.isFinite(from) && Number.isFinite(to))
+          ctx.fillRect(0, Math.min(from, to), params.bounding.width, Math.abs(to - from));
+        continue;
+      }
       for (const run of presentationRuns(fill.from, fill.to, first, last)) {
         let points: { x: number; from: number; to: number }[] = [];
         const finish = () => {

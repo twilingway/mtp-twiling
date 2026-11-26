@@ -1,3 +1,5 @@
+import { lightweightReferenceContext } from "./lightweight-reference-context.js";
+import { lightweightReferenceLevels } from "./lightweight-reference-levels.js";
 import { HistogramSeries, LineSeries } from "lightweight-charts";
 import type {
   IChartApi,
@@ -39,7 +41,8 @@ interface Entry {
 export function lightweightTechnical(
   chart: IChartApi,
   options: ChartOptions,
-  alive: () => boolean
+  alive: () => boolean,
+  primary?: () => ISeriesApi<"Candlestick"> | ISeriesApi<"Line">
 ) {
   const calculation = new TechnicalRenderData(technicalCalculationContext(options.timeframe));
   const owned = new Map<string, Entry>(),
@@ -52,6 +55,12 @@ export function lightweightTechnical(
     lastMetrics = "";
   let events: ReturnType<typeof attachTechnicalPaneEvents> | undefined;
   const nativePanes = () => (typeof chart.panes === "function" ? chart.panes() : []);
+  const referenceContext = lightweightReferenceContext(chart, () => primary?.());
+  const referenceLevels = lightweightReferenceLevels(
+    chart,
+    referenceContext,
+    () => !disposed && alive()
+  );
   const timeHeight = () =>
     typeof chart.timeScale().height === "function" ? chart.timeScale().height() : 28;
   const metrics = (): TechnicalPaneMetric[] => {
@@ -141,13 +150,29 @@ export function lightweightTechnical(
     }
   }
   const primitivePlot = (output: TechnicalRenderOutput) =>
+    output.presentation?.precisionPolicy === "fixed-2" ||
     output.presentation?.geometry.kind === "cross" ||
     (output.presentation?.geometry.kind === "line" &&
       output.presentation.geometry.gaps === "break");
   function outputOptions(output: TechnicalRenderOutput, fillCarrier = false) {
-    const autoscaleInfoProvider: AutoscaleInfoProvider = (original) =>
+    const original: AutoscaleInfoProvider = (original) =>
       !disposed && alive() && output.style.visible ? original() : null;
+    const autoscaleInfoProvider =
+      output.presentation?.precisionPolicy === "fixed-2"
+        ? referenceContext.autoscale(
+            output.instanceId,
+            output.paneKey,
+            () => referenceContext.first(output.values, output.timestamps, false),
+            null,
+            original
+          )
+        : original;
     return {
+      ...(output.presentation?.precisionPolicy === "fixed-2"
+        ? { priceFormat: { type: "price" as const, precision: 2, minMove: 0.01 } }
+        : output.presentation?.precisionPolicy === "native-price" && primary
+          ? { priceFormat: primary().options().priceFormat }
+          : {}),
       color: lineColor(output.style.color, output.style.opacity),
       visible: output.style.visible || fillCarrier,
       priceScaleId: "right",
@@ -233,7 +258,12 @@ export function lightweightTechnical(
           entry.primitive = new LightweightTechnicalPrimitive(chart, entry.series, alive);
           entry.series.attachPrimitive(entry.primitive);
         }
-        entry.primitive.updatePlot(output);
+        entry.primitive.updatePlot(
+          output,
+          output.presentation?.precisionPolicy === "fixed-2"
+            ? (value) => referenceContext.project(output.instanceId, output.paneKey, value)
+            : undefined
+        );
       } else if (entry.primitive) {
         entry.primitive.dispose();
         entry.series.detachPrimitive(entry.primitive);
@@ -279,7 +309,16 @@ export function lightweightTechnical(
         entry.levelKey = levelKey;
       }
     }
-    const activeFills = new Set(compiled.fills.map((fill) => fill.key));
+    referenceContext.update(
+      compiled.outputs,
+      new Map([...owned].map(([key, entry]) => [key, entry.series]))
+    );
+    referenceLevels.update(compiled.references ?? [], compiled.fills, (key) =>
+      key === "price" ? 0 : panes.get(key)!.paneIndex()
+    );
+    const activeFills = new Set(
+      compiled.fills.filter((fill) => fill.extent !== "pane").map((fill) => fill.key)
+    );
     for (const [key, fill] of fills)
       if (!activeFills.has(key)) {
         fill.primitive.dispose();
@@ -287,6 +326,7 @@ export function lightweightTechnical(
         fills.delete(key);
       }
     for (const fill of compiled.fills) {
+      if (fill.extent === "pane") continue;
       const carrier = owned.get(fill.scalePlotKey);
       if (!carrier) continue;
       let entry = fills.get(fill.key);
@@ -373,7 +413,9 @@ export function lightweightTechnical(
         ? all.reduce((sum, pane) => sum + pane.getHeight(), 0) + all.length - 1
         : options.container.clientHeight - timeHeight();
     },
+    refreshNativeMetadata: reconcile,
     dispose() {
+      referenceLevels.dispose();
       crosshair.dispose();
       disposed = true;
       events?.dispose();

@@ -107,10 +107,13 @@ export function isTechnicalIndicatorInstance(value: unknown): value is Technical
   return (
     value.styles === undefined ||
     (record(value.styles) &&
-      exact(
-        value.styles,
-        definition.outputs.map((output) => output.id)
-      ) &&
+      exact(value.styles, [
+        ...definition.outputs.map((output) => output.id),
+        ...(definition.presentation?.referenceLevels ?? []).map((level) => level.id),
+        ...(definition.presentation?.fills ?? [])
+          .filter((fill) => fill.extent === "pane")
+          .map((fill) => fill.id)
+      ]) &&
       Object.values(value.styles).every(style))
   );
 }

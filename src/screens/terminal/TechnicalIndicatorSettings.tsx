@@ -23,6 +23,11 @@ import {
 } from "../../model/technical-indicator-layout.js";
 
 const labels: Readonly<Record<string, readonly [string, string]>> = {
+  rsiLength: ["Период RSI", "RSI Length"],
+  stochasticLength: ["Период стохастика", "Stochastic Length"],
+  wmaLength: ["Период WMA", "WMA Length"],
+  longRocLength: ["Длинный период ROC", "Long ROC Length"],
+  shortRocLength: ["Короткий период ROC", "Short ROC Length"],
   length: ["Период", "Length"],
   source: ["Источник", "Source"],
   useExponentialMa: ["Экспоненциальная средняя", "Use Exponential MA"],
@@ -112,12 +117,27 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
     state.preferences.instrumentUid === initial.state.preferences.instrumentUid &&
     state.preferences.timeframe === initial.state.preferences.timeframe &&
     state.preferences.engine === initial.state.preferences.engine;
+  const styleOutputs = [
+    ...definition.outputs,
+    ...(definition.presentation?.referenceLevels ?? []).map((level) => ({
+      id: level.id,
+      title: level.title,
+      color: level.color
+    })),
+    ...(definition.presentation?.fills ?? [])
+      .filter((fill) => fill.extent === "pane")
+      .map((fill) => ({ id: fill.id, title: "Background", color: fill.color }))
+  ];
   const displayStyle = (id: string, stored: typeof styles): OutputStyle => ({
-    color: definition.outputs.find((output) => output.id === id)!.color,
+    color: styleOutputs.find((output) => output.id === id)!.color,
     width: 1,
     visible: true,
     opacity: 1,
     lineStyle: "solid",
+    ...(definition.presentation?.referenceLevels?.some((level) => level.id === id) ? { opacity: definition.presentation.referenceLevels.find(level=>level.id===id)!.opacity, lineStyle: definition.presentation.referenceLevels.find(level=>level.id===id)!.lineStyle }: {}),
+    ...(id === "background"
+      ? { opacity: definition.presentation?.fills.find((fill) => fill.id === id)?.opacity ?? 1 }
+      : {}),
     ...stored?.[id]
   });
   const style = (id: string, patch: Partial<OutputStyle>) =>
@@ -250,7 +270,7 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
         {limited && <p role="status">{calculationLimitMessage(english)}</p>}
         <fieldset disabled={pending || !current}>
           <legend>{text("Стиль", "Style")}</legend>
-          {definition.outputs.map((output) => {
+          {styleOutputs.map((output) => {
             const value = displayStyle(output.id, styles);
             const title =
               instance.definitionId === "keltner-channels"
@@ -263,6 +283,17 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                     output.title
                   )
                 : undefined;
+            const background = output.id === "background";
+            const referenceTitle =
+              output.id === "upperBand"
+                ? text("Верхняя граница", "Upper Band")
+                : output.id === "middleBand"
+                  ? text("Средняя граница", "Middle Band")
+                  : output.id === "lowerBand"
+                    ? text("Нижняя граница", "Lower Band")
+                    : background
+                      ? text("???", "Background")
+                      : undefined;
             const cross = definition.presentation?.plots.some(
               (plot) => plot.id === output.id && plot.geometry.kind === "cross"
             );
@@ -274,7 +305,8 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                     checked={value.visible}
                     onChange={(event) => style(output.id, { visible: event.target.checked })}
                   />
-                  {title ??
+                  {referenceTitle ??
+                    title ??
                     (output.id === "upTrend"
                       ? text("Восходящий тренд", "Up Trend")
                       : output.id === "downTrend"
@@ -293,18 +325,20 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                     onChange={(event) => style(output.id, { color: event.target.value })}
                   />
                 </label>
-                <label>
-                  {cross ? text("Размер", "Size") : text("Толщина", "Width")}
-                  <input
-                    type="number"
-                    min="1"
-                    max="4"
-                    required
-                    value={value.width}
-                    onChange={(event) => style(output.id, { width: Number(event.target.value) })}
-                  />
-                </label>
-                {!cross && (
+                {!background && (
+                  <label>
+                    {cross ? text("Размер", "Size") : text("Толщина", "Width")}
+                    <input
+                      type="number"
+                      min="1"
+                      max="4"
+                      required
+                      value={value.width}
+                      onChange={(event) => style(output.id, { width: Number(event.target.value) })}
+                    />
+                  </label>
+                )}
+                {!background && !cross && (
                   <label>
                     {text("Линия", "Line")}
                     <select

@@ -86,7 +86,9 @@ export function neutralKlinePrecision(
   }
   for (const plan of activePlans)
     if (plan.paneId === paneId)
-      precisions.push(plan.policy === "native-price" ? domain.pricePrecision : 6);
+      precisions.push(
+        plan.policy === "native-price" ? domain.pricePrecision : plan.policy === "fixed-2" ? 2 : 6
+      );
   const native = chart.getIndicatorByPaneId(paneId) as Map<string, Indicator> | null;
   if (native && typeof native.entries === "function")
     for (const [name, indicator] of native.entries())
