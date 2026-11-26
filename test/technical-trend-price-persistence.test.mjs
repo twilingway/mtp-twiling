@@ -1,4 +1,5 @@
 import test from "node:test";
+import { EXPECTED_DRIVE_PARAMETER_KEYS } from "./technical-registry-expectation.mjs";
 import assert from "node:assert/strict";
 import {
   core,
@@ -84,7 +85,7 @@ test("malformed params/runtime keys/styles fail root and JSON/Drive before allow
   }
 });
 
-test("Drive projection adds exactly the5 authorized numeric keys and no runtime or G5 writer fields", () => {
+test("Drive projection retains reviewed numeric keys and excludes runtime or G5 writer fields", () => {
   const keys = currentSource("services/drive/backup.ts")
       .match(/params:\s*scalars\(\s*"([^"]+)"/)[1]
       .split(" "),
@@ -92,10 +93,7 @@ test("Drive projection adds exactly the5 authorized numeric keys and no runtime 
       "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength diLength adxSmoothing divisor emaLength oscillatorAverage signalAverage longLength shortLength roc1Length roc2Length roc3Length roc4Length sma1Length sma2Length sma3Length sma4Length".split(
         " "
       );
-  assert.deepEqual(
-    keys.filter((key) => !previous.includes(key)),
-    ["atrLength", "factor", "start", "increment", "maximum"]
-  );
+  assert.deepEqual(keys, EXPECTED_DRIVE_PARAMETER_KEYS);
   assert.ok(previous.every((key) => keys.includes(key)));
   assert.equal(keys.length, new Set(keys).size);
   for (const key of [
