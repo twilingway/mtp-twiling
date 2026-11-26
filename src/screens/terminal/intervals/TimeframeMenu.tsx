@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { t } from "../../../i18n/messages.js";
 import {
@@ -44,7 +44,7 @@ export function TimeframeMenu({
 }: TimeframeMenuProps) {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Partial<Record<IntervalGroupId, boolean>>>({});
-  const [position, setPosition] = useState({ left: 8, top: 40, maxHeight: 500 });
+  const [position, setPosition] = useState<CSSProperties>();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
@@ -56,14 +56,29 @@ export function TimeframeMenu({
   const show = () => {
     const rect = triggerRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const below = window.innerHeight - rect.bottom - 16;
-    const above = rect.top - 16;
+    const viewport = window.visualViewport;
+    const viewportLeft = viewport?.offsetLeft ?? 0;
+    const viewportTop = viewport?.offsetTop ?? 0;
+    const viewportWidth = viewport?.width ?? document.documentElement.clientWidth;
+    const viewportHeight = viewport?.height ?? document.documentElement.clientHeight;
+    const inset = 8;
+    const anchorGap = 6;
+    const viewportBottom = viewportTop + viewportHeight;
+    const menuTop = Math.max(viewportTop + inset, rect.bottom + anchorGap);
+    const menuBottom = Math.min(viewportBottom - inset, rect.top - anchorGap);
+    const below = viewportBottom - inset - menuTop;
+    const above = menuBottom - viewportTop - inset;
     const openBelow = below >= Math.min(320, above);
     const maxHeight = Math.max(0, Math.min(560, openBelow ? below : above));
+    const maxWidth = Math.min(296, Math.max(0, viewportWidth - 2 * inset));
     setPosition({
-      left: Math.max(8, Math.min(rect.left, window.innerWidth - 296 - 8)),
-      top: openBelow ? rect.bottom + 6 : Math.max(8, rect.top - maxHeight - 6),
-      maxHeight
+      left: Math.max(
+        viewportLeft + inset,
+        Math.min(rect.left, viewportLeft + viewportWidth - maxWidth - inset)
+      ),
+      top: openBelow ? menuTop : menuBottom - maxHeight,
+      maxHeight,
+      maxWidth
     });
     setOpen(true);
   };
@@ -84,11 +99,14 @@ export function TimeframeMenu({
         setOpen(false);
     };
     const moved = () => setOpen(false);
+    const viewport = window.visualViewport;
     document.addEventListener("pointerdown", outside);
     window.addEventListener("resize", moved);
+    viewport?.addEventListener("resize", moved);
     return () => {
       document.removeEventListener("pointerdown", outside);
       window.removeEventListener("resize", moved);
+      viewport?.removeEventListener("resize", moved);
     };
   }, [open]);
   const row = (item: IntervalDefinition, prefix: string) => {
