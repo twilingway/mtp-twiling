@@ -100,7 +100,7 @@ test("raw root/JSON/Drive reject array/null/unknown/extra params and styles befo
     );
   }
 });
-test("Drive parameter allowlist adds exactly10 state and5 trend-price authorized scalar keys", () => {
+test("Drive parameter allowlist adds exactly10 state,5 trend-price and2 channel-price scalar keys", () => {
   const source = readFileSync(new URL("../src/services/drive/backup.ts", import.meta.url), "utf8");
   const keys = source.match(/params:\s*scalars\(\s*"([^"]+)"/)[1].split(" ");
   const previous =
@@ -124,7 +124,9 @@ test("Drive parameter allowlist adds exactly10 state and5 trend-price authorized
       "factor",
       "start",
       "increment",
-      "maximum"
+      "maximum",
+      "offset",
+      "sigma"
     ]
   );
   assert.ok(previous.every((k) => keys.includes(k)));

@@ -47,7 +47,10 @@ export const EXPECTED_COMPUTED_IDS = Object.freeze([
   "kst",
   "fisher-transform",
   "parabolic-sar",
-  "supertrend"
+  "supertrend",
+  "alma",
+  "lsma",
+  "chandelier-exit"
 ]);
 export const EXPECTED_COMPUTED_COUNT = EXPECTED_COMPUTED_IDS.length;
 export const EXPECTED_TECHNICAL_COUNT = EXPECTED_COMPUTED_COUNT + 1; // Existing Volume.

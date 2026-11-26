@@ -1,4 +1,8 @@
 import test from "node:test";
+import {
+  EXPECTED_LIBRARY_COUNT,
+  EXPECTED_TECHNICAL_COUNT
+} from "./technical-registry-expectation.mjs";
 import assert from "node:assert/strict";
 import * as jsx from "react/jsx-runtime";
 import { settings, walk, text } from "./technical-state-oscillator-settings-fixture.mjs";
@@ -11,7 +15,7 @@ const cases = {
   "chandelier-exit": { Период: "Length", "Период ATR": "ATR length", Множитель: "Multiplier" }
 };
 
-test("actual local library has55 available entries:51 technical incl Volume plus4 scripts, while blocked state disables additions", () => {
+test("actual local library exposes the reviewed technical set plus4 scripts, while blocked state disables additions", () => {
   for (const locale of ["ru", "en"])
     for (const blocked of [false, true]) {
       const state = {
@@ -38,9 +42,12 @@ test("actual local library has55 available entries:51 technical incl Volume plus
       const entries = reader(
         "screens/terminal/TerminalIndicatorLibrary.js"
       ).TerminalIndicatorLibrary().props.entries;
-      assert.equal(entries.filter((e) => e.available).length, blocked ? 0 : 55);
+      assert.equal(entries.filter((e) => e.available).length, blocked ? 0 : EXPECTED_LIBRARY_COUNT);
       if (!blocked) {
-        assert.equal(entries.filter((e) => e.available && e.category === "technicals").length, 51);
+        assert.equal(
+          entries.filter((e) => e.available && e.category === "technicals").length,
+          EXPECTED_TECHNICAL_COUNT
+        );
         assert.equal(entries.filter((e) => e.available && e.category === "scripts").length, 4);
       }
     }

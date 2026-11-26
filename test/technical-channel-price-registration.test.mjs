@@ -1,4 +1,8 @@
 import test from "node:test";
+import {
+  EXPECTED_COMPUTED_COUNT,
+  EXPECTED_TECHNICAL_COUNT
+} from "./technical-registry-expectation.mjs";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -29,9 +33,9 @@ const make = (id, params = {}) => core.createTechnicalIndicatorInstance(id, id, 
 const calc = (id, b, params = {}) => core.calculateTechnicalIndicator(make(id, params), b);
 
 test("only three definitions append after old47 with exact defaults/native price/primary colors and no KC/DC registration", () => {
-  assert.equal(core.technicalIndicatorDefinitions.length, 50);
+  assert.equal(core.technicalIndicatorDefinitions.length, EXPECTED_COMPUTED_COUNT);
   assert.deepEqual(
-    core.technicalIndicatorDefinitions.slice(-5).map((d) => d.id),
+    core.technicalIndicatorDefinitions.slice(45, 50).map((d) => d.id),
     ["parabolic-sar", "supertrend", ...ids]
   );
   for (const id of ids) {
@@ -58,7 +62,10 @@ test("only three definitions append after old47 with exact defaults/native price
     ]
   );
   const catalog = load("model/technical-indicators/catalog.js");
-  assert.equal(catalog.technicalCatalogEntries("ru").filter((e) => e.available).length, 51);
+  assert.equal(
+    catalog.technicalCatalogEntries("ru").filter((e) => e.available).length,
+    EXPECTED_TECHNICAL_COUNT
+  );
   for (const id of ["STD;Keltner_Channels", "STD;Donchian_Channels"])
     assert.equal(catalog.technicalDefinitionForCatalog(id), undefined);
 });
