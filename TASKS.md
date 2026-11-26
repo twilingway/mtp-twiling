@@ -1,5 +1,12 @@
 # Текущая очередь
 
+Актуально26.11.2026: сначала `HANDOFF_AUTONOMOUS_CURRENT.md`. Public/canonical0.3.22, 45 computed
+TA, CI/автоматический release/публичный Update проверены. Следующая ветка47 TA содержит
+SAR/Supertrend и исправления collapsed axis/pane order; требуется общий check и product browser.
+Отдельно выполняется Drive reader guard без нового формата и без настоящего Google входа. Остальная
+очередь: оставшиеся TA, custom minute intervals/native offset, полное рисование/меню, OKX
+exact-absence fallback, реальная Google/two-device проверка. Ниже исторические статусы.
+
 Актуальное дополнение от 25 ноября 2026:
 
 - В canonical 0.3.13: корзина только при hover/Tab на кнопку, стабильный сброс LW и удержание

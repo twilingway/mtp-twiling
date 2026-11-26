@@ -7,7 +7,55 @@ login отложить. Ответы коротко по-русски. Реал�
 
 ## Опубликовано
 
-### Новейший статус — важнее исторических строк ниже
+### Текущий проверенный статус — 26.11.2026, выпуск 0.3.22
+
+- Public/canonical main `131e38e81fe8b10a53132806c3ccbac29f4d33d6`, build `59e00dca6d4d2d16`. PR9
+  merged; PR CI45741077445/run25 и main CI45741596672/run26 success. Full842/842, strict specs49/49.
+  Штатный timer выпустил .22 UTC02:24:57.741, wall13.164s/peak192.5MiB. Все67
+  canonical/native/public hashes совпали, verified Python TLS; лимиты/соседи/таймер сохранены.
+  Evidence: `deploy-release-readiness/auto-release-0322-proof.json`.
+- Публично45 вычисляемых TA (48 и52 ниже относятся только к следующей рабочей ветке).
+  TSI/KST/Fisher, сохранение sparse styles и исправления concurrent routing включены в .22. Pure
+  derived-minute math включена как исходный модуль; custom интервалы пользователю пока не доступны.
+  Каталог127 не означает127 готовых алгоритмов.
+- Public .21→.22 Update выполнен в копии собственного анонимного профиля: прежние8 TA, параметры,
+  рисунки/rawGuest/UID сохранены; новые3 добавлены через настоящий UI. Обе engines, latest-intent
+  routing, mobile375 RU/EN dark/light и65 cached documents offline PASS. 23/23 PNG просмотрены,
+  pageerrors0. KLine на5 днях имеет native rounding1px при неизменных step/anchor/from/to;
+  roundtrip365 точный. LW comparable cycle точный. Own Chrome/CDP9335 закрыты, source403 hashes
+  unchanged. Report: `public-0322-pwa-qa/report.json`. Installed PWA/телефон/Google login не
+  проверены.
+- Canonical main чистый и собран; server.mjs прежний, managed own5210/session24824 не
+  перезапускался.
+
+### Следующая рабочая ветка — не опубликовано
+
+- `vps/artifacts/ta-render-integration`, исходный47-TA cut
+  `6978bf1f638eab03f741d5e808a4c9a1f3323ebc`. Общий runtime compiler/bridge, LW primitives и native
+  KLine cross/linebr/fills готовы. Старые45 computations сохранены; SAR/Supertrend регистрация
+  c14427f прошла независимое review9 групп +55 focused tests и включена как fa221a6. Итого47
+  computed,48 TA с Volume,52 library с4 MTP. Общая source integration63/63 PASS; полный check/build
+  и product browser ещё нужны.
+- Исправление 13f3c27 убирает fallback tick labels на30px collapsed strips, не меняя numeric data и
+  main price axis. Fresh visual на frozen f3a46cd подтвердил оба engines/dark-light/expand; итоговый
+  manifest/cleanup оформляется. LW при уменьшении высоты native autoscale округляет bottom
+  на0.00050438, после expand endpoints возвращаются точно; time camera неизменна.
+- Исправление captured pane order d5c3060 включено как6978bf1: sparse resize больше не ставит
+  изменённые панели перед untouched. Source callback→persist→reconcile обоих engines проверен,
+  отдельный независимый review и product browser ещё нужны.
+- Предыдущие frozen native harness QA: LW21 иKLine32 просмотренных PNG. SAR points, linebr/fills,
+  DPR1/2, layers, precision6→8→6, disposal и bounded performance проверены; там же найдены два
+  дефекта выше. Source/harness checks не заменяют финальный product UI gate.
+- Drive reader guard выполняется отдельно: same-head unknown payload не должен приниматься или
+  становиться родителем old-format upload; unknown local association не должна заменяться default.
+  Новых instance2/envelope3/DB3 writers нет. Proposal `docs/TA_STYLE_COMPATIBILITY_GATES.md`
+  содержит concrete compatibility decision и8/8 native IndexedDB prototype evidence; production
+  database не мигрировалась. Реальный Google OAuth/Drive/два устройства всё ещё не проверялись.
+- Reviewed math-only ALMA/LSMA/KC/DC/Chandelier:780e9c5, registration/UI/native offset ещё не
+  сделаны. DPO odd-length remains unresolved. Остальные TA, инструменты/меню/полное Fibonacci
+  соответствие и OKX fallback остаются в очереди; общая цель ACTIVE.
+
+### История выпусков 0.3.20–0.3.21
 
 - PR7 merged, canonical/public main0.3.20: `f69a6bdb65681d9724608cf84d73c0de5632dd2d`, build
   `f6f831b361430895`. PR CI45728265644/run20 и exact main push CI45728693676/run21 success.
