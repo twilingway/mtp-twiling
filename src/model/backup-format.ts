@@ -381,6 +381,8 @@ function isBackup(value: unknown): value is Backup {
     list(isBackupImage, 1000)(value.images) &&
     fields(value, {
       exportedAt: string,
+      requiredProviders: (value) =>
+        Array.isArray(value) && value.length === 1 && value[0] === "okx",
       layout: isProfilePreferences,
       watchlist: list(isBackupMarketRow, 300),
       history: list(isBackupHistory),

@@ -1,4 +1,5 @@
 import { marketAvailable } from "./market-readiness.js";
+import { providerLabel } from "./provider-label.js";
 import { t, systemText } from "../../i18n/messages.js";
 import { memo, useState } from "react";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
@@ -70,7 +71,7 @@ export function ChartPanel() {
             {row?.exchange === "dealer_fx_otc" || row?.realExchange === "REAL_EXCHANGE_DEALER"
               ? t("Дилер")
               : row?.providerRef
-                ? `Bybit · ${row.productKind === "spot" ? "Spot" : "USDT perpetual"}`
+                ? `${providerLabel(row.providerRef)} · ${row.productKind === "spot" ? "Spot" : "USDT perpetual"}`
                 : "MOEX"}
           </span>
           <span id="chart-period">{t(PERIOD_LABELS[p.timeframe])}</span>
@@ -116,7 +117,9 @@ export function ChartPanel() {
               </h2>
               <p>
                 {!available
-                  ? t("Bybit доступен без ключа. Для российских инструментов подключите Т‑Банк.")
+                  ? t(
+                      "Bybit и OKX доступны без ключа. Для российских инструментов подключите Т‑Банк."
+                    )
                   : !state.rows.length
                     ? t("Нажмите + в списке котировок, чтобы открыть график.")
                     : systemText(state.historyHelp)}

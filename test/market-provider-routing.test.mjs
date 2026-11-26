@@ -139,6 +139,27 @@ function fixture({ token = null, holdCatalog, holdHistory } = {}) {
   const { MarketClient } = load("services/market-client.ts");
   const client = new MarketClient(token, "profile", cache, {
     http,
+    okx: {
+      http: {
+        get: async (path, params) => {
+          assert.equal(path, "/api/v5/public/instruments");
+          return [
+            {
+              instType: params.instType,
+              instId: params.instType === "SPOT" ? "ETH-USDT" : "ETH-USDT-SWAP",
+              state: "live",
+              instCategory: "1",
+              baseCcy: "ETH",
+              quoteCcy: "USDT",
+              instFamily: "ETH-USDT",
+              uly: "ETH-USDT",
+              settleCcy: "USDT",
+              ctType: "linear"
+            }
+          ];
+        }
+      }
+    },
     online: () => true,
     bankFactory: (_token, _name, view) => {
       bank.cache = view;

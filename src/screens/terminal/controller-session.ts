@@ -2,6 +2,7 @@ import * as storage from "../../services/storage-v2.js";
 import { displayPreferences } from "../../i18n/preferences.js";
 import { MarketClient } from "../../services/market-client.js";
 import type { MarketSnapshot } from "../../services/market-client.js";
+import type { PublicMarketReconnect } from "../../services/market-public.js";
 import { TIMEFRAMES, updateCandleList } from "../../model/history-codec.js";
 import { migrateCandlePalette } from "../../model/candle-palette.js";
 import { pinSelectedInstrument, selectedMarketRow } from "../../model/selected-instrument.js";
@@ -155,12 +156,15 @@ export class TerminalSession {
     });
     client.addEventListener("market-reconnect", (event) => {
       const state = this.bridge.getState(),
-        row = selectedMarketRow(state.rows, state.preferences);
+        row = selectedMarketRow(state.rows, state.preferences),
+        source = (event as CustomEvent<PublicMarketReconnect>).detail;
       if (
         valid() &&
         !state.profileTransition &&
         !state.importingBackup &&
-        row?.providerRef?.category === (event as CustomEvent<string>).detail
+        !state.importRecoveryRequired &&
+        row?.providerRef?.provider === source.provider &&
+        row.providerRef.category === source.category
       )
         void this.bridge.loadHistory(true).catch(() => undefined);
     });

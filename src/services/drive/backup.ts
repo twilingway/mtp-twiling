@@ -1,4 +1,5 @@
 import { fromBase64, isRecord, toBase64, validateBackup } from "../../model/backup-format.js";
+import { withRequiredProviders } from "../../model/backup-export.js";
 import { isWatchlistFlags } from "../../model/watchlist-flags.js";
 import { validWatchlistSectionsField } from "../../model/watchlist-sections.js";
 import { isTechnicalIndicatorInstanceList } from "../../model/technical-indicators/instances.js";
@@ -40,6 +41,7 @@ const chartSettings: Shape = {
 };
 const backupShape: Shape = {
   ...scalars("application schemaVersion exportedAt"),
+  requiredProviders: [true],
   layout: {
     providerRef: scalars("provider category symbol"),
     ...scalars(
@@ -159,7 +161,7 @@ export function sanitizeDriveBackup(value: unknown): Backup {
     throw new DriveError("remote-invalid", "Некорректный фильтр меток инструментов.");
   const projected = project(value, backupShape);
   try {
-    return validateBackup(projected);
+    return withRequiredProviders(validateBackup(projected));
   } catch {
     throw new DriveError("remote-invalid", "Некорректная резервная копия для Google Диска.");
   }

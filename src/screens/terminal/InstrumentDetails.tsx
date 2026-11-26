@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { providerLabel } from "./provider-label.js";
 import type { MarketRow } from "../../model/types.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import {
@@ -47,8 +48,8 @@ export function InstrumentDetails({ row }: { row: MarketRow }) {
         (row.providerRef ? (
           <p>
             {l(
-              "Данные Bybit: цена контракта или токена, без корпоративных показателей T-Invest.",
-              "Bybit contract/token prices; T-Invest company data does not apply."
+              `${providerLabel(row.providerRef)} · цена контракта или токена.`,
+              `${providerLabel(row.providerRef)} · contract or token price.`
             )}
           </p>
         ) : !state.authenticated || !client ? (

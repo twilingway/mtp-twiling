@@ -1,4 +1,5 @@
 import { t } from "../../i18n/messages.js";
+import { providerLabel } from "./provider-label.js";
 import { timeZoneOffset } from "../../i18n/timezones.js";
 import { memo, useState } from "react";
 import type { DragEvent, MouseEvent } from "react";
@@ -57,15 +58,16 @@ export const QuoteRow = memo(function QuoteRow({
 }) {
   const digits = precision(row);
   const { state } = useTerminal();
-  const changeTitle = t(
-    row.comparisonBasis === "rolling-24h"
-      ? "Изменение за последние 24 часа · Bybit"
-      : row.previousClose == null
-        ? "Предыдущее закрытие недоступно"
-        : row.type === "future"
-          ? "К предыдущему закрытию Т-Банка"
-          : "К предыдущему дневному закрытию"
-  );
+  const changeTitle =
+    row.comparisonBasis === "rolling-24h" && row.providerRef
+      ? `${t("Изменение за последние 24 часа")} · ${providerLabel(row.providerRef)}`
+      : t(
+          row.previousClose == null
+            ? "Предыдущее закрытие недоступно"
+            : row.type === "future"
+              ? "К предыдущему закрытию Т-Банка"
+              : "К предыдущему дневному закрытию"
+        );
   return (
     <tr
       className={`quote-row ${selected ? "selected" : ""} ${row.availability === "unavailable" ? "unavailable" : ""} ${dragClass}`}

@@ -61,14 +61,13 @@ export class MarketClient extends EventTarget {
       {
         quote: (quote) => {
           const row = this.values.find((row) => row.uid === quote.seriesId);
-          if (!row) return;
-          applyPublicQuote(row, quote);
+          if (!row || !applyPublicQuote(row, quote)) return;
           this.notify();
           this.scheduleSave();
         },
         candle: (event) => this.emit<CandleEvent>("candle", event),
         notice: (message) => this.emit("notice", message),
-        reconnect: (category) => this.emit("market-reconnect", category)
+        reconnect: (source) => this.emit("market-reconnect", source)
       },
       options
     );

@@ -61,7 +61,7 @@ export class TerminalController {
     drawings: [],
     images: [],
     loading: false,
-    historyHelp: "Выберите инструмент Bybit или подключите Т‑Банк",
+    historyHelp: "Выберите криптовалюту или подключите Т‑Банк",
     activeTool: null,
     preview: null,
     selectedObject: null,

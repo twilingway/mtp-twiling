@@ -1,7 +1,12 @@
 import { get, all, transaction } from "./storage-db.js";
 import { object, normaliseRows, imageAsset, normalizeLocalProfileSelection } from "./types.js";
 import { validateBackup, isDrawing, isChartView } from "../model/backup-format.js";
-import { isBankIdentity, providerRefFromId } from "../model/market-provider.js";
+import {
+  isBankIdentity,
+  isReservedProviderId,
+  providerRefFromId,
+  providerRefFromViewKey
+} from "../model/market-provider.js";
 import { isInstrumentViewKey } from "../model/instrument-symbol.js";
 import { readRawPublicPortableRecords } from "./storage-guest-records.js";
 
@@ -76,7 +81,7 @@ async function migrate(owner: string, valid: () => boolean, signal?: AbortSignal
     } else if (
       typeof raw.viewKey === "string" &&
       isInstrumentViewKey(raw.viewKey) &&
-      !raw.viewKey.startsWith("bybit:") &&
+      !isReservedProviderId(raw.viewKey) &&
       isChartView(raw.value)
     ) {
       writes.push({
@@ -87,7 +92,7 @@ async function migrate(owner: string, valid: () => boolean, signal?: AbortSignal
   }
   for (const item of drawings) {
     const raw = object(item);
-    if (raw?.owner !== owner || typeof raw.symbol !== "string" || raw.symbol.startsWith("bybit:"))
+    if (raw?.owner !== owner || typeof raw.symbol !== "string" || isReservedProviderId(raw.symbol))
       continue;
     if (!Array.isArray(raw.items) || !raw.items.every(isDrawing))
       throw new Error("Повреждена разметка legacy профиля.");
@@ -98,7 +103,7 @@ async function migrate(owner: string, valid: () => boolean, signal?: AbortSignal
   }
   for (const item of images) {
     const image = imageAsset(item);
-    if (!image || image.owner !== owner || image.symbol.startsWith("bybit:")) continue;
+    if (!image || image.owner !== owner || isReservedProviderId(image.symbol)) continue;
     writes.push({
       store: "images",
       value: { ...image, id: crypto.randomUUID(), syncId: image.syncId ?? image.id, owner: target }
@@ -124,9 +129,6 @@ async function migrate(owner: string, valid: () => boolean, signal?: AbortSignal
     },
     signal
   );
-}
-function publicView(key: unknown): boolean {
-  return typeof key === "string" && !!providerRefFromId(key.split(":").slice(0, -3).join(":"));
 }
 export async function copyPublicProfile(
   sourceOwner: string,
@@ -158,7 +160,7 @@ export async function copyPublicProfile(
     .filter((image) => image?.owner === source && providerRefFromId(image.symbol));
   const sourceViews = preferences
     .map(object)
-    .filter((raw) => raw?.owner === source && publicView(raw.viewKey));
+    .filter((raw) => raw?.owner === source && providerRefFromViewKey(raw.viewKey));
   const count = incoming.length + sourceDocs.length + sourceImages.length + sourceViews.length;
   const hasTarget =
     existing.some((row) => row.providerRef) ||
@@ -172,7 +174,7 @@ export async function copyPublicProfile(
     }) ||
     preferences.some((value) => {
       const raw = object(value);
-      return raw?.owner === target && publicView(raw.viewKey);
+      return raw?.owner === target && providerRefFromViewKey(raw.viewKey);
     });
   if (!count || (hasTarget && !merge)) return { conflict: hasTarget && count > 0, count };
   const rows = [

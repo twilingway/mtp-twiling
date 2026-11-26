@@ -309,6 +309,7 @@ export type BackupMarketRow = Pick<MarketRow, "symbol" | "name"> & {
 export interface Backup {
   application: "personal-terminal";
   schemaVersion: 1 | 2;
+  requiredProviders?: ["okx"];
   exportedAt?: string;
   layout?: ProfilePreferences;
   watchlist?: BackupMarketRow[];
