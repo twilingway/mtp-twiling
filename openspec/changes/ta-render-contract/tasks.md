@@ -24,11 +24,12 @@ Research закончен отдельно от реализации. Runtime co
 
 ## 2. LW — L, после 1.3
 
-- [ ] 2.1 Реализовать owned cross/linebr primitive с native numeric carrier; проверить mock options,
+- [x] 2.1 Реализовать owned cross/linebr primitive с native numeric carrier; проверить mock options,
       segment/gap/singleton geometry, scale include/exclude, dispose и absence per-segment growth.
-- [ ] 2.2 Реализовать normal drawBackground fills по paired anchors; проверить
+- [x] 2.2 Реализовать normal drawBackground fills по paired anchors; проверить
       firstbar/reversal/null, pane/DPR/clipping tests и отсутствие body/direction scale carriers;
-      обновить renderer docs.
+      обновить renderer docs. Source-only evidence: `docs/TA_RENDER_LIGHTWEIGHT.md`; browser G2/G3
+      остаются в2.3.
 - [ ] 2.3 Проверить tiny-fixture actual LW paint в изолированном UI review, включая MTP/grid/cursor;
       сохранить SHA/version/screenshots и закрыть engine-specific G2/G3 evidence.
 
