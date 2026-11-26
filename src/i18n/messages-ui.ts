@@ -232,6 +232,7 @@ export const uiMessages = {
   "Изм. %": "Chg. %",
   "Инструменты не найдены": "No symbols found",
   "Список пуст. Добавьте инструмент кнопкой +.": "Watchlist is empty. Add a symbol using +.",
+  "Действия с инструментом": "Instrument actions",
   "с ценой": "with a price",
   "WebSocket · напрямую": "WebSocket · direct",
   "Закрытие сессии": "Session close",

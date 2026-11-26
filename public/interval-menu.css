@@ -239,3 +239,24 @@
     width: 44px;
   }
 }
+@media (max-width: 800px) {
+  .timeframes:has(.interval-menu) {
+    max-width: 100%;
+  }
+}
+@media (max-width: 600px) {
+  .interval-menu {
+    gap: 6px;
+  }
+  .interval-label-number {
+    display: none;
+  }
+  .timeframes .interval-favorite,
+  .timeframes .interval-menu-trigger {
+    padding-inline: 4px;
+  }
+  .interval-menu-trigger {
+    min-width: 42px;
+    gap: 4px;
+  }
+}

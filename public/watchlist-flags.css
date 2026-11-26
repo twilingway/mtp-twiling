@@ -113,8 +113,23 @@ html[data-theme] .quote-row.selected {
   border-radius: 50%;
   background: var(--flag-color);
 }
-.watchlist-flag-palette > button[aria-checked="true"] {
-  border-color: var(--text, #d1d4dc);
+.watchlist-flag-palette > button[aria-checked="true"] > span {
+  outline: 1px solid var(--text, #d1d4dc);
+  outline-offset: 3px;
+}
+.watchlist-flag-palette > button:focus-visible {
+  outline: none;
+}
+.watchlist-flag-palette > button:focus-visible > :is(span, svg) {
+  border-radius: 50%;
+  outline: 2px solid var(--accent, #2962ff);
+  outline-offset: 3px;
+}
+.watchlist-flag-palette > button[aria-checked="true"]:focus-visible > span {
+  box-shadow:
+    0 0 0 2px var(--surface, #131722),
+    0 0 0 3px var(--text, #d1d4dc);
+  outline-offset: 4px;
 }
 .watchlist-flag-palette > button:hover:not(:disabled) {
   background: var(--surface-hover, #2a2e39);
@@ -213,7 +228,6 @@ html[data-theme] .quote-row.selected {
   margin: 5px 4px;
 }
 .watchlist-flag:focus-visible,
-.watchlist-flag-palette button:focus-visible,
 .watchlist-list-trigger:focus-visible,
 .watchlist-lists-menu button:focus-visible {
   outline: 2px solid var(--accent, #2962ff);

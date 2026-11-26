@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { DragEvent, MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { t } from "../../i18n/messages.js";
@@ -25,7 +25,7 @@ import { WatchlistSectionHeader } from "./WatchlistSectionHeader.js";
 import { WatchlistSectionMenu } from "./WatchlistSectionMenu.js";
 
 type Menu = { x: number; y: number; owner: string } & (
-  | { kind: "row"; row: MarketRow; key: string; mode?: "flag" }
+  | { kind: "row"; row: MarketRow; key: string; mode?: "flag"; fromAction?: boolean }
   | { kind: "section"; section: WatchlistSection }
   | { kind: "blank" }
 );
@@ -43,6 +43,7 @@ export function WatchlistSectionsTable({
   onManualOrder: () => void;
 }) {
   const { controller, state } = useTerminal();
+  const rowMenuId = useId();
   const [menu, setMenu] = useState<Menu | null>(null),
     [dragSource, setDragSource] = useState<string | null>(null),
     [drop, setDrop] = useState<{ key: string; placement: "before" | "after" } | null>(null),
@@ -226,15 +227,21 @@ export function WatchlistSectionsTable({
   const openRow = (event: MouseEvent, row: MarketRow, key: string, mode?: "flag") => {
     event.preventDefault();
     event.stopPropagation();
+    const fromAction = event.type === "click" && !mode;
+    if (fromAction && menu?.kind === "row" && menu.key === key && menu.fromAction) {
+      closeMenu();
+      return;
+    }
     controller.setContext(null);
-    const rect = event.currentTarget.getBoundingClientRect();
+    const anchor = mode || fromAction ? event.currentTarget.getBoundingClientRect() : null;
     setMenu({
       kind: "row",
       row,
       key,
       owner: state.owner,
-      x: mode ? rect.left : event.clientX,
-      y: mode ? rect.bottom + 4 : event.clientY,
+      x: anchor ? anchor.left : event.clientX,
+      y: anchor ? anchor.bottom + 4 : event.clientY,
+      fromAction,
       ...(mode ? { mode } : {})
     });
   };
@@ -366,6 +373,11 @@ export function WatchlistSectionsTable({
                       onRemove={remove}
                       onFlag={(event) => openRow(event, row, key, "flag")}
                       onContext={(event) => openRow(event, row, key)}
+                      menuId={
+                        menu?.kind === "row" && menu.key === key && menu.fromAction
+                          ? rowMenuId
+                          : undefined
+                      }
                     />
                   )))
             ];
@@ -384,6 +396,7 @@ export function WatchlistSectionsTable({
         createPortal(
           menu.kind === "row" ? (
             <WatchlistMenu
+              id={rowMenuId}
               row={menu.row}
               x={menu.x}
               y={menu.y}

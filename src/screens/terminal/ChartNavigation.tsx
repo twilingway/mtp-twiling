@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { SyntheticEvent, PointerEvent, KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import type { SyntheticEvent, PointerEvent, KeyboardEvent, ReactNode, RefObject } from "react";
 import type { ChartAdapter } from "../../charts/adapter.js";
 import { navigationText } from "../../i18n/messages-navigation.js";
 import { chartNavigationReady } from "./chart-navigation-state.js";
@@ -25,13 +25,87 @@ function stop(event: SyntheticEvent) {
   event.stopPropagation();
 }
 
+const compactQuery = "(max-width: 800px), (hover: none), (pointer: coarse)";
+const compactLayout = () => window.matchMedia(compactQuery).matches;
+function subscribeCompactLayout(listener: () => void): () => void {
+  const query = window.matchMedia(compactQuery);
+  query.addEventListener("change", listener);
+  return () => query.removeEventListener("change", listener);
+}
+
+function CompactNavigation({
+  container,
+  label,
+  hold,
+  children
+}: {
+  container: RefObject<HTMLDivElement | null>;
+  label: string;
+  hold: ChartScrollHold;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const toggle = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = () => {
+      hold.cancel();
+      setOpen(false);
+    };
+    const outside = (event: Event) => {
+      if (container.current && !event.composedPath().includes(container.current)) close();
+    };
+    const escape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      close();
+      toggle.current?.focus();
+    };
+    document.addEventListener("pointerdown", outside, true);
+    document.addEventListener("focusin", outside, true);
+    document.addEventListener("keydown", escape, true);
+    return () => {
+      document.removeEventListener("pointerdown", outside, true);
+      document.removeEventListener("focusin", outside, true);
+      document.removeEventListener("keydown", escape, true);
+      hold.cancel();
+    };
+  }, [container, hold, open]);
+  return (
+    <>
+      <button
+        ref={toggle}
+        type="button"
+        aria-label={label}
+        title={label}
+        aria-expanded={open}
+        aria-controls="chart-navigation-actions"
+        onClick={() => {
+          if (open) hold.cancel();
+          setOpen(!open);
+        }}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M4 12h16M12 4v16M7 9l-3 3 3 3m10-6 3 3-3 3m-8-8 3-3 3 3m-6 10 3 3 3-3" />
+        </svg>
+      </button>
+      <div id="chart-navigation-actions" className="chart-navigation-actions" hidden={!open}>
+        {children}
+      </div>
+    </>
+  );
+}
+
 export function ChartNavigation() {
   const { controller, state } = useTerminal(),
     ref = useRef<HTMLDivElement>(null),
     [position, setPosition] = useState<Position | null>(null),
     [nearby, setNearby] = useState(false);
+  const compact = useSyncExternalStore(subscribeCompactLayout, compactLayout, () => false);
   const hold = useMemo(() => new ChartScrollHold(controller), [controller]);
   useEffect(() => {
+    if (compact) return;
     const panel = ref.current?.parentElement;
     if (!panel) return;
     const move = (event: globalThis.PointerEvent) => {
@@ -54,7 +128,7 @@ export function ChartNavigation() {
       panel.removeEventListener("pointerleave", leave);
       window.removeEventListener("blur", leave);
     };
-  }, []);
+  }, [compact]);
   useEffect(() => {
     const cancel = () => hold.cancel(),
       hidden = () => {
@@ -69,7 +143,7 @@ export function ChartNavigation() {
       document.removeEventListener("visibilitychange", hidden);
       hold.cancel();
     };
-  }, [controller, hold]);
+  }, [compact, controller, hold]);
   useEffect(() => {
     let frame = 0,
       previous = -Infinity;
@@ -155,17 +229,51 @@ export function ChartNavigation() {
       if (hold.finish(token) === "short") perform(action);
     } else if (!event.repeat && available(action)) hold.start(value, token);
   }
+  const actions = buttons.map(([action, path]) => (
+    <button
+      key={action}
+      type="button"
+      data-chart-navigation={action}
+      aria-label={navigationText(action, state.preferences.locale)}
+      title={navigationText(action, state.preferences.locale)}
+      disabled={!available(action)}
+      style={direction(action) !== null ? { touchAction: "none" } : undefined}
+      onPointerDown={(event) => down(event, action)}
+      onPointerUp={(event) => {
+        event.stopPropagation();
+        hold.finish(`pointer:${event.pointerId}`);
+      }}
+      onPointerCancel={(event) => {
+        event.stopPropagation();
+        hold.cancel(`pointer:${event.pointerId}`);
+      }}
+      onLostPointerCapture={(event) => hold.cancel(`pointer:${event.pointerId}`)}
+      onKeyDown={(event) => key(event, action, false)}
+      onKeyUp={(event) => key(event, action, true)}
+      onBlur={() => hold.cancel()}
+      onClick={() => {
+        const value = direction(action);
+        if (value === null || hold.click(value)) perform(action);
+      }}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d={path} />
+      </svg>
+    </button>
+  ));
   return (
     <div
       ref={ref}
       className="chart-navigation"
-      data-nearby={nearby || undefined}
+      data-compact={compact || undefined}
+      data-nearby={(!compact && nearby) || undefined}
       role="group"
       aria-label={navigationText("navigation", state.preferences.locale)}
       style={position ? { left: position.left, top: position.top } : undefined}
       onPointerDown={stop}
       onPointerUp={stop}
       onPointerMove={stop}
+      onPointerCancel={stop}
       onClick={stop}
       onDoubleClick={stop}
       onWheel={stop}
@@ -174,38 +282,17 @@ export function ChartNavigation() {
         stop(event);
       }}
     >
-      {buttons.map(([action, path]) => (
-        <button
-          key={action}
-          type="button"
-          data-chart-navigation={action}
-          aria-label={navigationText(action, state.preferences.locale)}
-          title={navigationText(action, state.preferences.locale)}
-          disabled={!available(action)}
-          style={direction(action) !== null ? { touchAction: "none" } : undefined}
-          onPointerDown={(event) => down(event, action)}
-          onPointerUp={(event) => {
-            event.stopPropagation();
-            hold.finish(`pointer:${event.pointerId}`);
-          }}
-          onPointerCancel={(event) => {
-            event.stopPropagation();
-            hold.cancel(`pointer:${event.pointerId}`);
-          }}
-          onLostPointerCapture={(event) => hold.cancel(`pointer:${event.pointerId}`)}
-          onKeyDown={(event) => key(event, action, false)}
-          onKeyUp={(event) => key(event, action, true)}
-          onBlur={() => hold.cancel()}
-          onClick={() => {
-            const value = direction(action);
-            if (value === null || hold.click(value)) perform(action);
-          }}
+      {compact ? (
+        <CompactNavigation
+          container={ref}
+          label={navigationText("navigation", state.preferences.locale)}
+          hold={hold}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-            <path d={path} />
-          </svg>
-        </button>
-      ))}
+          {actions}
+        </CompactNavigation>
+      ) : (
+        actions
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import test from'node:test';
 import assert from'node:assert/strict';
-import{fibPrice,drawingGeometry,hitDrawing,lineEnds,DEFAULT_FIB_LEVELS}from'../public/drawing-model.js';
+import{fibPrice,drawingGeometry,drawingLayer,hitDrawing,lineEnds,DEFAULT_FIB_LEVELS}from'../public/drawing-model.js';
 import{validateBackup}from'../public/backup-format.js';
 test('Fibonacci ratios follow anchor direction, reverse and three-point extension',()=>{
   const points=[{timestamp:1,value:50},{timestamp:2,value:100}];
@@ -24,4 +24,23 @@ test('drawing backups reject unsafe level colours and invalid timeframe visibili
   assert.equal(validateBackup(backup),backup);
   assert.throws(()=>validateBackup({...backup,drawings:[{symbol:'GAZP',items:[{...drawing,settings:{levelStyles:[{value:0,enabled:true,color:'url(secret)'}]}}]}]}));
   assert.throws(()=>validateBackup({...backup,drawings:[{symbol:'GAZP',items:[{...drawing,visibility:{days:{enabled:true,from:50,to:1}}}]}]}));
+});
+
+test('drawing hits follow the front and back paint order', () => {
+  const normal = {
+    id: 'normal',
+    name: 'segment',
+    points: [{ timestamp: 10, value: 20 }, { timestamp: 100, value: 20 }]
+  };
+  const front = { ...normal, id: 'front', layer: 'front' };
+  const back = { ...normal, id: 'back', layer: 'back' };
+  const project = (point) => ({ x: point.timestamp, y: point.value });
+  const hit = (items) => hitDrawing(items, { x: 40, y: 20 }, project, 200, 100)?.id;
+
+  assert.equal(drawingLayer(normal), 'front');
+  assert.equal(drawingLayer(back), 'back');
+  assert.equal(hit([normal, back]), 'normal');
+  assert.equal(hit([normal, front, back]), 'front');
+  assert.equal(hit([front, normal, back]), 'normal');
+  assert.equal(hit([back]), 'back');
 });

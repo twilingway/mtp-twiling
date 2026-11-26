@@ -361,7 +361,14 @@ test("offline pauses before export/API and preserves dirty changes until a succe
   assert.equal(f.events.includes("export"), false); assert.equal(f.store.count(), 0);
   assert.equal(f.coordinator.getSnapshot().pauseReason, "offline"); assert.equal(f.coordinator.getSnapshot().pendingChanges, true);
   assert.equal(f.coordinator.getSnapshot().lastSyncedAt, undefined);
-  f.setOnline(true); await f.coordinator.sync();
+  const exportGate = deferred();
+  f.hooks.export = () => exportGate.promise;
+  f.setOnline(true);
+  const retry = f.coordinator.sync();
+  assert.equal(f.coordinator.getSnapshot().phase, "syncing");
+  assert.equal(f.coordinator.getSnapshot().pauseReason, "offline");
+  exportGate.resolve();
+  await retry;
   assert.equal(f.store.count(), 1); assert.equal(f.coordinator.getSnapshot().pendingChanges, false);
   assert.equal(f.coordinator.getSnapshot().pauseReason, undefined);
 });
@@ -374,6 +381,7 @@ test("expired credential is detected before local export and does not masquerade
   await f.coordinator.sync();
   assert.equal(f.events.filter(x => x === "export").length, exports); assert.equal(f.store.count(), 1);
   assert.equal(f.coordinator.getSnapshot().phase, "auth-required"); assert.equal(f.coordinator.getSnapshot().pauseReason, "auth-required");
+  assert.equal(f.coordinator.getSnapshot().connectedThisSession, true);
   assert.equal(f.coordinator.getSnapshot().pendingChanges, true);
 });
 

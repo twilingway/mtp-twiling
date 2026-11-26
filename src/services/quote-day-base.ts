@@ -2,6 +2,12 @@ import { quotation } from "../model/market-model.js";
 import { serverTimestamp } from "./server-clock.js";
 
 export const DAY_MS = 86_400_000;
+
+/** The WebSocket clock estimates the UTC day. Its seconds can trail the last-price stream. */
+export function liveQuoteTimeLimit(now: number): number {
+  return (Math.floor(now / DAY_MS) + 1) * DAY_MS - 1;
+}
+
 export interface DailyQuoteBase {
   price: number;
   time: string;

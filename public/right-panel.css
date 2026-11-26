@@ -7,7 +7,8 @@
   background: #131722;
 }
 .workspace {
-  grid-template-columns: 48px minmax(0, 1fr) var(--right-panel-width, 380px);
+  --drawing-rail-width: 54px;
+  grid-template-columns: var(--drawing-rail-width) minmax(0, 1fr) var(--right-panel-width, 380px);
 }
 .panel-divider {
   position: absolute;
@@ -40,12 +41,12 @@
 }
 @media (min-width: 1700px) {
   .workspace {
-    grid-template-columns: 50px minmax(0, 1fr) var(--right-panel-width, 420px);
+    grid-template-columns: var(--drawing-rail-width) minmax(0, 1fr) var(--right-panel-width, 420px);
   }
 }
 @media (min-width: 801px) and (max-width: 1200px) {
   .workspace {
-    grid-template-columns: 44px minmax(0, 1fr) var(--right-panel-width, 340px);
+    grid-template-columns: var(--drawing-rail-width) minmax(0, 1fr) var(--right-panel-width, 340px);
   }
 }
 .right-panel-view {
@@ -143,13 +144,60 @@
 .quote-row:has(.quote-remove:focus-visible) .quote-percent {
   opacity: 0;
 }
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .quote-row:hover .quote-remove {
     opacity: 1;
     pointer-events: auto;
   }
   .quote-row:hover .quote-percent {
     opacity: 0;
+  }
+}
+.quote-more {
+  display: none;
+}
+@media (hover: none), (pointer: coarse) {
+  .watchlist-scroll th:nth-child(2) {
+    width: 23%;
+  }
+  .watchlist-scroll th:nth-child(3) {
+    width: 17%;
+  }
+  .watchlist-scroll th:nth-child(4) {
+    width: 26%;
+    padding-right: 34px;
+  }
+  .quote-row td:last-child {
+    padding: 0;
+  }
+  .quote-row-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+  }
+  .quote-row .quote-percent {
+    opacity: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .quote-remove {
+    display: none;
+  }
+  .quote-more {
+    display: grid;
+    flex: 0 0 32px;
+    height: 36px;
+    place-items: center;
+    padding: 0;
+    color: var(--text);
+    border-radius: 4px;
+    font-size: 20px;
+    line-height: 1;
+  }
+  .quote-more:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
   }
 }
 .watchlist-context-menu > button {

@@ -4,7 +4,7 @@ import type { RefObject } from "react";
 import type { Candle, Drawing } from "../../model/types.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import type { ChartAdapter, ChartOptions } from "../../charts/adapter.js";
-import { paintDrawings } from "../../model/drawing-model.js";
+import { drawingLayer, paintDrawings } from "../../model/drawing-model.js";
 import { loadChartView, saveAdapterView, saveChartView } from "../../services/chart-camera.js";
 import { useTerminal } from "./context.js";
 import { viewKey } from "./controller-bridge.js";
@@ -130,7 +130,7 @@ export function useChartCanvas(
         paint: (ctx, width, height, project, layer) => {
           if (!matches()) return;
           const current = controller.getSnapshot(),
-            items = visibleDrawings(current).filter((item) => (item.layer ?? "back") === layer);
+            items = visibleDrawings(current).filter((item) => drawingLayer(item) === layer);
           paintDrawings(
             ctx,
             [...items, ...(current.preview && layer === "front" ? [current.preview] : [])],

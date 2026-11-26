@@ -276,7 +276,7 @@ html[data-theme]
   scrollbar-color: var(--control-line) transparent;
 }
 
-html[data-theme] button:hover:not(:disabled),
+html[data-theme] button:hover:not(:disabled):where(:not(.indicator-menu-dismiss)),
 html[data-theme] .quote-row:hover,
 html[data-theme] .right-panel .object-row:hover,
 html[data-theme] .drawing-toolbar button:hover:not(:disabled),

@@ -126,7 +126,9 @@ export function AccountDialog() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [editingKey, setEditingKey] = useState(false),
-    [section, setSection] = useState<"account" | "drive" | "storage" | "transfer">("account");
+    [section, setSection] = useState<"account" | "drive" | "storage" | "transfer">(
+      state.initialAccountSection ?? "account"
+    );
   return (
     <Modal
       id="account-dialog"

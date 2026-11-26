@@ -86,6 +86,21 @@ test("the chooser includes the complete Intl IANA list and searchable honest cit
   assert.ok(searchTimeZones("New_York", "ru").includes("America/New_York"));
   assert.equal(timeZoneLabel("Africa/Abidjan", "ru"), "Abidjan");
 });
+test("timezone choices are ordered by their displayed city across IANA regions", () => {
+  const russian = searchTimeZones("", "ru");
+  assert.deepEqual(russian.slice(0, 3), ["UTC", "local", "exchange"]);
+  for (const locale of ["ru", "en"]) {
+    const collator = new Intl.Collator(locale);
+    const labels = searchTimeZones("", locale)
+      .slice(3)
+      .map((zone) => timeZoneLabel(zone, locale));
+    assert.deepEqual(labels, [...labels].sort(collator.compare));
+  }
+  const examples = ["Asia/Anadyr", "Europe/Astrakhan", "Asia/Barnaul"];
+  assert.deepEqual(russian.filter((zone) => examples.includes(zone)), examples);
+  assert.ok(searchTimeZones("Киров", "ru").includes("Europe/Kirov"));
+  assert.ok(searchTimeZones("Усть-Нера", "ru").includes("Asia/Ust-Nera"));
+});
 test("RU and EN format numbers and dates, with stable missing values", () => {
   assert.equal(formatNumber(1234.5, 2, false, { locale: "en" }), "1,234.50");
   assert.equal(formatNumber(1234.5, 2, false, { locale: "ru" }).replace(/\s/g, " "), "1 234,50");

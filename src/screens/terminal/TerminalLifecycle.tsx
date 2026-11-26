@@ -1,5 +1,5 @@
 import { t } from "../../i18n/messages.js";
-import { memo, useEffect } from "react";
+import { memo, useEffect, useState } from "react";
 import { setupPwa } from "../../services/pwa.js";
 import { DRAWING_CLIPBOARD_MIME } from "../../model/drawing-editing.js";
 import { useTerminal } from "./context.js";
@@ -23,6 +23,7 @@ export const UpdateBanner = memo(function UpdateBanner() {
 });
 export function TerminalLifecycle() {
   const { controller } = useTerminal();
+  const [settledController, setSettledController] = useState<typeof controller | null>(null);
   useEffect(() => {
     const disposeDrive = startTerminalDrive(controller);
     const lifecycle = new AbortController();
@@ -30,11 +31,15 @@ export function TerminalLifecycle() {
       disposePwa: (() => void) | null = null;
     void controller
       .start()
-      .catch((error: unknown) =>
-        controller.notify(
-          error instanceof Error ? error.message : t("Не удалось открыть сохранения")
-        )
-      );
+      .catch((error: unknown) => {
+        if (active)
+          controller.notify(
+            error instanceof Error ? error.message : t("Не удалось открыть сохранения")
+          );
+      })
+      .finally(() => {
+        if (active) setSettledController(controller);
+      });
     void setupPwa({
       notify: controller.notify,
       flush: controller.flush,
@@ -119,7 +124,7 @@ export function TerminalLifecycle() {
   return (
     <>
       <TransferMutationBarrier />
-      <WelcomeGate />
+      <WelcomeGate startupSettled={settledController === controller} />
     </>
   );
 }

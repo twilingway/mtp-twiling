@@ -121,7 +121,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     },
     paneViews: () =>
       (["back", "front"] as const).map((layer) => ({
-        zOrder: () => (layer === "front" ? ("normal" as const) : ("bottom" as const)),
+        zOrder: () => (layer === "front" ? ("top" as const) : ("bottom" as const)),
         renderer: () => ({
           draw: (target) => {
             target.useBitmapCoordinateSpace((scope) => {

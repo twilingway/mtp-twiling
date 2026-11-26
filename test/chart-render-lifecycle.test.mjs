@@ -167,6 +167,7 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
       }
     },
     "model/drawing-model.ts": {
+      drawingLayer: sourceModules({})("model/drawing-model.ts").drawingLayer,
       paintDrawings: (_ctx, drawings) => paints.push(drawings.map((item) => item.id))
     }
   });

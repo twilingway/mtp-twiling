@@ -22,6 +22,18 @@ export interface TimeframeMenuProps {
   availability?: Partial<Record<IntervalId, string>>;
   className?: string;
 }
+
+function IntervalBadgeLabel({ item }: { item: IntervalDefinition }) {
+  const label = t(item.shortLabel);
+  if (item.id !== "1d" && item.id !== "1w" && item.id !== "1M") return label;
+  return (
+    <>
+      <span className="interval-label-number">{label.slice(0, 1)}</span>
+      {label.slice(1)}
+    </>
+  );
+}
+
 export function TimeframeMenu({
   value,
   onSelect,
@@ -145,7 +157,7 @@ export function TimeframeMenu({
                 close(false);
               }}
             >
-              {t(item.shortLabel)}
+              <IntervalBadgeLabel item={item} />
             </button>
           ))}
         </span>
@@ -158,6 +170,7 @@ export function TimeframeMenu({
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
         aria-label={`${t("Интервал свечей")}: ${t(selected.label)}`}
+        title={t(selected.label)}
         onClick={() => (open ? close(false) : show())}
         onKeyDown={(event) => {
           if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -166,7 +179,9 @@ export function TimeframeMenu({
           }
         }}
       >
-        <span>{t(selected.shortLabel)}</span>
+        <span>
+          <IntervalBadgeLabel item={selected} />
+        </span>
         <span className="interval-menu-chevron" aria-hidden="true">
           ⌄
         </span>

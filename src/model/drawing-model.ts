@@ -412,6 +412,10 @@ export function paintDrawings(
   }
   ctx.restore();
 }
+export function drawingLayer(drawing: DrawingDraft): "back" | "front" {
+  return drawing.layer ?? "front";
+}
+
 export function hitDrawing(
   items: readonly DrawingDraft[],
   point: PixelPoint,
@@ -419,12 +423,19 @@ export function hitDrawing(
   width: number,
   height: number
 ): { id: string; handle: number } | null {
-  for (const d of [...items].reverse()) {
-    const g = drawingGeometry(d, project, width, height);
-    if (!g) continue;
-    const handle = g.points.findIndex((p) => Math.hypot(p.x - point.x, p.y - point.y) < 10);
-    if (handle >= 0) return { id: d.id, handle };
-    if (g.lines.some(([a, b]) => segmentDistance(point, a, b) < 7)) return { id: d.id, handle: -1 };
+  for (const layer of ["front", "back"] as const) {
+    for (let index = items.length - 1; index >= 0; index--) {
+      const drawing = items[index]!;
+      if (drawingLayer(drawing) !== layer) continue;
+      const geometry = drawingGeometry(drawing, project, width, height);
+      if (!geometry) continue;
+      const handle = geometry.points.findIndex(
+        (p) => Math.hypot(p.x - point.x, p.y - point.y) < 10
+      );
+      if (handle >= 0) return { id: drawing.id, handle };
+      if (geometry.lines.some(([a, b]) => segmentDistance(point, a, b) < 7))
+        return { id: drawing.id, handle: -1 };
+    }
   }
   return null;
 }

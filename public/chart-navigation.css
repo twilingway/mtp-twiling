@@ -50,17 +50,23 @@
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-@media (hover: none), (pointer: coarse) {
-  .chart-navigation {
-    opacity: 1;
-    pointer-events: auto;
-    height: 36px;
-  }
-  .chart-navigation button {
-    width: 36px;
-    height: 36px;
-    padding: 8px;
-  }
+.chart-navigation[data-compact] {
+  opacity: 1;
+  pointer-events: auto;
+  height: 36px;
+}
+.chart-navigation[data-compact] button {
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+}
+.chart-navigation-actions {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  display: flex;
+  gap: 4px;
+  transform: translateX(-50%);
 }
 @media (prefers-reduced-motion: reduce) {
   .chart-navigation {

@@ -21,7 +21,10 @@
   min-height: 0;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding: 16px 6px 4px 0;
+  /* Leave room for the focus outline at the scroll edge. */
+  margin-inline-start: -4px;
+  padding-block: 16px 4px;
+  padding-inline: 4px 6px;
 }
 #account-dialog > .account-help-links {
   margin-top: 12px;

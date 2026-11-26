@@ -1,8 +1,8 @@
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { t } from "../../i18n/messages.js";
 import { memo } from "react";
-import type { ChartEngine } from "../../model/types.js";
 import { useTerminal } from "./context.js";
+import { ChartEngineSelect } from "./ChartEngineSelect.js";
 import { TerminalIndicatorControls } from "./TerminalIndicatorControls.js";
 import { TimeframeMenu } from "./intervals/TimeframeMenu.js";
 import { isNativeIntervalId } from "../../model/intervals/registry.js";
@@ -22,7 +22,9 @@ const InstallButton = memo(function InstallButton() {
 export function Toolbar() {
   const { controller, state } = useTerminal(),
     p = state.preferences,
-    row = selectedMarketRow(state.rows, p);
+    row = selectedMarketRow(state.rows, p),
+    ticker = row?.ticker || t("Инструмент"),
+    searchLabel = t("Найти инструмент");
   return (
     <header className="topbar">
       <a className="brand" href="./" aria-label="MTP TWILING" title="MTP TWILING">
@@ -33,13 +35,18 @@ export function Toolbar() {
       </a>
       <div className="divider" />
       <button
+        type="button"
         className="symbol-button"
         id="symbol-button"
+        aria-haspopup="dialog"
+        aria-label={`${ticker} · ${searchLabel}`}
         onClick={() => controller.setDialog(state.ready ? "instruments" : "account")}
-        title={t("Найти инструмент")}
+        title={searchLabel}
       >
-        <span className="tiny-search">⌕</span>
-        <b id="top-symbol">{row?.ticker || t("Инструмент")}</b>
+        <span className="tiny-search" aria-hidden="true">
+          ⌕
+        </span>
+        <b id="top-symbol">{ticker}</b>
       </button>
       <nav className="timeframes" aria-label={t("Таймфрейм")}>
         <TimeframeMenu
@@ -74,17 +81,13 @@ export function Toolbar() {
       <label className="engine-label" htmlFor="engine">
         {t("График")}
       </label>
-      <select
+      <ChartEngineSelect
         id="engine"
-        aria-label={t("Библиотека графика")}
         value={p.engine}
-        onChange={(e) => {
-          void controller.setPreferences({ engine: e.target.value as ChartEngine });
+        onChange={(engine) => {
+          void controller.setPreferences({ engine });
         }}
-      >
-        <option value="tradingview">TradingView Lightweight</option>
-        <option value="kline">KLineChart</option>
-      </select>
+      />
       <button
         id="account-button"
         className="account-button"
