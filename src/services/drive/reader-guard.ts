@@ -1,4 +1,5 @@
 import { isRecord } from "../../model/backup-format.js";
+import { TOOL_NAMES } from "../../model/drawing-model.js";
 import { getTechnicalIndicatorDefinition } from "../../model/technical-indicators/definitions.js";
 import { sanitizeDriveBackup } from "./backup.js";
 import type { Backup } from "../../model/types.js";
@@ -11,9 +12,37 @@ function exact(value: unknown, keys: readonly string[]): void {
   if (isRecord(value) && Object.keys(value).some((key) => !keys.includes(key)))
     throw unsupportedDriveFormat();
 }
+/** Read capabilities without evaluating accessors that the full validator must reject. */
+function ownData(value: object, key: PropertyKey): unknown {
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  if (descriptor && !("value" in descriptor))
+    throw new DriveError("remote-invalid", "Некорректная резервная копия для Google Диска.");
+  return descriptor?.value;
+}
+function* ownArrayItems(items: unknown[]): Generator<unknown> {
+  // Visit actual indices, not every hole in an untrusted sparse array's length.
+  for (const key of Object.getOwnPropertyNames(items))
+    if (/^(0|[1-9]\d*)$/.test(key) && Number(key) < items.length) yield ownData(items, key);
+}
+function assertReadableDrawings(value: object): void {
+  const drawings = ownData(value, "drawings");
+  if (!Array.isArray(drawings)) return;
+  for (const group of ownArrayItems(drawings)) {
+    if (!isRecord(group)) continue;
+    const items = ownData(group, "items");
+    if (!Array.isArray(items)) continue;
+    for (const item of ownArrayItems(items)) {
+      if (!isRecord(item)) continue;
+      const name = ownData(item, "name");
+      if (typeof name === "string" && !Object.hasOwn(TOOL_NAMES, name))
+        throw unsupportedDriveFormat();
+    }
+  }
+}
 /** Capability checks precede the legacy allowlist, so unknown data cannot disappear. */
 export function assertReadableDrivePayload(value: unknown): Backup {
   if (!isRecord(value)) return sanitizeDriveBackup(value);
+  assertReadableDrawings(value);
   if (typeof value.schemaVersion === "number" && ![1, 2].includes(value.schemaVersion))
     throw unsupportedDriveFormat();
   const indicators = isRecord(value.layout) ? value.layout.technicalIndicators : undefined;
