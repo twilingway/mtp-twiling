@@ -2,6 +2,10 @@ import * as storage from "../../services/storage-v2.js";
 import { assertImportCurrent, type BackupImportOptions } from "../../model/backup-import.js";
 import { importTerminalBackup, restoreImportedProfile } from "./controller-import.js";
 import type { BackupExportOptions } from "../../model/backup-export.js";
+import type {
+  ExportStorageObserver,
+  FileImportObserver
+} from "../../model/backup-transfer-progress.js";
 
 type Bridge = Parameters<typeof importTerminalBackup>[1] & {
   flush: (options?: BackupExportOptions) => Promise<void>;
@@ -44,13 +48,23 @@ export class TerminalBackups {
     });
     return task;
   }
-  export = (includeHistory: boolean, options?: BackupExportOptions) =>
+  export = (
+    includeHistory: boolean,
+    options?: BackupExportOptions,
+    onProgress?: ExportStorageObserver
+  ) =>
     this.enqueue(async () => {
       const { owner } = this.bridge.getState();
+      onProgress?.("flush");
       await this.bridge.flush(options);
+      onProgress?.("collect");
       return storage.createBackup(owner, { includeHistory });
     });
-  private importNow = (input: unknown, options: BackupImportOptions = {}): Promise<void> =>
+  private importNow = (
+    input: unknown,
+    options: BackupImportOptions = {},
+    onProgress?: FileImportObserver
+  ): Promise<void> =>
     importTerminalBackup(
       input,
       {
@@ -67,27 +81,41 @@ export class TerminalBackups {
             this.bridge.update({ importingBackup: true });
         }
       },
-      options
+      options,
+      onProgress
     );
   import = (input: unknown, options: BackupImportOptions = {}): Promise<void> =>
     this.enqueue(() => {
       assertImportCurrent(options.valid);
       return this.importNow(input, options);
     });
-  importFile = (file: Pick<File, "size" | "text">): Promise<void> =>
+  importFile = (
+    file: Pick<File, "size" | "text">,
+    onProgress?: FileImportObserver
+  ): Promise<void> =>
     this.enqueue(async () => {
       if (file.size > 256 * 1024 * 1024) throw new Error("Для импорта допустим файл до 256 МБ.");
       const { owner } = this.bridge.getState(),
         client = this.bridge.getClient();
+      const checkScope = () => {
+        if (
+          !this.bridge.isAlive() ||
+          this.bridge.getState().owner !== owner ||
+          this.bridge.getClient() !== client
+        )
+          throw new DOMException("Профиль изменился. Повторите перенос.", "AbortError");
+      };
+      onProgress?.({ stage: "read" });
       const text = await file.text();
-      if (
-        !this.bridge.isAlive() ||
-        this.bridge.getState().owner !== owner ||
-        this.bridge.getClient() !== client
-      )
-        throw new DOMException("Профиль изменился. Повторите перенос.", "AbortError");
+      checkScope();
+      if (onProgress) {
+        onProgress({ stage: "validate" });
+        // Let the dialog show the stage before synchronous JSON parsing.
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        checkScope();
+      }
       const input: unknown = JSON.parse(text);
-      await this.importNow(input);
+      await this.importNow(input, undefined, onProgress);
     });
   recover = (): Promise<void> =>
     this.enqueue(async () => {

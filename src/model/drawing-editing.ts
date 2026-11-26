@@ -167,6 +167,7 @@ const settingKeys = new Set([
   "fontSize",
   "textEnabled",
   "text",
+  "textColor",
   "textAlign",
   "textVertical",
   "levelStyles",

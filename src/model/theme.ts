@@ -19,7 +19,7 @@ export const THEME_PALETTES: Readonly<Record<TerminalTheme, Readonly<ChartPalett
     muted: "#999999",
     grid: "#222222",
     border: "#333333",
-    crosshair: "#666666",
+    crosshair: "#a7afbe",
     labelBackground: "#333333",
     labelText: "#ffffff"
   },
@@ -29,7 +29,7 @@ export const THEME_PALETTES: Readonly<Record<TerminalTheme, Readonly<ChartPalett
     muted: "#5d606b",
     grid: "#f0f3fa",
     border: "#d1d4dc",
-    crosshair: "#787b86",
+    crosshair: "#4c5568",
     labelBackground: "#363a45",
     labelText: "#ffffff"
   }
@@ -67,7 +67,13 @@ export function chartPalette(settings: ChartSettings): Readonly<ChartPalette> {
   const theme = luminance == null ? terminalTheme(settings) : luminance > 0.179 ? "light" : "dark",
     palette = THEME_PALETTES[theme];
   const readable = (color: string) => readableChartColor(color, background, 4.5);
-  return { ...palette, background, text: readable(palette.text), muted: readable(palette.muted) };
+  return {
+    ...palette,
+    background,
+    text: readable(palette.text),
+    muted: readable(palette.muted),
+    crosshair: readable(palette.crosshair)
+  };
 }
 
 export function chartContrast(foreground: string, background: string): number | null {

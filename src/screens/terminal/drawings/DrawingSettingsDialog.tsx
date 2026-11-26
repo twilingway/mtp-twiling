@@ -127,6 +127,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
     }));
   const setColor = (color: string) => {
     if (colorTarget?.kind === "level") level(colorTarget.index, { color });
+    else if (colorTarget?.kind === "text") change("textColor", color);
     else change(colorTarget?.kind === "trend" ? "trendColor" : "color", color);
   };
   return (

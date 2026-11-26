@@ -23,6 +23,7 @@ function sources(overrides) {
       Math,
       Promise,
       DOMException,
+      setTimeout,
       TextEncoder,
       TextDecoder
     }),
@@ -234,6 +235,72 @@ test("selected file reserves transfer order before asynchronous file reading fin
   await importing;
   const result = await exporting;
   assert.deepEqual(structuredClone(result.views[0].value), f.viewA);
+});
+
+test("manual import reports what is in the file and keeps restoration distinct from writing", async () => {
+  const f = await fixture();
+  const reading = deferred();
+  const writing = deferred();
+  const restoring = deferred();
+  const reportWrite = deferred();
+  const reportRestore = deferred();
+  f.hooks.importGate = writing;
+  f.hooks.prepare = () => restoring.promise;
+  const progress = [];
+  const importing = f.transfers.importFile({ size: 100, text: () => reading.promise }, (value) => {
+    progress.push(structuredClone(value));
+    if (value.stage === "write") reportWrite.resolve();
+    if (value.stage === "restore") reportRestore.resolve();
+  });
+  await tick();
+  assert.deepEqual(progress.map(({ stage }) => stage), ["read"]);
+  reading.resolve(
+    JSON.stringify({ ...f.backupA, watchlist: [{ symbol: "SBER", uid: "sber", name: "Sber" }] })
+  );
+  await Promise.race([reportWrite.promise, importing]);
+  assert.deepEqual(progress.map(({ stage }) => stage), ["read", "validate", "write"]);
+  assert.deepEqual(progress.at(-1).summary, { instruments: 1, drawings: 0, images: 0 });
+  assert.equal(f.events.includes("import.commit:A"), false);
+  writing.resolve();
+  await Promise.race([reportRestore.promise, importing]);
+  assert.deepEqual(progress.map(({ stage }) => stage), ["read", "validate", "write", "restore"]);
+  assert.equal(f.events.includes("import.commit:A"), true);
+  assert.equal(f.state().backupBusy, true);
+  restoring.resolve();
+  await importing;
+  assert.equal(f.state().backupBusy, false);
+});
+
+test("manual file errors stop at the failed phase and export observes flush before collection", async () => {
+  const f = await fixture();
+  for (const [text, error, stages] of [
+    [
+      async () => {
+        throw new DOMException("cannot read", "NotReadableError");
+      },
+      { name: "NotReadableError" },
+      ["read"]
+    ],
+    [async () => "{", { name: "SyntaxError" }, ["read", "validate"]]
+  ]) {
+    const received = [];
+    await assert.rejects(
+      f.transfers.importFile({ size: 100, text }, ({ stage }) => received.push(stage)),
+      error
+    );
+    assert.deepEqual(received, stages);
+    assert.equal(f.state().backupBusy, false);
+  }
+  assert.equal(f.events.includes("import.start:A"), false);
+
+  const progress = [];
+  f.hooks.flushGate = deferred();
+  const exporting = f.transfers.export(false, undefined, (stage) => progress.push(stage));
+  await tick();
+  assert.deepEqual(progress, ["flush"]);
+  f.hooks.flushGate.resolve();
+  await exporting;
+  assert.deepEqual(progress, ["flush", "collect"]);
 });
 
 test("portable guard is checked after queued work and saveView, before retirement or commit", async () => {

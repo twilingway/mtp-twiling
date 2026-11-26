@@ -322,18 +322,21 @@
 .drawing-pointer::before {
   content: "";
   position: absolute;
-  width: 4px;
-  height: 4px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: currentColor;
+  background: #131722;
+  box-shadow: 0 0 0 1px #ffffff;
   transform: translate(-50%, -50%);
 }
 .drawing-pointer[data-cursor="demonstration"]::before {
   width: 32px;
   height: 32px;
-  background: #f2364540;
-  border: 1px solid #f2364580;
-  box-shadow: inset 0 0 0 12px #f2364510;
+  background: #f2364530;
+  border: 1px solid #b91435;
+  box-shadow:
+    0 0 0 1px #ffffff,
+    inset 0 0 0 12px #f2364510;
 }
 .drawing-pointer[data-cursor="demonstration"]::after {
   content: "";
@@ -341,7 +344,8 @@
   width: 4px;
   height: 4px;
   border-radius: 50%;
-  background: #f23645;
+  background: #b91435;
+  box-shadow: 0 0 0 1px #ffffff;
   transform: translate(-50%, -50%);
 }
 .drawing-pointer[hidden] {

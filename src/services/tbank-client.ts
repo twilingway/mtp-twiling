@@ -9,6 +9,7 @@ import { liveQuoteTimeLimit } from "./quote-day-base.js";
 import { profileKey } from "./profile-key.js";
 import { selectedMarketRow } from "../model/selected-instrument.js";
 import { isBankIdentity } from "../model/market-provider.js";
+import { nativePriceStep, positivePriceStep } from "../model/market-price-step.js";
 import { assertBankRequest } from "./market-bank-cache.js";
 import { lastPriceSubscription } from "./market-subscriptions.js";
 import { BankCandleStream } from "./tbank-candle-stream.js";
@@ -138,7 +139,7 @@ export class TBankClient extends EventTarget {
     this.authenticated = true;
     const cached = await this.cache.loadMarket(this.owner);
     if (cached?.rows.length) {
-      this.rows = cached.rows;
+      this.rows = cached.rows.map((row) => ({ ...row, step: nativePriceStep(row) }));
       this.state = "connecting";
       this.notify();
     }
@@ -155,17 +156,23 @@ export class TBankClient extends EventTarget {
     const catalogByUid = new Map(
       [
         ...catalog.shares,
-        ...catalog.futures,
+        ...catalog.futures.map((item) => ({ ...item, kind: "future" as const })),
         ...catalog.indicatives,
         ...(catalog.currencies ?? []).map((item) => ({ ...item, kind: "currency" as const }))
       ].map((item) => [item.uid ?? item.instrumentUid, item])
     );
     for (const row of this.rows) {
       const item = row.uid ? catalogByUid.get(row.uid) : undefined;
-      if (!item) continue;
-      if (item.kind === "currency") row.type = "currency";
+      if (!item) {
+        row.step = nativePriceStep(row);
+        continue;
+      }
+      if (item.kind === "currency" || item.kind === "future") row.type = item.kind;
       for (const key of ["classCode", "exchange", "realExchange"] as const)
         if (item[key] !== undefined) row[key] = item[key];
+      const step = quotation(item.minPriceIncrement);
+      if (positivePriceStep(step)) row.step = step;
+      row.step = nativePriceStep(row);
       if (item.brand !== undefined) row.brand = item.brand;
       row.first1minCandleDate = item.first1minCandleDate ?? row.first1minCandleDate;
       row.first1dayCandleDate = item.first1dayCandleDate ?? row.first1dayCandleDate;
@@ -267,6 +274,7 @@ export class TBankClient extends EventTarget {
       previousClose: null,
       availability: "pending"
     };
+    row.step = nativePriceStep(row);
     const rows = [...this.rows, row];
     await this.cache.saveWatchlistSnapshot(this.owner, rows);
     this.rows = rows;

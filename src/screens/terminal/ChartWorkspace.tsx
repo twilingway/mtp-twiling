@@ -1,141 +1,154 @@
-import { memo, useId, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { t } from "../../i18n/messages.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import type { MarketRow } from "../../model/types.js";
-import { AuxiliaryChart } from "./AuxiliaryChart.js";
-import type { WorkspaceInstrument } from "./AuxiliaryChart.js";
+import type { ChartLayoutCount } from "./ChartLayoutControl.js";
 import { ChartPanel } from "./ChartPanel.js";
 import { useTerminal } from "./context.js";
-import { marketAvailable } from "./market-readiness.js";
-import { providerLabel } from "./provider-label.js";
-import { PERIOD_LABELS } from "./state.js";
+import type { TerminalController } from "./controller.js";
+import type { TerminalState } from "./state.js";
+import { WorkspacePanelRuntime } from "./WorkspacePanelRuntime.js";
+import { WorkspaceGridDividers } from "./WorkspaceGridDividers.js";
+import { WorkspacePanelController } from "./workspace-panel-controller.js";
+import { loadWorkspaceInstrument, saveWorkspaceInstrument } from "./workspace-panel-preferences.js";
 
-import type { ChartLayoutCount } from "./ChartLayoutControl.js";
-
-function workspaceInstruments(rows: readonly MarketRow[]): readonly WorkspaceInstrument[] {
-  const seen = new Set<string>();
-  return rows.filter((row): row is WorkspaceInstrument => {
-    if (!row.uid || seen.has(row.uid)) return false;
-    seen.add(row.uid);
-    return true;
-  });
+interface WorkspaceSelection {
+  activeSlot: number;
+  onActivate: (slot: number, controller: TerminalController) => void;
 }
 
-function instrumentOption({ ticker, symbol, name, providerRef, classCode }: WorkspaceInstrument) {
-  const source = providerRef
-    ? `${providerLabel(providerRef)} ${providerRef.category === "spot" ? "Spot" : "USDT"}`
-    : classCode;
-  return [ticker || symbol, source, name].filter(Boolean).join(" · ");
-}
-
-const InstrumentOptions = memo(
-  function InstrumentOptions({ rows }: { rows: readonly WorkspaceInstrument[] }) {
-    return rows.map((row) => (
-      <option key={row.uid} value={row.uid}>
-        {instrumentOption(row)}
-      </option>
-    ));
-  },
-  (previous, next) =>
-    previous.rows.length === next.rows.length &&
-    previous.rows.every((row, index) => {
-      const updated = next.rows[index];
-      return updated?.uid === row.uid && instrumentOption(updated) === instrumentOption(row);
-    })
-);
-
-function ComparisonPanel({
-  index,
-  initialUid,
-  rows
-}: {
-  index: number;
-  initialUid: string;
-  rows: readonly WorkspaceInstrument[];
-}) {
-  const selectId = useId();
-  const [uid, setUid] = useState(initialUid);
-  const { controller, state } = useTerminal();
-  const p = state.preferences;
-  const row = rows.find((candidate) => candidate.uid === uid);
-  const timeframe = row?.providerRef
-    ? p.timeframe === "2m"
-      ? "1m"
-      : p.timeframe === "10m"
-        ? "5m"
-        : p.timeframe
-    : p.timeframe;
-  const market = controller.sessionKey();
-  const available =
-    marketAvailable(state) &&
-    (state.authenticated || !!row?.providerRef) &&
-    !state.profileTransition &&
-    !state.importingBackup &&
-    !state.importRecoveryRequired;
+function EmptyChartTitle({ slot, open }: { slot: number; open: () => void }) {
   return (
-    <section className="auxiliary-chart" aria-label={`${t("График")} ${index}`}>
-      <div className="auxiliary-chart-toolbar">
-        <label htmlFor={selectId}>{index}</label>
-        <select
-          id={selectId}
-          aria-label={`${t("Инструмент графика")} ${index}`}
-          value={row?.uid ?? ""}
-          onChange={(event) => setUid(event.currentTarget.value)}
-        >
-          <option value="">{t("Выберите инструмент")}</option>
-          <InstrumentOptions rows={rows} />
-        </select>
-        {row && (
-          <span className="auxiliary-chart-timeframe" title={t("Таймфрейм")}>
-            {t(PERIOD_LABELS[timeframe])}
-          </span>
-        )}
-      </div>
-      {market && available && row ? (
-        <AuxiliaryChart
-          key={JSON.stringify([row.uid, row.symbol, timeframe, p.rangeDays])}
-          row={row}
-          controller={controller}
-          market={market}
-          owner={state.owner}
-          preferences={timeframe === p.timeframe ? p : { ...p, timeframe }}
-        />
-      ) : (
-        <div className="auxiliary-chart-empty">
-          {t(row ? "Источник котировок недоступен." : "Выберите инструмент из списка котировок.")}
-        </div>
-      )}
-    </section>
+    <div className="workspace-empty-chart">
+      <button
+        type="button"
+        className="chart-instrument-button"
+        aria-label={`${t("Инструмент графика")} ${slot} · ${t("Выберите инструмент")}`}
+        onClick={open}
+      >
+        <span aria-hidden="true">{slot} ·</span>
+        <span>{t("Выберите инструмент")}</span>
+      </button>
+    </div>
   );
 }
 
-export function ChartWorkspace({ count }: { count: ChartLayoutCount }) {
-  const { state } = useTerminal();
-  const rows = useMemo(() => workspaceInstruments(state.rows), [state.rows]);
-  const primaryUid = selectedMarketRow(state.rows, state.preferences)?.uid;
-  const alternatives =
-    count > 1
-      ? rows.filter((row) => row.uid !== primaryUid && (state.authenticated || row.providerRef))
-      : [];
+function ComparisonPanel({
+  slot,
+  initialUid,
+  parent,
+  parentState,
+  activeSlot,
+  onActivate
+}: WorkspaceSelection & {
+  slot: number;
+  initialUid: string;
+  parent: TerminalController;
+  parentState: TerminalState;
+}) {
+  const [uid, setUid] = useState(
+    () => loadWorkspaceInstrument(parentState.owner, slot) ?? initialUid
+  );
+  useEffect(() => {
+    if (uid && loadWorkspaceInstrument(parentState.owner, slot) === undefined)
+      saveWorkspaceInstrument(parentState.owner, slot, uid);
+  }, [parentState.owner, slot, uid]);
+  const [controller] = useState(
+    () =>
+      new WorkspacePanelController(parent, slot, (next) => {
+        setUid(next);
+        saveWorkspaceInstrument(parentState.owner, slot, next);
+      })
+  );
+  const row = parentState.rows.find(
+    (candidate): candidate is MarketRow & { uid: string } =>
+      !!candidate.uid &&
+      candidate.uid === uid &&
+      (parentState.authenticated || !!candidate.providerRef)
+  );
+  const activate = () => onActivate(slot, controller);
   return (
-    <div id="chart-workspace" className="chart-workspace" data-chart-count={count}>
-      <ChartPanel />
-      {count >= 2 && (
-        <ComparisonPanel
-          key={`${state.owner}:2`}
-          index={2}
-          rows={rows}
-          initialUid={alternatives[0]?.uid ?? ""}
-        />
+    <div
+      className="auxiliary-chart"
+      data-chart-slot={slot}
+      data-chart-active={activeSlot === slot}
+      onPointerDownCapture={activate}
+      onFocusCapture={activate}
+      onContextMenuCapture={activate}
+    >
+      <WorkspacePanelRuntime controller={controller} row={row} parentState={parentState}>
+        {row ? (
+          <ChartPanel slot={slot} active={activeSlot === slot} />
+        ) : (
+          <EmptyChartTitle slot={slot} open={() => controller.setDialog("instruments")} />
+        )}
+      </WorkspacePanelRuntime>
+    </div>
+  );
+}
+
+export function ChartWorkspace({
+  count,
+  activeSlot,
+  onActivate
+}: WorkspaceSelection & { count: ChartLayoutCount }) {
+  const { controller, state } = useTerminal();
+  const primaryUid = selectedMarketRow(state.rows, state.preferences)?.uid;
+  const saved = Array.from({ length: count - 1 }, (_, i) =>
+    loadWorkspaceInstrument(state.owner, i + 2)
+  );
+  const occupied = new Set([primaryUid, ...saved]);
+  const alternatives = new Set<string>();
+  const missing = saved.filter((uid) => uid === undefined).length;
+  if (missing)
+    for (const row of state.rows) {
+      if (row.uid && !occupied.has(row.uid) && (state.authenticated || row.providerRef))
+        alternatives.add(row.uid);
+      if (alternatives.size === missing) break;
+    }
+  const suggested = [...alternatives];
+  const instruments = saved.map((uid) => uid ?? suggested.shift() ?? "");
+  const activatePrimary = () => onActivate(1, controller);
+  return (
+    <div
+      id="chart-workspace"
+      className="chart-workspace"
+      data-chart-count={count}
+      aria-label={t("График")}
+    >
+      {count > 1 && !primaryUid ? (
+        <section
+          id="chart-panel"
+          className="auxiliary-chart"
+          data-chart-slot={1}
+          data-chart-active={activeSlot === 1}
+          aria-label={t("График инструмента")}
+          onPointerDownCapture={activatePrimary}
+          onFocusCapture={activatePrimary}
+        >
+          <EmptyChartTitle
+            slot={1}
+            open={() => controller.setDialog(state.ready ? "instruments" : "account")}
+          />
+        </section>
+      ) : (
+        <ChartPanel active={activeSlot === 1} activate={activatePrimary} />
       )}
-      {count >= 3 && (
-        <ComparisonPanel
-          key={`${state.owner}:3`}
-          index={3}
-          rows={rows}
-          initialUid={alternatives[1]?.uid ?? ""}
-        />
-      )}
+      {instruments.map((initialUid, index) => {
+        const slot = index + 2;
+        return (
+          <ComparisonPanel
+            key={`${state.owner}:${slot}`}
+            slot={slot}
+            initialUid={initialUid}
+            parent={controller}
+            parentState={state}
+            activeSlot={activeSlot}
+            onActivate={onActivate}
+          />
+        );
+      })}
+      <WorkspaceGridDividers count={count} />
     </div>
   );
 }

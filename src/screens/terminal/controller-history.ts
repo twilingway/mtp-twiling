@@ -18,6 +18,7 @@ import { selectedMarketRow } from "../../model/selected-instrument.js";
 import type { MarketClient } from "../../services/market-client.js";
 import { errorText, isAbort, viewKey } from "./controller-bridge.js";
 import type { HistoryBridge } from "./controller-bridge.js";
+import { readWorkspaceAnnotations } from "./workspace-annotations.js";
 
 export class TerminalHistory {
   private abort: AbortController | null = null;
@@ -154,11 +155,7 @@ export class TerminalHistory {
       historyHelp: "Загружаем историю…"
     });
     try {
-      const [drawings, images, savedView] = await Promise.all([
-        storage.loadDrawings(owner, p.symbol),
-        storage.loadImages(owner, p.symbol),
-        loadChartView(owner, key)
-      ]);
+      const savedView = await loadChartView(owner, key);
       if (!current()) return;
       const view = liveView ?? savedView,
         width = historyViewNeedsWidth(view)
@@ -176,9 +173,11 @@ export class TerminalHistory {
       });
       restoring = plan.mode !== "none";
       let from = plan.from;
+      const { drawings, images } = await readWorkspaceAnnotations(owner, p.symbol);
+      if (!current()) return;
       this.bridge.update({
         drawings,
-        images: images.sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
+        images: [...images].sort((a, b) => (a.zOrder ?? 0) - (b.zOrder ?? 0)),
         historyViewReady: !restoring
       });
       const result = await client.candles(

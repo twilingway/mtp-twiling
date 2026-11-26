@@ -91,6 +91,8 @@ export const drawingMessages = {
   Снизу: "Bottom",
   Текст: "Text",
   "Текст рисунка": "Drawing text",
+  "Цвет текста": "Text colour",
+  "Использовать цвет линии": "Use line colour",
   "Текст по горизонтали": "Horizontal text position",
   "Текст по вертикали": "Vertical text position",
   "Размер шрифта": "Font size",

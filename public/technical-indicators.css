@@ -20,9 +20,29 @@
 }
 .technical-pane-legend {
   position: absolute;
-  left: 8px;
+  inset-inline-start: 0;
+  max-width: 100%;
+  pointer-events: none;
+}
+.technical-pane-row-list {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: 8px;
+  max-width: calc(100% - 92px);
+  max-height: 100%;
   overflow: auto;
   pointer-events: auto;
+}
+.technical-pane-summary {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  padding: 1px 4px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 22px;
 }
 .technical-indicator-rows {
   color: var(--text);
@@ -80,7 +100,46 @@
   stroke-width: 1.25;
 }
 .technical-pane-actions {
-  float: right;
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-end: 4px;
+  pointer-events: auto;
+  border: 1px solid var(--control-line);
+  border-radius: 5px;
+  background: var(--surface-input);
+  color: var(--text);
+}
+.technical-pane-actions button {
+  display: grid;
+  place-items: center;
+  min-width: 25px;
+  min-height: 23px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+}
+.technical-pane-actions button:is(:hover, :focus-visible, [aria-pressed="true"]) {
+  background: var(--surface-hover);
+}
+.technical-pane-actions svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.25;
+}
+.chart-scroll-host[data-technical-pane-focus] {
+  overflow: hidden;
+  overflow-anchor: none;
+}
+.chart-scroll-host[data-technical-pane-focus] > .chart-body {
+  height: var(--technical-focus-height);
+}
+.chart-panel:has(> .chart-scroll-host[data-technical-pane-focus])
+  > :is(.chart-heading, .chart-range-control, .chart-navigation) {
+  display: none;
 }
 #technical-indicator-settings {
   width: min(600px, calc(100vw - 24px));
@@ -137,6 +196,13 @@
 @media (pointer: coarse) {
   .technical-row-actions {
     visibility: visible;
+  }
+  .technical-pane-actions button {
+    min-width: 28px;
+    min-height: 24px;
+  }
+  .technical-pane-row-list {
+    max-width: calc(100% - 101px);
   }
 }
 @media (max-width: 600px) {

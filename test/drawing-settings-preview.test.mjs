@@ -88,6 +88,7 @@ const tools = [
   "horizontalStraightLine",
   "horizontalRayLine",
   "verticalStraightLine",
+  "rectangle",
   "fibonacciLine",
   "fibonacciExtension"
 ];
@@ -206,7 +207,7 @@ const draftFor = (f) => {
   };
 };
 
-test("all eight tools preview every candidate field without publishing and commit as one undo action", async () => {
+test("all drawing tools preview every candidate field without publishing and commit as one undo action", async () => {
   for (const name of tools) {
     const f = fixture(name),
       c = f.controller;
@@ -229,9 +230,10 @@ test("all eight tools preview every candidate field without publishing and commi
       trendStyle: "dashed",
       trendOpacity: 0.37,
       opacity: 0.61,
-      fontSize: 18,
+      fontSize: 72,
       textEnabled: true,
       text: "Preview",
+      textColor: "#398aff",
       labels: true,
       fill: true,
       oneColor: true,
@@ -538,6 +540,42 @@ test("actual form handlers preview fields and templates; Cancel/Escape/close/unm
   assert.equal(invalid.controller.getSnapshot().drawings[0].points[0].value, 100);
   invalid.unmount();
   invalid.controller.dispose();
+});
+
+test("rectangle text palette and font size preview separately from outline and persist at save", async () => {
+  const f = formFixture("rectangle"),
+    c = f.controller;
+  f.render();
+  const style = f.style();
+  const node = f.node().props.children.props.children[3].props.children;
+  const controls = node.type(style).props.children;
+  const find = (value, check) => {
+    if (Array.isArray(value)) return value.flatMap((item) => find(item, check));
+    if (!value?.props) return [];
+    return [...(check(value) ? [value] : []), ...find(value.props.children, check)];
+  };
+  const [font] = find(controls, (item) => item.props.name === "fontSize");
+  assert.equal(font.props.children.at(-1).props.value, "72");
+  const [swatch] = find(controls, (item) => item.props.label === "Цвет текста");
+  swatch.props.onClick();
+  f.render();
+  const [palette] = find(f.node(), (item) => item.props.target?.kind === "text");
+  palette.props.onColor("#f23645");
+  font.props.onChange({ currentTarget: { value: "72" } });
+  f.style().change("text", "Нижняя грань");
+  f.style().change("textVertical", "bottom");
+  f.render();
+  const preview = c.getSnapshot().drawingSettingsPreview.drawing.settings;
+  assert.equal(preview.fontSize, 72);
+  assert.equal(preview.textColor, "#f23645");
+  assert.equal(preview.text, "Нижняя грань");
+  assert.equal(preview.color, f.original.settings.color);
+  f.submit();
+  await new Promise(setImmediate);
+  assert.equal(f.persisted()[0].settings.textColor, "#f23645");
+  assert.equal(f.persisted()[0].settings.textVertical, "bottom");
+  f.unmount();
+  c.dispose();
 });
 
 test("visible opacity controls use 0..100 percent without inversion and retain inline line controls", () => {

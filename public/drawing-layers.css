@@ -5,13 +5,43 @@
   z-index: 3;
   pointer-events: none;
 }
-.chart-body[data-object-cursor] #chart,
-.chart-body[data-object-cursor] #chart * {
-  cursor: var(--drawing-cursor) !important;
+.chart-body {
+  --chart-cursor-arrow:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M4 2v17l4-4 3 6 3-1-3-6h6z' fill='%23fff' stroke='%23131722' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E")
+      4 2,
+    default;
+  --chart-cursor-crosshair:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='25' height='25' viewBox='0 0 25 25'%3E%3Cpath d='M12.5 3v6m0 7v6M3 12.5h6m7 0h6' stroke='%23fff' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M12.5 3v6m0 7v6M3 12.5h6m7 0h6' stroke='%23131722' stroke-width='1.5' stroke-linecap='round'/%3E%3Ccircle cx='12.5' cy='12.5' r='1.5' fill='%23131722' stroke='%23fff'/%3E%3C/svg%3E")
+      12 12,
+    crosshair;
+  --chart-cursor-pointer:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M8 3a1.5 1.5 0 0 1 3 0v8-1a1.5 1.5 0 0 1 3 0v1a1.5 1.5 0 0 1 3 0v1a1.5 1.5 0 0 1 3 0v3c0 2-1 3-2 4v2H9v-2l-5-5a1.5 1.5 0 0 1 2-2l2 2z' fill='%23fff' stroke='%23131722' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E")
+      9 2,
+    pointer;
+  --chart-cursor-grabbing:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M7 10V8a1.5 1.5 0 0 1 3 0v1-3a1.5 1.5 0 0 1 3 0v3-2a1.5 1.5 0 0 1 3 0v3-1a1.5 1.5 0 0 1 3 0v5c0 2-1 3-2 4v3H8v-3l-4-5c-1-1 0-3 1-3l2 2z' fill='%23fff' stroke='%23131722' stroke-width='2' stroke-linejoin='round'/%3E%3C/svg%3E")
+      12 11,
+    grabbing;
 }
-.chart-body[data-chart-pan] #chart,
-.chart-body[data-chart-pan] #chart * {
-  cursor: grabbing !important;
+.chart-body[data-object-cursor="default"] {
+  --chart-effective-cursor: var(--chart-cursor-arrow);
+}
+.chart-body[data-object-cursor="crosshair"] {
+  --chart-effective-cursor: var(--chart-cursor-crosshair);
+}
+.chart-body[data-object-cursor="pointer"] {
+  --chart-effective-cursor: var(--chart-cursor-pointer);
+}
+.chart-body[data-object-cursor="grabbing"] {
+  --chart-effective-cursor: var(--chart-cursor-grabbing);
+}
+.chart-body[data-object-cursor] .chart-canvas,
+.chart-body[data-object-cursor] .chart-canvas * {
+  cursor: var(--chart-effective-cursor, var(--drawing-cursor)) !important;
+}
+.chart-body[data-chart-pan] .chart-canvas,
+.chart-body[data-chart-pan] .chart-canvas * {
+  cursor: var(--chart-cursor-grabbing) !important;
 }
 .drawing-axis-labels {
   position: absolute;
@@ -50,6 +80,64 @@
   position: absolute;
   width: 5px;
   height: 1px;
+}
+.chart-measurement,
+.chart-measurement-prompt {
+  position: absolute;
+  z-index: 9;
+  pointer-events: none;
+}
+.chart-measurement {
+  inset: 0 auto auto 0;
+  overflow: hidden;
+}
+.chart-measurement > svg {
+  position: absolute;
+  inset: 0;
+}
+.chart-measurement-area {
+  fill: #168b7530;
+}
+.chart-measurement-path {
+  fill: none;
+  stroke: #169880;
+  stroke-width: 2;
+  stroke-dasharray: 5 3;
+}
+.chart-measurement circle {
+  fill: #117561;
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+.chart-measurement-card,
+.chart-measurement-prompt {
+  color: #ffffff;
+  background: #143c35;
+  box-shadow:
+    0 0 0 1px #ffffff90,
+    0 2px 8px #0004;
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+.chart-measurement-card {
+  position: absolute;
+  display: grid;
+  gap: 2px;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+.chart-measurement-card strong {
+  font-size: 12px;
+}
+.chart-measurement-card strong span {
+  color: #b5f5df;
+}
+.chart-measurement-prompt {
+  left: 6px;
+  bottom: 28px;
 }
 .selected-drawing-lock {
   display: inline-flex;

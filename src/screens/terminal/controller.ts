@@ -15,9 +15,12 @@ import {
 import type { TradingCalendarDay } from "../../model/candle-clock.js";
 import { resolveWatchlist } from "../../model/market-model.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
-import { removeWatchlistInstrument, reorderCanonicalWatchlist } from "./controller-watchlist.js";
+import {
+  addWatchlistInstrument,
+  removeWatchlistInstrument,
+  reorderCanonicalWatchlist
+} from "./controller-watchlist.js";
 import type {
-  Backup,
   Candle,
   ChartSettings,
   Drawing,
@@ -42,6 +45,7 @@ import { importWritable } from "./controller-transfer-guard.js";
 import { openLegacyIndicatorSettings } from "./indicator-preferences.js";
 import { marketAvailable } from "./market-readiness.js";
 import { nativeInterval } from "../../services/providers/bybit/market.js";
+import { flushWorkspaceAnnotations } from "./workspace-annotations.js";
 import type { ContextMenu, TerminalDialog, TerminalPreferences, TerminalState } from "./state.js";
 
 export class TerminalController {
@@ -83,8 +87,11 @@ export class TerminalController {
   readonly tools: TerminalDrawingTools;
   readonly panel: TerminalPanel;
   private readonly backups: TerminalBackups;
-  constructor() {
-    setDisplayPreferences(this.state.preferences);
+  constructor(
+    readonly workspaceSlot?: number,
+    shellPanel?: TerminalPanel
+  ) {
+    if (workspaceSlot === undefined) setDisplayPreferences(this.state.preferences);
     const bridge = {
       getState: () => this.state,
       getChart: () => this.chart,
@@ -94,7 +101,7 @@ export class TerminalController {
     this.editing = new TerminalEditing(bridge);
     this.drawingSettings = createDrawingPreview(bridge, this.editing, () => !this.session.disposed);
     this.tools = new TerminalDrawingTools(this);
-    this.panel = new TerminalPanel(this);
+    this.panel = shellPanel ?? new TerminalPanel(this);
     this.history = new TerminalHistory({
       ...bridge,
       getClient: () => this.session.client,
@@ -165,7 +172,8 @@ export class TerminalController {
         ...patch
       };
     this.state = drawingPreviewState({ ...this.state, ...patch });
-    if (patch.preferences) setDisplayPreferences(patch.preferences);
+    if (patch.preferences && this.workspaceSlot === undefined)
+      setDisplayPreferences(patch.preferences);
     this.listeners.forEach((listener) => listener());
   };
   notify = (message: string): void => {
@@ -181,6 +189,7 @@ export class TerminalController {
   flush = async (options: BackupExportOptions = {}): Promise<void> => {
     const client = this.client;
     await this.editing.flush();
+    await flushWorkspaceAnnotations(this.state.owner);
     if (options.captureView !== false) await this.saveView();
     await client?.flush();
     await storage.flush();
@@ -431,14 +440,14 @@ export class TerminalController {
   scheduleOlderHistory = (volumeAverage = false): void => this.history.scheduleOlder(volumeAverage);
   searchInstruments = async (query: string, kind: InstrumentSearchKind, signal: AbortSignal) =>
     this.client?.searchInstruments(query, kind, signal) ?? [];
+  addToWatchlist = (instrument: Parameters<MarketClient["addInstrument"]>[0]) =>
+    addWatchlistInstrument(this, this.session, instrument);
   addInstrument = async (
     instrument: Parameters<MarketClient["addInstrument"]>[0]
   ): Promise<void> => {
-    const client = this.client;
-    if (!client || !importWritable(this.state)) return;
-    const row = await client.addInstrument(instrument);
-    if (!this.session.matches(client) || !importWritable(this.state)) return;
-    this.session.applyBankState(client.snapshot());
+    const owner = this.state.owner;
+    const row = await this.addToWatchlist(instrument);
+    if (!row || !importWritable(this.state, owner)) return;
     this.update({ dialog: null });
     await this.setPreferences({ symbol: row.symbol, instrumentUid: row.uid });
   };
@@ -453,11 +462,10 @@ export class TerminalController {
   });
   clearHistory = (uid: string | null, timeframe: Timeframe | null): Promise<void> =>
     this.history.clear(uid, timeframe);
-  exportBackup = (includeHistory: boolean, options?: BackupExportOptions): Promise<Backup> =>
-    this.backups.export(includeHistory, options);
+  exportBackup: TerminalBackups["export"] = (...args) => this.backups.export(...args);
   importBackup = (input: unknown, options?: BackupImportOptions): Promise<void> =>
     this.backups.import(input, options);
-  importBackupFile = (file: File): Promise<void> => this.backups.importFile(file);
+  importBackupFile: TerminalBackups["importFile"] = (...args) => this.backups.importFile(...args);
   recoverBackup = (): Promise<void> => this.backups.recover();
   saveImage = async (asset: ImageAsset): Promise<void> => {
     if (asset.owner !== this.state.owner || asset.symbol !== this.state.preferences.symbol) return;
@@ -471,27 +479,7 @@ export class TerminalController {
   deleteImage = async (id: string): Promise<void> => {
     await this.tools.deleteObject(id);
   };
-  attachImage = async (file: File): Promise<void> => {
-    if (
-      !this.chart ||
-      !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type) ||
-      file.size > 20 * 1024 * 1024
-    )
-      throw new Error("Выберите PNG/JPEG/WebP/GIF до 20 МБ.");
-    const size = this.chart.plotSize(),
-      point = this.chart.pixelToPoint(size.width * 0.55, size.height * 0.25);
-    if (!point) throw new Error("Не удалось определить координаты изображения.");
-    await this.saveImage({
-      id: crypto.randomUUID(),
-      owner: this.state.owner,
-      symbol: this.state.preferences.symbol,
-      name: file.name,
-      blob: file,
-      point,
-      width: Math.min(220, size.width * 0.55),
-      createdAt: Date.now()
-    });
-  };
+  attachImage = (file: File): Promise<void> => this.editing.attachImage(file);
   editIndicator = (key: IndicatorKey): void => openLegacyIndicatorSettings(this, key);
   setCrosshair = (crosshairBar: Candle | null): void => {
     if (this.state.crosshairBar?.timestamp !== crosshairBar?.timestamp)

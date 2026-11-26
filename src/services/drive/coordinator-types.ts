@@ -3,6 +3,7 @@ import type { BackupImportOptions } from "../../model/backup-import.js";
 import type { DriveAuth } from "./auth.js";
 import type { DriveSync } from "./sync.js";
 import type { DriveAuthorization, DriveLocalAssociation, DriveErrorCode } from "./types.js";
+import type { DriveOperationTime, DriveProgress } from "./progress.js";
 
 export interface DriveRecord extends DriveLocalAssociation {
   lastSyncedAt?: string;
@@ -50,6 +51,8 @@ export interface DriveStatus {
   error?: DriveErrorCode | "local-changed" | undefined;
   conflict?: DriveConflict | undefined;
   choiceAction?: DriveChoiceAction | undefined;
+  progress?: DriveProgress | undefined;
+  lastOperation?: DriveOperationTime | undefined;
 }
 export interface DriveBridge {
   profile(): { owner: string; session: unknown; authenticated: boolean; blocked: boolean };

@@ -1,5 +1,5 @@
 import { HistogramSeries, LineSeries } from "lightweight-charts";
-import type { IChartApi, UTCTimestamp } from "lightweight-charts";
+import type { IChartApi, PriceFormat, UTCTimestamp } from "lightweight-charts";
 import type { Candle } from "../model/types.js";
 import type { ChartOptions } from "./adapter.js";
 import { movingAverage } from "./adapter.js";
@@ -7,7 +7,11 @@ import { lineColor } from "../model/candle-palette.js";
 import { volumeAverageSettings, volumeSma } from "../model/volume-average.js";
 
 /** Existing VOL/SMA20/EMA50 flags retain their formula, appearance and price-pane placement. */
-export function lightweightLegacy(chart: IChartApi, { indicators, settings }: ChartOptions) {
+export function lightweightLegacy(
+  chart: IChartApi,
+  { indicators, settings }: ChartOptions,
+  priceFormat?: PriceFormat
+) {
   const volume = chart.addSeries(HistogramSeries, {
     priceFormat: { type: "volume" },
     priceScaleId: "volume",
@@ -36,6 +40,7 @@ export function lightweightLegacy(chart: IChartApi, { indicators, settings }: Ch
         settings.indicatorOptions?.[key]?.color ?? fallback,
         settings.indicatorOptions?.[key]?.opacity
       ),
+      ...(priceFormat && { priceFormat }),
       lineWidth: (settings.indicatorOptions?.[key]?.width ?? 1) as 1 | 2 | 3 | 4,
       priceLineVisible: false,
       lastValueVisible: false
@@ -74,6 +79,11 @@ export function lightweightLegacy(chart: IChartApi, { indicators, settings }: Ch
     );
   };
   return {
+    setPriceFormat(format: PriceFormat) {
+      // These series precede candles and can supply the right-axis formatter even when empty.
+      sma.applyOptions({ priceFormat: format });
+      ema.applyOptions({ priceFormat: format });
+    },
     setData(data: Candle[]) {
       volume.setData(indicators.volume ? data.map(volumeValue) : []);
       setVolumeAverage(data);

@@ -16,11 +16,20 @@ import type {
   TechnicalIndicatorGroup,
   TechnicalPanePreference
 } from "../model/technical-indicator-layout.js";
-import type { ChartOptions, TechnicalPaneMetric, TechnicalSupplementalInputs } from "./adapter.js";
+import type {
+  ChartOptions,
+  TechnicalPaneFocus,
+  TechnicalPaneMetric,
+  TechnicalSupplementalInputs
+} from "./adapter.js";
 import { TechnicalRenderData } from "./technical-render-data.js";
 import { hasVisibleAverage, technicalCalculationContext } from "./technical-calculation-context.js";
 import type { TechnicalRenderOutput } from "./technical-render-data.js";
-import { captureTechnicalPaneLayout, technicalPaneGeometry } from "./technical-pane-geometry.js";
+import {
+  captureTechnicalPaneLayout,
+  expandedFocusedTechnicalPane,
+  technicalPaneGeometry
+} from "./technical-pane-geometry.js";
 import { attachTechnicalPaneEvents } from "./technical-pane-events.js";
 import { lineColor } from "../model/candle-palette.js";
 import { chartPalette } from "../model/theme.js";
@@ -53,7 +62,8 @@ export function lightweightTechnical(
     panes = new Map<string, IPaneApi<Time>>();
   const fills = new Map<string, { primitive: LightweightTechnicalPrimitive; series: Series }>();
   let instances: readonly TechnicalIndicatorInstance[] = [],
-    layout: readonly TechnicalPanePreference[] = [];
+    layout: readonly TechnicalPanePreference[] = [],
+    focus: TechnicalPaneFocus | null = null;
   let groups: TechnicalIndicatorGroup[] = [],
     disposed = false,
     lastMetrics = "",
@@ -123,7 +133,8 @@ export function lightweightTechnical(
       options.container.clientHeight,
       groups,
       null,
-      timeHeight()
+      timeHeight(),
+      focus
     );
     const price = nativePanes()[0];
     for (const item of targets) {
@@ -144,6 +155,10 @@ export function lightweightTechnical(
       changed,
       capture(before, after) {
         if (disposed || !alive()) return;
+        if (focus) {
+          apply();
+          return;
+        }
         const next = captureTechnicalPaneLayout(layout, before, after);
         if (next) {
           layout = next.layout;
@@ -241,7 +256,7 @@ export function lightweightTechnical(
   function reconcile() {
     if (disposed || !alive()) return;
     if (hasVisibleAverage(instances)) readViewport();
-    const compiled = calculation.compile(instances, layout);
+    const compiled = calculation.compile(instances, expandedFocusedTechnicalPane(layout, focus));
     projected = compiled.outputs.some((output) => output.timestamps.length > candleCount);
     calendar.update(compiled.priceRegions, candleTail);
     groups = compiled.groups;
@@ -440,6 +455,13 @@ export function lightweightTechnical(
       events?.cancel();
       instances = next;
       layout = nextLayout;
+      reconcile();
+    },
+    setFocus(next: TechnicalPaneFocus | null) {
+      if (disposed || !alive() || (focus?.key === next?.key && focus?.height === next?.height))
+        return;
+      events?.cancel();
+      focus = next;
       reconcile();
     },
     metrics,

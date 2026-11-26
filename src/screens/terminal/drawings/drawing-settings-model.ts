@@ -46,12 +46,13 @@ export function validSettingsDrawing(value: unknown): value is Drawing {
   );
 }
 export function settingsCandidate(draft: SettingsDraft): Drawing | null {
-  const settings = draft.settings;
+  const { textColor, ...settings } = draft.settings;
   const item = {
     ...draft,
     title: draft.title?.trim() ?? "",
     settings: {
       ...settings,
+      ...(textColor !== undefined && { textColor }),
       extendLeft: settings.extend === "left" || settings.extend === "both",
       extendRight: settings.extend === "right" || settings.extend === "both",
       levels: settings.levelStyles.filter((level) => level.enabled).map((level) => level.value)

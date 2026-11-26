@@ -50,6 +50,7 @@ function fixture() {
     reader: () => reader,
     busy: () => state.busy,
     setBusy: (value) => (state.busy = value),
+    reporter: () => () => {},
     applying: (value) => (state.applying = value),
     update: (patch) => Object.assign(state.status, patch),
     dirty: () => state.dirty++

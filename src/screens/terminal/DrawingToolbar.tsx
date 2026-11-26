@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { drawingToolbarSettings, type DrawingTarget } from "../../model/drawing-toolbar.js";
 import { useTerminal } from "./context.js";
 import { DrawingToolIcon, type DrawingIconName } from "./DrawingToolIcon.js";
+import { ChartMeasurementButton } from "./ChartMeasurement.js";
 import {
   DrawingToolbarMenu,
   DrawingToolbarSplit,
@@ -401,7 +402,7 @@ export function DrawingToolbar() {
         );
       })}
       <span className="tool-divider" />
-      {button("measure", t("Линейка"), "ruler", () => {}, false, true)}
+      <ChartMeasurementButton onChoose={closeMenu} />
       {button("zoom", t("Увеличить масштаб"), "zoom", () => {}, false, true)}
       {button("zoom-out", t("Уменьшить масштаб"), "zoomOut", () => {}, false, true)}
       <span className="tool-divider" />

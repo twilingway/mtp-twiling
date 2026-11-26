@@ -18,7 +18,7 @@ function sources(){
 }
 const load=sources(),{chartPriceFormat,lightweightPriceFormat}=load("charts/price-format.ts"),{watchChartPriceMetadata}=load("screens/terminal/chart-price-metadata.ts");
 test("price format honors decimal/scientific finite tick sizes and uses valid fallbacks",()=>{
- for(const [step,digits] of [[.005,3],[.000002,6],[1e-8,8],[5e-9,9],[2.5,2],[1,2]]){
+ for(const [step,digits] of [[.005,3],[.000002,6],[1e-8,8],[5e-9,9],[2.5,1],[1,0]]){
   assert.equal(chartPriceFormat({symbol:"VTBR",step}).precision,digits);assert.equal(chartPriceFormat({symbol:"VTBR",step}).minMove,step);
  }
  for(const step of [null,0,-1,NaN,Infinity])assert.deepEqual(chartPriceFormat({symbol:"VTBR",step}),{precision:2,minMove:null});

@@ -1,12 +1,56 @@
+import { useState } from "react";
 import { t } from "../../../i18n/messages.js";
 import { logicalForTime, timeForLogical } from "../../../charts/adapter.js";
+import {
+  nativePriceStep,
+  priceStepDecimals,
+  roundPriceToStep
+} from "../../../charts/price-format.js";
 import type { DrawingPoint } from "../../../model/types.js";
 import { TIMEFRAMES } from "../../../model/history-codec.js";
+import { selectedMarketRow } from "../../../model/selected-instrument.js";
 import { dateTimeInput, parseDateTimeInput } from "../../../i18n/datetime-input.js";
 import { intradayTimeframe } from "../../../i18n/format.js";
 import { resolveTimeZone } from "../../../i18n/timezones.js";
 import { useTerminal } from "../context.js";
 import { draftNumber } from "./drawing-settings-model.js";
+
+function CoordinatePriceInput({
+  value,
+  index,
+  step,
+  disabled,
+  onChange
+}: {
+  value: number;
+  index: number;
+  step: number | null;
+  disabled: boolean;
+  onChange: (value: number) => void;
+}) {
+  const [edit, setEdit] = useState<string | null>(null);
+  const display = roundPriceToStep(value, step);
+  const decimals = step === null ? null : priceStepDecimals(step);
+  const formatted =
+    decimals !== null && decimals <= 100 ? display.toFixed(decimals) : String(display);
+  return (
+    <input
+      type="number"
+      step={step ?? "any"}
+      disabled={disabled}
+      data-coordinate-value={index}
+      aria-label={t("Точка координат") + " " + (index + 1) + t(": цена")}
+      value={edit ?? (Number.isFinite(value) ? formatted : "")}
+      onChange={(event) => {
+        const input = event.currentTarget.value;
+        setEdit(input);
+        onChange(roundPriceToStep(draftNumber(input), step));
+      }}
+      onBlur={() => setEdit(null)}
+    />
+  );
+}
+
 export function DrawingCoordinatesFields({
   points,
   point,
@@ -20,6 +64,7 @@ export function DrawingCoordinatesFields({
 }) {
   const { state } = useTerminal();
   const interval = TIMEFRAMES[state.preferences.timeframe].ms;
+  const priceStep = nativePriceStep(selectedMarketRow(state.rows, state.preferences));
   const inputZone = intradayTimeframe(state.preferences.timeframe)
     ? resolveTimeZone(state.preferences.timeZone)
     : "UTC";
@@ -28,14 +73,12 @@ export function DrawingCoordinatesFields({
       <span>
         #{index + 1} {t("(цена, бар)")}
       </span>
-      <input
-        type="number"
-        step="any"
+      <CoordinatePriceInput
+        value={p.value}
+        index={index}
+        step={priceStep}
         disabled={disabled}
-        data-coordinate-value={index}
-        aria-label={t("Точка координат") + " " + (index + 1) + t(": цена")}
-        value={Number.isFinite(p.value) ? p.value : ""}
-        onChange={(event) => point(index, { value: draftNumber(event.currentTarget.value) })}
+        onChange={(value) => point(index, { value })}
       />
       <input
         type="number"

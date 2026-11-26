@@ -5,6 +5,7 @@ import vm from "node:vm";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { utils as klineFormat } from "../node_modules/klinecharts/dist/index.esm.js";
 
 const root = fileURLToPath(new URL("../src/", import.meta.url));
 function sources(overrides = {}, globals = {}) {
@@ -94,7 +95,9 @@ test("camera persistence scopes owner/engine/timeframe and keeps signed historic
 function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
   let data = [],
     spacing = 8,
-    offset = 8;
+    offset = 8,
+    dataWrites = 0,
+    paneWrites = 0;
   const actions = new Map(),
     calls = [], priceFormats = [], formatRedraws = [],
     primitives = [],
@@ -196,6 +199,7 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
           applyOptions(patch) { if (candles && patch.priceFormat) priceFormats.push(patch.priceFormat); },
           setData(next) {
             if (candles) {
+              dataWrites++;
               data = next;
               sizeChanged();
             }
@@ -238,6 +242,7 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
     const chart = {
       getDom: () => null,
       setPaneOptions(options) {
+        paneWrites++;
         assert.equal(options.id, "x_axis_pane");
         assert.equal(typeof options.axisOptions.name, "string");
       },
@@ -247,6 +252,7 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
       resize() {},
       subscribeAction: (name, callback) => actions.set(name, callback),
       applyNewData(next) {
+        dataWrites++;
         data = next;
         offset = 8;
       },
@@ -338,6 +344,8 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
     chartOptions: () => constructedOptions,
     primitives,
     priceLabels,
+    nativeWrites: () => ({ dataWrites, paneWrites }),
+    nativeLastPriceLabel: () => klineFormat.formatPrecision(data.at(-1)?.close, priceFormats.at(-1)?.precision),
     camera: () => ({ spacing, offset })
   };
 }
@@ -368,12 +376,19 @@ for(const engine of ["lightweight","kline"]){
   const bars=Array.from({length:1200},(_,i)=>({timestamp:Date.UTC(2022,0,1)+i*86400000,open:57.35,high:57.38,low:57.33,close:57.365,volume:1}));
   f.adapter.setData(bars,false);f.ready();
   f.adapter.setView({camera:{barSpace:1.0550660792951543,rightOffsetBars:-444.16359109010153}});f.ready();
-  const before=f.camera(),label=[...f.priceLabels][0];f.calls.length=0;
-  f.adapter.updatePriceFormat({owner:"A",uid:"vtbr",step:.005});f.ready();
+  const before=f.camera(),label=[...f.priceLabels][0],nativeBefore=f.nativeWrites();f.calls.length=0;
+  f.adapter.updatePriceFormat({owner:"A",uid:"vtbr",step:.005,priceHint:57.365});f.ready();
   assert.equal(f.priceFormats.at(-1).precision,3);
-  if(engine==="kline"){assert.equal(f.formatRedraws.length,1,"precision invalidates native labels immediately");assert.deepEqual(Object.keys(f.formatRedraws[0]),[]);}
+  if (engine === "kline") {
+    assert.equal(f.formatRedraws.length, 1, "precision invalidates native labels immediately");
+    assert.deepEqual(Object.keys(f.formatRedraws[0]), ["yAxis"]);
+    assert.deepEqual(Object.keys(f.formatRedraws[0].yAxis), ["size"]);
+    assert.equal(f.formatRedraws[0].yAxis.size, 78, "reserve space for three fractional digits");
+    assert.equal(f.nativeLastPriceLabel(), "57.365");
+  }
   if(engine==="lightweight")assert.equal(f.priceFormats.at(-1).minMove,.005);
   assert.deepEqual(f.camera(),before);assert.deepEqual(f.calls,[]);
+  assert.deepEqual(f.nativeWrites(), nativeBefore);
   if(engine==="lightweight"){assert.equal([...f.priceLabels][0],label);assert.equal(label.options.price,57.365);}
   const count=f.priceFormats.length;
   for(const metadata of [{owner:"B",uid:"vtbr",step:.000002},{owner:"A",uid:"other",step:.000002},
@@ -383,6 +398,8 @@ for(const engine of ["lightweight","kline"]){
   f.adapter.retired=true;f.adapter.updatePriceFormat({owner:"A",uid:"vtbr",step:.000002});assert.equal(f.priceFormats.length,count);
   f.adapter.retired=false;f.adapter.updatePriceFormat({owner:"A",uid:"vtbr",step:.000002});f.ready();
   assert.equal(f.priceFormats.at(-1).precision,6);assert.deepEqual(f.camera(),before);assert.deepEqual(f.calls,[]);
+  assert.deepEqual(f.nativeWrites(), nativeBefore);
+  if (engine === "kline") assert.equal(f.nativeLastPriceLabel(), "57.365000");
  });
 }
 

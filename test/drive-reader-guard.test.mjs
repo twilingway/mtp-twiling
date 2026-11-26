@@ -516,8 +516,8 @@ for (const dirty of [false, true])
     );
     assert.equal(
       payloadReads.length,
-      dirty ? 2 : 1,
-      "coordinator and standalone writer each validate JSON without image binaries"
+      1,
+      "the writer validates a dirty upload, and the coordinator validates an unchanged check"
     );
     console.log(
       JSON.stringify({

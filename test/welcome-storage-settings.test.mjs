@@ -118,6 +118,7 @@ test("automatic welcome waits for startup and opens only for the settled guest",
     const state = { ready: false, authenticated: false, profileTransition: false, dialog: null };
     const controller = {
       start: () => startup.promise,
+      editing: { observeWorkspaceAnnotations: () => () => {} },
       dispose() {},
       notify: (message) => notices.push(message),
       setDialog: (dialog) => dialogs.push(dialog)
@@ -127,6 +128,7 @@ test("automatic welcome waits for startup and opens only for the settled guest",
       react: {
         ...React,
         useEffect: (effect) => effects.push(effect),
+        useEffectEvent: (callback) => callback,
         useRef: () => consumed,
         useState: (initial) => typeof initial === "function"
           ? [initial(), () => {}]

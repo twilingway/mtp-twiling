@@ -4,7 +4,7 @@ import type {
   TechnicalPaneLayout,
   TechnicalPanePreference
 } from "../model/technical-indicator-layout.js";
-import type { TechnicalPaneMetric } from "./adapter.js";
+import type { TechnicalPaneFocus, TechnicalPaneMetric } from "./adapter.js";
 import { DEFAULT_TECHNICAL_PANE_HEIGHT_RATIO as defaultHeightRatio } from "../model/technical-indicator-layout.js";
 
 export function technicalMinimumCanvasHeight(
@@ -19,12 +19,24 @@ export function technicalPaneGeometry(
   height: number,
   groups: readonly TechnicalIndicatorGroup[],
   legacyVolume: { heightRatio: number | null } | null = null,
-  timeAxisHeight = 28
+  timeAxisHeight = 28,
+  focus: TechnicalPaneFocus | null = null
 ) {
   const lower = groups.filter((group) => group.key !== "price");
   const count = lower.length + Number(legacyVolume !== null);
   const total = Math.max(160 + 30 * count, height - timeAxisHeight - count);
   const minimumPrice = Math.min(total, 160);
+  if (focus && lower.some(({ key }) => key === focus.key)) {
+    const focusedHeight = Math.max(
+      30,
+      Math.min(focus.height, total - minimumPrice - 30 * (count - 1))
+    );
+    return [
+      { key: "price", height: total - focusedHeight - 30 * (count - 1) },
+      ...(legacyVolume === null ? [] : [{ key: "legacy:volume", height: 30 }]),
+      ...lower.map(({ key }) => ({ key, height: key === focus.key ? focusedHeight : 30 }))
+    ];
+  }
   const targets = lower.map((group) => ({
     key: group.key,
     height: group.preference?.collapsed
@@ -56,6 +68,18 @@ export function technicalPaneGeometry(
     ...(legacyVolume === null ? [] : [{ key: "legacy:volume", height: volume }]),
     ...targets
   ];
+}
+
+/** A temporary focus must not change the saved collapse state or height. */
+export function expandedFocusedTechnicalPane(
+  layout: readonly TechnicalPanePreference[],
+  focus: TechnicalPaneFocus | null
+): readonly TechnicalPanePreference[] {
+  return focus
+    ? layout.map((item) =>
+        item.collapsed && focus.key === `pane:${item.paneId}` ? { ...item, collapsed: false } : item
+      )
+    : layout;
 }
 
 /** Capture every measured pane's order, but change ratios only for genuinely resized panes. */

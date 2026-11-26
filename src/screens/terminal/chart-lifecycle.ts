@@ -10,6 +10,7 @@ import type {
 } from "../../charts/adapter.js";
 import { drawingLayer, paintDrawings } from "../../model/drawing-model.js";
 import { loadChartView, saveAdapterView, saveChartView } from "../../services/chart-camera.js";
+import { loadWorkspaceView, saveWorkspaceView } from "../../services/workspace-camera.js";
 import { useTerminal } from "./context.js";
 import { viewKey } from "./controller-bridge.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
@@ -28,6 +29,16 @@ function technicalInputs(preferences: TerminalPreferences) {
     : instances;
 }
 
+function viewAnchorCovered(view: ChartView | undefined, candles: readonly Candle[]): boolean {
+  const timestamp = view?.anchor?.timestamp;
+  const first = candles[0]?.timestamp;
+  const last = candles.at(-1)?.timestamp;
+  return (
+    timestamp === undefined ||
+    (first !== undefined && last !== undefined && timestamp >= first && timestamp <= last)
+  );
+}
+
 export function useChartCanvas(
   ref: RefObject<HTMLDivElement | null>,
   visibleDrawings: (state: TerminalState) => Drawing[],
@@ -37,6 +48,7 @@ export function useChartCanvas(
   const { controller, state } = useTerminal(),
     dataRef = useRef<Candle[]>([]),
     pendingSavedView = useRef<ChartView | undefined>(undefined),
+    fittedWorkspaceHistory = useRef(false),
     dataFallback = useRef(false),
     adapterRef = useRef<ChartAdapter | null>(null),
     supplementalRef = useRef(supplemental);
@@ -59,7 +71,12 @@ export function useChartCanvas(
     const container = ref.current,
       owner = state.owner,
       revision = state.chartRevision,
-      key = `${p.symbol}:${p.timeframe}:${p.engine}:${p.rangeDays}`;
+      key = `${p.symbol}:${p.timeframe}:${p.engine}:${p.rangeDays}`,
+      slot = controller.workspaceSlot;
+    const saveView = (owner: string, key: string, view: ChartView) =>
+      slot === undefined
+        ? saveChartView(owner, key, view)
+        : saveWorkspaceView(owner, slot, key, view);
     if (!container || !uid || !available || state.importRecoveryRequired) return;
     let cancelled = false,
       layoutWrite = 0,
@@ -83,7 +100,7 @@ export function useChartCanvas(
         instrument = selectedMarketRow(snapshot.rows, snapshot.preferences);
       if (!instrument || !matches()) return;
       const options: ChartOptions = {
-        ...cameraCallbacks(controller, () => owned, matches, saveChartView),
+        ...cameraCallbacks(controller, () => owned, matches, saveView),
         ...(p.locale ? { locale: p.locale } : {}),
         ...(p.timeZone ? { timeZone: p.timeZone } : {}),
         container,
@@ -160,7 +177,10 @@ export function useChartCanvas(
         p.engine === "kline"
           ? import("../../charts/kline.js").then((module) => module.makeKline)
           : import("../../charts/lightweight.js").then((module) => module.makeLightweight),
-        loadChartView(owner, key).catch(() => undefined)
+        (slot === undefined
+          ? loadChartView(owner, key)
+          : loadWorkspaceView(owner, slot, key)
+        ).catch(() => undefined)
       ]);
       if (!matches()) return;
       owned = factory(options);
@@ -168,8 +188,9 @@ export function useChartCanvas(
       const current = controller.getSnapshot(),
         ready = !current.importingBackup && current.historyViewReady !== false,
         candles = current.candles,
-        showingFallback = ready && candles.length > 0 && current.historyViewFallback === true;
-      owned.persistView = ready && !showingFallback;
+        showingFallback = ready && candles.length > 0 && current.historyViewFallback === true,
+        waitingForSlotAnchor = slot !== undefined && !viewAnchorCovered(view, candles);
+      owned.persistView = ready && !showingFallback && !waitingForSlotAnchor;
       adapterRef.current = owned;
       controller.chart = owned;
       const currentPreferences = controller.getSnapshot().preferences;
@@ -182,9 +203,11 @@ export function useChartCanvas(
       dataRef.current = ready ? candles : [];
       dataFallback.current = showingFallback;
       if (ready && candles.length) {
-        if (view && !showingFallback) owned.setView(view);
+        if (view && !showingFallback && !waitingForSlotAnchor) owned.setView(view);
         owned.setData([...candles], true);
-      } else pendingSavedView.current = view;
+        fittedWorkspaceHistory.current = !current.loading || !!view;
+      }
+      if (!ready || !candles.length || waitingForSlotAnchor) pendingSavedView.current = view;
     };
     void initialize().catch((error: unknown) => {
       if (matches())
@@ -203,13 +226,20 @@ export function useChartCanvas(
             selectedMarketRow(current.rows, current.preferences)?.uid === uid))
       )
         owned.persistView = false;
-      void saveAdapterView(owned, owner, key).catch(() => {});
+      if (slot === undefined) {
+        void saveAdapterView(owned, owner, key).catch(() => {});
+      } else {
+        const view =
+          owned && !owned.retired && owned.persistView !== false ? owned.getView() : null;
+        if (view) void saveView(owner, key, view).catch(() => {});
+      }
       owned?.destroy();
       if (controller.chart === owned) controller.chart = null;
       adapterRef.current = null;
       dataRef.current = [];
       dataFallback.current = false;
       pendingSavedView.current = undefined;
+      fittedWorkspaceHistory.current = false;
     };
   }, [
     controller,
@@ -234,35 +264,52 @@ export function useChartCanvas(
     const adapter = adapterRef.current,
       next = state.candles,
       previous = dataRef.current,
-      fallback = state.historyViewFallback === true;
+      fallback = state.historyViewFallback === true,
+      pending = pendingSavedView.current,
+      waitingForSlotAnchor =
+        controller.workspaceSlot !== undefined && !viewAnchorCovered(pending, next);
     if (adapter?.retired || state.importRecoveryRequired) return;
     if (adapter)
-      adapter.persistView = !fallback && !state.importingBackup && state.historyViewReady !== false;
+      adapter.persistView =
+        !fallback &&
+        !waitingForSlotAnchor &&
+        !state.importingBackup &&
+        state.historyViewReady !== false;
     if (state.importingBackup || state.historyViewReady === false) return;
-    if (!adapter || !next.length || next === previous) return;
+    if (!adapter || !next.length) return;
+    const firstWorkspaceHistory =
+      controller.workspaceSlot !== undefined && !fittedWorkspaceHistory.current && !pending;
+    if (firstWorkspaceHistory && !state.loading) fittedWorkspaceHistory.current = true;
+    if (next === previous) return;
     const incremental =
       previous.length > 0 &&
       next.length >= previous.length &&
       next.length <= previous.length + 1 &&
       previous.every((bar, i) => i >= previous.length - 1 || bar === next[i]);
-    if (fallback && !dataFallback.current) {
+    if (pending && controller.workspaceSlot !== undefined && !waitingForSlotAnchor) {
+      adapter.setData([...next], !previous.length);
+      if (!fallback) adapter.setView(pending);
+      fittedWorkspaceHistory.current = true;
+    } else if (firstWorkspaceHistory || (fallback && !dataFallback.current)) {
       adapter.setData([...next], true);
     } else if (incremental && previous[0]?.timestamp === next[0]?.timestamp) {
       const last = next.at(-1);
       if (last) adapter.updateBar(last);
     } else {
       const view = previous.length ? adapter.getView() : null;
-      if (!fallback && pendingSavedView.current) adapter.setView(pendingSavedView.current);
+      if (!fallback && pending && !waitingForSlotAnchor) adapter.setView(pending);
       adapter.setData([...next], !previous.length);
       if (view) adapter.setView(view);
     }
     dataRef.current = next;
     dataFallback.current = fallback;
-    pendingSavedView.current = undefined;
+    if (!waitingForSlotAnchor) pendingSavedView.current = undefined;
   }, [
+    controller,
     state.candles,
     state.historyViewReady,
     state.historyViewFallback,
+    state.loading,
     state.importingBackup,
     state.importRecoveryRequired
   ]);

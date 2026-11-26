@@ -8,6 +8,8 @@ import { snapDrawingPoint } from "../../model/drawing-magnet.js";
 import { chartBackground } from "../../model/theme.js";
 import type { Drawing, DrawingPoint, PixelPoint } from "../../model/types.js";
 import type { ChartAdapter, TechnicalSupplementalInputs } from "../../charts/adapter.js";
+import { nativePriceStep, roundPriceToStep } from "../../charts/price-format.js";
+import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { isPanMovement } from "../../charts/navigation.js";
 import { useChartCanvas } from "./chart-lifecycle.js";
 import { useTerminal } from "./context.js";
@@ -16,6 +18,8 @@ import { drawingVisibleOnInterval } from "../../model/intervals/drawing-visibili
 import { technicalIndicatorGroups } from "../../model/technical-indicator-layout.js";
 import { useCameraInput } from "./camera-input.js";
 import { drawingRenderList } from "./drawing-settings-preview.js";
+import { ChartMeasurementOverlay } from "./ChartMeasurement.js";
+import { useChartMeasurementInput } from "./chart-measurement-input.js";
 const chartControls =
   "[data-image-id],.indicator-legend,.technical-pane-legends,.calendar-analysis-overlays";
 
@@ -26,9 +30,11 @@ export function visibleDrawings(state: TerminalState): Drawing[] {
   );
 }
 export function ChartCanvas({
+  slot = 1,
   supplemental,
   drawingProjection
 }: {
+  slot?: number;
   supplemental: TechnicalSupplementalInputs;
   drawingProjection?: EventTarget;
 }) {
@@ -37,7 +43,8 @@ export function ChartCanvas({
   useChartCanvas(ref, visibleDrawings, supplemental, drawingProjection);
   return (
     <div
-      id="chart"
+      id={slot === 1 ? "chart" : `chart-${slot}`}
+      className="chart-canvas"
       ref={ref}
       style={{ background: chartBackground(state.preferences.chartSettings) }}
     />
@@ -69,7 +76,13 @@ function finishNativePan(pan: { current: NativePan | null }) {
   delete element.dataset.objectCursor;
   element.style.removeProperty("--drawing-cursor");
 }
-export function ChartGestures({ children }: { children: ReactNode }) {
+export function ChartGestures({
+  children,
+  drawingProjection
+}: {
+  children: ReactNode;
+  drawingProjection?: EventTarget;
+}) {
   const { controller, state } = useTerminal(),
     draft = useRef<DrawingPoint[]>([]),
     pointer = useRef<HTMLSpanElement>(null),
@@ -115,6 +128,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
     const rect = event.currentTarget.getBoundingClientRect();
     return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   };
+  const measurement = useChartMeasurementInput(controller, state, pixel, chartControls);
   const find = (p: PixelPoint) => {
     const chart = controller.chart;
     if (!chart) return null;
@@ -142,14 +156,16 @@ export function ChartGestures({ children }: { children: ReactNode }) {
       element.style.removeProperty("--drawing-cursor");
     }
   };
-  const cursorKind = () => {
+  const cursorKind = (hasVisibleMarker = false) => {
     const mode = drawingToolbarSettings(controller.getSnapshot().preferences.chartSettings).cursor;
     return mode === "arrow"
       ? "default"
       : mode === "eraser"
         ? "cell"
         : mode === "dot" || mode === "demonstration"
-          ? "none"
+          ? hasVisibleMarker
+            ? "none"
+            : "default"
           : "crosshair";
   };
   const drawingPoint = (p: PixelPoint, temporary: boolean) => {
@@ -159,7 +175,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
     const current = controller.getSnapshot(),
       options = drawingToolbarSettings(current.preferences.chartSettings);
     const mode = temporary ? (options.magnet === "off" ? "weak" : "off") : options.magnet;
-    return snapDrawingPoint(
+    const point = snapDrawingPoint(
       raw,
       p,
       current.candles,
@@ -169,6 +185,8 @@ export function ChartGestures({ children }: { children: ReactNode }) {
         ? current.preferences.indicators
         : undefined
     );
+    const step = nativePriceStep(selectedMarketRow(current.rows, current.preferences));
+    return { ...point, value: roundPriceToStep(point.value, step) };
   };
   function down(event: ReactPointerEvent<HTMLDivElement>) {
     if (
@@ -261,6 +279,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
     if (!chart) return;
     const p = pixel(event),
       current = controller.getSnapshot();
+    let markerVisible = false;
     if (pointer.current) {
       const size = chart.plotSize(),
         mode = drawingToolbarSettings(current.preferences.chartSettings).cursor;
@@ -273,6 +292,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
         p.y >= 0 &&
         p.x <= size.width &&
         p.y <= size.height;
+      markerVisible = visible;
       pointer.current.style.display = visible ? "block" : "none";
       pointer.current.style.transform = `translate(${p.x}px,${p.y}px)`;
     }
@@ -301,7 +321,13 @@ export function ChartGestures({ children }: { children: ReactNode }) {
         inPlot = p.x >= 0 && p.y >= 0 && p.x <= size.width && p.y <= size.height;
       cursor(
         event.currentTarget,
-        inPlot ? (current.activeTool ? "crosshair" : find(p) ? "pointer" : cursorKind()) : ""
+        inPlot
+          ? current.activeTool
+            ? "crosshair"
+            : find(p)
+              ? "pointer"
+              : cursorKind(markerVisible)
+          : ""
       );
       return;
     }
@@ -311,18 +337,20 @@ export function ChartGestures({ children }: { children: ReactNode }) {
       if (Math.hypot(p.x - active.start.x, p.y - active.start.y) <= 8) return;
       active.cloneId = crypto.randomUUID();
     }
+    const step = nativePriceStep(selectedMarketRow(current.rows, current.preferences));
     const points = active.original.points.map((point, i) => {
       if (!active.clone && active.handle >= 0 && active.handle !== i) return point;
       const start = active.pixels[i];
-      return start
+      const moved = start
         ? ((!active.clone && active.handle >= 0
             ? drawingPoint(
                 { x: start.x + p.x - active.start.x, y: start.y + p.y - active.start.y },
                 false
               )
             : chart.pixelToPoint(start.x + p.x - active.start.x, start.y + p.y - active.start.y)) ??
-            point)
+          point)
         : point;
+      return moved === point ? point : { ...moved, value: roundPriceToStep(moved.value, step) };
     });
     const candidate: unknown = { ...active.original, id: active.cloneId ?? active.id, points };
     if (isDrawing(candidate)) {
@@ -369,32 +397,39 @@ export function ChartGestures({ children }: { children: ReactNode }) {
       className={`chart-body ${state.activeTool ? "drawing-active" : ""}`}
       style={{ minHeight: minimumHeight }}
       onPointerDownCapture={(event) => {
-        if (cameraInput.down(event) !== false) down(event);
+        if (!measurement.down(event) && cameraInput.down(event) !== false) down(event);
       }}
       onPointerMoveCapture={(event) => {
-        if (cameraInput.move(event) !== false) move(event);
+        if (measurement.move(event)) {
+          if (pointer.current) pointer.current.style.display = "none";
+          cursor(event.currentTarget, "crosshair");
+        } else if (cameraInput.move(event) !== false) move(event);
       }}
       onPointerUpCapture={(event) => {
         cameraInput.up(event);
-        up(event);
+        if (!measurement.up(event)) up(event);
       }}
       onWheelCapture={(event) => {
         cameraInput.action(event);
       }}
       onPointerCancelCapture={(event) => {
+        measurement.cancel(event);
         cameraInput.up(event);
         cancel(event);
       }}
       onLostPointerCapture={(event) => {
+        measurement.cancel(event);
         cameraInput.up(event);
         cancel(event);
       }}
       onPointerLeave={(event) => {
+        measurement.cancel(event);
         if (pointer.current) pointer.current.style.display = "none";
         controller.setCrosshair(null);
         if (!drag.current && !pan.current) cursor(event.currentTarget, "");
       }}
       onDoubleClickCapture={(event) => {
+        if (measurement.active()) return;
         if (cameraInput.action(event) === false) return;
         if (event.target instanceof Element && event.target.closest(chartControls)) return;
         const hit = find(pixel(event));
@@ -419,6 +454,11 @@ export function ChartGestures({ children }: { children: ReactNode }) {
       }}
     >
       {children}
+      <ChartMeasurementOverlay
+        controller={controller}
+        state={state}
+        {...(drawingProjection ? { drawingProjection } : {})}
+      />
       <span
         ref={pointer}
         className="drawing-pointer"

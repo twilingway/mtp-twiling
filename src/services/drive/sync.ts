@@ -13,6 +13,7 @@ import {
   verifyContent
 } from "./backup.js";
 import { DRIVE_NAMESPACE, DriveError } from "./types.js";
+import type { DriveReport } from "./progress.js";
 import {
   assertDriveInspectionUnchanged,
   assertReadableDriveManifest,
@@ -104,6 +105,7 @@ export interface PublishOptions {
   deviceId: string;
   /** Last observed/applied remote parent; [] only for a genuinely empty Drive. */
   parents: string[];
+  checkBeforeWrite?: () => void;
   /** Optional pinned observation from a coordinator; never persisted. */
   expectedInspection?: DriveInspection;
 }
@@ -180,17 +182,33 @@ export class DriveSync {
     }
   }
 
-  async download(nodeId: string, expectedInspection?: DriveInspection): Promise<Backup> {
+  async download(
+    nodeId: string,
+    expectedInspection?: DriveInspection,
+    report?: DriveReport
+  ): Promise<Backup> {
+    report?.("read-versions");
     const inspection = await this.inspect();
     if (expectedInspection) assertDriveInspectionUnchanged(expectedInspection, inspection);
     const snapshot = inspection.snapshots.find((item) => item.manifest.nodeId === nodeId);
     if (!snapshot) throw invalid();
     const blobs = await this.blobIndex();
     const manifest = snapshot.manifest;
+    let transferredBytes = 0;
+    const totalFiles = manifest.images.length + 1;
+    const progress = (completedFiles: number) =>
+      report?.("download", { transfer: { completedFiles, totalFiles, transferredBytes } });
+    progress(0);
     const payload = await this.readPayload(manifest, blobs);
+    transferredBytes += payload.size;
+    progress(1);
     const images: Blob[] = [];
-    for (const image of manifest.images)
-      images.push(await this.loadBlob(image, blobs, MAX_IMAGE_BYTES));
+    for (const image of manifest.images) {
+      const body = await this.loadBlob(image, blobs, MAX_IMAGE_BYTES);
+      images.push(body);
+      transferredBytes += body.size;
+      progress(images.length + 1);
+    }
     const backup = await restoreDriveBackup(payload, images);
     if (backup.images.some((image, index) => image.type !== manifest.images[index]?.mimeType))
       throw invalid();
@@ -199,13 +217,15 @@ export class DriveSync {
 
   /** Reader capability check only: no image binary download or base64 allocation. */
   async validateHeads(inspection: DriveInspection): Promise<void> {
-    const blobs = await this.blobIndex();
-    for (const head of inspection.heads) {
-      const snapshot = inspection.snapshots.find((item) => item.manifest.nodeId === head);
-      if (!snapshot) throw invalid();
-      await this.readPayload(snapshot.manifest, blobs);
-      for (const image of snapshot.manifest.images)
-        if (!blobs.get(image.sha256)?.some((file) => file.size === image.size)) throw invalid();
+    if (inspection.heads.length) {
+      const blobs = await this.blobIndex();
+      for (const head of inspection.heads) {
+        const snapshot = inspection.snapshots.find((item) => item.manifest.nodeId === head);
+        if (!snapshot) throw invalid();
+        await this.readPayload(snapshot.manifest, blobs);
+        for (const image of snapshot.manifest.images)
+          if (!blobs.get(image.sha256)?.some((file) => file.size === image.size)) throw invalid();
+      }
     }
     assertDriveInspectionUnchanged(inspection, await this.inspect());
   }
@@ -232,28 +252,29 @@ export class DriveSync {
     return payload;
   }
 
-  publish(backup: unknown, options: PublishOptions): Promise<PublishResult> {
+  publish(backup: unknown, options: PublishOptions, report?: DriveReport): Promise<PublishResult> {
     if (this.namespace !== DRIVE_NAMESPACE)
       return Promise.reject(new DriveError("permission", "Legacy stream is read-only"));
     if (options.parents.length > 1) return Promise.reject(new DriveConflictError(options.parents));
-    return this.write(backup, options, false);
+    return this.write(backup, options, false, report);
   }
 
   /** The caller must show all conflicting heads and obtain an explicit user choice first. */
-  resolve(backup: unknown, options: PublishOptions): Promise<PublishResult> {
+  resolve(backup: unknown, options: PublishOptions, report?: DriveReport): Promise<PublishResult> {
     if (this.namespace !== DRIVE_NAMESPACE)
       return Promise.reject(new DriveError("permission", "Legacy stream is read-only"));
     if (options.parents.length < 2)
       return Promise.reject(
         new DriveError("conflict", "Для разрешения нужны все конфликтующие снимки.")
       );
-    return this.write(backup, options, true);
+    return this.write(backup, options, true, report);
   }
 
   private async write(
     backup: unknown,
     options: PublishOptions,
-    resolving: boolean
+    resolving: boolean,
+    report?: DriveReport
   ): Promise<PublishResult> {
     if (this.writing) throw new DriveError("busy", "Синхронизация Google Диска уже выполняется.");
     if (
@@ -266,9 +287,12 @@ export class DriveSync {
     // Clone parent identities before yielding, so caller mutation cannot reparent a snapshot.
     const parents = [...options.parents];
     const deviceId = options.deviceId;
+    const checkBeforeWrite = options.checkBeforeWrite;
     const expected = options.expectedInspection && structuredClone(options.expectedInspection);
     try {
+      report?.("prepare-upload");
       const prepared = await prepareDriveBackup(backup);
+      report?.("check-versions");
       const before = await this.inspect();
       if (expected) assertDriveInspectionUnchanged(expected, before);
       if (!sameSet(parents, before.heads) || (before.conflict && !resolving))
@@ -277,8 +301,20 @@ export class DriveSync {
       const blobs = await this.blobIndex();
       const payload = await reference(prepared.payload);
       assertDriveInspectionUnchanged(before, await this.inspect());
-      await this.saveBlob(prepared.payload, payload, blobs);
-      for (const image of prepared.images) await this.saveBlob(image.body, image.reference, blobs);
+      checkBeforeWrite?.();
+      let completedFiles = 0,
+        transferredBytes = 0;
+      const totalFiles = prepared.images.length + 2;
+      const progress = () =>
+        report?.("upload", { transfer: { completedFiles, totalFiles, transferredBytes } });
+      const save = async (body: Blob, ref: ContentReference) => {
+        if (await this.saveBlob(body, ref, blobs)) transferredBytes += body.size;
+        completedFiles++;
+        progress();
+      };
+      progress();
+      await save(prepared.payload, payload);
+      for (const image of prepared.images) await save(image.body, image.reference);
       const manifest: SnapshotManifest = {
         protocol: 1,
         nodeId: crypto.randomUUID(),
@@ -297,8 +333,14 @@ export class DriveSync {
       if (body.size > MAX_MANIFEST_BYTES)
         throw new DriveError("limit", "Манифест снимка слишком большой.");
       const manifestHash = await sha256(body);
+      report?.("confirm");
       assertDriveInspectionUnchanged(before, await this.inspect());
+      progress();
       await this.store.create("snapshot", manifest.nodeId, manifestHash, body);
+      transferredBytes += body.size;
+      completedFiles++;
+      progress();
+      report?.("confirm");
       return { nodeId: manifest.nodeId, inspection: await this.inspect() };
     } finally {
       this.writing = false;
@@ -332,12 +374,13 @@ export class DriveSync {
     body: Blob,
     ref: ContentReference,
     files: Map<string, DriveFile[]>
-  ): Promise<void> {
+  ): Promise<boolean> {
     if (files.has(ref.sha256)) {
       await this.loadBlob(ref, files, Math.max(MAX_PAYLOAD_BYTES, MAX_IMAGE_BYTES));
-      return;
+      return false;
     }
     const file = await this.store.create("blob", ref.sha256, ref.sha256, body);
     files.set(ref.sha256, [file]);
+    return true;
   }
 }

@@ -4,6 +4,8 @@ import { useTerminal } from "./context.js";
 import { ChartEngineSelect } from "./ChartEngineSelect.js";
 import { ChartLayoutControl } from "./ChartLayoutControl.js";
 import type { ChartLayoutCount } from "./ChartLayoutControl.js";
+import type { TerminalController } from "./controller.js";
+import { TerminalFullscreenControl } from "./TerminalFullscreenControl.js";
 import { TerminalIndicatorControls } from "./TerminalIndicatorControls.js";
 import { TimeframeMenu } from "./intervals/TimeframeMenu.js";
 import { isNativeIntervalId } from "../../model/intervals/registry.js";
@@ -14,10 +16,12 @@ import {
 } from "../../model/intervals/favorites.js";
 export function Toolbar({
   chartCount = 1,
-  onChartCountChange
+  onChartCountChange,
+  accountController
 }: {
   chartCount?: ChartLayoutCount;
   onChartCountChange?: (value: ChartLayoutCount) => void;
+  accountController?: TerminalController;
 } = {}) {
   const { controller, state } = useTerminal(),
     p = state.preferences,
@@ -28,6 +32,8 @@ export function Toolbar({
       row?.providerRef?.provider === "okx"
         ? "OKX: интервал пока не поддерживается"
         : "Bybit: интервал пока не поддерживается";
+  const account = accountController ?? controller;
+  const accountState = account === controller ? state : account.getSnapshot();
   return (
     <header className="topbar">
       <a className="brand" href="./" aria-label="MTP TWILING" title="MTP TWILING">
@@ -43,7 +49,9 @@ export function Toolbar({
         id="symbol-button"
         aria-haspopup="dialog"
         aria-label={`${ticker} · ${searchLabel}`}
-        onClick={() => controller.setDialog(state.ready ? "instruments" : "account")}
+        onClick={() =>
+          state.ready ? controller.setDialog("instruments") : account.setDialog("account")
+        }
         title={searchLabel}
       >
         <span className="tiny-search" aria-hidden="true">
@@ -82,6 +90,7 @@ export function Toolbar({
       {onChartCountChange && (
         <ChartLayoutControl value={chartCount} onChange={onChartCountChange} />
       )}
+      <TerminalFullscreenControl />
       <div className="top-spacer" />
       <div id="install-actions" className="install-actions" hidden>
         <button type="button" id="install-app" className="install-button">
@@ -111,18 +120,18 @@ export function Toolbar({
         id="account-button"
         className="account-button"
         title={t("Аккаунт и настройки")}
-        onClick={() => controller.setDialog("account")}
+        onClick={() => account.setDialog("account")}
       >
         <span className="avatar">{t("Я")}</span>
         <i
-          className={`account-connection ${state.status}`}
+          className={`account-connection ${accountState.status}`}
           aria-label={
-            state.authenticated && state.status === "connected"
+            accountState.authenticated && accountState.status === "connected"
               ? t("Т-Банк подключён")
               : t("Т-Банк не подключён")
           }
         />
-        <span id="account-name">{state.name || t("Аккаунт и источники")}</span>
+        <span id="account-name">{accountState.name || t("Аккаунт и источники")}</span>
       </button>
     </header>
   );

@@ -20,6 +20,7 @@ function fixture() {
     react: {
       memo: (render) => render,
       useContext: () => controller,
+      useEffect: () => {},
       useRef: (current) => ({ current }),
       useState: (initial) => [initial, () => {}],
       useSyncExternalStore: (subscribe, getSnapshot) =>

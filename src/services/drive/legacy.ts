@@ -3,9 +3,11 @@ import type { Backup } from "../../model/types.js";
 import type { DriveAuthorization, DriveInspection } from "./types.js";
 import type { DriveBridge, DriveChoice, DriveStatus } from "./coordinator-types.js";
 import { summarize } from "./coordinator-types.js";
+import type { DriveReport } from "./progress.js";
+
 interface Reader {
   inspect(): Promise<DriveInspection>;
-  download(id: string): Promise<Backup>;
+  download(id: string, expectedInspection?: DriveInspection, report?: DriveReport): Promise<Backup>;
 }
 interface Context {
   epoch: number;
@@ -18,7 +20,8 @@ interface Operations {
   valid(context: Context): boolean;
   reader(authorization: DriveAuthorization): Reader | undefined;
   busy(): boolean;
-  setBusy(value: boolean): void;
+  setBusy(value: boolean, context: Context): void;
+  reporter(context: Context): DriveReport;
   applying(context: Context | null): void;
   update(patch: Partial<DriveStatus>): void;
   dirty(): void;
@@ -62,7 +65,7 @@ export class LegacyDriveMigration {
     const context = this.operations.capture(),
       reader = context && this.operations.reader(context.authorization);
     if (!context || !reader) throw new DriveError("auth-required", "Подключите Google Диск.");
-    this.operations.setBusy(true);
+    this.operations.setBusy(true, context);
     try {
       const modern = await context.remote.inspect();
       this.check(context);
@@ -76,14 +79,14 @@ export class LegacyDriveMigration {
       if (legacy.heads.length > 8) throw new DriveError("limit", "Слишком много legacy снимков.");
       const choices: DriveChoice[] = [];
       for (const nodeId of legacy.heads) {
-        const backup = await reader.download(nodeId);
+        const backup = await reader.download(nodeId, undefined, this.operations.reporter(context));
         this.check(context);
         choices.push({ ...summarize(backup), nodeId });
       }
       this.preview = { context, heads: legacy.heads, choices };
       return choices;
     } finally {
-      this.operations.setBusy(false);
+      this.operations.setBusy(false, context);
     }
   }
   async choose(nodeId: string): Promise<void> {
@@ -92,7 +95,7 @@ export class LegacyDriveMigration {
     this.check(preview.context);
     const reader = this.operations.reader(preview.context.authorization);
     if (!reader) return;
-    this.operations.setBusy(true);
+    this.operations.setBusy(true, preview.context);
     try {
       const modern = await preview.context.remote.inspect();
       this.check(preview.context);
@@ -105,12 +108,14 @@ export class LegacyDriveMigration {
       if (nodeId !== "local" && !preview.heads.includes(nodeId))
         throw new DriveError("remote-invalid", "Неизвестный снимок.");
       if (nodeId !== "local") {
-        const incoming = await reader.download(nodeId);
+        const report = this.operations.reporter(preview.context);
+        const incoming = await reader.download(nodeId, undefined, report);
         this.check(preview.context);
         if (!incoming.layout || !incoming.watchlist || !incoming.views)
           throw new DriveError("remote-invalid", "Неполный legacy снимок.");
         this.operations.applying(preview.context);
         try {
+          report("apply");
           await this.bridge.importBackup(
             { ...incoming, schemaVersion: 2 },
             {
@@ -129,7 +134,7 @@ export class LegacyDriveMigration {
       this.operations.update({ legacyAvailable: false, phase: "idle", conflict: undefined });
       this.operations.dirty();
     } finally {
-      this.operations.setBusy(false);
+      this.operations.setBusy(false, preview.context);
     }
   }
 }

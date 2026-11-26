@@ -1,18 +1,17 @@
-import { driveBackupDigest, sanitizeDriveBackup } from "./backup.js";
 import { DriveError, type DriveAuthorization, type DriveInspection } from "./types.js";
 import type { Backup } from "../../model/types.js";
 import {
-  readDriveHeads,
   readableDriveConflict,
   unreadableDrivePause,
-  needsDriveConflict,
   restoreReadableDriveProfile,
   restoredDriveStatus,
   initialDriveStatus
 } from "./coordinator-reader.js";
-import { assertDriveInspectionUnchanged } from "./reader-guard.js";
 import { finishDriveChoice, resolveDriveChoice } from "./coordinator-choice.js";
+import { synchronizeDrive } from "./coordinator-sync-action.js";
 import { driveAvailable, driveFailure, prepareDriveIdentity } from "./coordinator-status.js";
+import { advanceDriveProgress, beginDriveProgress, finishDriveProgress } from "./progress.js";
+import type { DriveReport } from "./progress.js";
 import { LegacyDriveMigration } from "./legacy.js";
 import { acceptDriveRecord } from "./accept.js";
 import { applyDriveBackup } from "./apply.js";
@@ -24,8 +23,6 @@ import type {
   DriveRecord,
   DriveStatus
 } from "./coordinator-types.js";
-const same = (left: string[], right: string[]) =>
-  [...left].sort().join() === [...right].sort().join();
 const cancelled = () => new DOMException("Синхронизация прервана", "AbortError");
 export class DriveCoordinator {
   readonly legacy: LegacyDriveMigration;
@@ -62,12 +59,15 @@ export class DriveCoordinator {
       valid: (context) => this.current(context.epoch) && context.revision === this.revision,
       reader: (authorization) => dependencies.legacySync?.(authorization),
       busy: () => this.busy,
-      setBusy: (value) => {
+      setBusy: (value, context) => {
+        if (context.epoch !== this.epoch) return;
         this.busy = value;
         this.update({
-          phase: value ? "syncing" : this.status.legacyAvailable ? "conflict" : "idle"
+          phase: value ? "syncing" : this.status.legacyAvailable ? "conflict" : "idle",
+          ...(value && { progress: beginDriveProgress("read-versions") })
         });
       },
+      reporter: (context) => this.reporter(context.epoch),
       applying: (context) => {
         this.applyingEpoch = context?.epoch;
       },
@@ -81,8 +81,20 @@ export class DriveCoordinator {
     return () => this.listeners.delete(listener);
   };
   private update(patch: Partial<DriveStatus>): void {
+    const progress = this.status.progress;
+    if (patch.phase === "syncing" && !progress)
+      patch = { progress: beginDriveProgress(), ...patch };
+    if (patch.phase && patch.phase !== "syncing" && progress)
+      patch = { lastOperation: finishDriveProgress(progress), ...patch, progress: undefined };
     this.status = { ...this.status, ...patch };
     this.listeners.forEach((listener) => listener());
+  }
+  private reporter(epoch: number): DriveReport {
+    return (stage, details) => {
+      const { phase, progress } = this.status;
+      if (epoch === this.epoch && phase === "syncing" && progress)
+        this.update({ progress: advanceDriveProgress(progress, stage, details) });
+    };
   }
   profileChanged(): void {
     const profile = this.bridge.profile();
@@ -257,7 +269,8 @@ export class DriveCoordinator {
       authorizationStored: false,
       credentialSaveError: false,
       pauseReason: undefined,
-      legacyAvailable: false
+      legacyAvailable: false,
+      lastOperation: undefined
     });
   };
   disconnect = (): void => {
@@ -318,6 +331,7 @@ export class DriveCoordinator {
     clearTimeout(this.debounce);
     const epoch = this.epoch,
       remote = this.remote,
+      record = this.record,
       revision = this.revision;
     this.busy = true;
     this.preview = undefined;
@@ -329,38 +343,19 @@ export class DriveCoordinator {
         this.status.choiceAction?.state === "confirmed" ? this.status.choiceAction : undefined
     });
     try {
-      const backup = sanitizeDriveBackup(await this.bridge.exportBackup());
-      this.check(epoch, revision);
-      const digest = await driveBackupDigest(backup),
-        inspection = await remote.inspect();
-      this.check(epoch, revision);
-      if (await this.legacy.detect(inspection)) return;
-      await readDriveHeads(remote, inspection, () => this.check(epoch, revision));
-      if (needsDriveConflict(inspection, this.record, digest)) {
-        await this.conflict(inspection, backup, digest, epoch, revision);
-        return;
-      }
-      if (!same(inspection.heads, this.record.baseHeads) && inspection.heads[0]) {
-        const incoming = await remote.download(inspection.heads[0], inspection);
-        this.check(epoch, revision);
-        assertDriveInspectionUnchanged(inspection, await remote.inspect());
-        this.check(epoch, revision);
-        await this.apply(incoming, inspection.heads, epoch, revision);
-        return;
-      }
-      if (!inspection.heads.length || digest !== this.record.lastSyncedDigest) {
-        const result = await remote.publish(backup, {
-          deviceId: this.record.deviceId,
-          parents: inspection.heads,
-          expectedInspection: inspection
-        });
-        this.check(epoch);
-        if (result.inspection.conflict) {
-          await this.conflict(result.inspection, backup, digest, epoch, revision);
-          return;
-        }
-        await this.accept([result.nodeId], digest, epoch, revision);
-      } else await this.accept(inspection.heads, digest, epoch, revision);
+      await synchronizeDrive({
+        exportBackup: () => this.bridge.exportBackup(),
+        remote,
+        record,
+        report: this.reporter(epoch),
+        check: () => this.check(epoch, revision),
+        checkSession: () => this.check(epoch),
+        detectLegacy: (inspection) => this.legacy.detect(inspection),
+        conflict: (inspection, backup, digest) =>
+          this.conflict(inspection, backup, digest, epoch, revision),
+        apply: (backup, heads) => this.apply(backup, heads, epoch, revision),
+        accept: (heads, digest) => this.accept(heads, digest, epoch, revision)
+      });
     } catch (error) {
       if (this.current(epoch)) {
         if (error instanceof DriveError && error.code === "conflict") {
@@ -383,6 +378,7 @@ export class DriveCoordinator {
     revision: number,
     choiceAction?: DriveChoiceAction
   ): Promise<void> {
+    this.reporter(epoch)("check-versions");
     const next = await readableDriveConflict(
       this.remote!,
       inspection,
@@ -427,6 +423,7 @@ export class DriveCoordinator {
         deviceId: record.deviceId,
         revision,
         exportBackup: () => this.bridge.exportBackup(),
+        report: this.reporter(epoch),
         check: () => this.check(epoch, revision)
       });
       if (result.kind === "review") {
@@ -458,6 +455,7 @@ export class DriveCoordinator {
     epoch: number,
     revision: number
   ): Promise<void> {
+    this.reporter(epoch)("apply");
     const signal = this.authorization?.signal;
     if (!signal) throw cancelled();
     const digest = await applyDriveBackup(backup, this.bridge, signal, {
@@ -476,6 +474,7 @@ export class DriveCoordinator {
     epoch: number,
     revision: number
   ): Promise<void> {
+    this.reporter(epoch)("save-status");
     if (!this.record) throw cancelled();
     const lastSyncedAt = await acceptDriveRecord(this.record, heads, digest, revision, {
       check: () => this.check(epoch),

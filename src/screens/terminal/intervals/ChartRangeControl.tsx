@@ -12,14 +12,15 @@ const RANGE_OPTIONS = [
   [3650, "3650 дней"]
 ] as const;
 /** History lookback is independent of candle interval and camera zoom. */
-export function ChartRangeControl() {
+export function ChartRangeControl({ slot = 1 }: { slot?: number } = {}) {
   const { controller, state } = useTerminal();
   const days = state.preferences.rangeDays;
+  const id = slot === 1 ? "range" : `range-${slot}`;
   return (
     <div className="chart-range-control">
-      <label htmlFor="range">{t("История")}</label>
+      <label htmlFor={id}>{t("История")}</label>
       <select
-        id="range"
+        id={id}
         aria-label={t("Период истории")}
         value={days}
         disabled={
@@ -52,8 +53,12 @@ export function ChartRangeControl() {
           </option>
         ))}
       </select>
-      <span className="chart-range-note">{t("Глубина загрузки")}</span>
-      <ClockZoneControl />
+      {slot === 1 && (
+        <>
+          <span className="chart-range-note">{t("Глубина загрузки")}</span>
+          <ClockZoneControl />
+        </>
+      )}
     </div>
   );
 }

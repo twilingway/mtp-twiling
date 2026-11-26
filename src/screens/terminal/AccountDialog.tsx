@@ -1,123 +1,11 @@
 import { t, systemText } from "../../i18n/messages.js";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useTerminal } from "./context.js";
 import { Modal } from "./Modal.js";
 import { ApplicationInfo } from "./ApplicationInfo.js";
 import { GoogleDriveSettings } from "./GoogleDriveSettings.js";
 import { StoragePanel } from "./StoragePanel.js";
-import { LegacyGuestRecovery } from "./LegacyGuestRecovery.js";
-function TransferSettings({ active }: { active: boolean }) {
-  const { controller, state } = useTerminal(),
-    [history, setHistory] = useState(false),
-    [busy, setBusy] = useState(false),
-    input = useRef<HTMLInputElement>(null);
-  return (
-    <section className="transfer-settings">
-      <h3>{t("Перенос между устройствами")}</h3>
-      <p>
-        {t(
-          "Формат 2: обновите приложение на другом устройстве. Старые данные и синхронизация формата 1 сохраняются отдельно."
-        )}
-      </p>
-      {state.pendingPublicSource && (
-        <div role="status">
-          <p>
-            {t(
-              "В другом локальном профиле сохранены публичные инструменты. Существующую разметку этого профиля заменять не будем."
-            )}
-          </p>
-          <button
-            type="button"
-            disabled={busy || state.profileTransition}
-            onClick={() => {
-              void controller
-                .mergePublicProfile()
-                .catch((error: unknown) =>
-                  controller.notify(error instanceof Error ? error.message : "Перенос недоступен")
-                );
-            }}
-          >
-            {t("Добавить недостающие публичные данные")}
-          </button>
-        </div>
-      )}
-      <p>
-        {t(
-          "Индикаторы, вид графиков, список инструментов, линии и изображения. API-ключ не включается."
-        )}
-      </p>
-      <label className="checkbox-label">
-        <input
-          id="export-history"
-          type="checkbox"
-          checked={history}
-          onChange={(e) => setHistory(e.target.checked)}
-        />
-        {t("Также включить историю свечей")}
-      </label>
-      <div>
-        <button
-          type="button"
-          id="export-settings"
-          disabled={busy || state.backupBusy || !state.marketReady}
-          onClick={() => {
-            setBusy(true);
-            void controller
-              .exportBackup(history)
-              .then((backup) => {
-                const url = URL.createObjectURL(
-                    new Blob([JSON.stringify(backup)], { type: "application/json" })
-                  ),
-                  link = document.createElement("a");
-                link.href = url;
-                link.download = `mtp-${new Date().toISOString().slice(0, 10)}.json`;
-                link.click();
-                setTimeout(() => URL.revokeObjectURL(url), 60000);
-              })
-              .catch((error: unknown) =>
-                controller.notify(error instanceof Error ? error.message : t("Экспорт недоступен"))
-              )
-              .finally(() => setBusy(false));
-          }}
-        >
-          {t("Экспорт")}
-        </button>
-        <button
-          type="button"
-          id="import-settings"
-          disabled={busy || state.backupBusy || !state.marketReady}
-          onClick={() => input.current?.click()}
-        >
-          {t("Импорт")}
-        </button>
-      </div>
-      <input
-        type="file"
-        ref={input}
-        id="settings-file"
-        accept="application/json,.json"
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (!file) return;
-          if (file.size > 256 * 1024 * 1024) {
-            controller.notify(t("Для импорта допустим файл до 256 МБ."));
-            return;
-          }
-          setBusy(true);
-          void controller
-            .importBackupFile(file)
-            .catch((error: unknown) =>
-              controller.notify(error instanceof Error ? error.message : t("Импорт недоступен"))
-            )
-            .finally(() => setBusy(false));
-        }}
-      />
-      <LegacyGuestRecovery active={active} includeHistory={history} />
-    </section>
-  );
-}
+import { BackupTransferSettings } from "./BackupTransferSettings.js";
 export function AccountDialog() {
   const { controller, state } = useTerminal(),
     [name, setName] = useState(state.name),
@@ -302,7 +190,7 @@ export function AccountDialog() {
         id="account-section-transfer"
         hidden={section !== "transfer"}
       >
-        <TransferSettings active={section === "transfer"} />
+        <BackupTransferSettings active={section === "transfer"} />
       </div>
       <div className="account-help-links">
         <button type="button" id="open-welcome" onClick={() => controller.setDialog("welcome")}>

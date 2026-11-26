@@ -28,7 +28,15 @@ import { marketBreadthCoverage } from "../../model/technical-indicators/catalog-
 const Version = memo(function Version() {
   return <span id="app-version" hidden />;
 });
-export function ChartPanel() {
+export function ChartPanel({
+  slot = 1,
+  active = true,
+  activate
+}: {
+  slot?: number;
+  active?: boolean;
+  activate?: () => void;
+} = {}) {
   const [scrollTop, setScrollTop] = useState(0);
   const drawingProjection = useMemo(() => new EventTarget(), []);
   const { controller, state } = useTerminal(),
@@ -96,19 +104,42 @@ export function ChartPanel() {
   };
   return (
     <section
-      id="chart-panel"
+      id={slot === 1 ? "chart-panel" : `chart-panel-${slot}`}
       className="chart-panel"
-      aria-label={t("График инструмента")}
+      aria-label={slot === 1 ? t("График инструмента") : `${t("График инструмента")} ${slot}`}
       aria-busy={busy}
       data-history-loading={busy || undefined}
+      data-chart-slot={slot === 1 ? slot : undefined}
+      data-chart-active={slot === 1 ? active : undefined}
+      onPointerDownCapture={activate}
+      onFocusCapture={activate}
+      onContextMenuCapture={activate}
     >
       <div
         className="chart-heading"
         style={{ maxHeight: headingHeight, visibility: headingHeight === 0 ? "hidden" : undefined }}
       >
         <div className="instrument-title">
-          {row && <InstrumentIcon key={row.uid ?? row.symbol} row={row} id="chart-icon" />}
-          <h1 id="instrument-name">{row?.name ?? (p.symbol || t("Выберите инструмент"))}</h1>
+          <button
+            type="button"
+            className="chart-instrument-button"
+            aria-haspopup="dialog"
+            aria-label={`${t("Инструмент графика")} ${slot} · ${row?.ticker ?? t("Найти инструмент")}`}
+            onClick={() =>
+              controller.setDialog(slot === 1 && !state.ready ? "account" : "instruments")
+            }
+          >
+            {row && (
+              <InstrumentIcon
+                key={row.uid ?? row.symbol}
+                row={row}
+                {...(slot === 1 ? { id: "chart-icon" } : {})}
+              />
+            )}
+            <span id={slot === 1 ? "instrument-name" : undefined}>
+              {row?.name ?? (p.symbol || t("Выберите инструмент"))}
+            </span>
+          </button>
           <span
             className="market-tag"
             title={
@@ -129,7 +160,7 @@ export function ChartPanel() {
                 ? `${providerLabel(row.providerRef)} · ${row.productKind === "spot" ? "Spot" : "USDT perpetual"}`
                 : "MOEX"}
           </span>
-          <span id="chart-period">{t(PERIOD_LABELS[p.timeframe])}</span>
+          <span id={slot === 1 ? "chart-period" : undefined}>{t(PERIOD_LABELS[p.timeframe])}</span>
           <SelectedDrawingLock />
         </div>
         <OhlcLegend
@@ -139,23 +170,27 @@ export function ChartPanel() {
           settings={p.chartSettings}
         />
         <div className="chart-price">
-          <strong id="chart-price">{number(row?.price, digits)}</strong>
-          <span id="chart-change" className={signClass(row?.change)}>
+          <strong id={slot === 1 ? "chart-price" : undefined}>{number(row?.price, digits)}</strong>
+          <span id={slot === 1 ? "chart-change" : undefined} className={signClass(row?.change)}>
             {available
               ? `${number(row?.change, digits, true)} (${number(row?.changePercent, 2, true)}%)${row?.comparisonBasis === "rolling-24h" ? ` · ${t("24ч")}` : ""}`
               : t("Выберите источник котировок")}
           </span>
         </div>
         <SupplementalStudyStatusContext.Provider value={studyStatus}>
-          <IndicatorLegend />
+          <IndicatorLegend slot={slot} />
         </SupplementalStudyStatusContext.Provider>
       </div>
       <div
         className="chart-scroll-host"
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       >
-        <ChartGestures>
-          <ChartCanvas supplemental={supplemental} drawingProjection={drawingProjection} />
+        <ChartGestures drawingProjection={drawingProjection}>
+          <ChartCanvas
+            slot={slot}
+            supplemental={supplemental}
+            drawingProjection={drawingProjection}
+          />
           <CalendarAnalysisTables
             tables={extra.calendar.tables}
             refresh={extra.calendar.refresh}
@@ -163,78 +198,90 @@ export function ChartPanel() {
           />
           <ImageLayer />
           <DrawingAxisLabels drawingProjection={drawingProjection} />
-          <CandleCountdown />
+          {slot === 1 && <CandleCountdown />}
           <SupplementalStudyStatusContext.Provider value={studyStatus}>
             <TechnicalIndicatorPanels metrics={metrics} />
           </SupplementalStudyStatusContext.Provider>
-          {(!available ||
-            ((!state.candles.length || state.historyViewReady === false) && !state.loading)) && (
-            <div className="chart-message" id="chart-message">
-              <span className="message-icon">⌃</span>
-              <h2>
-                {!available
-                  ? t("Ваш рынок. Ваш график.")
-                  : !state.rows.length
-                    ? t("Добавьте инструмент")
-                    : state.historyViewReady === false
-                      ? t("Не удалось восстановить окно графика")
-                      : t("История недоступна")}
-              </h2>
-              <p>
-                {!available
-                  ? t(
-                      "Bybit и OKX доступны без ключа. Для российских инструментов подключите Т‑Банк."
-                    )
-                  : !state.rows.length
-                    ? t("Нажмите + в списке котировок, чтобы открыть график.")
-                    : systemText(state.historyHelp)}
-              </p>
-              {!available && (
-                <button
-                  id="connect-chart"
-                  className="primary-button"
-                  onClick={() => controller.setDialog("account")}
-                >
-                  {t("Подключить API")}
-                </button>
-              )}
-              {available && !state.rows.length && (
-                <button
-                  className="primary-button"
-                  onClick={() => controller.setDialog("instruments")}
-                >
-                  {t("Добавить инструмент")}
-                </button>
-              )}
-              {available && state.rows.length > 0 && (
-                <button
-                  className="primary-button"
-                  onClick={() => {
-                    void (
-                      state.importRecoveryRequired
-                        ? controller.recoverBackup()
-                        : controller.loadHistory()
-                    ).catch((error: unknown) =>
-                      controller.notify(
-                        error instanceof Error
-                          ? error.message
-                          : t("Не удалось восстановить график.")
-                      )
-                    );
-                  }}
-                >
-                  {state.importRecoveryRequired
-                    ? t("Повторить восстановление")
-                    : t("Повторить загрузку")}
-                </button>
-              )}
+          {slot > 1 && !row && (
+            <div className="auxiliary-chart-empty chart-message">
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => controller.setDialog("instruments")}
+              >
+                {t("Выберите инструмент")}
+              </button>
             </div>
           )}
+          {(slot === 1 || row) &&
+            (!available ||
+              ((!state.candles.length || state.historyViewReady === false) && !state.loading)) && (
+              <div className="chart-message" id={slot === 1 ? "chart-message" : undefined}>
+                <span className="message-icon">⌃</span>
+                <h2>
+                  {!available
+                    ? t("Ваш рынок. Ваш график.")
+                    : !state.rows.length
+                      ? t("Добавьте инструмент")
+                      : state.historyViewReady === false
+                        ? t("Не удалось восстановить окно графика")
+                        : t("История недоступна")}
+                </h2>
+                <p>
+                  {!available
+                    ? t(
+                        "Bybit и OKX доступны без ключа. Для российских инструментов подключите Т‑Банк."
+                      )
+                    : !state.rows.length
+                      ? t("Нажмите + в списке котировок, чтобы открыть график.")
+                      : systemText(state.historyHelp)}
+                </p>
+                {!available && slot === 1 && (
+                  <button
+                    id="connect-chart"
+                    className="primary-button"
+                    onClick={() => controller.setDialog("account")}
+                  >
+                    {t("Подключить API")}
+                  </button>
+                )}
+                {available && !state.rows.length && (
+                  <button
+                    className="primary-button"
+                    onClick={() => controller.setDialog("instruments")}
+                  >
+                    {t("Добавить инструмент")}
+                  </button>
+                )}
+                {available && state.rows.length > 0 && (
+                  <button
+                    className="primary-button"
+                    onClick={() => {
+                      void (
+                        state.importRecoveryRequired
+                          ? controller.recoverBackup()
+                          : controller.loadHistory()
+                      ).catch((error: unknown) =>
+                        controller.notify(
+                          error instanceof Error
+                            ? error.message
+                            : t("Не удалось восстановить график.")
+                        )
+                      );
+                    }}
+                  >
+                    {state.importRecoveryRequired
+                      ? t("Повторить восстановление")
+                      : t("Повторить загрузку")}
+                  </button>
+                )}
+              </div>
+            )}
         </ChartGestures>
       </div>
-      <ChartNavigation />
-      <ChartRangeControl />
-      <Version />
+      {slot === 1 && <ChartNavigation />}
+      <ChartRangeControl slot={slot} />
+      {slot === 1 && <Version />}
     </section>
   );
 }
