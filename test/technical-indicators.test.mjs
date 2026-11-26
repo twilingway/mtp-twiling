@@ -194,7 +194,7 @@ test("Stochastic extrema count bar positions, ignoring missing extrema without s
 
 test("all definitions are immutable serializable data; independent instances and styles round-trip with exact output keys", () => {
   const json = JSON.stringify(core.technicalIndicatorDefinitions);
-  assert.equal(JSON.parse(json).length, 45);
+  assert.equal(JSON.parse(json).length, 47);
   assert.ok(
     core.technicalIndicatorDefinitions.every(
       (definition) => definition.status === "computed" && definition.references.length
@@ -224,8 +224,11 @@ test("all definitions are immutable serializable data; independent instances and
       historicalVolatilityPeriodsPerYear: 365
     });
     assert.deepEqual(
-      Object.keys(result.series),
-      definition.outputs.map((output) => output.id)
+      Object.keys(result.series).sort(),
+      [
+        ...definition.outputs.map((output) => output.id),
+        ...(definition.presentation?.hiddenSeries ?? [])
+      ].sort()
     );
     assert.deepEqual(
       result.timestamps,

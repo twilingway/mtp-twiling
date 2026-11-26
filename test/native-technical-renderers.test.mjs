@@ -59,7 +59,24 @@ function assertValues(f, instances, data = bars, layout = []) {
       );
     }
   } else {
-    const actual = f.activeIndicators().filter((item) => item.name.startsWith("PERSONAL_TA_"));
+    const active = f.activeIndicators(),
+      companions = active.filter((item) => item.name.startsWith("PERSONAL_TA_FILL_")),
+      actual = active.filter(
+        (item) => item.name.startsWith("PERSONAL_TA_") && !item.name.startsWith("PERSONAL_TA_FILL_")
+      );
+    const { getTechnicalIndicatorDefinition } = api(f);
+    assert.equal(
+      companions.length,
+      instances.filter(
+        (item) =>
+          item.visible &&
+          getTechnicalIndicatorDefinition(item.definitionId).presentation?.fills.length
+      ).length
+    );
+    for (const companion of companions) {
+      assert.deepEqual(companion.figures, []);
+      assert.deepEqual(companion.result, []);
+    }
     assert.equal(actual.length, new Set(expected.map((item) => item.instanceId)).size);
     for (const instance of instances.filter((item) => item.visible)) {
       const values = expected.filter((item) => item.instanceId === instance.id);
@@ -174,14 +191,14 @@ for (const engine of ["lightweight", "kline"]) {
     f.adapter.destroy();
   });
 
-  test(`${engine}: actual adapter renders all 45 common formulas, warmup and real timestamps`, () => {
+  test(`${engine}: actual adapter renders all 47 common formulas, warmup and real timestamps`, () => {
     const f = nativeFixture(engine),
       { createTechnicalIndicatorInstance: create, technicalIndicatorDefinitions: definitions } =
         api(f);
     const instances = definitions.map((definition, i) =>
       create(definition.id, `instance-${i}`, { order: i })
     );
-    assert.equal(instances.length, 45);
+    assert.equal(instances.length, 47);
     f.adapter.setData(bars);
     const writes = f.primaryWrites(),
       camera = f.camera();
