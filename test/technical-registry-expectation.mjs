@@ -58,7 +58,7 @@ export const EXPECTED_PRE_EXPANSION_IDS = Object.freeze([
   "relative-volatility-index",
   "bull-bear-power"
 ]);
-// Open Interest and both Fibonacci studies enter this snapshot only with their runtime wiring.
+// A catalog addition enters this snapshot with its runtime wiring.
 export const EXPECTED_EXPANSION_IDS = Object.freeze([
   "vwap",
   "vwap-auto-anchored",
@@ -66,6 +66,9 @@ export const EXPECTED_EXPANSION_IDS = Object.freeze([
   "visible-average-price",
   "ichimoku-cloud",
   "williams-alligator",
+  "auto-key-levels",
+  "auto-pitchfork",
+  "auto-trendlines",
   "kama",
   "mcginley-dynamic",
   "moving-average-cross",
@@ -80,15 +83,25 @@ export const EXPECTED_EXPANSION_IDS = Object.freeze([
   "woodies-cci",
   "rsi-divergence",
   "booker-reversal",
+  "booker-intraday-pivots",
+  "booker-missed-pivots",
+  "booker-ziv-ghost-pivots",
+  "performance",
+  "seasonality",
+  "correlation-coefficient",
   "advance-decline-ratio-bars",
   "technical-ratings",
   "open-interest",
+  "knoxville-divergence",
   "williams-fractals",
   "zigzag",
   "pivot-points-high-low",
   "average-daily-range",
   "auto-fib-retracement",
   "auto-fib-extension",
+  "advance-decline-line",
+  "advance-decline-ratio",
+  "cumulative-volume-index",
   "pmo",
   "ppo",
   "smi",
@@ -96,6 +109,10 @@ export const EXPECTED_EXPANSION_IDS = Object.freeze([
   "smi-ergodic-oscillator",
   "connors-rsi",
   "dpo",
+  "net-volume",
+  "pivot-points-standard",
+  "multi-time-period-charts",
+  "price-target",
   "gaps",
   "trading-sessions",
   "moon-phases",
@@ -109,7 +126,10 @@ export const EXPECTED_EXPANSION_IDS = Object.freeze([
   "rci-ribbon",
   "klinger-oscillator",
   "relative-volume-at-time",
-  "volume-24-hours"
+  "volume-24-hours",
+  "volume-delta",
+  "cumulative-volume-delta",
+  "up-down-volume"
 ]);
 export const EXPECTED_COMPUTED_IDS = Object.freeze([
   ...EXPECTED_PRE_EXPANSION_IDS,
@@ -129,6 +149,9 @@ export const EXPECTED_DRIVE_PARAMETER_KEYS = Object.freeze([
     " "
   ),
   ..."depth deviation reverse extend showPrices showLevels levelFormat labelSide level0 level1 level2 level3 level4 level5 level6 level7 level8 level9 level10".split(
+    " "
+  ),
+  ..."previousDay currentDay previousWeek currentWeek previousMonth currentMonth custom showOpen showHigh showLow showClose showPoc showVal showVah customLength levelsStart variant innerRatio outerRatio extendLeft transparency size barsToBreakout extendRight showPivots periodsBack showHour showFourHours showEightHours showDay showWeek showMonth includeChartSymbol comparisonSymbols comparisonPeriods intensityCutoff tablePosition startYear ignoredMonths showAverages showDeviation showPercentPositive showProjections comparisonUid momentumLength method timeframe useDailyBased showLabels autoTimeframe calculation heikinAshi".split(
     " "
   )
 ]);

@@ -9,7 +9,7 @@ export function CorrelationInstrumentSelect({
   onChange
 }: {
   value: string;
-  onChange(uid: string): void;
+  onChange: (uid: string) => void;
 }) {
   const { state } = useTerminal();
   const primary = selectedMarketRow(state.rows, state.preferences)?.uid;

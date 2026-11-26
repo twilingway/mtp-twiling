@@ -8,7 +8,9 @@ import { bookerPivotStudies } from "./booker-pivots.js";
 import { calendarAnalysisStudies } from "./calendar-analysis.js";
 import { correlationStudies } from "./correlation.js";
 import { externalStudies } from "./external.js";
+import { knoxvilleStudies } from "./knoxville.js";
 import { levelStudies } from "./levels.js";
+import { marketBreadthStudies } from "./market-breadth.js";
 import { momentumStudies } from "./momentum.js";
 import { netVolumeStudy } from "./net-volume.js";
 import { periodStudies } from "./period-studies.js";
@@ -36,7 +38,9 @@ export const catalogExpansionStudies = [
   ...calendarAnalysisStudies,
   ...correlationStudies,
   ...externalStudies,
+  ...knoxvilleStudies,
   ...levelStudies,
+  ...marketBreadthStudies,
   ...momentumStudies,
   netVolumeStudy,
   ...periodStudies,

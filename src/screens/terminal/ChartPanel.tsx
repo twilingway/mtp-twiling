@@ -11,6 +11,7 @@ import { InstrumentIcon } from "./Watchlist.js";
 import { ChartCanvas, ChartGestures } from "./ChartSurface.js";
 import { ImageLayer } from "./ImageLayer.js";
 import { DrawingAxisLabels } from "./DrawingAxisLabels.js";
+import { SelectedDrawingLock } from "./SelectedDrawingLock.js";
 import { CandleCountdown } from "./CandleCountdown.js";
 import { IndicatorLegend } from "./IndicatorLegend.js";
 import { OhlcLegend } from "./OhlcLegend.js";
@@ -23,11 +24,13 @@ import { useOpenInterest } from "./use-open-interest.js";
 import { useQuoteTurnover } from "./use-quote-turnover.js";
 import { CalendarAnalysisTables } from "./CalendarAnalysisTables.js";
 import { useExtraStudyData } from "./use-extra-study-data.js";
+import { marketBreadthCoverage } from "../../model/technical-indicators/catalog-expansion/market-breadth.js";
 const Version = memo(function Version() {
   return <span id="app-version" hidden />;
 });
 export function ChartPanel() {
   const [scrollTop, setScrollTop] = useState(0);
+  const drawingProjection = useMemo(() => new EventTarget(), []);
   const { controller, state } = useTerminal(),
     metrics = useTechnicalPaneMetrics(controller),
     price = metrics.find((metric) => metric.key === "price"),
@@ -57,13 +60,39 @@ export function ChartPanel() {
     }),
     [observations, volumeStudies, additional]
   );
+  const breadthInput = additional.marketBreadth;
+  const coverage = useMemo(
+    () =>
+      p.timeframe === "1d" && breadthInput
+        ? marketBreadthCoverage(state.candles, breadthInput)
+        : undefined,
+    [breadthInput, p.timeframe, state.candles]
+  );
+  const breadthStatus = (metric: keyof NonNullable<typeof coverage>) =>
+    ({
+      status:
+        p.timeframe !== "1d"
+          ? "unsupported"
+          : !breadthInput
+            ? "needs-file"
+            : coverage?.[metric]
+              ? "ready"
+              : "empty",
+      ...(breadthInput && { currency: breadthInput.marketId })
+    }) as const;
   const studyStatus = {
     openInterest,
     quoteTurnover,
     priceTarget: extra.priceTarget,
     intrabarVolume: extra.intrabarVolume,
     netVolume: extra.netVolume,
-    priceLevel: extra.priceLevel
+    priceLevel: extra.priceLevel,
+    correlation: extra.correlation,
+    marketBreadth: {
+      line: breadthStatus("line"),
+      ratio: breadthStatus("ratio"),
+      cvi: breadthStatus("cvi")
+    }
   };
   return (
     <section
@@ -101,6 +130,7 @@ export function ChartPanel() {
                 : "MOEX"}
           </span>
           <span id="chart-period">{t(PERIOD_LABELS[p.timeframe])}</span>
+          <SelectedDrawingLock />
         </div>
         <OhlcLegend
           bar={bar}
@@ -125,14 +155,14 @@ export function ChartPanel() {
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       >
         <ChartGestures>
-          <ChartCanvas supplemental={supplemental} />
+          <ChartCanvas supplemental={supplemental} drawingProjection={drawingProjection} />
           <CalendarAnalysisTables
             tables={extra.calendar.tables}
             refresh={extra.calendar.refresh}
             {...(p.locale ? { locale: p.locale } : {})}
           />
           <ImageLayer />
-          <DrawingAxisLabels />
+          <DrawingAxisLabels drawingProjection={drawingProjection} />
           <CandleCountdown />
           <SupplementalStudyStatusContext.Provider value={studyStatus}>
             <TechnicalIndicatorPanels metrics={metrics} />

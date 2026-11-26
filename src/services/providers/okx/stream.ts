@@ -26,7 +26,7 @@ export interface OkxStreamOptions {
 
 export interface OkxSubscriptions {
   tickers: readonly OkxProviderRef[];
-  candle: { ref: OkxProviderRef; timeframe: string } | null;
+  candles: readonly { ref: OkxProviderRef; timeframe: string }[];
 }
 
 const channelLimits = {
@@ -306,9 +306,10 @@ export class OkxStream {
       if (tickers.size > 1_000) throw new Error("Too many OKX ticker subscriptions");
     }
     const candles = new Map<string, OkxTopic>();
-    if (subscriptions.candle) {
-      const topic = topicFor(subscriptions.candle.ref, subscriptions.candle.timeframe);
+    for (const { ref, timeframe } of subscriptions.candles) {
+      const topic = topicFor(ref, timeframe);
       candles.set(okxTopicKey(topic.channel, topic.instId), topic);
+      if (candles.size > 1_000) throw new Error("Too many OKX candle subscriptions");
     }
     this.tickers.setTopics(tickers);
     if (!this.disposed) this.candles.setTopics(candles);

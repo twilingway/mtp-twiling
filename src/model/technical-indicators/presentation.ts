@@ -60,7 +60,8 @@ export function compilePresentation(
   assert(
     precisionPolicy === "legacy-fixed-6" ||
       precisionPolicy === "native-price" ||
-      precisionPolicy === "fixed-2",
+      precisionPolicy === "fixed-2" ||
+      precisionPolicy === "compact-number",
     "precision policy"
   );
   assert(typeof input.visible === "boolean" && typeof input.collapsed === "boolean", "visibility");

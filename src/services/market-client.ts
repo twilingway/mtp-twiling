@@ -9,6 +9,7 @@ import type { WatchlistMove } from "./watchlist-order.js";
 import { profileKey } from "./profile-key.js";
 import { isBankIdentity, validProviderIdentity } from "../model/market-provider.js";
 import { selectedMarketRow } from "../model/selected-instrument.js";
+import { nativeTimeframe, NATIVE_TIMEFRAME_CONFIG } from "../model/intervals/native-timeframes.js";
 import type {
   MarketRow,
   CatalogInstrument,
@@ -35,6 +36,9 @@ export class MarketClient extends EventTarget {
   private readonly bank: TBankClient | null;
   private readonly publicMarket: PublicMarket;
   private readonly mutations = new MutationQueue();
+  private readonly lifetime = new AbortController();
+  private backgroundHistory = new AbortController();
+  private readonly historyWrites = new Set<Promise<void>>();
   private closedValue = false;
   private ready = false;
   private starting: Promise<MarketSnapshot> | undefined;
@@ -53,13 +57,23 @@ export class MarketClient extends EventTarget {
     this.name = name;
     this.online =
       options.online ?? (() => typeof navigator === "undefined" || navigator.onLine !== false);
+    const providerCache: Cache = {
+      ...cache,
+      saveHistory: (...args) => {
+        const write = cache.saveHistory(...args);
+        this.historyWrites.add(write);
+        const settle = () => this.historyWrites.delete(write);
+        void write.then(settle, settle);
+        return write;
+      }
+    };
     this.bank = token
-      ? (options.bankFactory?.(token, name, bankCacheView(cache)) ??
-        new TBankClient(token, name, bankCacheView(cache)))
+      ? (options.bankFactory?.(token, name, bankCacheView(providerCache)) ??
+        new TBankClient(token, name, bankCacheView(providerCache)))
       : null;
     this.publicMarket = new PublicMarket(
       () => this.owner,
-      cache,
+      providerCache,
       {
         quote: (quote) => {
           const row = this.values.find((row) => row.uid === quote.seriesId);
@@ -85,6 +99,9 @@ export class MarketClient extends EventTarget {
     this.bank?.addEventListener("candle", (event) =>
       this.emit("candle", (event as CustomEvent<CandleEvent>).detail)
     );
+    this.bank?.addEventListener("reconnect", () => {
+      if (!this.cachePaused) this.emit("bank-reconnect", undefined);
+    });
   }
   get rows(): MarketRow[] {
     return this.values;
@@ -112,6 +129,8 @@ export class MarketClient extends EventTarget {
     this.paused = value;
     this.publicMarket.cachePaused = value;
     if (this.bank) this.bank.cachePaused = value;
+    if (value) this.backgroundHistory.abort();
+    else if (this.backgroundHistory.signal.aborted) this.backgroundHistory = new AbortController();
   }
   async prepareOwner(): Promise<string> {
     if (this.token) this.owner = await profileKey(this.token);
@@ -317,17 +336,40 @@ export class MarketClient extends EventTarget {
       ? this.publicMarket.loadOpenInterest(row, timeframe, range, signal, onPage)
       : Promise.resolve(null);
   }
-  async candles(
+  candles(
     symbol: string,
     timeframe: Timeframe,
     range: HistoryRange,
     options: CandleOptions = {}
   ): Promise<CandleResult> {
+    return this.readCandles(symbol, timeframe, range, options, true);
+  }
+  /** Reads history without choosing or replacing any live stream. */
+  loadCandles(
+    symbol: string,
+    timeframe: Timeframe,
+    range: HistoryRange,
+    options: CandleOptions = {}
+  ): Promise<CandleResult> {
+    return this.readCandles(symbol, timeframe, range, options, false);
+  }
+  private async readCandles(
+    symbol: string,
+    timeframe: Timeframe,
+    range: HistoryRange,
+    options: CandleOptions,
+    select: boolean
+  ): Promise<CandleResult> {
+    const lifetime = this.activeSignal(options.signal);
+    const signal = select ? lifetime : AbortSignal.any([lifetime, this.backgroundHistory.signal]);
+    signal.throwIfAborted();
     const row = selectedMarketRow(this.values, { symbol, instrumentUid: options.uid });
-    this.publicMarket.select(null, timeframe);
+    if (!select && !row?.uid) throw new Error("Инструмент недоступен.");
+    const activeOptions = { ...options, signal };
+    if (select) this.publicMarket.select(null, timeframe);
     if (row?.providerRef) {
-      this.bank?.unsubscribeCandles();
-      return this.publicMarket.candles(row, timeframe, range, options);
+      if (select) this.bank?.unsubscribeCandles();
+      return this.publicMarket.candles(row, timeframe, range, activeOptions, select);
     }
     if (!this.bank || !this.authenticated) {
       if (!row?.uid) throw new Error("Инструмент недоступен.");
@@ -338,6 +380,7 @@ export class MarketClient extends EventTarget {
         range.from,
         range.to
       );
+      signal.throwIfAborted();
       return {
         symbol,
         ticker: row.ticker,
@@ -348,7 +391,52 @@ export class MarketClient extends EventTarget {
         source: "Т‑Банк · кеш устройства; нужен ключ для обновления"
       };
     }
-    return this.bank.candles(symbol, timeframe, range, options);
+    return this.bank.candles(symbol, timeframe, range, activeOptions, select);
+  }
+  private activeSignal(signal?: AbortSignal): AbortSignal {
+    return signal ? AbortSignal.any([signal, this.lifetime.signal]) : this.lifetime.signal;
+  }
+  /** Retains a provider topic while this view needs it. Release is idempotent. */
+  watchCandles(
+    uid: string,
+    timeframe: Timeframe,
+    listener: (event: CandleEvent) => void,
+    signal?: AbortSignal
+  ): () => void {
+    const active = this.activeSignal(signal);
+    active.throwIfAborted();
+    const row = this.values.find((item) => item.uid === uid);
+    if (!row) throw new Error("Инструмент недоступен.");
+    const interval = NATIVE_TIMEFRAME_CONFIG[nativeTimeframe(timeframe)].stream;
+    const receive = (event: Event) => {
+      const detail = (event as CustomEvent<CandleEvent>).detail;
+      if (
+        !active.aborted &&
+        !this.cachePaused &&
+        detail.uid === uid &&
+        detail.interval === interval
+      )
+        listener(detail);
+    };
+    this.addEventListener("candle", receive);
+    let release: (() => void) | undefined;
+    try {
+      release = row.providerRef
+        ? this.publicMarket.retainCandle(row, timeframe)
+        : this.bank?.retainCandle(uid, timeframe);
+    } catch (error) {
+      this.removeEventListener("candle", receive);
+      throw error;
+    }
+    const dispose = () => {
+      active.removeEventListener("abort", dispose);
+      this.removeEventListener("candle", receive);
+      release?.();
+      release = undefined;
+    };
+    if (active.aborted) dispose();
+    else active.addEventListener("abort", dispose, { once: true });
+    return dispose;
   }
   subscribeCandles(uid: string, timeframe: Timeframe): void {
     const row = this.values.find((row) => row.uid === uid);
@@ -372,15 +460,17 @@ export class MarketClient extends EventTarget {
     this.quoteTimer = undefined;
     await this.publicMarket.flush();
     await this.bank?.flush();
+    // A storage write can be preparing its profile before it reaches the IndexedDB queue.
+    await Promise.allSettled(this.historyWrites);
     if (!this.paused && !this.mutations.active)
       await this.cache.saveMarket(this.owner, { rows: this.values, at: Date.now() });
   }
   async close(): Promise<void> {
     if (this.closed) return;
     this.closedValue = true;
+    this.lifetime.abort();
     clearTimeout(this.quoteTimer);
-    await this.publicMarket.close();
-    await this.bank?.close();
+    await Promise.all([this.publicMarket.close(), this.bank?.close()]);
     if (!this.paused)
       await this.cache.saveMarket(this.owner, { rows: this.values, at: Date.now() });
   }

@@ -10,11 +10,13 @@ import { draftNumber } from "./drawing-settings-model.js";
 export function DrawingCoordinatesFields({
   points,
   point,
-  setError
+  setError,
+  disabled = false
 }: {
   points: DrawingPoint[];
   point: (index: number, patch: Partial<DrawingPoint>) => void;
   setError: (message: string) => void;
+  disabled?: boolean;
 }) {
   const { state } = useTerminal();
   const interval = TIMEFRAMES[state.preferences.timeframe].ms;
@@ -29,6 +31,7 @@ export function DrawingCoordinatesFields({
       <input
         type="number"
         step="any"
+        disabled={disabled}
         data-coordinate-value={index}
         aria-label={t("Точка координат") + " " + (index + 1) + t(": цена")}
         value={Number.isFinite(p.value) ? p.value : ""}
@@ -37,6 +40,7 @@ export function DrawingCoordinatesFields({
       <input
         type="number"
         step="1"
+        disabled={disabled}
         data-coordinate-bar={index}
         aria-label={t("Точка координат") + " " + (index + 1) + t(": бар")}
         value={
@@ -56,6 +60,7 @@ export function DrawingCoordinatesFields({
       <input
         type="datetime-local"
         step="60"
+        disabled={disabled}
         data-coordinate-time={index}
         aria-label={
           t("Точка координат") + " " + (index + 1) + t(": дата и время") + " " + inputZone

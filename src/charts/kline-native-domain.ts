@@ -45,6 +45,9 @@ export function eligiblePublicPlots(
 ) {
   return outputs.some((output) => output.style.visible && finiteInDomain(output.values, domain));
 }
+export function klinePlotPrecision(policy: PlotPrecisionPolicy, paneId: string): number {
+  return policy === "fixed-2" || (policy === "compact-number" && paneId !== "candle_pane") ? 2 : 6;
+}
 function eligibleNative(indicator: Indicator, domain: NativeDomain): boolean {
   if (!indicator.visible) return false;
   for (let i = domain.first; i < Math.min(domain.end, indicator.result.length); i++) {
@@ -87,7 +90,9 @@ export function neutralKlinePrecision(
   for (const plan of activePlans)
     if (plan.paneId === paneId)
       precisions.push(
-        plan.policy === "native-price" ? domain.pricePrecision : plan.policy === "fixed-2" ? 2 : 6
+        plan.policy === "native-price"
+          ? domain.pricePrecision
+          : klinePlotPrecision(plan.policy, paneId)
       );
   const native = chart.getIndicatorByPaneId(paneId) as Map<string, Indicator> | null;
   if (native && typeof native.entries === "function")

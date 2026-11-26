@@ -42,6 +42,7 @@ const capabilities: Record<string, Partial<ToolbarTool>> = {
   LineToolHorzLine: { tool: "horizontalStraightLine", icon: "horizontal" },
   LineToolHorzRay: { tool: "horizontalRayLine", icon: "horizontalRay" },
   LineToolVertLine: { tool: "verticalStraightLine", icon: "vertical" },
+  LineToolRectangle: { tool: "rectangle", icon: "rectangle" },
   LineToolFibRetracement: { tool: "fibonacciLine", icon: "fibonacci", shortcut: "Alt+F" },
   LineToolTrendBasedFibExtension: { tool: "fibonacciExtension", icon: "fibExtension" },
   LineToolImage: { image: true, icon: "image" }

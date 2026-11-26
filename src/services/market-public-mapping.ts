@@ -1,7 +1,14 @@
-import type { BybitInstrument } from "./providers/bybit/types.js";
+import { searchCatalog } from "./providers/bybit/index.js";
+import type { BybitCatalog, BybitInstrument } from "./providers/bybit/types.js";
 import type { OkxInstrument } from "./providers/okx/types.js";
 import { providerSeriesId } from "../model/market-provider.js";
-import type { CatalogInstrument, InstrumentKind, MarketRow } from "../model/types.js";
+import type { OkxProviderRef } from "../model/market-provider.js";
+import type {
+  CatalogInstrument,
+  InstrumentKind,
+  InstrumentSearchKind,
+  MarketRow
+} from "../model/types.js";
 
 export interface PublicQuote {
   seriesId: string;
@@ -22,6 +29,41 @@ export function okxMatches(item: OkxInstrument, query: string): boolean {
   return [item.ref.symbol, item.baseCoin, item.quoteCoin].some((part) =>
     publicSearchKey(part).includes(query)
   );
+}
+
+export function marketTuple(item: BybitInstrument | OkxInstrument): string {
+  return JSON.stringify([
+    item.ref.category,
+    item.baseCoin.toUpperCase(),
+    item.quoteCoin.toUpperCase(),
+    item.settleCoin?.toUpperCase() ?? null
+  ]);
+}
+
+export function okxRefs(rows: readonly MarketRow[]): OkxProviderRef[] {
+  return rows.flatMap((row) => (row.providerRef?.provider === "okx" ? [row.providerRef] : []));
+}
+
+export function supportedBybitInstrument(item: BybitInstrument): boolean {
+  return (
+    item.status === "Trading" &&
+    (item.ref.category === "spot" ||
+      (item.contractType === "LinearPerpetual" && item.settleCoin === "USDT"))
+  );
+}
+
+export function knownBybitMarkets(catalog: BybitCatalog): Set<string> {
+  const categories = new Set(catalog.instruments.map((item) => item.ref.category));
+  if (!catalog.complete || !categories.has("spot") || !categories.has("linear"))
+    throw new Error("Полный каталог Bybit не подтверждён.");
+  return new Set(catalog.instruments.filter(supportedBybitInstrument).map(marketTuple));
+}
+
+export function searchBybit(catalog: BybitCatalog, query: string, kind: InstrumentSearchKind) {
+  return searchCatalog(catalog, query, { cryptoOnly: false, limit: 300 })
+    .filter((item) => supportedBybitInstrument(item) && item.assetClass !== "unknown")
+    .map(publicCatalogInstrument)
+    .filter((item) => kind === "all" || item.kind === kind);
 }
 
 export function publicCatalogInstrument(item: BybitInstrument): CatalogInstrument {

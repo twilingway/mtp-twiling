@@ -191,19 +191,8 @@ export const technicalIndicatorDefinitions: readonly TechnicalIndicatorDefinitio
   ...catalogExpansionStudies.map(({ definition }) => definition)
 ]);
 
-/** A real catalog limitation, not a claimed OHLCV implementation. No 224 fake calculators. */
 export const unsupportedTechnicalIndicatorDefinitions: readonly UnsupportedIndicatorDefinition[] =
-  freezeData([
-    {
-      schemaVersion: 1,
-      id: "advance-decline-line",
-      title: "Advance/Decline Line",
-      status: "unsupported",
-      reason:
-        "Требуются данные о растущих и падающих инструментах рынка; одной OHLCV серии недостаточно.",
-      requiredData: ["market-breadth"]
-    }
-  ]);
+  freezeData([]);
 export function getTechnicalIndicatorDefinition(
   id: string
 ): TechnicalIndicatorDefinition | UnsupportedIndicatorDefinition | null {

@@ -87,14 +87,35 @@ function assertValues(f, instances, data = bars, layout = [], compiled) {
       );
     }
   } else {
+    const decorations = compiled?.priceRegions ?? [];
+    const isLunar = ({ kind }) => kind === "candle-tint" || kind === "price-circle";
+    const decorationLayers = {
+      PERSONAL_TA_PRICE_REGIONS: {
+        regions: decorations.filter((region) => !("kind" in region)),
+        sloped: decorations.filter((region) => "kind" in region && !isLunar(region))
+      },
+      PERSONAL_TA_MOON_PHASES: { decorations: decorations.filter(isLunar) }
+    };
     const active = f.activeIndicators(),
       companions = active.filter((item) => item.name.startsWith("PERSONAL_TA_FILL_")),
       actual = active.filter(
         (item) =>
           item.name.startsWith("PERSONAL_TA_") &&
           !item.name.startsWith("PERSONAL_TA_FILL_") &&
-          item.name !== "PERSONAL_TA_PRICE_REGIONS"
+          !Object.hasOwn(decorationLayers, item.name)
       );
+    for (const [name, payload] of Object.entries(decorationLayers)) {
+      const layer = active.filter((item) => item.name === name);
+      const expectedLayer = Object.values(payload).some((items) => items.length > 0);
+      assert.equal(layer.length, Number(expectedLayer), name);
+      if (layer.length) {
+        assert.equal(layer[0].paneId, "candle_pane");
+        assert.deepEqual(layer[0].figures, []);
+        assert.deepEqual(layer[0].result, []);
+        for (const [field, items] of Object.entries(payload))
+          assert.deepEqual(layer[0].extendData[field], items);
+      }
+    }
     const { getTechnicalIndicatorDefinition } = api(f);
     assert.equal(
       companions.length,
@@ -344,6 +365,7 @@ for (const engine of ["lightweight", "kline"]) {
     render.setData(bars);
     render.setVisibleBars(visible.from, visible.to - (engine === "kline" ? 1 : 0));
     const compiled = render.compile(instances);
+    assert.ok(compiled.priceRegions.some(({ kind }) => kind === "sloped-line"));
     assert.ok(
       compiled.outputs.some(
         (output) => output.instanceId === "ichimoku-cloud" && output.timestamps.length > bars.length

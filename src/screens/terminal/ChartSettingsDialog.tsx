@@ -6,6 +6,7 @@ import { INDICATOR_NAMES } from "./state.js";
 import { Modal } from "./Modal.js";
 import { TRADINGVIEW_CANDLE_STYLE } from "../../model/candle-palette.js";
 import { chartBackground, terminalTheme, withTheme } from "../../model/theme.js";
+import { DEFAULT_LAST_PRICE_COLOR } from "../../model/last-price-style.js";
 import { TimeZonePicker } from "./ClockZoneControl.js";
 import { ChartEngineSelect } from "./ChartEngineSelect.js";
 import {
@@ -160,6 +161,36 @@ export function ChartSettingsDialog() {
             {t(label)}
           </label>
         ))}
+        <div className="drawing-style-row">
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              name="custom-last-price"
+              checked={settings.lastPriceColor !== undefined}
+              onChange={(event) => {
+                if (event.target.checked) {
+                  update({ lastPriceColor: DEFAULT_LAST_PRICE_COLOR });
+                  return;
+                }
+                setSettings((previous) => {
+                  const next = { ...previous };
+                  delete next.lastPriceColor;
+                  return next;
+                });
+              }}
+            />
+            {t("Свой цвет последней цены")}
+          </label>
+          {settings.lastPriceColor !== undefined && (
+            <input
+              type="color"
+              name="lastPriceColor"
+              aria-label={t("Цвет последней цены")}
+              value={settings.lastPriceColor}
+              onChange={(event) => update({ lastPriceColor: event.target.value })}
+            />
+          )}
+        </div>
         <label>
           {t("Размер шрифта шкал")}
           <select

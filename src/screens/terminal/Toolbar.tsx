@@ -2,6 +2,8 @@ import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { t } from "../../i18n/messages.js";
 import { useTerminal } from "./context.js";
 import { ChartEngineSelect } from "./ChartEngineSelect.js";
+import { ChartLayoutControl } from "./ChartLayoutControl.js";
+import type { ChartLayoutCount } from "./ChartLayoutControl.js";
 import { TerminalIndicatorControls } from "./TerminalIndicatorControls.js";
 import { TimeframeMenu } from "./intervals/TimeframeMenu.js";
 import { isNativeIntervalId } from "../../model/intervals/registry.js";
@@ -10,7 +12,13 @@ import {
   DEFAULT_INTERVAL_FAVORITES,
   toggleIntervalFavorite
 } from "../../model/intervals/favorites.js";
-export function Toolbar() {
+export function Toolbar({
+  chartCount = 1,
+  onChartCountChange
+}: {
+  chartCount?: ChartLayoutCount;
+  onChartCountChange?: (value: ChartLayoutCount) => void;
+} = {}) {
   const { controller, state } = useTerminal(),
     p = state.preferences,
     row = selectedMarketRow(state.rows, p),
@@ -71,6 +79,9 @@ export function Toolbar() {
       </nav>
       <div className="divider" />
       <TerminalIndicatorControls />
+      {onChartCountChange && (
+        <ChartLayoutControl value={chartCount} onChange={onChartCountChange} />
+      )}
       <div className="top-spacer" />
       <div id="install-actions" className="install-actions" hidden>
         <button type="button" id="install-app" className="install-button">

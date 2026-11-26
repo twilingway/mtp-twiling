@@ -2,7 +2,9 @@ import { candleCalendarPeriod } from "../../candle-clock.js";
 import { NATIVE_TIMEFRAME_CONFIG } from "../../intervals/native-timeframes.js";
 import { getInterval, INTERVALS } from "../../intervals/registry.js";
 import type { IntervalId } from "../../intervals/registry.js";
+import type { SpotTradeHistory } from "../../market-trades.js";
 import { klingerOscillator } from "../ta-batch-volume-flow.js";
+import type { IntrabarVolumeHistory } from "../ta-batch-volume-intrabars.js";
 import { readQuoteTurnover, TURNOVER_DAY } from "../ta-batch-volume-flow-turnover.js";
 import type { QuoteTurnoverSeries } from "../ta-batch-volume-flow-turnover.js";
 import { relativeVolumeAtTime } from "../ta-batch-volume-flow-time.js";
@@ -37,8 +39,8 @@ const DAY_MS = 86_400_000;
 export type VolumeAnchorInterval = (typeof anchors)[number];
 
 export interface VolumeStudyData {
-  readonly intrabarVolume?: import("../ta-batch-volume-intrabars.js").IntrabarVolumeHistory;
-  readonly netVolumeTrades?: import("../../market-trades.js").SpotTradeHistory;
+  readonly intrabarVolume?: IntrabarVolumeHistory;
+  readonly netVolumeTrades?: SpotTradeHistory;
   /** Aligned to the current instrument and chart interval, with source-confirmed period coverage. */
   readonly relativeVolumePeriods?: Partial<
     Record<VolumeAnchorInterval, readonly RelativeVolumePeriod[]>
@@ -264,7 +266,22 @@ const turnover = defineCatalogStudy<"volume-24-hours", VolumeStudyParameters["vo
       "https://www.tradingview.com/support/solutions/43000668584-24-hour-volume/",
       "https://bybit-exchange.github.io/docs/v5/market/kline",
       "https://app.okx.com/docs-v5/en/#rest-api-market-data-get-candlesticks-history"
-    ]
+    ],
+    presentation: {
+      renderVersion: 2,
+      precisionPolicy: "compact-number",
+      hiddenSeries: [],
+      fills: [],
+      plots: [
+        {
+          id: "value",
+          seriesKey: "value",
+          geometry: { kind: "line", gaps: "legacy" },
+          color: { kind: "solid", color: "#396bce" },
+          width: 1
+        }
+      ]
+    }
   },
   history: () => ({
     warmupBars: 1,

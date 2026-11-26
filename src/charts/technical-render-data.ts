@@ -52,17 +52,22 @@ export interface TechnicalRenderReference extends CompiledReferenceLevel {
   readonly timestamps: readonly number[];
 }
 
-const auxiliaryStudyIds = new Set<string>([
-  "correlation-coefficient",
-  "pivot-points-standard",
-  "multi-time-period-charts",
-  "booker-intraday-pivots",
-  "booker-missed-pivots",
-  "booker-ziv-ghost-pivots",
-  "seasonality",
-  "price-target",
-  "auto-key-levels"
-]);
+type SupplementalKey = keyof TechnicalSupplementalInputs;
+const auxiliaryStudyInputs: Partial<Record<string, readonly SupplementalKey[]>> = {
+  "correlation-coefficient": ["correlationHistory"],
+  "pivot-points-standard": ["priceLevelPeriods"],
+  "multi-time-period-charts": ["priceLevelPeriods"],
+  "booker-intraday-pivots": ["bookerPivotPeriods"],
+  "booker-missed-pivots": ["bookerPivotPeriods"],
+  "booker-ziv-ghost-pivots": ["bookerPivotPeriods"],
+  seasonality: ["seasonalityHistory"],
+  "price-target": ["priceTarget"],
+  "auto-key-levels": ["priceLevelPeriods", "autoKeyLevelTrades"],
+  "advance-decline-line": ["marketBreadth"],
+  "advance-decline-ratio": ["marketBreadth"],
+  "cumulative-volume-index": ["marketBreadth"]
+};
+const auxiliaryKeys = new Set(Object.values(auxiliaryStudyInputs).flatMap((keys) => keys ?? []));
 /** Per-adapter cache, keyed by the independent asynchronous and viewport inputs used by a study. */
 export class TechnicalRenderData {
   private bars: readonly Candle[] = [];
@@ -73,7 +78,7 @@ export class TechnicalRenderData {
   private openInterestRevision = 0;
   private volumeRevision = 0;
   private intrabarRevision = 0;
-  private supplementalRevision = 0;
+  private readonly supplementalRevisions = new Map<SupplementalKey, number>();
   constructor(context?: TechnicalCalculationContext) {
     this.context = context ? { ...context } : undefined;
   }
@@ -92,7 +97,8 @@ export class TechnicalRenderData {
       bookerPivotPeriods,
       seasonalityHistory,
       priceTarget,
-      autoKeyLevelTrades
+      autoKeyLevelTrades,
+      marketBreadth
     } = inputs.instrumentUid === instrumentUid ? inputs : {};
     const { turnover24Hours, intrabarVolume, relativeVolumePeriods, netVolumeTrades } =
       volumeStudies ?? {};
@@ -104,6 +110,7 @@ export class TechnicalRenderData {
       ...(seasonalityHistory ? { seasonalityHistory } : {}),
       ...(priceTarget?.forecast.instrumentKey === instrumentUid ? { priceTarget } : {}),
       ...(autoKeyLevelTrades?.instrumentKey === instrumentUid ? { autoKeyLevelTrades } : {}),
+      ...(marketBreadth ? { marketBreadth } : {}),
       ...(volumeStudies
         ? {
             volumeStudies: {
@@ -122,17 +129,15 @@ export class TechnicalRenderData {
       scoped.volumeStudies?.relativeVolumePeriods !== previousVolume?.relativeVolumePeriods ||
       scoped.volumeStudies?.netVolumeTrades !== previousVolume?.netVolumeTrades;
     const intrabarChanged = scoped.volumeStudies?.intrabarVolume !== previousVolume?.intrabarVolume;
-    const supplementalChanged =
-      scoped.correlationHistory !== this.supplemental.correlationHistory ||
-      scoped.priceLevelPeriods !== this.supplemental.priceLevelPeriods ||
-      scoped.bookerPivotPeriods !== this.supplemental.bookerPivotPeriods ||
-      scoped.seasonalityHistory !== this.supplemental.seasonalityHistory ||
-      scoped.priceTarget !== this.supplemental.priceTarget ||
-      scoped.autoKeyLevelTrades !== this.supplemental.autoKeyLevelTrades;
+    let supplementalChanged = false;
+    for (const key of auxiliaryKeys) {
+      if (scoped[key] === this.supplemental[key]) continue;
+      supplementalChanged = true;
+      this.supplementalRevisions.set(key, (this.supplementalRevisions.get(key) ?? 0) + 1);
+    }
     if (interestChanged) this.openInterestRevision++;
     if (volumeChanged) this.volumeRevision++;
     if (intrabarChanged) this.intrabarRevision++;
-    if (supplementalChanged) this.supplementalRevision++;
     this.supplemental = scoped;
     return interestChanged || volumeChanged || intrabarChanged || supplementalChanged;
   }
@@ -170,9 +175,9 @@ export class TechnicalRenderData {
               ? this.volumeRevision
               : isVolumeDeltaStudy(instance.definitionId)
                 ? this.intrabarRevision
-                : auxiliaryStudyIds.has(instance.definitionId)
-                  ? this.supplementalRevision
-                  : null;
+                : (auxiliaryStudyInputs[instance.definitionId]?.map(
+                    (key) => this.supplementalRevisions.get(key) ?? 0
+                  ) ?? null);
         const key = JSON.stringify([instance.definitionId, instance.params, range, externalKey]);
         seen.add(key);
         let result = this.cache.get(key);

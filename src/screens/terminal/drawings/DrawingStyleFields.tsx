@@ -1,5 +1,6 @@
 import { t } from "../../../i18n/messages.js";
-import type { DrawingSettings, FibLevelStyle } from "../../../model/types.js";
+import { drawingHasLineText } from "../../../model/drawing-model.js";
+import type { DrawingSettings, DrawingTool, FibLevelStyle } from "../../../model/types.js";
 import { Swatch } from "./DrawingStylePopover.js";
 import type { ColorTarget } from "./DrawingStylePopover.js";
 import { DrawingLineControls } from "./controls/DrawingLineControls.js";
@@ -16,7 +17,7 @@ export function DrawingStyleFields({
   setColorTarget,
   onPatch
 }: {
-  name: string;
+  name: DrawingTool;
   settings: DraftSettings;
   change: Change;
   level: (index: number, patch: Partial<FibLevelStyle>) => void;
@@ -24,6 +25,7 @@ export function DrawingStyleFields({
   onPatch: (patch: Partial<DrawingSettings>) => void;
 }) {
   const fib = name.startsWith("fibonacci");
+  const rectangle = name === "rectangle";
   const checked = (key: CheckKey, label: string) => (
     <label className="checkbox-label">
       <input
@@ -69,6 +71,18 @@ export function DrawingStyleFields({
       onOpen={setColorTarget}
       onChange={onPatch}
     />
+  );
+  const fillControl = (label: string) => (
+    <div className="setting-row">
+      {checked("fill", label)}
+      <OpacityControl
+        name="opacity"
+        value={settings.opacity}
+        color={settings.color}
+        label="Непрозрачность фона"
+        onChange={(value) => change("opacity", value)}
+      />
+    </div>
   );
 
   return (
@@ -151,16 +165,7 @@ export function DrawingStyleFields({
               onClick={() => setColorTarget({ kind: "line" })}
             />
           </div>
-          <div className="setting-row">
-            {checked("fill", t("Фон"))}
-            <OpacityControl
-              name="opacity"
-              value={settings.opacity}
-              color={settings.color}
-              label="Непрозрачность фона"
-              onChange={(value) => change("opacity", value)}
-            />
-          </div>
+          {fillControl("Фон")}
           {checked("reverse", t("Переворот"))}
           {checked("prices", t("Цены"))}
           <div className="setting-row">
@@ -182,6 +187,18 @@ export function DrawingStyleFields({
               ["bottom", t("Снизу")]
             ])}
           </div>
+        </>
+      ) : (
+        <>
+          <div className="setting-row">
+            <span>{t(rectangle ? "Контур" : "Линия")}</span>
+            {colorControl()}
+          </div>
+          {rectangle && fillControl("Заливка")}
+        </>
+      )}
+      {(fib || drawingHasLineText(name)) && (
+        <>
           <div className="setting-row">
             {checked("textEnabled", t("Текст"))}
             <input
@@ -193,29 +210,22 @@ export function DrawingStyleFields({
               onChange={(event) => change("text", event.currentTarget.value)}
             />
           </div>
-          <div className="setting-row">
-            {choice("textAlign", "", [
-              ["left", t("Слева")],
-              ["center", t("По центру")],
-              ["right", t("Справа")]
-            ])}
-            {choice("textVertical", "", [
-              ["top", t("Сверху")],
-              ["center", t("По центру")],
-              ["bottom", t("Снизу")]
-            ])}
-          </div>
+          {choice("textAlign", "Текст по горизонтали", [
+            ["left", t("Слева")],
+            ["center", t("По центру")],
+            ["right", t("Справа")]
+          ])}
+          {choice("textVertical", "Текст по вертикали", [
+            ["top", t("Сверху")],
+            ["center", t("По центру")],
+            ["bottom", t("Снизу")]
+          ])}
           {choice(
             "fontSize",
             t("Размер шрифта"),
             [10, 11, 12, 13, 14, 16, 18, 20, 24].map((size) => [size, String(size)])
           )}
         </>
-      ) : (
-        <div className="setting-row">
-          <span>{t("Линия")}</span>
-          {colorControl()}
-        </div>
       )}
     </>
   );

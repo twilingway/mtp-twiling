@@ -25,10 +25,16 @@ export function visibleDrawings(state: TerminalState): Drawing[] {
     drawingVisibleOnInterval(drawing.visibility, state.preferences.timeframe)
   );
 }
-export function ChartCanvas({ supplemental }: { supplemental: TechnicalSupplementalInputs }) {
+export function ChartCanvas({
+  supplemental,
+  drawingProjection
+}: {
+  supplemental: TechnicalSupplementalInputs;
+  drawingProjection?: EventTarget;
+}) {
   const { state } = useTerminal(),
     ref = useRef<HTMLDivElement>(null);
-  useChartCanvas(ref, visibleDrawings, supplemental);
+  useChartCanvas(ref, visibleDrawings, supplemental, drawingProjection);
   return (
     <div
       id="chart"
@@ -196,7 +202,10 @@ export function ChartGestures({ children }: { children: ReactNode }) {
           id: crypto.randomUUID(),
           name: tool,
           points: [...draft.current],
-          settings: { ...drawingStyle({}), levelStyles: structuredClone(DEFAULT_FIB_LEVELS) },
+          settings: {
+            ...drawingStyle({ name: tool }),
+            levelStyles: structuredClone(DEFAULT_FIB_LEVELS)
+          },
           ...controller.getSnapshot().preferences.chartSettings.drawingTemplates?.[
             `default:${tool}`
           ]

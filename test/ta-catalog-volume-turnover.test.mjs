@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createSourceLoader } from "./technical-volume-registration-fixture.mjs";
+import { nativeFixture } from "./native-technical-fixture.mjs";
 
 const load = createSourceLoader();
 const { compileQuoteTurnover, quoteTurnoverWindow, readQuoteTurnover, turnoverInterval } = load(
@@ -149,3 +150,49 @@ test("the registered indicator uses only lower observations before the chart clo
   assert.deepEqual(result.series.value, [576, 616, null]);
   assert.equal(result.historyRequirement.windowMs, day);
 });
+
+for (const engine of ["lightweight", "kline"]) {
+  test(`${engine} gives 24h turnover a compact pane scale without rounding the plotted value`, () => {
+    const fixture = nativeFixture(engine);
+    try {
+      const start = Date.UTC(2026, 10, 25);
+      const rawTurnover = 8_800_000_000.125;
+      const turnover24Hours = compileQuoteTurnover({
+        instrumentKey: fixture.options.row.uid,
+        currency: "USDT",
+        interval: "5m",
+        range: { from: start, to: start + day - fiveMinutes },
+        bars: Array.from({ length: day / fiveMinutes }, (_, i) =>
+          sample(start + i * fiveMinutes, i === 0 ? rawTurnover : 0)
+        )
+      });
+      const instance = createTechnicalIndicatorInstance("volume-24-hours", "turnover");
+      fixture.adapter.setData([candle(start), candle(start + day)], true);
+      fixture.adapter.updateTechnicalIndicators([instance], []);
+      fixture.adapter.updateTechnicalInputs({ volumeStudies: { turnover24Hours } });
+      fixture.ready();
+      const activeStudy = () =>
+        engine === "lightweight"
+          ? fixture.activeSeries().at(-1)
+          : fixture.activeIndicators().find((entry) => entry.name.startsWith("PERSONAL_TA_"));
+      if (engine === "lightweight") {
+        assert.equal(activeStudy().options().priceFormat.type, "volume");
+        assert.equal(activeStudy().data[0].value, rawTurnover);
+      } else {
+        assert.equal(activeStudy().shouldFormatBigNumber, true);
+        assert.equal(activeStudy().result[0].value, rawTurnover);
+      }
+
+      fixture.adapter.updateTechnicalIndicators([{ ...instance, pane: { kind: "overlay" } }], []);
+      fixture.ready();
+      if (engine === "lightweight")
+        assert.deepEqual(
+          activeStudy().options().priceFormat,
+          fixture.activeSeries()[0].options().priceFormat
+        );
+      else assert.notEqual(activeStudy().shouldFormatBigNumber, true);
+    } finally {
+      fixture.adapter.destroy();
+    }
+  });
+}

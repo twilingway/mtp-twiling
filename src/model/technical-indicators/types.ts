@@ -45,12 +45,14 @@ import type {
   CorrelationStudyParameters
 } from "./catalog-expansion/correlation.js";
 import type { ExternalStudyParameters } from "./catalog-expansion/external.js";
+import type { KnoxvilleStudyParameters } from "./catalog-expansion/knoxville.js";
 import type { LevelStudyParameters } from "./catalog-expansion/levels.js";
 import type {
   MarketBreadthCalculationInputs,
   MarketBreadthHistoryRequirement
 } from "./catalog-expansion/market-breadth.js";
 import type { MomentumStudyParameters } from "./catalog-expansion/momentum.js";
+import type { MarketBreadthStudyParameters } from "./catalog-expansion/market-breadth.js";
 import type {
   NetVolumeHistoryRequirement,
   NetVolumeStudyParameters
@@ -95,7 +97,9 @@ export interface CatalogExpansionParameters
     CalendarAnalysisParameters,
     CorrelationStudyParameters,
     ExternalStudyParameters,
+    KnoxvilleStudyParameters,
     LevelStudyParameters,
+    MarketBreadthStudyParameters,
     MomentumStudyParameters,
     NetVolumeStudyParameters,
     PeriodStudyParameters,

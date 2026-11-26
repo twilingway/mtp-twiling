@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { TIMEFRAMES, updateCandleList } from "../../model/history-codec.js";
+import { TIMEFRAMES, mergeCandles, updateCandleList } from "../../model/history-codec.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
+import { providerRefFromId } from "../../model/market-provider.js";
 import type { Candle, MarketRow, Timeframe } from "../../model/types.js";
 import type { CorrelationHistory } from "../../model/technical-indicators/catalog-expansion/correlation.js";
 import type {
@@ -34,25 +35,39 @@ type Result = {
   key: string;
   session: object;
   history: CorrelationHistory;
+  done: boolean;
+  failures: number;
 };
+
+interface ChartCorrelation {
+  status:
+    | "hidden"
+    | "unsupported"
+    | "needs-comparison"
+    | "loading"
+    | "ready"
+    | "partial"
+    | "empty"
+    | "error";
+  history?: CorrelationHistory;
+}
 
 export function useCorrelationHistory(
   controller: TerminalController,
   state: TerminalState,
   row: MarketRow | undefined
-): CorrelationHistory | undefined {
+): ChartCorrelation {
   const { timeframe, chartSettings, technicalIndicators } = state.preferences;
   const primaryUid = row?.uid;
   const session = controller.sessionKey();
-  const ids = new Set(
-    (technicalIndicators ?? []).flatMap((item) =>
-      item.visible && item.definitionId === "correlation-coefficient" && item.params.comparisonUid
-        ? [item.params.comparisonUid]
-        : []
-    )
-  );
+  const selected = (technicalIndicators ?? [])
+    .filter((item) => item.definitionId === "correlation-coefficient")
+    .filter((item) => item.visible);
+  const ids = new Set(selected.map(({ params }) => params.comparisonUid).filter(Boolean));
+  const wanted = selected.length > 0 && !drawingToolbarSettings(chartSettings).indicatorsHidden;
   const planned = JSON.stringify(
     [...ids].sort().flatMap((uid) => {
+      if (providerRefFromId(uid) && (timeframe === "2m" || timeframe === "10m")) return [];
       const target = primaryUid && selectCorrelationComparison(state.rows, uid, primaryUid);
       return target ? [target] : [];
     })
@@ -61,7 +76,7 @@ export function useCorrelationHistory(
   const from = state.candles[0]?.timestamp;
   const active =
     planned !== "[]" &&
-    !drawingToolbarSettings(chartSettings).indicatorsHidden &&
+    wanted &&
     marketAvailable(state) &&
     !state.profileTransition &&
     !state.importingBackup &&
@@ -70,28 +85,27 @@ export function useCorrelationHistory(
   const [result, setResult] = useState<Result>();
 
   useEffect(() => {
-    if (
-      !active ||
-      !session ||
-      !primaryUid ||
-      from === undefined ||
-      !canReadHistory(session)
-    )
+    if (!active || !session || !primaryUid || from === undefined || !canReadHistory(session))
       return;
     const instruments = JSON.parse(planned) as CorrelationComparisonInstrument[];
     const abort = new AbortController();
     const comparisons = new Map<string, CorrelationCandleSeries>();
     const disposeStreams: (() => void)[] = [];
+    let done = false;
+    let failures = 0;
     const current = () => !abort.signal.aborted && controller.sessionKey() === session;
     const publish = () => {
       if (current())
         setResult({
           key: scope,
           session,
+          done,
+          failures,
           history: { primaryUid, timeframe, comparisons: new Map(comparisons) }
         });
     };
     const fetchComparison = async (target: (typeof instruments)[number]) => {
+      comparisons.set(target.uid, { instrumentUid: target.uid, timeframe, bars: [] });
       let live: Candle[] = [];
       let reading = false;
       const readHistory = async () => {
@@ -100,8 +114,17 @@ export function useCorrelationHistory(
         if (to === undefined || to < from) return;
         reading = true;
         try {
-          const loaded = await loadCorrelationComparison(session, target, timeframe, { from, to }, abort.signal);
-          comparisons.set(target.uid, { ...loaded, bars: live.reduce(updateCandleList, loaded.bars) });
+          const loaded = await loadCorrelationComparison(
+            session,
+            target,
+            timeframe,
+            { from, to },
+            abort.signal
+          );
+          comparisons.set(target.uid, {
+            ...loaded,
+            bars: mergeCandles(comparisons.get(target.uid)?.bars ?? [], loaded.bars, live)
+          });
           publish();
         } finally {
           reading = false;
@@ -139,13 +162,21 @@ export function useCorrelationHistory(
           if (!ref || (source?.provider === ref.provider && source.category === ref.category))
             void readHistory().catch(() => {});
         };
-        session.addEventListener(ref ? "market-reconnect" : "bank-reconnect", reconnect, { signal: abort.signal });
+        session.addEventListener(ref ? "market-reconnect" : "bank-reconnect", reconnect, {
+          signal: abort.signal
+        });
       }
       await readHistory();
     };
     const read = async () => {
-      for (let offset = 0; current() && offset < instruments.length; offset += 4)
-        await Promise.allSettled(instruments.slice(offset, offset + 4).map(fetchComparison));
+      for (let offset = 0; current() && offset < instruments.length; offset += 4) {
+        const outcomes = await Promise.allSettled(
+          instruments.slice(offset, offset + 4).map(fetchComparison)
+        );
+        failures += outcomes.filter(({ status }) => status === "rejected").length;
+      }
+      done = true;
+      publish();
     };
     void read();
     return () => {
@@ -154,5 +185,12 @@ export function useCorrelationHistory(
     };
   }, [active, controller, session, primaryUid, timeframe, planned, scope, from]);
 
-  return active && result?.key === scope && result.session === session ? result.history : undefined;
+  if (!wanted) return { status: "hidden" };
+  if (!ids.size) return { status: "needs-comparison" };
+  if (planned === "[]") return { status: "unsupported" };
+  if (!active || result?.key !== scope || result.session !== session) return { status: "loading" };
+  const { history, done, failures } = result;
+  const available = [...history.comparisons.values()].filter(({ bars }) => bars.length > 0).length;
+  if (available > 0) return { status: done && available < ids.size ? "partial" : "ready", history };
+  return { status: !done ? "loading" : failures ? "error" : "empty" };
 }

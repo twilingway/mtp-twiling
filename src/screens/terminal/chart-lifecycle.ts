@@ -31,7 +31,8 @@ function technicalInputs(preferences: TerminalPreferences) {
 export function useChartCanvas(
   ref: RefObject<HTMLDivElement | null>,
   visibleDrawings: (state: TerminalState) => Drawing[],
-  supplemental: TechnicalSupplementalInputs
+  supplemental: TechnicalSupplementalInputs,
+  drawingProjection?: EventTarget
 ): void {
   const { controller, state } = useTerminal(),
     dataRef = useRef<Candle[]>([]),
@@ -152,6 +153,7 @@ export function useChartCanvas(
             height,
             current.selectedObject
           );
+          if (layer === "front") drawingProjection?.dispatchEvent(new Event("change"));
         }
       };
       const [factory, view] = await Promise.all([
@@ -214,6 +216,7 @@ export function useChartCanvas(
     session,
     ref,
     visibleDrawings,
+    drawingProjection,
     uid,
     state.owner,
     available,

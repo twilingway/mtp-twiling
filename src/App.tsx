@@ -5,7 +5,8 @@ import { TerminalController } from "./screens/terminal/controller.js";
 import { Toolbar } from "./screens/terminal/Toolbar.js";
 import { DrivePauseBanner } from "./screens/terminal/DrivePauseBanner.js";
 import { RightPanel } from "./screens/terminal/RightPanel.js";
-import { ChartPanel } from "./screens/terminal/ChartPanel.js";
+import { ChartWorkspace } from "./screens/terminal/ChartWorkspace.js";
+import type { ChartLayoutCount } from "./screens/terminal/ChartLayoutControl.js";
 import { DrawingToolbar } from "./screens/terminal/DrawingToolbar.js";
 import { AccountDialog } from "./screens/terminal/AccountDialog.js";
 import { DeleteObjectDialog } from "./screens/terminal/DeleteObjectDialog.js";
@@ -21,13 +22,15 @@ import { ThemeEffect } from "./screens/terminal/ThemeEffect.js";
 import { LocaleEffect } from "./screens/terminal/LocaleEffect.js";
 import { TerminalIndicatorLibrary } from "./screens/terminal/TerminalIndicatorLibrary.js";
 import { TechnicalIndicatorSettings } from "./screens/terminal/TechnicalIndicatorSettings.js";
+import { MarketBreadthProvider } from "./screens/terminal/MarketBreadthContext.js";
 function Terminal() {
   const { state } = useTerminal();
+  const [chartCount, setChartCount] = useState<ChartLayoutCount>(1);
   return (
     <>
       <ThemeEffect />
       <LocaleEffect />
-      <Toolbar />
+      <Toolbar chartCount={chartCount} onChartCountChange={setChartCount} />
       <DrivePauseBanner />
       <main
         className="workspace"
@@ -35,7 +38,7 @@ function Terminal() {
         data-mobile-panel-open={!!state.mobilePanelOpen && !state.preferences.rightPanelCollapsed}
       >
         <DrawingToolbar />
-        <ChartPanel />
+        <ChartWorkspace count={chartCount} />
         <RightPanel />
       </main>
       {state.dialog === "account" && <AccountDialog />}
@@ -64,7 +67,9 @@ export function App() {
   const [controller] = useState(() => new TerminalController());
   return (
     <TerminalContext value={controller}>
-      <Terminal />
+      <MarketBreadthProvider>
+        <Terminal />
+      </MarketBreadthProvider>
     </TerminalContext>
   );
 }

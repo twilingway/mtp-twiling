@@ -35,6 +35,15 @@ export type MarketBreadthHistoryRequirement =
 
 type BreadthMetric = "line" | "ratio" | "cvi";
 type BreadthSeries = Readonly<Record<BreadthMetric, NumericSeries>>;
+export const marketBreadthMetrics = {
+  "advance-decline-line": "line",
+  "advance-decline-ratio": "ratio",
+  "cumulative-volume-index": "cvi"
+} as const satisfies Record<keyof MarketBreadthStudyParameters, BreadthMetric>;
+
+export function isMarketBreadthStudy(id: string): id is keyof MarketBreadthStudyParameters {
+  return Object.hasOwn(marketBreadthMetrics, id);
+}
 
 interface BreadthMetadata {
   readonly marketId: string;
@@ -307,25 +316,43 @@ function marketInput(
     : undefined;
 }
 
-function projectedSeries(
-  bars: readonly TechnicalBar[],
-  input: MarketBreadthInput,
-  metric: BreadthMetric
-): NumericSeries {
+function projectedDays(
+  bars: readonly Pick<TechnicalBar, "timestamp">[],
+  input: MarketBreadthInput
+) {
   const { data } = input;
   const format = input.dateBasis === "exchange-local" ? marketFormat(data.metadata.timeZone) : null;
-  const days = bars.map(({ timestamp }) => {
+  return bars.map(({ timestamp }) => {
     if (!Number.isFinite(timestamp) || Math.abs(timestamp) > 8.64e15) return null;
     if (!format) return Math.floor(timestamp / DAY_MS);
     const parts = format.formatToParts(timestamp);
     const read = (type: string) => parts.find((part) => part.type === type)?.value;
     return marketDay(`${read("year")}-${read("month")}-${read("day")}`);
   });
-  return days.map((day, i) =>
-    day === null || days[i - 1] === day || days[i + 1] === day
-      ? null
-      : (data.series[metric][day - data.firstDay] ?? null)
-  );
+}
+
+function projectedPoint(
+  days: readonly (number | null)[],
+  index: number,
+  data: ImportedMarketBreadth,
+  metric: BreadthMetric
+): NumericValue {
+  const day = days[index];
+  return day == null || days[index - 1] === day || days[index + 1] === day
+    ? null
+    : (data.series[metric][day - data.firstDay] ?? null);
+}
+
+export function marketBreadthCoverage(
+  bars: readonly Pick<TechnicalBar, "timestamp">[],
+  input: MarketBreadthInput
+): Readonly<Record<BreadthMetric, boolean>> {
+  const { data } = input;
+  const days = projectedDays(bars, input);
+  const usable = (metric: BreadthMetric) =>
+    data.coverage.availableDays[metric] > 0 &&
+    days.some((_, i) => projectedPoint(days, i, data, metric) !== null);
+  return { line: usable("line"), ratio: usable("ratio"), cvi: usable("cvi") };
 }
 
 function marketBreadthStudy<Id extends keyof MarketBreadthStudyParameters>({
@@ -393,7 +420,13 @@ function marketBreadthStudy<Id extends keyof MarketBreadthStudyParameters>({
         : "external-data-unavailable",
     calculate: (bars, _params, context) => {
       const input = marketInput(context);
-      return { value: input ? projectedSeries(bars, input, metric) : bars.map(() => null) };
+      const days = input ? projectedDays(bars, input) : undefined;
+      return {
+        value:
+          input && days
+            ? days.map((_, i) => projectedPoint(days, i, input.data, metric))
+            : bars.map(() => null)
+      };
     }
   });
 }

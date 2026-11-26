@@ -4,9 +4,12 @@ import * as jsx from "react/jsx-runtime";
 import { createSourceLoader } from "./technical-volume-registration-fixture.mjs";
 
 const load = createSourceLoader();
-const { marketBreadthStudies, parseMarketBreadthFile, MAX_MARKET_BREADTH_FILE_SIZE } = load(
-  "model/technical-indicators/catalog-expansion/market-breadth.js"
-);
+const {
+  marketBreadthStudies,
+  marketBreadthCoverage,
+  parseMarketBreadthFile,
+  MAX_MARKET_BREADTH_FILE_SIZE
+} = load("model/technical-indicators/catalog-expansion/market-breadth.js");
 
 function observed(date, advancing, declining, unchanged, advancingVolume, decliningVolume) {
   return {
@@ -100,6 +103,21 @@ test("projection keeps cumulative values from earlier market dates outside the v
     null
   ]);
   assert.deepEqual(cvi.calculate(prices, {}, context(source)).value, [null, null, 90, null, null]);
+  assert.deepEqual(marketBreadthCoverage(prices, context(source).marketBreadth), {
+    line: true,
+    ratio: true,
+    cvi: true
+  });
+  assert.deepEqual(marketBreadthCoverage(prices.slice(-2), context(source).marketBreadth), {
+    line: false,
+    ratio: true,
+    cvi: false
+  });
+  assert.deepEqual(marketBreadthCoverage(prices.slice(-1), context(source).marketBreadth), {
+    line: false,
+    ratio: false,
+    cvi: false
+  });
   assert.equal(line.history({}).historyRequirement.lookbackBars, null);
   assert.equal(ratio.history({}).historyRequirement.lookbackBars, 1);
 });

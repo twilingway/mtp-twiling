@@ -287,21 +287,22 @@ test("instance validation rejects arbitrary keys, code, unknown sources/outputs,
   assert.throws(() => make("macd", "bad", { params: { signalLength: 0 } }), /Invalid/);
 });
 
-test("unsupported breadth item exposes its required data and reason and cannot create empty successful points", () => {
+test("registered breadth reports missing external data without inventing values from OHLCV", () => {
   const definition = core.getTechnicalIndicatorDefinition("advance-decline-line");
-  assert.equal(definition.status, "unsupported");
-  assert.deepEqual(definition.requiredData, ["market-breadth"]);
-  assert.ok(definition.reason.length > 20);
-  assert.throws(() => make("advance-decline-line", "breadth"), /OHLCV/);
-  assert.throws(
-    () =>
-      core.calculateTechnicalIndicator(
-        { ...make("rsi", "r"), definitionId: "advance-decline-line" },
-        bars([1, 2])
-      ),
-    /OHLCV/
+  assert.equal(definition.status, "computed");
+  const input = bars([1, 2]);
+  const result = core.calculateTechnicalIndicator(make("advance-decline-line", "breadth"), input);
+  assert.equal(result.unavailableReason, "external-data-unavailable");
+  assert.deepEqual(result.series, { value: [null, null] });
+  assert.deepEqual(
+    result.timestamps,
+    input.map(({ timestamp }) => timestamp)
   );
   assert.equal(core.getTechnicalIndicatorDefinition("unknown"), null);
+  assert.throws(
+    () => core.calculateTechnicalIndicator({ ...make("rsi", "r"), definitionId: "unknown" }, input),
+    /Invalid technical indicator instance/
+  );
 });
 
 test("runtime gap masks retain alignment, source selection is explicit, and timestamp holes do not synthesize bars", () => {

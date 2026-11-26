@@ -41,6 +41,7 @@ export type TechnicalSupplementalInputs = Pick<
   | "seasonalityHistory"
   | "priceTarget"
   | "autoKeyLevelTrades"
+  | "marketBreadth"
 > & { readonly instrumentUid?: string };
 
 export interface ChartAdapter {

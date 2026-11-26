@@ -90,6 +90,7 @@ export const TOOL_GROUP: Partial<Record<DrawingTool, string>> = {
   horizontalStraightLine: "lines",
   horizontalRayLine: "lines",
   verticalStraightLine: "lines",
+  rectangle: "shapes",
   fibonacciLine: "fib",
   fibonacciExtension: "fib"
 };

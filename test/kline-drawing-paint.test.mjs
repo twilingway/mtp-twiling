@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { nativeFixture } from "./native-technical-fixture.mjs";
 
-test("KLine static DRAWINGS extendData paints line and Fibonacci through the current price projection", () => {
+test("KLine static DRAWINGS projects line text, rectangle and Fibonacci", () => {
   let paint = () => {};
   const f = nativeFixture("kline", [], { paint: (...args) => paint(...args) });
   const { paintDrawings } = f.load("model/drawing-model.ts");
@@ -19,7 +19,16 @@ test("KLine static DRAWINGS extendData paints line and Fibonacci through the cur
         { timestamp: start, value: 100 },
         { timestamp: start + 86400000, value: 120 }
       ],
-      settings: { color: "#ffff00", lineOpacity: 1 }
+      settings: { color: "#ffff00", lineOpacity: 1, text: "Entry" }
+    },
+    {
+      id: "area",
+      name: "rectangle",
+      points: [
+        { timestamp: start, value: 100 },
+        { timestamp: start + 86400000, value: 120 }
+      ],
+      settings: { color: "#398aff", fill: true, opacity: 0.41 }
     },
     {
       id: "fib",
@@ -74,6 +83,13 @@ test("KLine static DRAWINGS extendData paints line and Fibonacci through the cur
     )
   );
   assert.ok(commands.some((command) => command.method === "fillRect" && command.alpha === 0.3));
+  assert.ok(commands.some((command) => command.method === "fillRect" && command.alpha === 0.41));
+  assert.ok(
+    commands.some((command) => command.method === "strokeRect" && command.color === "#398aff")
+  );
+  assert.ok(
+    commands.some((command) => command.method === "fillText" && command.args[0] === "Entry")
+  );
   assert.ok(
     commands.some((command) => command.method === "rect" && command.args[3] === size.height)
   );

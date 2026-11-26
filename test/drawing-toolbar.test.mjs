@@ -328,6 +328,7 @@ test("cursor, last tool per group, favorites and magnet strength survive subsequ
   const f = fixture();
   await f.tools.choose("rayLine");
   await f.tools.choose("fibonacciExtension");
+  await f.tools.choose("rectangle");
   await f.tools.setCursor("dot");
   assert.equal(f.state().activeTool, null);
   assert.equal(f.options().cursor, "dot");
@@ -336,6 +337,7 @@ test("cursor, last tool per group, favorites and magnet strength survive subsequ
   assert.deepEqual(json(f.options().lastTools), {
     lines: "segment",
     fib: "fibonacciExtension",
+    shapes: "rectangle",
     cursors: "dot"
   });
   await f.tools.toggleFavorite("rayLine");

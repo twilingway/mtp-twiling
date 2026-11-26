@@ -27,12 +27,16 @@ const calculationContext = (chartInterval, properties = {}) => ({
 });
 const relativeParams = { anchor: "1d", length: 2, mode: "regular" };
 
-test("volume catalog registers Klinger, RVAT and quote turnover, leaving unsupported studies unavailable", () => {
+test("volume catalog registers native and external-data studies without substituting missing inputs", () => {
   const entries = new Map(
     technicalCatalogEntries("en").map((entry) => [entry.id, entry.available])
   );
   for (const study of volumeStudies) assert.equal(entries.get(study.catalogId), true);
-  assert.equal(entries.get("STD;Cumulative%1Volume%1Index"), false);
+  assert.equal(entries.get("STD;Cumulative%1Volume%1Index"), true);
+  const cvi = createTechnicalIndicatorInstance("cumulative-volume-index", "cvi");
+  const result = calculateTechnicalIndicator(cvi, [candle(day, 10)]);
+  assert.equal(result.unavailableReason, "external-data-unavailable");
+  assert.deepEqual(result.series, { value: [null] });
 });
 
 test("Klinger uses actual volumes, preserves missing observations, and plots both output lines", () => {

@@ -6,6 +6,7 @@ import type { MarketRow } from "../../model/types.js";
 import type { CorrelationCandleReader } from "../../services/correlation-history.js";
 import type { TerminalController } from "./controller.js";
 import type { TerminalState } from "./state.js";
+import { useMarketBreadth } from "./MarketBreadthContext.js";
 import { useAutoKeyLevelTrades } from "./use-auto-key-level-trades.js";
 import { useCalendarAnalysis } from "./use-calendar-analysis.js";
 import { useCorrelationHistory } from "./use-correlation-history.js";
@@ -24,6 +25,12 @@ export function useExtraStudyData(
   row: MarketRow | undefined
 ) {
   const session = controller.sessionKey();
+  const transitioning = !!(
+    state.profileTransition ||
+    state.importingBackup ||
+    state.importRecoveryRequired
+  );
+  const activeRow = transitioning ? undefined : row;
   const ownerKey = useMemo(
     () => session && { session, owner: state.owner },
     [session, state.owner]
@@ -36,27 +43,26 @@ export function useExtraStudyData(
   }, [session]);
   const calendar = useCalendarAnalysis({
     ownerKey,
-    row,
+    row: activeRow,
     rows: state.rows,
     instances: state.preferences.technicalIndicators,
     hidden: Boolean(
-      drawingToolbarSettings(state.preferences.chartSettings).indicatorsHidden ||
-      state.profileTransition ||
-      state.importingBackup ||
-      state.importRecoveryRequired
+      drawingToolbarSettings(state.preferences.chartSettings).indicatorsHidden || transitioning
     ),
     loadCandles: calendarLoader
   });
-  const correlationHistory = useCorrelationHistory(controller, state, row);
-  const priceLevel = usePriceLevelHistory(controller, state, row);
-  const autoKeyLevel = useAutoKeyLevelTrades(controller, state, row);
-  const priceTarget = usePriceTarget(controller, state, row);
-  const intrabarVolume = useIntrabarVolume(controller, state, row);
-  const netVolume = useNetVolume(controller, state, row);
-  const instrumentUid = row?.uid;
+  const correlation = useCorrelationHistory(controller, state, activeRow);
+  const correlationHistory = correlation.history;
+  const priceLevel = usePriceLevelHistory(controller, state, activeRow);
+  const autoKeyLevel = useAutoKeyLevelTrades(controller, state, activeRow);
+  const priceTarget = usePriceTarget(controller, state, activeRow);
+  const intrabarVolume = useIntrabarVolume(controller, state, activeRow);
+  const netVolume = useNetVolume(controller, state, activeRow);
+  const instrumentUid = activeRow?.uid;
   const { priceLevelPeriods } = priceLevel;
   const { seasonalityHistory } = calendar;
   const forecast = priceTarget.priceTarget;
+  const marketBreadth = useMarketBreadth()?.input;
   const autoKeyLevelTrades = autoKeyLevel.data;
   const intrabar = intrabarVolume.volumeStudies?.intrabarVolume;
   const netVolumeTrades = netVolume.volumeStudies?.netVolumeTrades;
@@ -67,6 +73,7 @@ export function useExtraStudyData(
       ...(priceLevelPeriods ? { priceLevelPeriods } : {}),
       ...(seasonalityHistory ? { seasonalityHistory } : {}),
       ...(forecast ? { priceTarget: forecast } : {}),
+      ...(marketBreadth ? { marketBreadth } : {}),
       ...(autoKeyLevelTrades ? { autoKeyLevelTrades } : {}),
       ...(intrabar || netVolumeTrades
         ? {
@@ -83,10 +90,11 @@ export function useExtraStudyData(
       priceLevelPeriods,
       seasonalityHistory,
       forecast,
+      marketBreadth,
       autoKeyLevelTrades,
       intrabar,
       netVolumeTrades
     ]
   );
-  return { data, calendar, priceLevel, priceTarget, intrabarVolume, netVolume };
+  return { data, calendar, priceLevel, priceTarget, intrabarVolume, netVolume, correlation };
 }

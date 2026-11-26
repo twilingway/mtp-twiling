@@ -77,9 +77,9 @@ test.after(() => {
   assert.equal(fetchCalls, 0);
 });
 
-test("all current eight drawing kinds and historical fixtures retain exact readable projection", () => {
+test("all nine drawing kinds and historical fixtures retain exact readable projection", () => {
   const value = backup();
-  assert.equal(Object.keys(TOOL_NAMES).length, 8);
+  assert.equal(Object.keys(TOOL_NAMES).length, 9);
   value.drawings = [
     {
       symbol: "SBER",
@@ -91,6 +91,24 @@ test("all current eight drawing kinds and historical fixtures retain exact reada
     assert.deepEqual(assertReadableDrivePayload(raw), sanitizeDriveBackup(raw));
     assert.equal(JSON.stringify(raw), before);
   }
+});
+test("rectangle and ray text survive Drive validation, while a rectangle must have two anchors", () => {
+  const value = backup();
+  value.drawings = [
+    {
+      symbol: "SBER",
+      items: [
+        { ...drawing("rectangle", "area"), settings: { fill: true, opacity: 0.3 } },
+        {
+          ...drawing("horizontalRayLine", "ray"),
+          settings: { textEnabled: true, text: "Вход", textAlign: "left", textVertical: "top" }
+        }
+      ]
+    }
+  ];
+  assert.deepEqual(assertReadableDrivePayload(value).drawings, value.drawings);
+  value.drawings[0].items[0].points.pop();
+  assert.throws(() => assertReadableDrivePayload(value), malformed);
 });
 for (const position of [0, 1, 2])
   test(`future string kind at position ${position} retains every drawing and group`, () => {

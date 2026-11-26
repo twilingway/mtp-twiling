@@ -119,6 +119,7 @@ test("Reading Bybit open interest through MarketClient leaves active market subs
     { uid: spotUid, symbol: spotUid, providerRef: { ...ref, category: "spot" }, baseCoin: "BTC" },
     { uid: "shares", symbol: "SBER" }
   ];
+  client.publicMarket.sync(client.rows);
   client.subscribeCandles(linearUid, "1h");
   const prior = subscriptions.length;
   assert.ok(prior > 0);

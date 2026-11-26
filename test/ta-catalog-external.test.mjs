@@ -176,19 +176,21 @@ for (const mode of ["lightweight", "kline"]) {
       fixture.ready();
       const view = fixture.camera();
       const writes = fixture.primaryWrites();
+      const rawOpenInterest = 34_000.123456;
       const observation = {
         unit: { kind: "base", currency: "BTC" },
         rows: [
           { timestamp: bars[2].timestamp, value: 0 },
-          { timestamp: bars[4].timestamp, value: 3 }
+          { timestamp: bars[4].timestamp, value: rawOpenInterest }
         ]
       };
+      const activeStudy = () =>
+        mode === "lightweight"
+          ? fixture.activeSeries().at(-1)
+          : fixture.activeIndicators().find((entry) => entry.name.startsWith("PERSONAL_TA_"));
       const output = () => {
-        const item =
-          mode === "lightweight"
-            ? fixture.activeSeries().at(-1).data
-            : fixture.activeIndicators().find((entry) => entry.name.startsWith("PERSONAL_TA_"))
-                .result;
+        const study = activeStudy();
+        const item = mode === "lightweight" ? study.data : study.result;
         return item.map(({ value }) => value ?? null);
       };
       assert.deepEqual(output(), [null, null, null, null, null]);
@@ -201,7 +203,14 @@ for (const mode of ["lightweight", "kline"]) {
         openInterest: { ...observation, instrumentKey: fixture.options.row.uid }
       });
       fixture.ready();
-      assert.deepEqual(output(), [null, null, 0, null, 3]);
+      assert.deepEqual(output(), [null, null, 0, null, rawOpenInterest]);
+      if (mode === "lightweight")
+        assert.deepEqual(activeStudy().options().priceFormat, {
+          type: "price",
+          precision: 2,
+          minMove: 0.01
+        });
+      else assert.equal(activeStudy().precision, 2);
       fixture.adapter.updateTechnicalInputs({});
       fixture.ready();
       assert.deepEqual(output(), [null, null, null, null, null]);
