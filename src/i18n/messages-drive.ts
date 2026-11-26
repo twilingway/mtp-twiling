@@ -62,6 +62,30 @@ export const driveMessages = {
   "Google Диск": "Google Drive",
   "Получить из Google Диска": "Get from Google Drive",
   "Отправить на Google Диск": "Send to Google Drive",
+  "Отправляем…": "Sending…",
+  "Получаем…": "Getting…",
+  "Отправляем версию устройства…": "Sending this device's version…",
+  "Получаем версию с Google Диска…": "Getting the Google Drive version…",
+  "Версия устройства отправлена на Google Диск.": "This device's version was sent to Google Drive.",
+  "Версия с Google Диска применена на устройстве.":
+    "The Google Drive version was applied to this device.",
+  "Версии изменились. Сравните их и повторите выбор.":
+    "The versions changed. Compare them and choose again.",
+  "Дождитесь загрузки графика и повторите выбор.": "Wait for the chart to load, then choose again.",
+  "Завершите или отмените разметку и повторите выбор.":
+    "Finish or cancel the drawing, then choose again.",
+  "Дождитесь завершения операции в рабочем пространстве и повторите выбор.":
+    "Wait for the workspace operation to finish, then choose again.",
+  "Отправка на Google Диск не подтверждена.": "Sending to Google Drive was not confirmed.",
+  "Получение версии с Google Диска не подтверждено.":
+    "Getting the Google Drive version was not confirmed.",
+  "Повторить синхронизацию": "Retry sync",
+  "Не удалось сохранить отметку синхронизации на этом устройстве. Повторите синхронизацию.":
+    "Could not save the sync status on this device. Retry sync.",
+  "Нет интернета. Подключитесь и повторите синхронизацию.":
+    "You're offline. Reconnect and retry sync.",
+  "Локальные данные изменились. Повторите синхронизацию, чтобы проверить версии.":
+    "Local data changed. Retry sync to check the versions.",
   "Вход Google действует до истечения сессии или перезагрузки приложения. После этого войдите повторно; сохранённые данные останутся.":
     "Google sign-in lasts until the session expires or the app reloads. Sign in again afterwards; saved data is retained.",
   "Подключение Google отменено": "Google sign-in cancelled",

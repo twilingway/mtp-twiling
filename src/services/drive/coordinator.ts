@@ -10,13 +10,16 @@ import {
   restoredDriveStatus,
   initialDriveStatus
 } from "./coordinator-reader.js";
-import { assertDriveInspectionUnchanged, driveInspectionIdentity } from "./reader-guard.js";
+import { assertDriveInspectionUnchanged } from "./reader-guard.js";
+import { finishDriveChoice, resolveDriveChoice } from "./coordinator-choice.js";
 import { driveAvailable, driveFailure, prepareDriveIdentity } from "./coordinator-status.js";
 import { LegacyDriveMigration } from "./legacy.js";
 import { acceptDriveRecord } from "./accept.js";
 import { applyDriveBackup } from "./apply.js";
 import type {
   DriveBridge,
+  DriveChoiceAction,
+  DriveChoicePreview,
   DriveDependencies,
   DriveRecord,
   DriveStatus
@@ -41,8 +44,7 @@ export class DriveCoordinator {
   private busy = false;
   private applyingEpoch: number | undefined;
   private debounce: ReturnType<typeof setTimeout> | undefined;
-  private preview:
-    { heads: string[]; digest: string; revision: number; identity: string } | undefined;
+  private preview: DriveChoicePreview | undefined;
   constructor(
     private readonly bridge: DriveBridge,
     private readonly dependencies: DriveDependencies
@@ -170,7 +172,12 @@ export class DriveCoordinator {
     this.session = profile.session;
     const epoch = ++this.epoch,
       pending = this.dependencies.auth.connectFromUserGesture(profile.owner);
-    this.update({ phase: "connecting", error: undefined, conflict: undefined });
+    this.update({
+      phase: "connecting",
+      error: undefined,
+      conflict: undefined,
+      choiceAction: undefined
+    });
     try {
       const authorization = await pending;
       if (!this.profileCurrent(epoch)) {
@@ -200,6 +207,7 @@ export class DriveCoordinator {
           phase: "auth-required",
           connected: false,
           conflict: undefined,
+          choiceAction: finishDriveChoice(this.status.choiceAction, "unconfirmed"),
           pauseReason: "auth-required",
           error: "auth-required",
           authorizationStored: false,
@@ -244,6 +252,7 @@ export class DriveCoordinator {
       connectedThisSession: undefined,
       automaticBlockedByFormat: undefined,
       conflict: undefined,
+      choiceAction: undefined,
       error: undefined,
       authorizationStored: false,
       credentialSaveError: false,
@@ -312,7 +321,13 @@ export class DriveCoordinator {
       revision = this.revision;
     this.busy = true;
     this.preview = undefined;
-    this.update({ phase: "syncing", error: undefined, conflict: undefined });
+    this.update({
+      phase: "syncing",
+      error: undefined,
+      conflict: undefined,
+      choiceAction:
+        this.status.choiceAction?.state === "confirmed" ? this.status.choiceAction : undefined
+    });
     try {
       const backup = sanitizeDriveBackup(await this.bridge.exportBackup());
       this.check(epoch, revision);
@@ -365,7 +380,8 @@ export class DriveCoordinator {
     backup: Backup,
     digest: string,
     epoch: number,
-    revision: number
+    revision: number,
+    choiceAction?: DriveChoiceAction
   ): Promise<void> {
     const next = await readableDriveConflict(
       this.remote!,
@@ -376,74 +392,57 @@ export class DriveCoordinator {
       () => this.check(epoch, revision)
     );
     this.preview = next.preview;
-    this.update({ phase: "conflict", conflict: next.conflict, pauseReason: undefined });
+    this.update({
+      phase: "conflict",
+      conflict: next.conflict,
+      pauseReason: undefined,
+      choiceAction
+    });
   }
   async choose(nodeId: string): Promise<void> {
     const preview = this.preview,
       remote = this.remote,
       record = this.record;
-    if (
-      !preview ||
-      !remote ||
-      !record ||
-      this.busy ||
-      this.bridge.profile().blocked ||
-      !this.available()
-    )
-      return;
+    if (!preview || !remote || !record || this.busy) return;
     const epoch = this.epoch,
       revision = this.revision;
+    if (nodeId !== "local" && !preview.heads.includes(nodeId)) {
+      this.update({ choiceAction: { nodeId, state: "review" } });
+      return;
+    }
+    if (this.bridge.profile().blocked) {
+      this.update({ choiceAction: { nodeId, state: "blocked" } });
+      return;
+    }
+    if (!this.available()) {
+      if (this.profileCurrent(epoch))
+        this.update({ choiceAction: { nodeId, state: "unconfirmed" } });
+      return;
+    }
     this.busy = true;
-    this.update({ phase: "syncing", error: undefined });
+    this.update({ phase: "syncing", error: undefined, choiceAction: { nodeId, state: "running" } });
     try {
-      const local = sanitizeDriveBackup(await this.bridge.exportBackup()),
-        digest = await driveBackupDigest(local);
-      this.check(epoch, revision);
-      const inspection = await remote.inspect();
-      this.check(epoch, revision);
-      if (
-        digest !== preview.digest ||
-        revision !== preview.revision ||
-        driveInspectionIdentity(inspection) !== preview.identity
-      ) {
-        await this.conflict(inspection, local, digest, epoch, revision);
+      const result = await resolveDriveChoice(nodeId, preview, {
+        remote,
+        deviceId: record.deviceId,
+        revision,
+        exportBackup: () => this.bridge.exportBackup(),
+        check: () => this.check(epoch, revision)
+      });
+      if (result.kind === "review") {
+        await this.conflict(result.inspection, result.backup, result.digest, epoch, revision, {
+          nodeId,
+          state: "review"
+        });
         return;
       }
-      if (nodeId !== "local" && !preview.heads.includes(nodeId)) return;
-      const backup = nodeId === "local" ? local : await remote.download(nodeId, inspection);
       this.check(epoch, revision);
-      let heads = inspection.heads;
-      if (nodeId === "local" || heads.length > 1) {
-        const result = await (heads.length > 1
-          ? remote.resolve(backup, {
-              deviceId: record.deviceId,
-              parents: heads,
-              expectedInspection: inspection
-            })
-          : remote.publish(backup, {
-              deviceId: record.deviceId,
-              parents: heads,
-              expectedInspection: inspection
-            }));
-        this.check(epoch, revision);
-        // The chosen backup belongs to our node. A newer descendant may already be the
-        // inspected head; acknowledging it here would silently skip its unseen payload.
-        heads = [result.nodeId];
-        if (result.inspection.conflict) {
-          await this.conflict(result.inspection, local, digest, epoch, revision);
-          return;
-        }
-      } else {
-        const latest = await remote.inspect();
-        this.check(epoch, revision);
-        assertDriveInspectionUnchanged(inspection, latest);
-      }
-      if (nodeId === "local") await this.accept(heads, digest, epoch, revision);
-      else await this.apply(backup, heads, epoch, revision);
+      if (nodeId === "local") await this.accept(result.heads, result.digest, epoch, revision);
+      else await this.apply(result.backup, result.heads, epoch, revision);
     } catch (error) {
       if (this.current(epoch)) {
         this.preview = undefined;
-        this.update({ conflict: undefined });
+        this.update({ conflict: undefined, choiceAction: { nodeId, state: "unconfirmed" } });
         this.fail(error);
       }
     } finally {
@@ -492,6 +491,7 @@ export class DriveCoordinator {
       lastSyncedAt,
       pendingChanges: revision !== this.revision,
       conflict: undefined,
+      choiceAction: finishDriveChoice(this.status.choiceAction, "confirmed"),
       error: undefined,
       pauseReason: undefined
     });

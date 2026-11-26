@@ -10,6 +10,7 @@ export type DriveErrorCode =
   | "not-ready"
   | "busy"
   | "network"
+  | "local-save"
   | "quota"
   | "permission"
   | "remote-invalid"
