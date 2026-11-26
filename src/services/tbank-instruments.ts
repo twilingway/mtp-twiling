@@ -5,6 +5,7 @@ import {
   matchesCurrencyAlias
 } from "../model/currency-search.js";
 import { normaliseInstruments } from "./types.js";
+import { sortInstrumentSearch } from "../model/instrument-search-sort.js";
 
 export async function searchCatalog(
   catalog: Catalog | undefined,
@@ -34,22 +35,11 @@ export async function searchCatalog(
     const instruments = await find(currencyFallbackQuery(query), signal);
     if (signal?.aborted) return [];
     result = normaliseInstruments(instruments)
-      .map((item) => ({
-        ...item,
-        kind: catalogInstrumentKind(item)
-      }))
+      .map((item) => {
+        const kind = catalogInstrumentKind(item);
+        return kind ? { ...item, kind } : item;
+      })
       .filter(matches);
   }
-  return result
-    .sort((a, b) => {
-      const pa = a.ticker.toLowerCase().startsWith(needle) ? 0 : 1,
-        pb = b.ticker.toLowerCase().startsWith(needle) ? 0 : 1;
-      return (
-        pa - pb ||
-        (a.expirationDate && b.expirationDate
-          ? Date.parse(a.expirationDate) - Date.parse(b.expirationDate)
-          : a.ticker.localeCompare(b.ticker))
-      );
-    })
-    .slice(0, 80);
+  return sortInstrumentSearch(result, query).slice(0, 80);
 }

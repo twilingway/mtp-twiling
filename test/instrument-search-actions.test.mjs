@@ -44,6 +44,7 @@ function searchFixture(t, results, rows, query = "CNY") {
   let hook = 0;
   const load = sourceModules({
     react: {
+      useMemo: (factory) => factory(),
       useState: (initial) => {
         const index = hook++;
         if (!(index in stores)) stores[index] = initial;
@@ -174,5 +175,22 @@ test("identity checks use provider, product, UID or an unambiguous FIGI", () => 
   assert.equal(
     searchWatchlistRow([legacy, { ...legacy }], { ...added, figi: legacy.figi }),
     undefined
+  );
+});
+
+test("the result displays only the exact cached price and uses the instrument's price precision", (t) => {
+  const item = { ...added, currency: "rub" };
+  const other = { ...missing, currency: "rub" };
+  const f = searchFixture(t, [item, other], [{ ...savedRow, price: 12.299, step: 0.001 }]);
+  const prices = f.render().filter((item) => item.props.className === "instrument-result-price");
+  assert.deepEqual(
+    prices.map((item) => item.props.children),
+    ["12,299 RUB", "— RUB"]
+  );
+  const order = f.render().find((item) => item.props.className === "instrument-search-order");
+  assert.equal(order.props.value, "relevance");
+  assert.deepEqual(
+    order.props.children.map((item) => item.props.value),
+    ["relevance", "ticker", "source"]
   );
 });

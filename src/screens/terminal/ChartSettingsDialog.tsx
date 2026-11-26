@@ -14,6 +14,7 @@ import {
 import { PriceAxisLabelFields } from "./PriceAxisLabelFields.js";
 import { TimeZonePicker } from "./ClockZoneControl.js";
 import { ChartEngineSelect } from "./ChartEngineSelect.js";
+import { ChartSettingsSections } from "./ChartSettingsSections.js";
 import {
   MAX_VOLUME_AVERAGE_PERIOD,
   isVolumeAveragePeriod,
@@ -39,6 +40,20 @@ export function ChartSettingsDialog() {
   const [timeZone, setTimeZone] = useState(state.preferences.timeZone ?? "Europe/Moscow");
   const [engine, setEngine] = useState<ChartEngine>();
   const update = (patch: ChartSettings) => setSettings((previous) => ({ ...previous, ...patch }));
+  const toggle = (
+    key: "grid" | "showLegend" | "priceLine" | "showCandleCountdown",
+    label: string
+  ) => (
+    <label className="checkbox-label">
+      <input
+        type="checkbox"
+        name={key}
+        checked={settings[key] !== false}
+        onChange={(e) => update({ [key]: e.target.checked })}
+      />
+      {t(label)}
+    </label>
+  );
   return (
     <Modal
       id="chart-settings-dialog"
@@ -66,195 +81,205 @@ export function ChartSettingsDialog() {
             });
         }}
       >
-        <div className="display-preferences">
-          <label htmlFor="chart-settings-engine">
-            {t("Библиотека графика")}
-            <ChartEngineSelect
-              id="chart-settings-engine"
-              value={engine ?? state.preferences.engine}
-              onChange={setEngine}
-            />
-          </label>
-          <label>
-            {t("Язык")}
-            <select
-              name="locale"
-              value={locale}
-              onChange={(event) => setLocale(event.target.value === "en" ? "en" : "ru")}
-            >
-              <option value="ru">{t("Русский")}</option>
-              <option value="en">English</option>
-            </select>
-          </label>
-          <label>{t("Часовой пояс")}</label>
-          <TimeZonePicker
-            value={timeZone}
-            locale={locale}
-            now={controller.marketNow()}
-            onChange={setTimeZone}
-          />
-        </div>
-        <h3>{t("Инструмент")}</h3>
-        {CANDLE_PARTS.map(([visible, label, up, down]) => (
-          <div className="drawing-style-row" key={visible}>
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                name={visible}
-                checked={settings[visible] !== false}
-                onChange={(e) => update({ [visible]: e.target.checked })}
-              />
-              {t(label)}
-            </label>
-            <label>
-              {t("Рост")}
-              <input
-                type="color"
-                name={up}
-                value={settings[up] ?? TRADINGVIEW_CANDLE_STYLE[up]}
-                onChange={(e) => update({ [up]: e.target.value })}
-              />
-            </label>
-            <label>
-              {t("Падение")}
-              <input
-                type="color"
-                name={down}
-                value={settings[down] ?? TRADINGVIEW_CANDLE_STYLE[down]}
-                onChange={(e) => update({ [down]: e.target.value })}
-              />
-            </label>
-          </div>
-        ))}
-        <button type="button" onClick={() => update(TRADINGVIEW_CANDLE_STYLE)}>
-          {t("Цвета как в вашем TradingView")}
-        </button>
-        <h3>{t("Оформление")}</h3>
-        <label>
-          {t("Тема интерфейса")}
-          <select
-            name="theme"
-            value={terminalTheme(settings)}
-            onChange={(e) =>
-              setSettings((previous) =>
-                withTheme(previous, e.target.value === "light" ? "light" : "dark")
-              )
-            }
-          >
-            <option value="dark">{t("Тёмная")}</option>
-            <option value="light">{t("Светлая")}</option>
-          </select>
-        </label>
-        <label>
-          {t("Фон")}
-          <input
-            type="color"
-            name="background"
-            value={chartBackground(settings)}
-            onChange={(e) => update({ background: e.target.value })}
-          />
-        </label>
-        <label>
-          {t("Данные свечи (OHLC)")}
-          <select
-            name="ohlcDisplay"
-            value={ohlcDisplayMode(settings)}
-            onChange={(event) => {
-              const option = OHLC_MODES.find(([value]) => value === event.target.value);
-              if (option) update({ ohlcDisplay: option[0] });
-            }}
-          >
-            {OHLC_MODES.map(([value, label]) => (
-              <option key={value} value={value}>
-                {t(label)}
-              </option>
-            ))}
-          </select>
-        </label>
-        {ohlcDisplayMode(settings) === "candle" && (
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              name="ohlcOnHold"
-              checked={settings.ohlcOnHold === true}
-              onChange={(event) => update({ ohlcOnHold: event.target.checked })}
-            />
-            {t("Подсказывать значения при удержании")}
-          </label>
-        )}
-        {(
-          [
-            ["grid", t("Линии сетки")],
-            ["showLegend", t("Названия индикаторов")],
-            ["priceLine", t("Линия последней цены")],
-            ["showCandleCountdown", t("Отсчёт до закрытия свечи")]
-          ] as const
-        ).map(([key, label]) => (
-          <label className="checkbox-label" key={key}>
-            <input
-              type="checkbox"
-              name={key}
-              checked={settings[key] !== false}
-              onChange={(e) => update({ [key]: e.target.checked })}
-            />
-            {t(label)}
-          </label>
-        ))}
-        <div className="drawing-style-row">
-          <label className="checkbox-label">
-            <input
-              type="checkbox"
-              name="custom-last-price"
-              checked={settings.lastPriceColor !== undefined}
-              onChange={(event) => {
-                if (event.target.checked) {
-                  update({ lastPriceColor: DEFAULT_LAST_PRICE_COLOR });
-                  return;
-                }
-                setSettings((previous) => {
-                  const next = { ...previous };
-                  delete next.lastPriceColor;
-                  return next;
-                });
-              }}
-            />
-            {t("Свой цвет линии последней цены")}
-          </label>
-          {settings.lastPriceColor !== undefined && (
-            <input
-              type="color"
-              name="lastPriceColor"
-              aria-label={t("Цвет линии последней цены")}
-              value={settings.lastPriceColor}
-              onChange={(event) => update({ lastPriceColor: event.target.value })}
-            />
-          )}
-        </div>
-        <PriceAxisLabelFields
-          settings={settings}
-          onChange={(theme, label, field, color) =>
-            setSettings((previous) =>
-              updatePriceAxisLabelColor(previous, theme, label, field, color)
+        <ChartSettingsSections
+          content={{
+            instrument: (
+              <>
+                <label htmlFor="chart-settings-engine">
+                  {t("Библиотека графика")}
+                  <ChartEngineSelect
+                    id="chart-settings-engine"
+                    value={engine ?? state.preferences.engine}
+                    onChange={setEngine}
+                  />
+                </label>
+                {CANDLE_PARTS.map(([visible, label, up, down]) => (
+                  <div className="drawing-style-row" key={visible}>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        name={visible}
+                        checked={settings[visible] !== false}
+                        onChange={(e) => update({ [visible]: e.target.checked })}
+                      />
+                      {t(label)}
+                    </label>
+                    <label>
+                      {t("Рост")}
+                      <input
+                        type="color"
+                        name={up}
+                        value={settings[up] ?? TRADINGVIEW_CANDLE_STYLE[up]}
+                        onChange={(e) => update({ [up]: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      {t("Падение")}
+                      <input
+                        type="color"
+                        name={down}
+                        value={settings[down] ?? TRADINGVIEW_CANDLE_STYLE[down]}
+                        onChange={(e) => update({ [down]: e.target.value })}
+                      />
+                    </label>
+                  </div>
+                ))}
+                <button
+                  className="chart-candle-preset"
+                  type="button"
+                  onClick={() => update(TRADINGVIEW_CANDLE_STYLE)}
+                >
+                  {t("Цвета как в вашем TradingView")}
+                </button>
+              </>
+            ),
+            status: (
+              <>
+                <label>
+                  {t("Данные свечи (OHLC)")}
+                  <select
+                    name="ohlcDisplay"
+                    value={ohlcDisplayMode(settings)}
+                    onChange={(event) => {
+                      const option = OHLC_MODES.find(([value]) => value === event.target.value);
+                      if (option) update({ ohlcDisplay: option[0] });
+                    }}
+                  >
+                    {OHLC_MODES.map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {t(label)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {ohlcDisplayMode(settings) === "candle" && (
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      name="ohlcOnHold"
+                      checked={settings.ohlcOnHold === true}
+                      onChange={(event) => update({ ohlcOnHold: event.target.checked })}
+                    />
+                    {t("Подсказывать значения при удержании")}
+                  </label>
+                )}
+                {toggle("showLegend", "Названия индикаторов")}
+              </>
+            ),
+            scales: (
+              <>
+                {toggle("priceLine", "Линия последней цены")}
+                <div className="drawing-style-row">
+                  <label className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      name="custom-last-price"
+                      checked={settings.lastPriceColor !== undefined}
+                      onChange={(event) => {
+                        if (event.target.checked) {
+                          update({ lastPriceColor: DEFAULT_LAST_PRICE_COLOR });
+                          return;
+                        }
+                        setSettings((previous) => {
+                          const next = { ...previous };
+                          delete next.lastPriceColor;
+                          return next;
+                        });
+                      }}
+                    />
+                    {t("Свой цвет линии последней цены")}
+                  </label>
+                  {settings.lastPriceColor !== undefined && (
+                    <input
+                      type="color"
+                      name="lastPriceColor"
+                      aria-label={t("Цвет линии последней цены")}
+                      value={settings.lastPriceColor}
+                      onChange={(event) => update({ lastPriceColor: event.target.value })}
+                    />
+                  )}
+                </div>
+                {toggle("showCandleCountdown", "Отсчёт до закрытия свечи")}
+                <PriceAxisLabelFields
+                  settings={settings}
+                  onChange={(theme, label, field, color) =>
+                    setSettings((previous) =>
+                      updatePriceAxisLabelColor(previous, theme, label, field, color)
+                    )
+                  }
+                />
+                <label>
+                  {t("Размер шрифта шкал")}
+                  <select
+                    name="scaleFontSize"
+                    value={settings.scaleFontSize ?? 11}
+                    onChange={(e) => update({ scaleFontSize: Number(e.target.value) })}
+                  >
+                    {[10, 11, 12, 13, 14].map((n) => (
+                      <option key={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+                <div className="chart-settings-zone">
+                  <span>{t("Часовой пояс")}</span>
+                  <TimeZonePicker
+                    value={timeZone}
+                    locale={locale}
+                    now={controller.marketNow()}
+                    onChange={setTimeZone}
+                  />
+                </div>
+              </>
+            ),
+            appearance: (
+              <>
+                <label>
+                  {t("Тема интерфейса")}
+                  <select
+                    name="theme"
+                    value={terminalTheme(settings)}
+                    onChange={(e) =>
+                      setSettings((previous) =>
+                        withTheme(previous, e.target.value === "light" ? "light" : "dark")
+                      )
+                    }
+                  >
+                    <option value="dark">{t("Тёмная")}</option>
+                    <option value="light">{t("Светлая")}</option>
+                  </select>
+                </label>
+                <label>
+                  {t("Фон")}
+                  <input
+                    type="color"
+                    name="background"
+                    value={chartBackground(settings)}
+                    onChange={(e) => update({ background: e.target.value })}
+                  />
+                </label>
+                {toggle("grid", "Линии сетки")}
+                <label>
+                  {t("Язык")}
+                  <select
+                    name="locale"
+                    value={locale}
+                    onChange={(event) => setLocale(event.target.value === "en" ? "en" : "ru")}
+                  >
+                    <option value="ru">{t("Русский")}</option>
+                    <option value="en">English</option>
+                  </select>
+                </label>
+              </>
             )
-          }
+          }}
         />
-        <label>
-          {t("Размер шрифта шкал")}
-          <select
-            name="scaleFontSize"
-            value={settings.scaleFontSize ?? 11}
-            onChange={(e) => update({ scaleFontSize: Number(e.target.value) })}
-          >
-            {[10, 11, 12, 13, 14].map((n) => (
-              <option key={n}>{n}</option>
-            ))}
-          </select>
-        </label>
         <footer>
           <button type="button" onClick={() => controller.setDialog(null)}>
             {t("Отмена")}
           </button>
-          <button className="primary-button">{t("Ок")}</button>
+          <button type="submit" className="primary-button">
+            {t("Ок")}
+          </button>
         </footer>
       </form>
     </Modal>

@@ -9,6 +9,7 @@ import type { WatchlistMove } from "./watchlist-order.js";
 import { profileKey } from "./profile-key.js";
 import { isBankIdentity, validProviderIdentity } from "../model/market-provider.js";
 import { selectedMarketRow } from "../model/selected-instrument.js";
+import { sortInstrumentSearch } from "../model/instrument-search-sort.js";
 import { nativeTimeframe, NATIVE_TIMEFRAME_CONFIG } from "../model/intervals/native-timeframes.js";
 import type {
   MarketRow,
@@ -241,7 +242,7 @@ export class MarketClient extends EventTarget {
     if (error && !rows.length)
       throw error instanceof Error ? error : new Error("Источник котировок недоступен.");
     if (error) this.emit("notice", "Один из источников недоступен; показаны доступные результаты.");
-    return rows.slice(0, 160);
+    return rows.length > 160 ? sortInstrumentSearch(rows, query).slice(0, 160) : rows;
   }
   addInstrument(instrument: CatalogInstrument): Promise<MarketRow> {
     return this.mutations.run(async () => {
