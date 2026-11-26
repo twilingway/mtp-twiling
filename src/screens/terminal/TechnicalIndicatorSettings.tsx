@@ -31,7 +31,11 @@ const labels: Readonly<Record<string, readonly [string, string]>> = {
   smoothK: ["Сглаживание K", "K smoothing"],
   smoothD: ["Сглаживание D", "D smoothing"],
   expansionLength: ["Период максимального расширения", "Highest expansion length"],
-  contractionLength: ["Период минимального сжатия", "Lowest contraction length"]
+  contractionLength: ["Период минимального сжатия", "Lowest contraction length"],
+  divisor: ["Делитель", "Divisor"],
+  emaLength: ["Период EMA", "EMA length"],
+  oscillatorAverage: ["Тип средней осциллятора", "Oscillator MA type"],
+  signalAverage: ["Тип сигнальной средней", "Signal MA type"]
 };
 
 export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIndicatorInstance }) {
@@ -96,7 +100,7 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
             params: Object.fromEntries(
               definition.parameters.map((parameter) => [
                 parameter.key,
-                parameter.type === "source"
+                parameter.type === "source" || parameter.type === "choice"
                   ? parameters[parameter.key]
                   : Number(parameters[parameter.key])
               ])
@@ -130,16 +134,18 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
           {definition.parameters.map((parameter) => (
             <label key={parameter.key}>
               <span>{labels[parameter.key]?.[english ? 1 : 0] ?? parameter.key}</span>
-              {parameter.type === "source" ? (
+              {parameter.type === "source" || parameter.type === "choice" ? (
                 <select
                   value={parameters[parameter.key]}
                   onChange={(event) =>
                     setParameters({ ...parameters, [parameter.key]: event.target.value })
                   }
                 >
-                  {PRICE_SOURCES.map((source) => (
-                    <option key={source}>{source}</option>
-                  ))}
+                  {(parameter.type === "source" ? PRICE_SOURCES : parameter.choices).map(
+                    (source) => (
+                      <option key={source}>{source}</option>
+                    )
+                  )}
                 </select>
               ) : (
                 <input
