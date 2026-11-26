@@ -1,4 +1,12 @@
 export const driveMessages = {
+  "Обновите приложение": "Update the app",
+  "Старые версии": "Older versions",
+  "Конфликт версий": "Version conflict",
+  "Нужен вход": "Sign-in required",
+  "Нет интернета": "Offline",
+  "Ожидаем проверки": "Check pending",
+  "Нет связи": "Unreachable",
+  "Не отправлено": "Unsynced changes",
   "Автосинхронизация с Google Диском приостановлена.": "Google Drive auto-sync is paused.",
   "Изменения ещё не синхронизированы.": "Changes haven't synced yet.",
   "Открыть настройки Google Диска": "Open Google Drive settings",

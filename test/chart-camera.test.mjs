@@ -99,7 +99,7 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
     dataWrites = 0,
     paneWrites = 0;
   const actions = new Map(),
-    calls = [], priceFormats = [], formatRedraws = [],
+    calls = [], priceFormats = [], formatRedraws = [], lastPriceStrokes = [],
     primitives = [],
     frames = new Map();
   let constructedOptions;
@@ -300,7 +300,11 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
         }
       ]
     };
-    const ctx = { setTransform() {}, clearRect() {} };
+    const ctx = {
+      setTransform() {}, clearRect() {}, save() {}, restore() {}, beginPath() {},
+      setLineDash() {}, moveTo() {}, lineTo() {},
+      stroke() { lastPriceStrokes.push(this.strokeStyle); }
+    };
     factory = sources(
       {
         klinecharts: {
@@ -341,6 +345,7 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
     calls,
     priceFormats,
     formatRedraws,
+    lastPriceStrokes,
     chartOptions: () => constructedOptions,
     primitives,
     priceLabels,
@@ -401,6 +406,55 @@ for(const engine of ["lightweight","kline"]){
   assert.deepEqual(f.nativeWrites(), nativeBefore);
   if (engine === "kline") assert.equal(f.nativeLastPriceLabel(), "57.365000");
  });
+}
+
+for (const engine of ["lightweight", "kline"]) {
+  test(`${engine}: themed label colors update in place independently of the last-price line`, () => {
+    const f = harness(engine);
+    const timestamp = Date.UTC(2026, 0, 2);
+    f.adapter.setData(
+      [{ timestamp, open: 57.36, high: 57.4, low: 57.33, close: 57.38, volume: 1 }],
+      false
+    );
+    f.ready();
+    const before = f.camera();
+    const writes = f.nativeWrites();
+    const [source] = f.priceLabels;
+    const originalColor = source?.options.color;
+    const colors = { fill: "#3a3245", text: "#ffdd55" };
+    f.adapter.setLastPriceLabelColors(colors);
+    f.ready();
+    if (engine === "lightweight") {
+      assert.equal([...f.priceLabels][0], source);
+      assert.equal(source.options.color, originalColor);
+      assert.equal(source.options.axisLabelColor, colors.fill);
+      assert.equal(source.options.axisLabelTextColor, colors.text);
+      assert.equal(source.options.lineVisible, true);
+    } else {
+      const native = f.formatRedraws.at(-1).candle.priceMark.last;
+      assert.equal(native.upColor, colors.fill);
+      assert.equal(native.downColor, colors.fill);
+      assert.equal(native.text.color, colors.text);
+      assert.equal(native.line.show, false);
+      assert.equal(f.lastPriceStrokes.at(-1), "#53b987");
+      const calls = f.formatRedraws.length;
+      f.adapter.setLastPriceLabelColors({ ...colors });
+      assert.equal(f.formatRedraws.length, calls);
+    }
+
+    const strokes = f.lastPriceStrokes.length;
+    f.adapter.setLastPriceLabelColors(null);
+    f.ready();
+    assert.deepEqual(f.camera(), before);
+    assert.deepEqual(f.nativeWrites(), writes);
+    if (engine === "lightweight") {
+      assert.equal([...f.priceLabels][0], source);
+      assert.equal(source.options.axisLabelColor, originalColor);
+    } else {
+      assert.equal(f.formatRedraws.at(-1).candle.priceMark.last.line.show, true);
+      assert.equal(f.lastPriceStrokes.length, strokes);
+    }
+  });
 }
 
 test("Lightweight binds real and visible future calendar grid to the bottom primitive without changing camera", () => {

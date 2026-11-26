@@ -1,23 +1,64 @@
 .drive-pause-banner[data-active="true"] {
-  display: flex;
+  display: block;
   flex: none;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px 14px;
-  padding: 8px 12px;
-  background: var(--accent-surface);
-  border-bottom: 1px solid var(--control-line);
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.4;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-input);
 }
 .drive-pause-banner button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
   min-height: 32px;
-  padding: 4px 8px;
-  border: 1px solid var(--accent);
-  border-radius: 5px;
-  color: var(--accent);
+  padding: 3px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 12px;
+  white-space: nowrap;
+  text-align: start;
+}
+.drive-pause-banner button:hover {
+  background: var(--surface-hover);
+}
+.drive-pause-banner button:focus-visible {
+  outline-offset: -3px;
+}
+.drive-pause-banner button svg {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  color: var(--muted);
+}
+.drive-pause-service {
+  font-weight: 600;
+}
+.drive-pause-reason {
+  min-width: 0;
+  margin-inline-end: auto;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+}
+.drive-pause-banner:is([data-reason="conflict"], [data-reason="legacy"], [data-reason="format"])
+  .drive-pause-reason {
+  color: var(--danger);
+  font-weight: 600;
+}
+.drive-pause-pending {
+  padding-inline-start: 8px;
+  border-inline-start: 1px solid var(--control-line);
+}
+.drive-pause-description {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 #root:has(> .drive-pause-banner[data-active="true"]) {
   display: flex;

@@ -205,9 +205,19 @@ export interface VolumeAverageSettings {
   enabled: boolean;
   period: number;
 }
+export interface PriceAxisLabelColors {
+  fill?: string;
+  text?: string;
+}
+export interface PriceAxisLabelPalette {
+  lastPrice?: PriceAxisLabelColors;
+  drawings?: PriceAxisLabelColors;
+}
+export type PriceAxisLabelThemes = Partial<Record<"light" | "dark", PriceAxisLabelPalette>>;
 export interface ChartSettings {
   legendCollapsed?: boolean;
   mtpMenuCollapsed?: boolean;
+  mtpAllHidden?: boolean;
   theme?: "dark" | "light";
   drawingTools?: DrawingToolbarSettings;
   removedIndicators?: IndicatorKey[];
@@ -228,6 +238,7 @@ export interface ChartSettings {
   showLegend?: boolean;
   priceLine?: boolean;
   lastPriceColor?: string;
+  priceAxisLabels?: PriceAxisLabelThemes;
   indicatorOptions?: IndicatorOptions;
   volumeAverage?: VolumeAverageSettings;
   drawingTemplates?: Record<string, DrawingTemplate>;

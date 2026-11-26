@@ -10,7 +10,7 @@ import { focusRange } from "./navigation.js";
 import { PendingChartView } from "./view-camera.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { chartPalette } from "../model/theme.js";
-import { lastPriceStyle } from "../model/last-price-style.js";
+import { lastPriceLabelColors, lastPriceStyle } from "../model/last-price-style.js";
 import { hasCalendarAxis } from "../model/intervals/axis-ticks.js";
 import { paintCalendarAxis, paintCalendarGrid } from "./lightweight-calendar-grid.js";
 import { lightweightDateFormatters } from "../i18n/chart-formatters.js";
@@ -40,6 +40,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     settleFrame: number | null = null;
   const pendingView = new PendingChartView();
   let lastPriceLabel: IPriceLine | null = null;
+  let labelColors = lastPriceLabelColors(settings);
   const palette = chartPalette(settings);
   const dateFormatters = lightweightDateFormatters(timeframe, options);
   const display = calendarAxisDisplay(timeframe, options);
@@ -240,11 +241,11 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       lastPriceLabel = null;
       return;
     }
-    const { color, text } = lastPriceStyle(settings, bar.close >= bar.open);
+    const { color, fill, text } = lastPriceStyle(settings, bar.close >= bar.open, labelColors);
     const label = {
       price: bar.close,
       color,
-      axisLabelColor: color,
+      axisLabelColor: fill,
       axisLabelTextColor: text,
       axisLabelVisible: true,
       lineVisible: settings.priceLine !== false,
@@ -296,6 +297,15 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
   const projectionDelta = () =>
     technical.hasProjectedPlots() ? projectedBaseDelta(chart.timeScale(), data.length) : 0;
   const adapter: ChartAdapter = {
+    setLastPriceLabelColors(colors) {
+      if (
+        live.retired ||
+        (colors?.fill === labelColors?.fill && colors?.text === labelColors?.text)
+      )
+        return;
+      labelColors = colors;
+      camera.programmatic(updateLastPriceLabel);
+    },
     updatePriceFormat(metadata) {
       if (
         live.retired ||

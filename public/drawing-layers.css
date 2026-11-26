@@ -83,9 +83,17 @@
 }
 .chart-measurement,
 .chart-measurement-prompt {
+  --measurement-color: var(--muted, #9598a1);
+  --measurement-ink: color-mix(in srgb, var(--measurement-color) 72%, var(--text, #d4d4d4));
   position: absolute;
   z-index: 9;
   pointer-events: none;
+}
+.chart-measurement[data-measurement-direction="up"] {
+  --measurement-color: var(--up, #089981);
+}
+.chart-measurement[data-measurement-direction="down"] {
+  --measurement-color: var(--down, #f23645);
 }
 .chart-measurement {
   inset: 0 auto auto 0;
@@ -96,26 +104,28 @@
   inset: 0;
 }
 .chart-measurement-area {
-  fill: #168b7530;
+  fill: var(--measurement-color);
+  fill-opacity: 0.16;
 }
-.chart-measurement-path {
+.chart-measurement-arrow {
   fill: none;
-  stroke: #169880;
-  stroke-width: 2;
-  stroke-dasharray: 5 3;
+  stroke: var(--measurement-ink);
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .chart-measurement circle {
-  fill: #117561;
-  stroke: #ffffff;
+  fill: var(--measurement-ink);
+  stroke: var(--chart-background, var(--surface, #000));
   stroke-width: 1.5;
 }
 .chart-measurement-card,
 .chart-measurement-prompt {
-  color: #ffffff;
-  background: #143c35;
+  color: var(--text, #d4d4d4);
+  background: color-mix(in srgb, var(--measurement-color) 12%, var(--surface-raised, #111));
   box-shadow:
-    0 0 0 1px #ffffff90,
-    0 2px 8px #0004;
+    0 0 0 1px color-mix(in srgb, var(--measurement-ink) 55%, var(--control-line, #444)),
+    0 2px 8px var(--shadow, #0004);
   border-radius: 5px;
   padding: 5px 8px;
   font-size: 11px;
@@ -131,9 +141,7 @@
 }
 .chart-measurement-card strong {
   font-size: 12px;
-}
-.chart-measurement-card strong span {
-  color: #b5f5df;
+  color: var(--measurement-ink);
 }
 .chart-measurement-prompt {
   left: 6px;

@@ -333,6 +333,45 @@ test("enabling volume with an active average schedules optional backfill only", 
   assert.equal(f.reloads(), 0);
 });
 
+test("hiding combined MTP keeps a single legend row and never reveals its separate ranges", async () => {
+  const f = terminalFixture(),
+    { changeMenuIndicator } = f.load("screens/terminal/indicator-menu-actions.js"),
+    { indicatorLegendKeys, indicatorShown } = f.load("model/indicator-legend.js"),
+    { chartRenderConfigKey, chartRenderConfigFromKey } = f.load("charts/render-config.js");
+  await changeMenuIndicator(f.controller, "mtpAll", true);
+  const initial = f.controller.getSnapshot().preferences;
+  const indicators = { ...initial.indicators, mtp160: true, mtp440: true, mtp640: true };
+  f.controller.update({ preferences: { ...initial, indicators } });
+  const capture = () => {
+    const { chartSettings, indicators } = f.controller.getSnapshot().preferences;
+    const keys = indicatorLegendKeys(chartSettings, indicators).filter((key) => key.startsWith("mtp"));
+    const drawn = chartRenderConfigFromKey(chartRenderConfigKey(chartSettings, indicators)).indicators;
+    return { chartSettings, indicators, keys, drawn };
+  };
+
+  await f.controller.toggleIndicator("mtpAll");
+  const hidden = capture();
+  assert.equal(hidden.indicators, indicators);
+  assert.deepEqual(hidden.keys, ["mtpAll"]);
+  assert.equal(hidden.chartSettings.mtpAllHidden, true);
+  assert.equal(indicatorShown(hidden.chartSettings, indicators, "mtpAll"), false);
+  assert.ok(!Object.entries(hidden.drawn).some(([key, enabled]) => key.startsWith("mtp") && enabled));
+
+  await f.controller.toggleIndicator("mtpAll");
+  const shown = capture();
+  assert.deepEqual(shown.keys, ["mtpAll"]);
+  assert.equal(shown.chartSettings.mtpAllHidden, undefined);
+  assert.equal(shown.drawn.mtpAll, true);
+  assert.equal(f.reloads(), 1);
+
+  await f.controller.toggleIndicator("mtpAll");
+  await changeMenuIndicator(f.controller, "mtpAll");
+  const disabled = capture();
+  assert.equal(disabled.chartSettings.mtpAllHidden, undefined);
+  for (const key of ["mtpAll", "mtp160", "mtp440", "mtp640"])
+    assert.equal(disabled.indicators[key], false);
+});
+
 test("collapse persists per owner through manual backup and Drive, while render config and camera stay identical", async () => {
   const f = terminalFixture(),
     { persistMtpMenuCollapsed } = f.load("screens/terminal/indicator-menu-actions.js");

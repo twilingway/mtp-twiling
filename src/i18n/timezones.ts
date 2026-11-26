@@ -92,16 +92,29 @@ export function supportedTimeZones(): TimeZoneChoice[] {
   const zones = Intl.supportedValuesOf("timeZone");
   return [...new Set([DEFAULT_TIME_ZONE, "UTC", "local", "exchange", ...zones])];
 }
-export function searchTimeZones(query: string, locale: Locale): TimeZoneChoice[] {
+export function searchTimeZones(query: string, locale: Locale, instant: number) {
   const language = intlLocale(locale);
   const needle = query.trim().toLocaleLowerCase(language);
   const collator = new Intl.Collator(language);
   const matches = supportedTimeZones()
     .map((zone) => ({ zone, label: timeZoneLabel(zone, locale) }))
-    .filter(({ zone, label }) => `${label} ${zone}`.toLocaleLowerCase(language).includes(needle));
+    .filter(({ zone, label }) => `${label} ${zone}`.toLocaleLowerCase(language).includes(needle))
+    .map((choice) => ({ ...choice, offset: timeZoneOffset(choice.zone, instant) }));
   const modes = new Set<TimeZoneChoice>(["UTC", "local", "exchange"]);
   const cities = matches
     .filter(({ zone }) => !modes.has(zone))
-    .sort((a, b) => collator.compare(a.label, b.label) || collator.compare(a.zone, b.zone));
-  return [...matches.filter(({ zone }) => modes.has(zone)), ...cities].map(({ zone }) => zone);
+    .map((choice) => ({ choice, minutes: offsetMinutes(choice.offset) }))
+    .sort(
+      (a, b) =>
+        a.minutes - b.minutes ||
+        collator.compare(a.choice.label, b.choice.label) ||
+        collator.compare(a.choice.zone, b.choice.zone)
+    );
+  return [...matches.filter(({ zone }) => modes.has(zone)), ...cities.map(({ choice }) => choice)];
+}
+
+function offsetMinutes(offset: string): number {
+  if (offset === "UTC") return 0;
+  const minutes = Number(offset.slice(4, 6)) * 60 + Number(offset.slice(7, 9));
+  return offset[3] === "-" ? -minutes : minutes;
 }

@@ -21,7 +21,7 @@ function chartCountLabel(count: ChartLayoutCount) {
   }
 }
 
-function LayoutPreview({ count }: { count: ChartLayoutCount }) {
+export function ChartLayoutPreview({ count }: { count: ChartLayoutCount }) {
   return (
     <span className="chart-layout-icon" data-layout-preview={count} aria-hidden="true">
       {chartLayoutRowWidths(count).map((width, row) => (
@@ -37,15 +37,18 @@ function LayoutPreview({ count }: { count: ChartLayoutCount }) {
 
 export function ChartLayoutControl({
   value,
-  onChange
+  onChange,
+  showLabel = false
 }: {
   value: ChartLayoutCount;
   onChange: (count: ChartLayoutCount) => void;
+  showLabel?: boolean;
 }) {
   const label = t("Раскладка графиков");
   return (
     <label className="chart-layout-control" title={label}>
-      <LayoutPreview count={value} />
+      <ChartLayoutPreview count={value} />
+      {showLabel && <span>{label}</span>}
       <select
         value={value}
         aria-label={label}

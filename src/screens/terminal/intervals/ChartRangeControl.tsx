@@ -12,12 +12,16 @@ const RANGE_OPTIONS = [
   [3650, "3650 дней"]
 ] as const;
 /** History lookback is independent of candle interval and camera zoom. */
-export function ChartRangeControl({ slot = 1 }: { slot?: number } = {}) {
+export function ChartRangeControl({
+  slot = 1,
+  placement = "footer"
+}: { slot?: number; placement?: "footer" | "toolbar" } = {}) {
   const { controller, state } = useTerminal();
   const days = state.preferences.rangeDays;
-  const id = slot === 1 ? "range" : `range-${slot}`;
+  const id =
+    placement === "toolbar" ? "mobile-chart-range" : slot === 1 ? "range" : `range-${slot}`;
   return (
-    <div className="chart-range-control">
+    <div className="chart-range-control" data-placement={placement}>
       <label htmlFor={id}>{t("История")}</label>
       <select
         id={id}
@@ -53,7 +57,7 @@ export function ChartRangeControl({ slot = 1 }: { slot?: number } = {}) {
           </option>
         ))}
       </select>
-      {slot === 1 && (
+      {slot === 1 && placement === "footer" && (
         <>
           <span className="chart-range-note">{t("Глубина загрузки")}</span>
           <ClockZoneControl />

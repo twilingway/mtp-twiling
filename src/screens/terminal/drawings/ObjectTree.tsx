@@ -5,11 +5,12 @@ import type { Drawing, ImageAsset, IndicatorKey } from "../../../model/types.js"
 import type { ContextTarget } from "../state.js";
 import { INDICATOR_NAMES, PERIOD_LABELS } from "../state.js";
 import { TOOL_NAMES } from "../../../model/drawing-model.js";
+import { indicatorShown } from "../../../model/indicator-legend.js";
 import { useTerminal } from "../context.js";
 import { VisibilityIcon, LockIcon, DeleteIcon } from "../VisibilityIcon.js";
 import { TechnicalObjectTree } from "../TechnicalIndicatorPanels.js";
 
-export function ObjectTree() {
+export function ObjectTree({ onClose }: { onClose?: (() => void) | undefined } = {}) {
   const { controller, state } = useTerminal();
   const [renaming, setRenaming] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -112,7 +113,10 @@ export function ObjectTree() {
     <aside className="objects-panel" aria-label={t("Дерево объектов")}>
       <header>
         <strong>{t("Дерево объектов")}</strong>
-        <button aria-label={t("Закрыть дерево объектов")} onClick={controller.toggleObjects}>
+        <button
+          aria-label={t("Закрыть дерево объектов")}
+          onClick={onClose ?? controller.toggleObjects}
+        >
           ×
         </button>
       </header>
@@ -122,30 +126,37 @@ export function ObjectTree() {
         </strong>
         {(Object.keys(INDICATOR_NAMES) as IndicatorKey[])
           .filter((key) => !state.preferences.chartSettings.removedIndicators?.includes(key))
-          .map((key) => (
-            <div
-              key={key}
-              className={`object-row ${state.preferences.indicators[key] ? "" : "object-hidden"}`}
-              onContextMenu={(event) => context(event, { kind: "indicator", key })}
-            >
-              <span>∿</span>
-              <button onClick={() => controller.editIndicator(key)}>
-                {t(INDICATOR_NAMES[key])}
-              </button>
-              <button
-                title={state.preferences.indicators[key] ? t("Скрыть") : t("Показать")}
-                onClick={() => run(controller.toggleIndicator(key))}
+          .map((key) => {
+            const shown = indicatorShown(
+              state.preferences.chartSettings,
+              state.preferences.indicators,
+              key
+            );
+            return (
+              <div
+                key={key}
+                className={`object-row ${shown ? "" : "object-hidden"}`}
+                onContextMenu={(event) => context(event, { kind: "indicator", key })}
               >
-                <VisibilityIcon hidden={!state.preferences.indicators[key]} />
-              </button>
-              <button
-                title={t("Настройки индикатора")}
-                onClick={() => controller.editIndicator(key)}
-              >
-                ⚙
-              </button>
-            </div>
-          ))}
+                <span>∿</span>
+                <button onClick={() => controller.editIndicator(key)}>
+                  {t(INDICATOR_NAMES[key])}
+                </button>
+                <button
+                  title={shown ? t("Скрыть") : t("Показать")}
+                  onClick={() => run(controller.toggleIndicator(key))}
+                >
+                  <VisibilityIcon hidden={!shown} />
+                </button>
+                <button
+                  title={t("Настройки индикатора")}
+                  onClick={() => controller.editIndicator(key)}
+                >
+                  ⚙
+                </button>
+              </div>
+            );
+          })}
         <TechnicalObjectTree />
         {[...state.drawings].reverse().map((drawing) => (
           <div
@@ -156,6 +167,22 @@ export function ObjectTree() {
           >
             <span>{drawing.name.startsWith("fibonacci") ? "☷" : "╱"}</span>
             {label(drawing)}
+            <button
+              type="button"
+              className="object-settings-mobile"
+              data-object-action="settings"
+              aria-label={t("Настройки рисунка")}
+              title={t("Настройки рисунка")}
+              onClick={() => {
+                controller.selectObject(drawing.id);
+                controller.setDialog("drawing-settings");
+              }}
+            >
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M3 5h14M3 10h14M3 15h14" />
+                <path d="M7 3v4m6 1v4m-5 1v4" strokeWidth="2.6" />
+              </svg>
+            </button>
             {actions(drawing)}
           </div>
         ))}

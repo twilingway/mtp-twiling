@@ -6,7 +6,11 @@ import { INDICATOR_NAMES } from "./state.js";
 import { Modal } from "./Modal.js";
 import { TRADINGVIEW_CANDLE_STYLE } from "../../model/candle-palette.js";
 import { chartBackground, terminalTheme, withTheme } from "../../model/theme.js";
-import { DEFAULT_LAST_PRICE_COLOR } from "../../model/last-price-style.js";
+import {
+  DEFAULT_LAST_PRICE_COLOR,
+  updatePriceAxisLabelColor
+} from "../../model/last-price-style.js";
+import { PriceAxisLabelFields } from "./PriceAxisLabelFields.js";
 import { TimeZonePicker } from "./ClockZoneControl.js";
 import { ChartEngineSelect } from "./ChartEngineSelect.js";
 import {
@@ -179,18 +183,26 @@ export function ChartSettingsDialog() {
                 });
               }}
             />
-            {t("Свой цвет последней цены")}
+            {t("Свой цвет линии последней цены")}
           </label>
           {settings.lastPriceColor !== undefined && (
             <input
               type="color"
               name="lastPriceColor"
-              aria-label={t("Цвет последней цены")}
+              aria-label={t("Цвет линии последней цены")}
               value={settings.lastPriceColor}
               onChange={(event) => update({ lastPriceColor: event.target.value })}
             />
           )}
         </div>
+        <PriceAxisLabelFields
+          settings={settings}
+          onChange={(theme, label, field, color) =>
+            setSettings((previous) =>
+              updatePriceAxisLabelColor(previous, theme, label, field, color)
+            )
+          }
+        />
         <label>
           {t("Размер шрифта шкал")}
           <select

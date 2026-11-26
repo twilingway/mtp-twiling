@@ -6,6 +6,7 @@ import type { BackupExportOptions } from "../../model/backup-export.js";
 import type { WatchlistMove } from "../../services/watchlist-order.js";
 import { marketCalendar } from "../../services/market-calendar.js";
 import { toggleIndicatorFlags } from "../../model/indicator-flags.js";
+import { toggleCombinedMtpVisibility } from "./indicator-menu-actions.js";
 import { historyDepthTransition, saveControllerView } from "./controller-camera.js";
 import {
   PreferenceRouting,
@@ -361,6 +362,8 @@ export class TerminalController {
     await this.setPreferences({ timeframe });
   };
   toggleIndicator = async (key: IndicatorKey): Promise<void> => {
+    if (key === "mtpAll" && this.state.preferences.indicators.mtpAll)
+      return toggleCombinedMtpVisibility(this);
     const owner = this.state.owner,
       client = this.client;
     await this.saveView();
@@ -373,6 +376,7 @@ export class TerminalController {
           (item) => item !== key && !indicators[item]
         ) ?? []
     };
+    if (!indicators.mtpAll) delete chartSettings.mtpAllHidden;
     this.update({ preferences: { ...this.state.preferences, indicators, chartSettings } });
     await this.savePreferences();
     if (!this.session.matches(client) || owner !== this.state.owner) return;

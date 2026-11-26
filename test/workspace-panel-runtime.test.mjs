@@ -131,6 +131,40 @@ function fixtures(annotations = async () => ({ drawings: [], images: [] })) {
   };
 }
 
+test("both label palettes are saved by a secondary chart without changing siblings or the profile", async () => {
+  const f = fixtures();
+  const firstPanel = f.create(2);
+  const secondPanel = f.create(3);
+  firstPanel.configure(f.first, f.state);
+  secondPanel.configure(f.second, f.state);
+  await immediate();
+  const palettes = {
+    dark: { lastPrice: { fill: "#483a5a" } },
+    light: { lastPrice: { text: "#240f1a" }, drawings: { fill: "#aabb01", text: "#333333" } }
+  };
+  await firstPanel.setPreferences({ chartSettings: { theme: "dark", priceAxisLabels: palettes } });
+  assert.deepEqual(firstPanel.getSnapshot().preferences.chartSettings.priceAxisLabels, palettes);
+  assert.equal(secondPanel.getSnapshot().preferences.chartSettings.priceAxisLabels, undefined);
+  assert.equal(f.state.preferences.chartSettings.priceAxisLabels, undefined);
+  firstPanel.stop();
+
+  const reopened = f.create(2);
+  reopened.configure(f.first, f.state);
+  const { lastPriceLabelColors } = f.load("model/last-price-style.js");
+  assert.deepEqual(
+    lastPriceLabelColors(reopened.getSnapshot().preferences.chartSettings),
+    palettes.dark.lastPrice
+  );
+  f.state.preferences = { ...f.state.preferences, chartSettings: { theme: "light" } };
+  reopened.configure(f.first, f.state);
+  assert.deepEqual(
+    lastPriceLabelColors(reopened.getSnapshot().preferences.chartSettings),
+    palettes.light.lastPrice
+  );
+  reopened.stop();
+  secondPanel.stop();
+});
+
 test("timeframe, depth, engine and price style belong to one slot across reopen and owner changes", async () => {
   const f = fixtures();
   const panel = f.create(6);

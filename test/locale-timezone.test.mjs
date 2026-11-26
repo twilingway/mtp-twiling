@@ -82,24 +82,58 @@ test("the chooser includes the complete Intl IANA list and searchable honest cit
   assert.ok(zones.length > 300);
   assert.equal(zones.length, new Set(zones).size);
   assert.ok(Intl.supportedValuesOf("timeZone").every((zone) => zones.includes(zone)));
-  assert.ok(searchTimeZones("москва", "ru").includes("Europe/Moscow"));
-  assert.ok(searchTimeZones("New_York", "ru").includes("America/New_York"));
+  assert.ok(searchTimeZones("москва", "ru", winter).some(({ zone }) => zone === "Europe/Moscow"));
+  assert.ok(
+    searchTimeZones("New_York", "ru", winter).some(({ zone }) => zone === "America/New_York")
+  );
   assert.equal(timeZoneLabel("Africa/Abidjan", "ru"), "Abidjan");
 });
-test("timezone choices are ordered by their displayed city across IANA regions", () => {
-  const russian = searchTimeZones("", "ru");
-  assert.deepEqual(russian.slice(0, 3), ["UTC", "local", "exchange"]);
+test("timezones are sorted by signed offset and equal offsets by localized city", () => {
+  const choices = searchTimeZones("", "ru", winter);
+  assert.deepEqual(
+    choices.slice(0, 3).map(({ zone }) => zone),
+    ["UTC", "local", "exchange"]
+  );
+  const examples = [
+    "America/Los_Angeles",
+    "America/New_York",
+    "America/St_Johns",
+    "Europe/Moscow",
+    "Europe/Astrakhan",
+    "Asia/Barnaul",
+    "Asia/Anadyr",
+    "Pacific/Chatham"
+  ];
+  assert.deepEqual(
+    choices.map(({ zone }) => zone).filter((zone) => examples.includes(zone)),
+    examples
+  );
   for (const locale of ["ru", "en"]) {
     const collator = new Intl.Collator(locale);
-    const labels = searchTimeZones("", locale)
+    const labels = searchTimeZones("", locale, winter)
       .slice(3)
-      .map((zone) => timeZoneLabel(zone, locale));
+      .filter(({ offset }) => offset === "UTC+03:00")
+      .map(({ label }) => label);
     assert.deepEqual(labels, [...labels].sort(collator.compare));
   }
-  const examples = ["Asia/Anadyr", "Europe/Astrakhan", "Asia/Barnaul"];
-  assert.deepEqual(russian.filter((zone) => examples.includes(zone)), examples);
-  assert.ok(searchTimeZones("Киров", "ru").includes("Europe/Kirov"));
-  assert.ok(searchTimeZones("Усть-Нера", "ru").includes("Asia/Ust-Nera"));
+  assert.ok(searchTimeZones("Киров", "ru", winter).some(({ zone }) => zone === "Europe/Kirov"));
+  assert.ok(
+    searchTimeZones("Усть-Нера", "ru", winter).some(({ zone }) => zone === "Asia/Ust-Nera")
+  );
+});
+test("timezone order uses the offset shown at the current instant", () => {
+  const seasonal = (instant) =>
+    searchTimeZones("", "ru", instant)
+      .filter(({ zone }) => zone === "Pacific/Guam" || zone === "Australia/Adelaide")
+      .map(({ zone, offset }) => [zone, offset]);
+  assert.deepEqual(seasonal(winter), [
+    ["Pacific/Guam", "UTC+10:00"],
+    ["Australia/Adelaide", "UTC+10:30"]
+  ]);
+  assert.deepEqual(seasonal(summer), [
+    ["Australia/Adelaide", "UTC+09:30"],
+    ["Pacific/Guam", "UTC+10:00"]
+  ]);
 });
 test("RU and EN format numbers and dates, with stable missing values", () => {
   assert.equal(formatNumber(1234.5, 2, false, { locale: "en" }), "1,234.50");

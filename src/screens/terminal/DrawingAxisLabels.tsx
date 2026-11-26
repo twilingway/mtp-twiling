@@ -13,7 +13,7 @@ import {
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { precision } from "../../charts/adapter.js";
 import { intlLocale } from "../../i18n/preferences.js";
-import { chartBackground, chartLabelText, readableChartColor } from "../../model/theme.js";
+import { drawingPriceLabelStyle } from "../../model/last-price-style.js";
 
 interface AxisLabel {
   timestamp: number;
@@ -59,7 +59,6 @@ export function DrawingAxisLabels({ drawingProjection }: { drawingProjection: Ev
       text: format.format(target.point.value)
     }));
   }, [visible, selected, digits, locale]);
-  const background = chartBackground(chartSettings);
   useEffect(() => {
     if (!points?.length && !targets.length) {
       setLabels([]);
@@ -169,18 +168,18 @@ export function DrawingAxisLabels({ drawingProjection }: { drawingProjection: Ev
       ))}
       <div aria-label={t("Цены объектов на шкале")}>
         {prices.map(({ text, y, trueY, width, color }) => {
-          const fill = readableChartColor(color, background, 3);
+          const style = drawingPriceLabelStyle(chartSettings, color);
           return (
             <span key={text}>
               <span
                 className="drawing-price-tick"
                 aria-hidden="true"
-                style={{ top: trueY, right: width, background: fill }}
+                style={{ top: trueY, right: width, background: style.color }}
               />
               <span
                 className="drawing-price-label"
                 title={text}
-                style={{ top: y, width, background: fill, color: chartLabelText(fill) }}
+                style={{ top: y, width, background: style.fill, color: style.text }}
               >
                 {text}
               </span>

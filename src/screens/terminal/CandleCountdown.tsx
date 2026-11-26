@@ -97,7 +97,7 @@ export function CandleCountdown() {
       ? candleCloseAt(timestamp, timeframe, now, calendar.days)
       : null;
   if (!closesAt || !position || position.key !== key || position.width < 38 || !bar) return null;
-  const { color, text } = lastPriceStyle(chartSettings, bar.close >= bar.open);
+  const { fill, text } = lastPriceStyle(chartSettings, bar.close >= bar.open);
   const countdown = formatCountdown(closesAt - now).replace("д", t("д"));
   return (
     <time
@@ -109,7 +109,7 @@ export function CandleCountdown() {
       style={{
         top: position.top,
         width: position.width,
-        background: color,
+        background: fill,
         color: text
       }}
     >

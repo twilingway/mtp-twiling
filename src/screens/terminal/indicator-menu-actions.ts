@@ -69,18 +69,34 @@ export async function changeMenuIndicator(
       : toggleIndicatorFlags(previous.indicators, key);
   const removed = previous.chartSettings.removedIndicators;
   const nextRemoved = removed?.filter((item) => !indicatorEnabled(indicators, item));
-  if (indicators === previous.indicators && nextRemoved?.length === removed?.length) return;
+  const revealCombined = key === "mtpAll" && previous.chartSettings.mtpAllHidden === true;
+  if (
+    indicators === previous.indicators &&
+    nextRemoved?.length === removed?.length &&
+    !revealCombined
+  )
+    return;
   const chartSettings = {
     ...previous.chartSettings,
     ...(nextRemoved ? { removedIndicators: nextRemoved } : {})
   };
+  if (revealCombined || !indicators.mtpAll) delete chartSettings.mtpAllHidden;
   const refresh =
-    key !== "volume"
-      ? "full"
-      : indicators.volume && chartSettings.volumeAverage?.enabled
-        ? "volume"
-        : "none";
+    revealCombined && indicators === previous.indicators
+      ? "none"
+      : key !== "volume"
+        ? "full"
+        : indicators.volume && chartSettings.volumeAverage?.enabled
+          ? "volume"
+          : "none";
   await persist(controller, { indicators, chartSettings }, refresh);
+}
+
+export function toggleCombinedMtpVisibility(controller: Controller): Promise<void> {
+  const chartSettings = { ...controller.getSnapshot().preferences.chartSettings };
+  if (chartSettings.mtpAllHidden) delete chartSettings.mtpAllHidden;
+  else chartSettings.mtpAllHidden = true;
+  return persist(controller, { chartSettings }, "none");
 }
 
 export async function persistMtpMenuCollapsed(controller: Controller): Promise<void> {
