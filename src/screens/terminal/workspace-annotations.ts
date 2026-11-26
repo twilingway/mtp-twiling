@@ -1,5 +1,4 @@
 import type { Drawing, ImageAsset } from "../../model/types.js";
-import * as storage from "../../services/storage-v2.js";
 
 type AnnotationDocument = { drawings: Drawing[]; images: ImageAsset[] };
 type Change = AnnotationDocument & { owner: string; symbol: string; editor: object };
@@ -17,9 +16,10 @@ export function writeWorkspaceAnnotations(change: Change): Promise<void> {
   const { owner, symbol, drawings, images } = change;
   const key = JSON.stringify([owner, symbol]);
   const queued = writes.get(key)?.write.catch(() => {});
-  const write = Promise.resolve(queued).then(() =>
-    storage.saveAnnotationDocument(owner, symbol, drawings, images)
-  );
+  const write = Promise.resolve(queued).then(async () => {
+    const { saveAnnotationDocument } = await import("../../services/storage-v2.js");
+    await saveAnnotationDocument(owner, symbol, drawings, images);
+  });
   writes.set(key, { change, write });
   generation++;
   listeners.forEach((accept) => accept(change));
@@ -38,9 +38,10 @@ export async function readWorkspaceAnnotations(
   const pending = writes.get(key)?.change;
   if (pending) return { drawings: pending.drawings, images: pending.images };
   const before = generation;
+  const { loadDrawings, loadImages } = await import("../../services/storage-v2.js");
   const [drawings, images] = await Promise.all([
-    storage.loadDrawings(owner, symbol),
-    storage.loadImages(owner, symbol)
+    loadDrawings(owner, symbol),
+    loadImages(owner, symbol)
   ]);
   return before === generation ? { drawings, images } : readWorkspaceAnnotations(owner, symbol);
 }

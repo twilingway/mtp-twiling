@@ -8,6 +8,7 @@ import type {
   DriveChoice
 } from "../../services/drive/coordinator-types.js";
 import { terminalDrive } from "./controller-drive.js";
+import { DriveOperationProgress } from "./DriveOperationProgress.js";
 import { useTerminal } from "./context.js";
 
 const phases: Record<DriveStatus["phase"], string> = {
@@ -112,6 +113,7 @@ export function GoogleDriveSettings() {
         <p id="google-drive-status" role="status">
           {t(phases[status.phase])}
         </p>
+        <DriveOperationProgress progress={status.progress} previous={status.lastOperation} />
         <p className="drive-pending-status">
           {t(
             status.pendingChanges

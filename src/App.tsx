@@ -1,5 +1,5 @@
 import { systemText } from "./i18n/messages.js";
-import { useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { TerminalContext, useTerminal } from "./screens/terminal/context.js";
 import { TerminalController } from "./screens/terminal/controller.js";
 import { Toolbar } from "./screens/terminal/Toolbar.js";
@@ -23,6 +23,7 @@ import { LocaleEffect } from "./screens/terminal/LocaleEffect.js";
 import { TerminalIndicatorLibrary } from "./screens/terminal/TerminalIndicatorLibrary.js";
 import { TechnicalIndicatorSettings } from "./screens/terminal/TechnicalIndicatorSettings.js";
 import { MarketBreadthProvider } from "./screens/terminal/MarketBreadthContext.js";
+import { setActiveWorkspaceChart } from "./screens/terminal/workspace-active-chart.js";
 function Terminal() {
   const { controller, state } = useTerminal();
   const [chartCount, setChartCount] = useState<ChartLayoutCount>(1);
@@ -36,6 +37,7 @@ function Terminal() {
       ? selection
       : undefined;
   const editor = active?.editor ?? controller;
+  useLayoutEffect(() => setActiveWorkspaceChart(controller, editor), [controller, editor]);
   const select = (slot: number, next: TerminalController) => {
     if (editor === next || state.profileTransition || state.importingBackup) return;
     editor.editing.cancelGesture();

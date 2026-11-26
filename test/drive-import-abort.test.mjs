@@ -124,7 +124,7 @@ async function fixture() {
     return request;
   } };
   const context = vm.createContext({ indexedDB, window: { dispatchEvent() {} }, console,
-    crypto, Blob, Date, Error, DOMException, Event, AbortController, AbortSignal, TextEncoder,
+    crypto, performance, Blob, Date, Error, DOMException, Event, AbortController, AbortSignal, TextEncoder,
     TextDecoder, structuredClone, btoa, atob, setTimeout, clearTimeout, setInterval, clearInterval });
   const modules = new Map();
   const filename = relative => path.resolve(root,relative).replace(/\.js$/, ".ts");

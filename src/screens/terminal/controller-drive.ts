@@ -10,6 +10,8 @@ import { cameraPending, flushCamera, subscribeCamera } from "./controller-camera
 import { optionalDriveObserver } from "./controller-drive-observer.js";
 import { marketAvailable } from "./market-readiness.js";
 import { LEGACY_DRIVE_NAMESPACE } from "../../services/drive/types.js";
+import { activeWorkspaceChart } from "./workspace-active-chart.js";
+import { subscribeWorkspaceAnnotations } from "./workspace-annotations.js";
 
 const drives = new WeakMap<TerminalController, DriveCoordinator>();
 export function terminalDrive(controller: TerminalController): DriveCoordinator {
@@ -19,6 +21,7 @@ export function terminalDrive(controller: TerminalController): DriveCoordinator 
       {
         profile: () => {
           const state = controller.getSnapshot();
+          const chart = activeWorkspaceChart(controller).getSnapshot();
           return {
             owner: state.owner,
             session: controller.sessionKey(),
@@ -30,6 +33,10 @@ export function terminalDrive(controller: TerminalController): DriveCoordinator 
               state.importingBackup ||
               state.importRecoveryRequired ||
               state.loading ||
+              chart.loading ||
+              chart.preview ||
+              chart.activeTool ||
+              (chart.dialog && chart.dialog !== "account") ||
               state.preview ||
               state.activeTool ||
               (state.dialog && state.dialog !== "account")
@@ -98,6 +105,11 @@ export function startTerminalDrive(controller: TerminalController): () => void {
       else drive.localChanged();
     });
   });
+  const unsubscribeAnnotations = subscribeWorkspaceAnnotations(({ owner, symbol }) => {
+    const state = controller.getSnapshot();
+    if (state.owner === owner && state.preferences.symbol !== symbol)
+      observer.run(() => drive.localChanged());
+  });
   let previous = controller.getSnapshot(),
     signature: string | undefined;
   observer.run(() => {
@@ -146,6 +158,7 @@ export function startTerminalDrive(controller: TerminalController): () => void {
   return () => {
     unsubscribe();
     unsubscribeCamera();
+    unsubscribeAnnotations();
     clearInterval(timer);
     window.removeEventListener("focus", wake);
     window.removeEventListener("online", wake);

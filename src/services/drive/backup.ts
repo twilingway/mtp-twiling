@@ -204,6 +204,8 @@ export async function prepareDriveBackup(input: unknown): Promise<PreparedBackup
   let total = 0;
   const images: PreparedBackup["images"] = [];
   const metadata = { ...backup, images: backup.images.map((image) => ({ ...image, data: "" })) };
+  // The manifest dates v2 snapshots; the content hash must survive a failed manifest upload.
+  if (metadata.schemaVersion === 2) delete metadata.exportedAt;
   for (const [index, image] of backup.images.entries()) {
     let bytes: ArrayBuffer;
     try {

@@ -21,7 +21,6 @@ import {
   reorderCanonicalWatchlist
 } from "./controller-watchlist.js";
 import type {
-  Backup,
   Candle,
   ChartSettings,
   Drawing,
@@ -463,11 +462,10 @@ export class TerminalController {
   });
   clearHistory = (uid: string | null, timeframe: Timeframe | null): Promise<void> =>
     this.history.clear(uid, timeframe);
-  exportBackup = (includeHistory: boolean, options?: BackupExportOptions): Promise<Backup> =>
-    this.backups.export(includeHistory, options);
+  exportBackup: TerminalBackups["export"] = (...args) => this.backups.export(...args);
   importBackup = (input: unknown, options?: BackupImportOptions): Promise<void> =>
     this.backups.import(input, options);
-  importBackupFile = (file: File): Promise<void> => this.backups.importFile(file);
+  importBackupFile: TerminalBackups["importFile"] = (...args) => this.backups.importFile(...args);
   recoverBackup = (): Promise<void> => this.backups.recover();
   saveImage = async (asset: ImageAsset): Promise<void> => {
     if (asset.owner !== this.state.owner || asset.symbol !== this.state.preferences.symbol) return;

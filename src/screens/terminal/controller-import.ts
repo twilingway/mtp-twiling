@@ -8,6 +8,8 @@ import type { TerminalState } from "./state.js";
 import type { TerminalEditing } from "./controller-editing.js";
 import type { TerminalSession } from "./controller-session.js";
 import { flushWorkspaceAnnotations } from "./workspace-annotations.js";
+import { summarizeBackupFile } from "../../model/backup-transfer-progress.js";
+import type { FileImportObserver } from "../../model/backup-transfer-progress.js";
 
 interface ImportBridge {
   getState: () => TerminalState;
@@ -93,9 +95,11 @@ export async function restoreImportedProfile(
 export async function importTerminalBackup(
   input: unknown,
   bridge: ImportBridge,
-  options: BackupImportOptions = {}
+  options: BackupImportOptions = {},
+  onProgress?: FileImportObserver
 ): Promise<void> {
   const data = validateBackup(input),
+    summary = onProgress ? summarizeBackupFile(data) : undefined,
     { owner } = bridge.getState(),
     client = bridge.getClient(),
     valid = () => bridge.session.matches(client) && owner === bridge.getState().owner;
@@ -118,6 +122,7 @@ export async function importTerminalBackup(
     }
     let result: Awaited<ReturnType<typeof storage.importBackup>>;
     try {
+      if (summary) onProgress?.({ stage: "write", summary });
       result = await storage.importBackup(owner, data, {
         ...options,
         valid: () => valid() && (options.valid?.() ?? true)
@@ -143,6 +148,7 @@ export async function importTerminalBackup(
     // Commit succeeded: invalidate all old/newborn canvas work before any next await.
     bridge.editing.reset();
     invalidateImportedView(bridge, false);
+    if (summary) onProgress?.({ stage: "restore", summary });
     await restoreImportedProfile(bridge, options.valid);
     if (valid())
       bridge.notify(`Импортировано: ${result.drawings} рисунков, ${result.images} изображений.`);
