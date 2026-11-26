@@ -108,3 +108,29 @@ Browser/build не запускались.
 
 Для повторной browser C проверки использовать сохранённый .18 baseline до ошибочного .19 decision.
 Уже существующий target-occupied marker намеренно не пересматривается: инвариант one-shot сохранён.
+
+## Итоговая отдельная Chrome QA координатора
+
+Source cut3757264/build9d68e99e91dea44d: общий check697/697, strict specs39/39, CI run17 PASS.
+Независимое source review bootstrap fix — без material findings. Изображения проверял отдельный
+визуальный worker; root получил только текст и пути. Итоговый report и manifest находятся в
+`vps/artifacts/guest-recovery-final-qa`, старые failed cut и harness попытки сохранены отдельно.
+
+A genuine raw17 и B genuine occupied18 на неизменённой6edd части прошли: guest source byte-exact, B
+сохраняет текущие layout/UID/RSI; реальные offline downloads без/с history, явный import старого
+backup после сохранения текущего и возврат текущего backup. RU dark и EN light375 не выходят за
+экран. D контролируемая native-IDB fixture подтвердила точные PNG/history bytes, перенос
+views/drawings/coverage и reload без дублей. При unchecked history payload reads0; при checked
+payload read1 и прежний SHA1152bytes. Контролируемый asynchronous native DOMException quota fault
+откатывает copies/decision, оставляя source, пустой bootstrap, warning и действующий download без
+history. Поздний DB owner bounce и последний Blob await с реальным UI import отменяют устаревший
+download/alert. Scoped foreign/vault reads0. Это fault injection на собственном профиле, не
+физическое заполнение диска и не проверка реального банка/Google.
+
+C genuine empty18 сначала выявил Drive bootstrap blocker; original и failing C-run сохранены. Повтор
+из original baseline на3757264 через обычную кнопку Обновить прошёл: видимые KLine/180/en/light,
+gridfalse/font13, decision copied, layout restored. Raw guest, весь Drive record и drive-device
+byte-exact до и после reload, дублей0. Его pristine профиль сохранён отдельно от smoke clone. В
+smoke — реальные Bybit BTC spot+RSI обоих engines, sections/rename/collapse/sidebar без изменения
+getView и без новых kline requests; mobile375 menu300×242. Recovery card public1 → контролируемый
+другой owner0 → public1. Реальные Google OAuth и bank credentials не применялись.

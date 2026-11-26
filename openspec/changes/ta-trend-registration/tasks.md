@@ -14,6 +14,9 @@
 
 ## Workflow follow-up
 
-- Root добавляет только diLength/adxSmoothing в Drive allowlist и проверяет все шесть roundtrips.
-- Root обновляет native 35 fixtures и отдельно проверяет chart/browser поведение.
+- [x] Root добавил только diLength/adxSmoothing в Drive allowlist и проверил все шесть roundtrips.
+- [x] Root обновил native 35 fixtures; оба adapters проходят полный source suite.
+- [x] Отдельная browser QA проверила поиск/добавление35, Canvas новых6, параметры, pane/layout,
+      native gestures, reload/import и ограниченный camera roundtrip. Унаследованный mobile checkbox
+      defect исправлен7095365 и повторно проверен RU/EN dark/light375.
 - Архивировать change после .20 интеграционной приёмки.
