@@ -5,6 +5,7 @@ import { MutationQueue } from "./mutation-queue.js";
 import { persistWatchlistMove, type WatchlistMove } from "./watchlist-order.js";
 import { applyLastPrice, applyQuoteSnapshot, quoteSnapshot } from "./quote-snapshot.js";
 import { QuoteDayBases, MISSING_DAY_BASE } from "./quote-day-bases.js";
+import { liveQuoteTimeLimit } from "./quote-day-base.js";
 import { profileKey } from "./profile-key.js";
 import { selectedMarketRow } from "../model/selected-instrument.js";
 import { isBankIdentity } from "../model/market-provider.js";
@@ -188,9 +189,11 @@ export class TBankClient extends EventTarget {
     return this.snapshot();
   }
   applyPrice(input: unknown, notify = true): void {
-    const row = applyLastPrice(this.rows, input, notify ? undefined : this.serverNow());
+    const now = this.serverNow(),
+      acceptedThrough = notify ? liveQuoteTimeLimit(now) : now,
+      row = applyLastPrice(this.rows, input, acceptedThrough);
     if (!row) return;
-    this.dayBases.update(row);
+    this.dayBases.update(row, acceptedThrough);
     this.updatedAt = new Date().toISOString();
     if (notify) this.notify();
   }

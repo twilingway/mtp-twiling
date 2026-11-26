@@ -82,7 +82,7 @@ export function applyQuoteSnapshot(
 export function applyLastPrice(
   rows: readonly MarketRow[],
   input: unknown,
-  snapshotTime?: number
+  acceptedThrough: number
 ): MarketRow | undefined {
   const price = object(input);
   if (!price) return;
@@ -92,18 +92,12 @@ export function applyLastPrice(
   if (!row) return;
   const value = quotation(price.price);
   if (value === null || value <= 0) return;
-  const time = text(price.time) ?? null;
-  if (snapshotTime !== undefined) {
-    const previousTime = datedQuote(row, snapshotTime),
-      nextTime = serverTimestamp(time);
-    if (
-      previousTime !== null &&
-      (nextTime === null || nextTime > snapshotTime || nextTime < previousTime)
-    )
-      return;
-  }
+  const previousTime = datedQuote(row, acceptedThrough),
+    nextTime = serverTimestamp(price.time),
+    dated = nextTime !== null && nextTime <= acceptedThrough;
+  if (previousTime !== null && (!dated || nextTime < previousTime)) return;
   row.price = value;
-  row.time = time;
+  row.time = dated ? (text(price.time) ?? new Date(nextTime).toISOString()) : null;
   row.availability = "available";
   return row;
 }

@@ -1,6 +1,12 @@
 import { dayChange } from "../model/market-model.js";
 import type { MarketRow } from "../model/types.js";
-import { DAY_MS, priorDayBase, quoteDay, type DailyQuoteBase } from "./quote-day-base.js";
+import {
+  DAY_MS,
+  liveQuoteTimeLimit,
+  priorDayBase,
+  quoteDay,
+  type DailyQuoteBase
+} from "./quote-day-base.js";
 import { list, object } from "./types.js";
 
 interface Requester {
@@ -59,12 +65,12 @@ export class QuoteDayBases {
     row.previousCloseSource = null;
     Object.assign(row, dayChange(row.price, null));
   }
-  update(row: MarketRow): void {
+  update(row: MarketRow, acceptedThrough = this.now()): void {
     if (row.price === null || !Number.isFinite(row.price) || row.price <= 0) {
       this.invalidate(row);
       return;
     }
-    const day = quoteDay(row.time, this.now());
+    const day = quoteDay(row.time, acceptedThrough);
     const existing = row.uid ? this.bases.get(row.uid) : undefined;
     const knownBase =
       row.previousClose !== null && Number.isFinite(row.previousClose) && row.previousClose > 0;
@@ -90,7 +96,7 @@ export class QuoteDayBases {
       existing?.day === day &&
       (existing.retryAfter === undefined || existing.retryAfter > this.now())
         ? existing
-        : { day, result: this.load(uid, row.time, day) };
+        : { day, result: this.load(uid, row.time, day, acceptedThrough) };
     this.bases.set(uid, entry);
     const update = entry.result.then((base) => {
       if (!base && entry.retryAfter === undefined)
@@ -98,7 +104,7 @@ export class QuoteDayBases {
       if (
         generation !== this.generation ||
         !this.active(row) ||
-        quoteDay(row.time, this.now()) !== day
+        quoteDay(row.time, liveQuoteTimeLimit(this.now())) !== day
       )
         return;
       row.previousClose = base?.price ?? null;
@@ -121,9 +127,14 @@ export class QuoteDayBases {
     this.missingDays.add(day);
     this.missing();
   }
-  private async load(uid: string, time: unknown, day: string): Promise<DailyQuoteBase | null> {
+  private async load(
+    uid: string,
+    time: unknown,
+    day: string,
+    acceptedThrough: number
+  ): Promise<DailyQuoteBase | null> {
     const close = this.closes.get(uid);
-    const direct = priorDayBase(time, close, [], this.now());
+    const direct = priorDayBase(time, close, [], acceptedThrough);
     if (direct) return direct;
     const boundary = Date.parse(day + "T00:00:00Z");
     try {
@@ -134,7 +145,7 @@ export class QuoteDayBases {
         from: new Date(boundary - 32 * DAY_MS).toISOString(),
         to: new Date(boundary).toISOString()
       });
-      return priorDayBase(time, undefined, response.candles, this.now());
+      return priorDayBase(time, undefined, response.candles, acceptedThrough);
     } catch {
       return null;
     }
