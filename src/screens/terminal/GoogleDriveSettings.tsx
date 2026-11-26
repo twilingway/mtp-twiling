@@ -250,9 +250,13 @@ export function GoogleDriveSettings() {
         <div id="google-drive-conflict" className="drive-conflict">
           <h4>{t("Выберите сохраняемую версию")}</h4>
           <p>
-            {t(
-              "Выбранная версия заменит настройки, рисунки и изображения этого профиля. История котировок и ключ сохранятся. Прежние облачные снимки останутся на Google Диске."
-            )}
+            {status.conflict.remotes.length === 0
+              ? t(
+                  "В подключённом Google Диске нет ранее синхронизированной версии. Подтвердите отправку копии настроек, рисунков и изображений с этого устройства."
+                )
+              : t(
+                  "Облачная версия заменит настройки, рисунки и изображения этого профиля. История котировок, ключ и прежние облачные снимки сохранятся."
+                )}
           </p>
           <strong>{t("На этом устройстве")}</strong>
           <Summary summary={status.conflict.local} />
@@ -264,7 +268,7 @@ export function GoogleDriveSettings() {
               void drive.choose("local");
             }}
           >
-            {t("Сохранить версию устройства")}
+            {t("Отправить версию устройства на Google Диск")}
           </button>
           {status.conflict.remotes.map((remote, index) => (
             <div key={remote.nodeId}>

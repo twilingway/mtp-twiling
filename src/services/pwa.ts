@@ -37,11 +37,15 @@ export async function setupPwa({
   const { signal } = listeners;
   let registration: ServiceWorkerRegistration | undefined;
   let installPrompt: InstallPrompt | null = null;
+  let installPromptPending = false;
   let reloading = false;
   let updateRequested = false;
   let checkTimer: ReturnType<typeof setInterval> | undefined;
   const dispose = () => {
+    if (signal.aborted) return;
     listeners.abort();
+    installPrompt = null;
+    installButton.hidden = true;
     clearInterval(checkTimer);
     parentSignal?.removeEventListener("abort", dispose);
   };
@@ -60,7 +64,7 @@ export async function setupPwa({
       if (!isInstallPrompt(event)) return;
       event.preventDefault();
       installPrompt = event;
-      installButton.hidden = false;
+      installButton.hidden = installPromptPending;
     },
     { signal }
   );
@@ -77,12 +81,21 @@ export async function setupPwa({
     "click",
     () => {
       const prompt = installPrompt;
-      if (!prompt) return;
+      if (!prompt || installPromptPending) return;
+      installPrompt = null;
+      installPromptPending = true;
+      installButton.hidden = true;
       void (async () => {
-        await prompt.prompt();
-        await prompt.userChoice;
-        installPrompt = null;
-      })().catch(() => notify("Не удалось открыть установку приложения."));
+        try {
+          await prompt.prompt();
+          await prompt.userChoice;
+        } catch {
+          if (!signal.aborted) notify("Не удалось открыть установку приложения.");
+        } finally {
+          installPromptPending = false;
+          if (!signal.aborted) installButton.hidden = !installPrompt;
+        }
+      })();
     },
     { signal }
   );

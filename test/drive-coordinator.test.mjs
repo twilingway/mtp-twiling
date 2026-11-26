@@ -63,6 +63,7 @@ function fixture(store = new Store(), options = {}) {
   coordinator.profileChanged();
   return { coordinator, store, hooks, imports, writes, events, local: () => local, record: () => record, authorization: () => authorization, disconnects: () => disconnects,
     edit(patch) { local = { ...local, ...patch }; coordinator.localChanged(); },
+    setStore(next) { store = next; },
     setOnline(value) { online = value; }, setRecord(patch) { record = { ...record, ...patch }; }, changeProfile(patch) { profile = { ...profile, ...patch }; coordinator.profileChanged(); },
     async connect() { await coordinator.prepare(); await coordinator.connect(); },
     async remote(incoming) { const sync = new DriveSync(store), inspection = await sync.inspect(); return sync.publish(incoming, { deviceId: crypto.randomUUID(), parents: inspection.heads }); }
@@ -98,6 +99,78 @@ test("first link to populated Drive previews exact counts/date and never overwri
   await f.coordinator.choose(status.conflict.remotes[0].nodeId);
   assert.equal(f.imports.length, 1); assert.equal(f.local().layout.chartSettings.theme, "light");
   assert.equal(f.local().images[0].data, btoa("png fixture bytes"));
+});
+
+test("reconnecting an associated profile to an empty Drive requires a choice before uploading", async t => {
+  const f = fixture(undefined, { automatic: false });
+  t.after(() => f.coordinator.disconnect());
+  await f.connect();
+  const previous = structuredClone(f.record());
+  const otherStore = new Store();
+  f.coordinator.disconnect();
+  f.setStore(otherStore);
+
+  await f.connect();
+  const status = f.coordinator.getSnapshot();
+  assert.equal(status.phase, "conflict");
+  assert.equal(status.automatic, false);
+  assert.deepEqual(status.conflict.remotes, []);
+  assert.equal(otherStore.files.length, 0);
+  assert.equal(f.imports.length, 0);
+  assert.deepEqual(f.record(), previous);
+
+  await f.coordinator.choose("local");
+  const inspection = await new DriveSync(otherStore).inspect();
+  assert.equal(f.coordinator.getSnapshot().phase, "idle");
+  assert.equal(inspection.snapshots.length, 1);
+  assert.deepEqual(inspection.snapshots[0].manifest.parents, []);
+  assert.deepEqual(f.record().baseHeads, inspection.heads);
+  assert.equal(f.store.count(), 1);
+});
+
+test("reconnecting a clean profile to an unrelated populated Drive previews both choices", async t => {
+  for (const choice of ["local", "cloud"]) {
+    await t.test(choice, async t => {
+      const f = fixture(undefined, { automatic: false });
+      t.after(() => f.coordinator.disconnect());
+      await f.connect();
+      const previous = structuredClone(f.record());
+      const otherStore = new Store();
+      const remote = new DriveSync(otherStore);
+      const { nodeId } = await remote.publish(backup("light"), {
+        deviceId: crypto.randomUUID(),
+        parents: []
+      });
+      const initialFiles = otherStore.files.length;
+      f.coordinator.disconnect();
+      f.setStore(otherStore);
+
+      await f.connect();
+      const status = f.coordinator.getSnapshot();
+      assert.equal(status.phase, "conflict");
+      assert.deepEqual(status.conflict.remotes.map(item => item.nodeId), [nodeId]);
+      assert.equal(otherStore.files.length, initialFiles);
+      assert.equal(f.imports.length, 0);
+      assert.deepEqual(f.record(), previous);
+
+      await f.coordinator.choose(choice === "local" ? "local" : nodeId);
+      const inspection = await remote.inspect();
+      assert.equal(f.coordinator.getSnapshot().phase, "idle");
+      assert.deepEqual(f.record().baseHeads, inspection.heads);
+      assert.equal(f.store.count(), 1);
+      if (choice === "local") {
+        const current = inspection.snapshots.find(
+          item => item.manifest.nodeId === inspection.heads[0]
+        );
+        assert.deepEqual(current.manifest.parents, [nodeId]);
+        assert.equal(f.imports.length, 0);
+      } else {
+        assert.equal(otherStore.files.length, initialFiles);
+        assert.equal(f.imports.length, 1);
+        assert.equal(f.local().layout.chartSettings.theme, "light");
+      }
+    });
+  }
 });
 
 test("divergent local and remote edits require choice; choosing local creates a preserved child", async t => {

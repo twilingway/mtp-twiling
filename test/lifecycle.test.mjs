@@ -511,7 +511,7 @@ class TrackedTarget extends EventTarget {
   }
 }
 
-test("aborting PWA setup during registration removes listeners and prevents late checks", async () => {
+function pwaElements() {
   class Element extends TrackedTarget {
     dataset = {};
     hidden = true;
@@ -532,6 +532,81 @@ test("aborting PWA setup during registration removes listeners and prevents late
   document.baseURI = "https://example.test/quotes/";
   document.hidden = false;
   document.getElementById = (id) => nodes.get(id);
+  return { nodes, window, document, Element, Button };
+}
+
+test("PWA install consumes each prompt once and presents a fresh prompt after dismissal", async (t) => {
+  const { nodes, window, document, Element, Button } = pwaElements();
+  const install = nodes.get("install-app");
+  const serviceWorker = new TrackedTarget();
+  serviceWorker.register = async () => new TrackedTarget();
+  const { setupPwa } = sourceModules(
+    {
+      HTMLElement: Element,
+      HTMLButtonElement: Button,
+      window,
+      document,
+      navigator: { serviceWorker }
+    },
+    { "generated/app-version.ts": { APP_VERSION: "source-only", BUILD_ID: "source-only" } }
+  ).load("services/pwa.ts");
+  const notices = [];
+  const dispose = await setupPwa({
+    notify: (notice) => notices.push(notice),
+    flush: async () => {}
+  });
+  t.after(dispose);
+  const calls = [];
+  const capturePrompt = (name) => {
+    const choice = deferred();
+    const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+      prompt: () => calls.push(name),
+      userChoice: choice.promise
+    });
+    assert.equal(window.dispatchEvent(event), false);
+    return choice;
+  };
+  const click = () => install.dispatchEvent(new Event("click"));
+
+  const first = capturePrompt("first");
+  assert.equal(install.hidden, false);
+  click();
+  assert.equal(install.hidden, true);
+  assert.deepEqual(calls, ["first"]);
+  first.resolve({ outcome: "dismissed" });
+  await new Promise(setImmediate);
+  assert.equal(install.hidden, true);
+  click();
+  assert.deepEqual(calls, ["first"]);
+
+  const second = capturePrompt("second");
+  assert.equal(install.hidden, false);
+  click();
+  const fresh = capturePrompt("fresh");
+  assert.equal(install.hidden, true);
+  click();
+  assert.deepEqual(calls, ["first", "second"]);
+  second.resolve({ outcome: "dismissed" });
+  await new Promise(setImmediate);
+  assert.equal(install.hidden, false);
+  click();
+  assert.deepEqual(calls, ["first", "second", "fresh"]);
+  window.dispatchEvent(new Event("appinstalled"));
+  fresh.resolve({ outcome: "accepted" });
+  await new Promise(setImmediate);
+  assert.equal(install.hidden, true);
+  assert.deepEqual(notices, ["Приложение установлено."]);
+
+  capturePrompt("before disposal");
+  assert.equal(install.hidden, false);
+  dispose();
+  assert.equal(install.hidden, true);
+  click();
+  assert.deepEqual(calls, ["first", "second", "fresh"]);
+});
+
+test("aborting PWA setup during registration removes listeners and prevents late checks", async () => {
+  const { nodes, window, document, Element, Button } = pwaElements();
   const pendingRegistration = deferred(),
     serviceWorker = new TrackedTarget();
   let registerCalls = 0,

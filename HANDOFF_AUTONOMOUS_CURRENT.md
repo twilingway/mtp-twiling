@@ -2,8 +2,9 @@
 
 Обновление 26.11.2026. Этот файл важнее исторических статусов в HANDOFF_NEXT_SESSION.md. Цель
 остаётся активной: привычный интерфейс и функции TradingView, без потери пользовательских данных.
-Пользователь спит и разрешил автономный отдельный Chrome. Обычный Chrome не трогать; ручной Google
-login отложить. Ответы коротко по-русски. Реальный cap — четыре агента с root.
+Приоритет текущей сессии — реальная проверка Google Drive, перевод OAuth в Production и выпуск PWA.
+Для Google пользователь разрешил обычный Chrome и участвует при входе. Тесты установки ведутся в
+отдельном профиле. Остальные TA остаются в очереди после выпуска.
 
 ## Текущий проверенный срез — выпуск 0.3.23
 
@@ -24,10 +25,9 @@ login отложить. Ответы коротко по-русски. Реал�
 
 ## Текущие независимые задачи
 
-- Кандидат .24 KC: 51 computed, source review принят, full 1131/spec58 PASS. Final native/product
-  gate ещё открыт; `docs/RELEASE_0324_INTEGRATION.md`. Отключённые plots не участвуют в scale;
-  fill.scale=none. Opacity=0 с visible=true сохраняет настоящий диапазон и позволяет заливку без
-  видимых линий; fresh product proof и mixed-precision native checks отдельные.
+- Кандидат .24 KC: 51 вычисляемый TA. На `8306dd6` прошли CI и проверки обоих SDK. `43b210d` закрыл
+  замечание о мобильной форме. Детали, границы проверок Drive и PWA — в
+  `docs/RELEASE_0324_INTEGRATION.md`.
 - Pure пять relative oscillators: fixed `e08f4662399dfb634bc41d00909419213041af4b`, independent
   2200/2200 + 139 tests PASS, source-only. Stoch RSI/Coppock pre-registration contract выполняется;
   остальные требуют offset/palette. Precision/default colors сверяются по primary, не угадываются.
