@@ -21,5 +21,9 @@
 
 ## Workflow follow-up
 
-- Координатор выполняет независимое review, native/browser и интеграционный cut.
+- [x] Независимый source review c485150:95 focused и24 Drive tests, blockers нет.
+- [x] Интеграционный cut298101c: native42 и11 volume outputs,761/761 full check,44/44 specs.
+- [x] Fresh browser QA: новые7/11 outputs, оба engines/реальный spot+perpetual, choices/JSON,
+      панели/native gestures/camera/mobile. Все28 screenshots просмотрены; отсутствие объёма
+      проверено только source/native без подмены реальных котировок.
 - Архивировать change после принятия координатором.
