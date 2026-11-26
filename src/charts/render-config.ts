@@ -1,6 +1,7 @@
 import { chartBackground, terminalTheme } from "../model/theme.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { volumeAverageSettings } from "../model/volume-average.js";
+import { resolveNativeChartType } from "../model/native-chart-type.js";
 import type {
   ChartSettings,
   IndicatorFlags,
@@ -38,6 +39,7 @@ export function chartRenderConfigKey(settings: ChartSettings, flags: IndicatorFl
   }
   const config: ChartRenderConfig = {
     settings: {
+      chartType: resolveNativeChartType(settings),
       theme: terminalTheme(settings),
       background: chartBackground(settings),
       scaleFontSize: settings.scaleFontSize ?? 11,

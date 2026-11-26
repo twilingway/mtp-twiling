@@ -1,4 +1,4 @@
-import { CandlestickSeries, ColorType, CrosshairMode, createChart } from "lightweight-charts";
+import { ColorType, CrosshairMode, createChart } from "lightweight-charts";
 import type { IPriceLine, ISeriesPrimitive, Logical, Time, UTCTimestamp } from "lightweight-charts";
 import { MtpModel, activeMtpPeriods, lightweightMtp } from "../model/mtp.js";
 import { TIMEFRAMES } from "../model/history-codec.js";
@@ -21,6 +21,8 @@ import { lightweightLegacy } from "./lightweight-legacy.js";
 import { observeWorkspaceTouchScroll } from "./workspace-touch.js";
 import { lightweightTechnical } from "./lightweight-technical.js";
 import { lightweightDrawingX } from "./lightweight-drawing-projection.js";
+import { lightweightBarTime as time, lightweightMainSeries } from "./lightweight-main-series.js";
+import { lightweightLoadedFit } from "./lightweight-loaded-fit.js";
 import { lightweightLink } from "./lightweight-link.js";
 import {
   preserveLightweightCamera,
@@ -40,6 +42,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     restoreFrame: number | null = null,
     settleFrame: number | null = null;
   const pendingView = new PendingChartView();
+  let pendingPriceRange: { from: number; to: number } | undefined;
   let lastPriceLabel: IPriceLine | null = null;
   let labelColors = lastPriceLabelColors(settings);
   const palette = chartPalette(settings);
@@ -94,19 +97,8 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
   const stopTouchScroll = observeWorkspaceTouchScroll(container, (vertTouchDrag) =>
     chart.applyOptions({ handleScroll: { vertTouchDrag } })
   );
-  const series = chart.addSeries(CandlestickSeries, {
-    upColor: settings.bodyVisible === false ? "transparent" : (settings.upColor ?? "#53b987"),
-    downColor: settings.bodyVisible === false ? "transparent" : (settings.downColor ?? "#eb4d5c"),
-    wickUpColor: settings.wickUpColor ?? "#336854",
-    wickDownColor: settings.wickDownColor ?? "#7f323f",
-    borderUpColor: settings.borderUpColor ?? "#53b987",
-    borderDownColor: settings.borderDownColor ?? "#eb4d5c",
-    borderVisible: settings.borderVisible !== false,
-    wickVisible: settings.wickVisible !== false,
-    priceLineVisible: false,
-    lastValueVisible: false,
-    priceFormat: lightweightPriceFormat(priceFormat)
-  });
+  const main = lightweightMainSeries(chart, settings, priceFormat);
+  const { series } = main;
   const legacy = lightweightLegacy(chart, options, lightweightPriceFormat(priceFormat));
   series.setSeriesOrder(3);
   const model = new MtpModel();
@@ -208,10 +200,12 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
         : []
   };
   series.attachPrimitive(primitive);
-  chart.timeScale().subscribeVisibleLogicalRangeChange((range) => {
-    if (range && range.from < 80) options.onNearStart();
-    camera.nativeChanged();
-  });
+  const loadedFit = lightweightLoadedFit(
+    chart.timeScale(),
+    () => data.length,
+    options.onNearStart,
+    camera.nativeChanged
+  );
   function pointToPixel(point: DrawingPoint) {
     const x = lightweightDrawingX(
         chart.timeScale(),
@@ -220,7 +214,6 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       y = series.priceToCoordinate(point.value);
     return x == null || y == null ? null : { x, y };
   }
-  const time = (bar: Candle): UTCTimestamp => Math.floor(bar.timestamp / 1000) as UTCTimestamp;
   function updateLastPriceLabel() {
     const bar = data.at(-1);
     if (!bar) {
@@ -289,7 +282,8 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     timeframe,
     () => technical.metrics()[0]?.height ?? container.clientHeight - 28,
     projectionDelta,
-    options.onCrosshair
+    options.onCrosshair,
+    () => data
   );
   const adapter: ChartAdapter = {
     setLastPriceLabelColors(colors) {
@@ -341,7 +335,12 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       settingData = true;
       data = [...next];
       model.reset(data, activeMtpPeriods(indicators));
-      series.setData(data.map((bar) => ({ ...bar, time: time(bar) })));
+      main.setData(data);
+      loadedFit.updateMinimum();
+      if (data.length && pendingPriceRange) {
+        series.priceScale().setVisibleRange(pendingPriceRange);
+        pendingPriceRange = undefined;
+      }
       updateLastPriceLabel();
       legacy.setData(data);
       preserveLightweightProjection(chart, () => technical.setData(data), projectionDelta);
@@ -368,9 +367,9 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       }
       if (historical) model.reset(data, activeMtpPeriods(indicators));
       else model.update(data);
-      if (historical && index < 0)
-        series.setData(data.map((item) => ({ ...item, time: time(item) })));
-      else series.update({ ...bar, time: time(bar) }, historical);
+      if (historical && index < 0) main.setData(data);
+      else main.update(bar, historical);
+      if (index < 0) loadedFit.updateMinimum();
       updateLastPriceLabel();
       if (historical && index < 0) legacy.setData(data);
       else legacy.update(data, bar, historical);
@@ -407,6 +406,16 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       pendingView.stage(view);
       viewStaged = true;
       scheduleViewRestore();
+    },
+    getManualPriceRange() {
+      if (live.retired || !data.length) return null;
+      const scale = series.priceScale();
+      return scale.options().autoScale ? null : scale.getVisibleRange();
+    },
+    setManualPriceRange(range) {
+      if (live.retired || !Number.isFinite(range.to - range.from) || range.to <= range.from) return;
+      if (data.length) camera.programmatic(() => series.priceScale().setVisibleRange(range));
+      else pendingPriceRange = range;
     },
     setLinkedCrosshair(timestamp) {
       if (!live.retired) link.setCrosshair(data, timestamp);
@@ -468,12 +477,13 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     }),
     fit() {
       series.priceScale().applyOptions({ autoScale: true });
-      chart.timeScale().fitContent();
+      loadedFit.fit();
     },
     redrawDrawings: () => updateDrawings(),
     destroy() {
       stopTouchScroll();
       link.dispose();
+      loadedFit.dispose();
       if (restoreFrame !== null) cancelAnimationFrame(restoreFrame);
       if (settleFrame !== null) cancelAnimationFrame(settleFrame);
       mtp.destroy();

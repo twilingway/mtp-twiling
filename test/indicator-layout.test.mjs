@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import ts from "typescript";
+import { CandleType } from "../node_modules/klinecharts/dist/index.esm.js";
 
 const root = fileURLToPath(new URL("../src/", import.meta.url));
 function sources(overrides = {}, globals = {}) {
@@ -206,6 +207,7 @@ function nativeFixture({ ratio = 0.3, volume = true } = {}) {
     getVisibleRange: () => ({ from: 0, to: data.length })
   };
   const api = {
+    CandleType,
     ActionType: {
       OnPaneDrag: "drag",
       OnDataReady: "ready",

@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { PointerEvent } from "react";
 import type { PixelPoint } from "../../model/types.js";
 import { createOhlcInspection } from "../../model/ohlc-inspection.js";
-import { ohlcCandleIndex, ohlcDisplayMode } from "../../model/ohlc-legend.js";
+import { ohlcHitTimestamp } from "../../model/ohlc-hit-test.js";
+import { ohlcDisplayMode } from "../../model/ohlc-legend.js";
 import type { TerminalController } from "./controller.js";
 import type { TerminalState } from "./state.js";
 import { chartRangeZoomSession } from "./chart-range-zoom-input.js";
@@ -18,6 +19,7 @@ export function useOhlcInspection(
 ) {
   const { owner, activeTool, preferences } = state;
   const { chartSettings, engine, symbol, instrumentUid, timeframe } = preferences;
+  const { chartType, bodyVisible, borderVisible, wickVisible } = chartSettings;
   const mode = ohlcDisplayMode(chartSettings);
   const hold = chartSettings?.ohlcOnHold === true;
   const zoom = chartRangeZoomSession(controller);
@@ -27,8 +29,32 @@ export function useOhlcInspection(
     timestamp: number | null;
   }>();
   const scope = useMemo(
-    () => ({ owner, engine, symbol, instrumentUid, timeframe, mode, hold }),
-    [owner, engine, symbol, instrumentUid, timeframe, mode, hold]
+    () => ({
+      owner,
+      engine,
+      symbol,
+      instrumentUid,
+      timeframe,
+      chartType,
+      bodyVisible,
+      borderVisible,
+      wickVisible,
+      mode,
+      hold
+    }),
+    [
+      owner,
+      engine,
+      symbol,
+      instrumentUid,
+      timeframe,
+      chartType,
+      bodyVisible,
+      borderVisible,
+      wickVisible,
+      mode,
+      hold
+    ]
   );
   const inspection = useMemo(
     () =>
@@ -79,7 +105,7 @@ export function useOhlcInspection(
       event.target instanceof Element &&
       event.target.closest(`${ignored},button,input,select,textarea,a`)
     );
-  const sample = ({ x, y }: PixelPoint) => {
+  const sample = (point: PixelPoint, touch: boolean) => {
     const current = controller.getSnapshot();
     const chart = controller.chart;
     if (
@@ -92,8 +118,18 @@ export function useOhlcInspection(
       current.historyViewReady === false
     )
       return null;
-    const point = chart.pixelToPoint(x, y);
-    return point && ohlcCandleIndex(current.candles, point.timestamp) >= 0 ? point.timestamp : null;
+    const quote = chart.pixelToPoint(point.x, point.y);
+    return quote
+      ? ohlcHitTimestamp(
+          current.candles,
+          point,
+          quote,
+          (tick) => chart.pointToPixel(tick),
+          current.preferences.chartSettings,
+          current.preferences.engine,
+          touch
+        )
+      : null;
   };
   const touch = (event: PlotPointer) => event.pointerType !== "mouse";
   return {
@@ -109,9 +145,10 @@ export function useOhlcInspection(
       }
       if (event.button !== 0) return;
       const point = pixel(event);
+      const isTouch = touch(event);
       inspection.down(
-        { id: event.pointerId, point, touch: touch(event), startedAt: event.timeStamp },
-        sample(point)
+        { id: event.pointerId, point, touch: isTouch, startedAt: event.timeStamp },
+        sample(point, isTouch)
       );
     },
     move(event: PlotPointer, blocked: boolean) {
@@ -121,17 +158,19 @@ export function useOhlcInspection(
         return;
       }
       const point = pixel(event);
-      inspection.move(event.pointerId, point);
-      if (!touch(event) && event.buttons === 0) inspection.hover(sample(point));
+      const isTouch = touch(event);
+      if (inspection.hasPress(event.pointerId))
+        inspection.move(event.pointerId, point, () => sample(point, isTouch));
+      else if (!isTouch && event.buttons === 0) inspection.hover(sample(point, false));
     },
     up(event: PlotPointer, blocked: boolean) {
-      if (mode !== "candle") return;
+      if (mode !== "candle" || !inspection.hasPress(event.pointerId)) return;
       if (blocked || !enabled(event)) {
         inspection.cancel(event.pointerId);
         return;
       }
       const point = pixel(event);
-      inspection.up(event.pointerId, point, sample(point), event.timeStamp);
+      inspection.up(event.pointerId, point, sample(point, touch(event)), event.timeStamp);
     },
     cancel(event: PlotPointer) {
       inspection.cancel(event.pointerId);

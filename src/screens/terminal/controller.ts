@@ -47,6 +47,7 @@ import { openLegacyIndicatorSettings } from "./indicator-preferences.js";
 import { marketAvailable } from "./market-readiness.js";
 import { nativeInterval } from "../../services/providers/bybit/market.js";
 import { flushWorkspaceAnnotations } from "./workspace-annotations.js";
+import { ChartSettingsCommands, mergeChartPreferences } from "./controller-chart-settings.js";
 import type { ContextMenu, TerminalDialog, TerminalPreferences, TerminalState } from "./state.js";
 
 export class TerminalController {
@@ -88,6 +89,7 @@ export class TerminalController {
   readonly tools: TerminalDrawingTools;
   readonly panel: TerminalPanel;
   private readonly backups: TerminalBackups;
+  private readonly chartSettings = new ChartSettingsCommands(this, () => !this.session.disposed);
   constructor(
     readonly workspaceSlot?: number,
     shellPanel?: TerminalPanel
@@ -195,9 +197,7 @@ export class TerminalController {
     await client?.flush();
     await storage.flush();
   };
-  private resetHistory(): void {
-    this.history.reset();
-  }
+  private resetHistory = (): void => this.history.reset();
   start = (): Promise<void> => this.session.start();
   dispose = (): void => {
     this.drawingSettings.cancel();
@@ -253,6 +253,7 @@ export class TerminalController {
     valid: () => boolean = () => true
   ): Promise<void> => {
     if (!importWritable(this.state)) return;
+    if (patch.chartSettings) mergeChartPreferences(this.state.preferences, patch);
     const routing =
       forceReload ||
       ["symbol", "instrumentUid", "timeframe", "rangeDays", "engine"].some((key) => key in patch);
@@ -270,7 +271,7 @@ export class TerminalController {
     await this.saveView();
     await this.editing.flush();
     if (!this.session.matches(client) || !importWritable(this.state, owner) || !valid()) return;
-    const next = { ...this.state.preferences, ...patch },
+    const next = mergeChartPreferences(this.state.preferences, patch),
       selected = selectedMarketRow(this.state.rows, next);
     if (selected?.providerRef) next.providerRef = selected.providerRef;
     else delete next.providerRef;
@@ -384,16 +385,14 @@ export class TerminalController {
     if (key === "volume") this.scheduleOlderHistory(true);
     else await this.loadHistory(true);
   };
-  setChartSettings = async (patch: ChartSettings): Promise<void> => {
-    const owner = this.state.owner,
-      client = this.client;
-    await this.saveView();
-    if (!this.session.matches(client) || !importWritable(this.state, owner)) return;
+  setChartSettings = (patch: ChartSettings): Promise<void> =>
+    this.chartSettings.setOrdinary(patch, (settings) => this.applyChartSettings(settings));
+  setChartType = (value: unknown) =>
+    this.chartSettings.setType(value, (settings) => this.applyChartSettings(settings, true));
+  protected applyChartSettings = async (chartSettings: ChartSettings, changingType = false) => {
     this.update({
-      preferences: {
-        ...this.state.preferences,
-        chartSettings: { ...this.state.preferences.chartSettings, ...patch }
-      }
+      preferences: { ...this.state.preferences, chartSettings },
+      ...(changingType && { crosshairBar: null })
     });
     await this.savePreferences();
   };

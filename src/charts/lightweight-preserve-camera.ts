@@ -1,4 +1,5 @@
-import type { IChartApi, ISeriesApi } from "lightweight-charts";
+import type { IChartApi } from "lightweight-charts";
+import type { LightweightMainSeries } from "./lightweight-main-series.js";
 
 export function projectedBaseDelta(
   scale: ReturnType<IChartApi["timeScale"]>,
@@ -27,7 +28,7 @@ export function preserveLightweightProjection(
 
 export function preserveLightweightCamera(
   chart: IChartApi,
-  series: ISeriesApi<"Candlestick">,
+  series: Pick<LightweightMainSeries, "priceScale">,
   action: () => void,
   projectionDelta: () => number = () => 0
 ): void {

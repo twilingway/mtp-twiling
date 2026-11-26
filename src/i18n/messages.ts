@@ -8,6 +8,7 @@ import { accountMessages } from "./messages-account.js";
 import { cameraMessages } from "./messages-camera.js";
 import { marketMessages } from "./messages-markets.js";
 import { chartWorkspaceMessages } from "./messages-chart-workspace.js";
+import { chartTypeMessages } from "./messages-chart-types.js";
 import { currentDisplayPreferences } from "./preferences.js";
 import type { Locale } from "./preferences.js";
 
@@ -21,7 +22,8 @@ export const english = {
   ...accountMessages,
   ...cameraMessages,
   ...marketMessages,
-  ...chartWorkspaceMessages
+  ...chartWorkspaceMessages,
+  ...chartTypeMessages
 } as const;
 export type MessageKey = keyof typeof english;
 export const russian = Object.fromEntries(Object.keys(english).map((key) => [key, key])) as Record<

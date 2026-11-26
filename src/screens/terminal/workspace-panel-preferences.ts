@@ -66,6 +66,7 @@ function initialSettings(settings: ChartSettings): ChartSettings {
   const appearance = panelChartSettings(settings);
   for (const key of [
     "drawingTools",
+    "chartType",
     "drawingTemplates",
     "removedIndicators",
     "indicatorOptions",

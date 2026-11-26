@@ -1,18 +1,33 @@
-import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
+import type { IChartApi, UTCTimestamp } from "lightweight-charts";
 import type { Candle, Timeframe } from "../model/types.js";
 import type { ChartOptions, LinkedTimeWindow } from "./adapter.js";
 import { inPlot, linkedBarIndex, linkedTimeIndices } from "./layout-link.js";
+import type { LightweightMainSeries } from "./lightweight-main-series.js";
+
+/** Line/area points only contain time and close; report the original candle in every mode. */
+function rawCandleAt(data: readonly Candle[], time: number): Candle | null {
+  let low = 0;
+  let high = data.length;
+  while (low < high) {
+    const index = Math.floor((low + high) / 2);
+    if (Math.floor(data[index]!.timestamp / 1000) < time) low = index + 1;
+    else high = index;
+  }
+  const bar = data[low];
+  return bar && Math.floor(bar.timestamp / 1000) === time ? bar : null;
+}
 
 export function lightweightLink(
   chart: Pick<
     IChartApi,
     "timeScale" | "setCrosshairPosition" | "clearCrosshairPosition" | "subscribeCrosshairMove"
   >,
-  series: ISeriesApi<"Candlestick">,
+  series: LightweightMainSeries,
   timeframe: Timeframe,
   height: () => number,
   projectionDelta: () => number,
-  onCrosshair: ChartOptions["onCrosshair"]
+  onCrosshair: ChartOptions["onCrosshair"],
+  data: () => readonly Candle[]
 ) {
   let linkedCrosshair = false;
   let linkedTimestamp: number | null = null;
@@ -40,19 +55,8 @@ export function lightweightLink(
     if (!event.sourceEvent && (linkedCrosshair || event.point)) return;
     linkedCrosshair = false;
     linkedTimestamp = null;
-    const bar = event.seriesData.get(series);
-    onCrosshair(
-      bar && "open" in bar && typeof bar.time === "number"
-        ? {
-            timestamp: bar.time * 1000,
-            open: bar.open,
-            high: bar.high,
-            low: bar.low,
-            close: bar.close,
-            volume: 0
-          }
-        : null
-    );
+    const time = event.time ?? event.seriesData.get(series)?.time;
+    onCrosshair(typeof time === "number" ? rawCandleAt(data(), time) : null);
   });
   return {
     setCrosshair,

@@ -6,6 +6,7 @@ import type { WatchlistSections } from "./watchlist-sections.js";
 import type { TechnicalIndicatorInstance } from "./technical-indicators/types.js";
 import type { TechnicalPaneLayout } from "./technical-indicator-layout.js";
 import type { MarketProviderRef, ProviderAttributes } from "./market-provider.js";
+import type { NativeChartType } from "./native-chart-type.js";
 
 export type Timeframe = NativeIntervalId;
 export interface Candle {
@@ -217,6 +218,7 @@ export interface PriceAxisLabelPalette {
 }
 export type PriceAxisLabelThemes = Partial<Record<"light" | "dark", PriceAxisLabelPalette>>;
 export interface ChartSettings {
+  chartType?: NativeChartType;
   ohlcDisplay?: OhlcDisplay;
   ohlcOnHold?: boolean;
   legendCollapsed?: boolean;

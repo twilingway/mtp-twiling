@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from "react";
 import type { RefObject } from "react";
 import type { Candle, ChartView, Drawing } from "../../model/types.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
+import { resolveNativeChartType } from "../../model/native-chart-type.js";
 import type {
   ChartAdapter,
   ChartOptions,
@@ -53,11 +54,20 @@ export function useChartCanvas(
     fittedWorkspaceHistory = useRef(false),
     dataFallback = useRef(false),
     adapterRef = useRef<ChartAdapter | null>(null),
+    typeRange = useRef<{
+      owner: string;
+      revision: number;
+      session: ReturnType<typeof controller.sessionKey>;
+      key: string;
+      uid: string;
+      range: { from: number; to: number };
+    }>(undefined),
     supplementalRef = useRef(supplemental);
   const p = state.preferences,
     available = marketAvailable(state),
     session = controller.sessionKey(),
     uid = selectedMarketRow(state.rows, p)?.uid,
+    chartType = resolveNativeChartType(p.chartSettings),
     renderKey = chartRenderConfigKey(p.chartSettings, p.indicators),
     renderConfig = useMemo(() => chartRenderConfigFromKey(renderKey), [renderKey]),
     drawingsHidden = drawingToolbarSettings(p.chartSettings).drawingsHidden,
@@ -98,6 +108,7 @@ export function useChartCanvas(
         controller.sessionKey() === session &&
         current.owner === owner &&
         current.chartRevision === revision &&
+        resolveNativeChartType(current.preferences.chartSettings) === chartType &&
         viewKey(current.preferences) === key &&
         selectedMarketRow(current.rows, current.preferences)?.uid === uid
       );
@@ -213,6 +224,16 @@ export function useChartCanvas(
       stopPriceMetadata = watchChartPriceMetadata(controller, owned, matches);
       dataRef.current = ready ? candles : [];
       dataFallback.current = showingFallback;
+      const manual = typeRange.current;
+      typeRange.current = undefined;
+      if (
+        manual?.owner === owner &&
+        manual.session === session &&
+        manual.revision === revision &&
+        manual.key === key &&
+        manual.uid === uid
+      )
+        owned.setManualPriceRange?.(manual.range);
       if (ready && candles.length) {
         if (view && !showingFallback && !waitingForSlotAnchor) owned.setView(view);
         owned.setData([...candles], true);
@@ -228,6 +249,22 @@ export function useChartCanvas(
       cancelled = true;
       stopPriceMetadata();
       const current = controller.getSnapshot();
+      if (
+        owned &&
+        !owned.retired &&
+        owned.persistView !== false &&
+        !current.importingBackup &&
+        !current.profileTransition &&
+        current.owner === owner &&
+        current.chartRevision === revision &&
+        controller.sessionKey() === session &&
+        viewKey(current.preferences) === key &&
+        selectedMarketRow(current.rows, current.preferences)?.uid === uid &&
+        resolveNativeChartType(current.preferences.chartSettings) !== chartType
+      ) {
+        const range = owned.getManualPriceRange?.();
+        if (range) typeRange.current = { owner, revision, session, key, uid, range };
+      }
       if (
         owned &&
         (current.importingBackup || current.historyViewReady === false) &&
@@ -259,6 +296,7 @@ export function useChartCanvas(
     visibleDrawings,
     drawingProjection,
     uid,
+    chartType,
     state.owner,
     available,
     state.chartRevision,

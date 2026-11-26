@@ -5,7 +5,7 @@ import vm from "node:vm";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
-import { utils as klineFormat } from "../node_modules/klinecharts/dist/index.esm.js";
+import { CandleType, utils as klineFormat } from "../node_modules/klinecharts/dist/index.esm.js";
 
 const root = fileURLToPath(new URL("../src/", import.meta.url));
 function sources(overrides = {}, globals = {}) {
@@ -308,6 +308,7 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
     factory = sources(
       {
         klinecharts: {
+          CandleType,
           init: () => chart,
           registerIndicator() {},
           registerXAxis() {},

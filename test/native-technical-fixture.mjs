@@ -4,6 +4,7 @@ import path from "node:path";
 import vm from "node:vm";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { CandleType } from "../node_modules/klinecharts/dist/index.esm.js";
 
 const root = fileURLToPath(new URL("../src/", import.meta.url)),
   compiled = new Map();
@@ -125,6 +126,7 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
   const width = () => container.clientWidth - 65;
   const pixel = (index) => width() - 1 - (data.length - 1 + offset - index + 0.5) * spacing;
   const logical = (x) => data.length - 1 + offset + 0.5 - (width() - x - 1) / spacing;
+  const timeOf = (row) => row.time ?? row.timestamp / 1000;
   const scale = {
     width,
     height: () => 28,
@@ -135,10 +137,14 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
       if (value.rightOffset !== undefined) offset = value.rightOffset;
     },
     logicalToCoordinate: pixel,
+    timeToCoordinate(time) {
+      const index = data.findIndex((row) => timeOf(row) === time);
+      return index < 0 ? null : pixel(index);
+    },
     coordinateToLogical: logical,
     getVisibleLogicalRange: () => ({ from: logical(0), to: logical(width()) }),
     getVisibleRange: () =>
-      data.length ? { from: data[0].timestamp / 1000, to: data.at(-1).timestamp / 1000 } : null,
+      data.length ? { from: timeOf(data[0]), to: timeOf(data.at(-1)) } : null,
     setVisibleRange() {
       calls.push("fit");
     },
@@ -166,6 +172,7 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
       options: () => ({ autoScale, textColor }),
       getVisibleRange: () => ({ ...range }),
       setVisibleRange: (value) => {
+        autoScale = false;
         range = { ...value };
       }
     };
@@ -228,7 +235,7 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
   }
   function addSeries(definition, options = {}, index = 0) {
     const pane = panes[index],
-      first = definition?.type === "Candlestick",
+      first = allSeries.length === 0,
       seriesOptions = { ...options };
     const entry = {
       type: definition?.type,
@@ -321,7 +328,14 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
           panes: () => [...panes],
           paneSize: (index) => ({ width: width(), height: panes[index].height }),
           timeScale: () => scale,
-          subscribeCrosshairMove() {},
+          subscribeCrosshairMove: (callback) => subscribe("crosshair", callback),
+          unsubscribeCrosshairMove: (callback) => actions.get("crosshair")?.delete(callback),
+          setCrosshairPosition(price, time, series) {
+            calls.push(["setCrosshair", price, time, series.type]);
+          },
+          clearCrosshairPosition() {
+            calls.push("clearCrosshair");
+          },
           remove() {
             removed = true;
           }
@@ -409,12 +423,12 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
           },
           setStyles() {},
           resize: reflow,
-          subscribeAction(type, callback) {
-            if (!actions.has(type)) actions.set(type, new Set());
-            actions.get(type).add(callback);
-          },
+          subscribeAction: subscribe,
           unsubscribeAction(type, callback) {
             actions.get(type)?.delete(callback);
+          },
+          executeAction(type, value) {
+            calls.push([type, plain(value)]);
           },
           applyNewData(next) {
             data = [...next];
@@ -479,6 +493,10 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
   function emit(type, value = {}) {
     for (const callback of actions.get(type) ?? []) callback(value);
   }
+  function subscribe(type, callback) {
+    if (!actions.has(type)) actions.set(type, new Set());
+    actions.get(type).add(callback);
+  }
   const mtp = {
     activeMtpPeriods: (indicators) => (indicators.mtp160 ? [160] : []),
     lightweightMtp: () => ({ update() {}, destroy() {} }),
@@ -503,12 +521,16 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
         ColorType: { Solid: "solid" },
         CrosshairMode: { Normal: 1, Hidden: 0 },
         CandlestickSeries: { type: "Candlestick" },
+        BarSeries: { type: "Bar" },
+        AreaSeries: { type: "Area" },
         HistogramSeries: { type: "Histogram" },
         LineSeries: { type: "Line" }
       },
       klinecharts: {
-        init() {
+        CandleType,
+        init(_container, { styles }) {
           creations++;
+          native.initialStyles = plain(styles);
           return native;
         },
         dispose() {

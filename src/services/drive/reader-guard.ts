@@ -1,5 +1,6 @@
 import { isRecord } from "../../model/backup-format.js";
 import { TOOL_NAMES } from "../../model/drawing-model.js";
+import { validNativeChartTypeField } from "../../model/native-chart-type.js";
 import { getTechnicalIndicatorDefinition } from "../../model/technical-indicators/definitions.js";
 import { technicalIndicatorStyleIds } from "../../model/technical-indicators/instances.js";
 import { sanitizeDriveBackup } from "./backup.js";
@@ -44,6 +45,12 @@ function assertReadableDrawings(value: object): void {
 export function assertReadableDrivePayload(value: unknown): Backup {
   if (!isRecord(value)) return sanitizeDriveBackup(value);
   assertReadableDrawings(value);
+  if (
+    isRecord(value.layout) &&
+    isRecord(value.layout.chartSettings) &&
+    !validNativeChartTypeField(value.layout.chartSettings)
+  )
+    throw unsupportedDriveFormat();
   if (typeof value.schemaVersion === "number" && ![1, 2].includes(value.schemaVersion))
     throw unsupportedDriveFormat();
   const indicators = isRecord(value.layout) ? value.layout.technicalIndicators : undefined;

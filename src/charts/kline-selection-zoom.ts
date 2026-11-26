@@ -17,6 +17,8 @@ interface NativePriceChart extends Pick<Chart, "getDom"> {
   getDrawPaneById?(paneId: string): {
     getAxisComponent?(): {
       getType?(): string;
+      getRange?(): AxisRange;
+      getAutoCalcTickFlag?(): boolean;
       setRange?(value: AxisRange): void;
       setAutoCalcTickFlag?(flag: boolean): void;
     } | null;
@@ -30,6 +32,36 @@ interface NativePriceChart extends Pick<Chart, "getDom"> {
 }
 
 const pricePane = "candle_pane";
+
+type PriceRange = { from: number; to: number };
+
+function rangeInNativeUnits({ from, to }: PriceRange): AxisRange {
+  const range = to - from;
+  return { from, to, range, realFrom: from, realTo: to, realRange: range };
+}
+
+export function getKlineManualPriceRange(chart: NativePriceChart): PriceRange | null {
+  const axis = chart.getDrawPaneById?.(pricePane)?.getAxisComponent?.();
+  if (axis?.getType?.() !== "normal" || axis.getAutoCalcTickFlag?.() !== false) return null;
+  const range = axis.getRange?.();
+  return range && Number.isFinite(range.to - range.from) && range.to > range.from
+    ? { from: range.from, to: range.to }
+    : null;
+}
+
+export function setKlineManualPriceRange(chart: NativePriceChart, range: PriceRange): void {
+  const axis = chart.getDrawPaneById?.(pricePane)?.getAxisComponent?.();
+  if (
+    axis?.getType?.() !== "normal" ||
+    !axis.setRange ||
+    !chart.adjustPaneViewport ||
+    !Number.isFinite(range.to - range.from) ||
+    range.to <= range.from
+  )
+    return;
+  axis.setRange(rangeInNativeUnits(range));
+  chart.adjustPaneViewport(false, true, true, true);
+}
 
 export function resetKlineSelectionPrice(chart: NativePriceChart): boolean {
   const axis = chart.getDrawPaneById?.(pricePane)?.getAxisComponent?.();
@@ -66,10 +98,8 @@ export function zoomKlineSelection(
   const x = xAt(window.center);
   if (x === undefined || !Number.isFinite(x)) return false;
 
-  const { from, to } = selection.price;
-  const range = to - from;
   // setRange switches off native autoscale just like dragging the vertical price axis.
-  axis.setRange({ from, to, range, realFrom: from, realTo: to, realRange: range });
+  axis.setRange(rangeInNativeUnits(selection.price));
   if (chart.getBarSpace() !== window.spacing) chart.setBarSpace(window.spacing);
   const centerX = xAt(window.center);
   if (centerX !== undefined && Number.isFinite(centerX)) {

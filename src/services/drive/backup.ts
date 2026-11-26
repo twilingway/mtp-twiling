@@ -43,7 +43,7 @@ const indicators = "ma ema volume mtp160 mtp440 mtp640 mtpAll";
 const priceAxisLabelPalette = { lastPrice: scalars("fill text"), drawings: scalars("fill text") };
 const chartSettings: Shape = {
   ...scalars(
-    "theme legendCollapsed mtpMenuCollapsed mtpAllHidden showCandleCountdown bodyVisible wickUpColor wickDownColor borderUpColor borderDownColor borderVisible wickVisible candlePaletteVersion grid upColor downColor background scaleFontSize showLegend priceLine lastPriceColor ohlcDisplay ohlcOnHold"
+    "theme legendCollapsed mtpMenuCollapsed mtpAllHidden showCandleCountdown bodyVisible wickUpColor wickDownColor borderUpColor borderDownColor borderVisible wickVisible candlePaletteVersion grid upColor downColor background scaleFontSize showLegend priceLine lastPriceColor ohlcDisplay ohlcOnHold chartType"
   ),
   removedIndicators: [true],
   volumeAverage: scalars("enabled period"),

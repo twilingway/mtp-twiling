@@ -41,11 +41,14 @@ function load(relative) {
 const { createOhlcLegend, formatOhlcValue, ohlcDisplayMode, ohlcCandleIndex, placeOhlcCard } =
   load("model/ohlc-legend.ts");
 const { createOhlcInspection, OHLC_HOLD_MS } = load("model/ohlc-inspection.ts");
+const { ohlcHitTimestamp } = load("model/ohlc-hit-test.ts");
 const { isChartSettings } = load("model/backup-format.ts");
 const { chartContrast } = load("model/theme.ts");
 const { DEFAULT_LAST_PRICE_COLOR, lastPriceStyle } = load("model/last-price-style.ts");
 const { drawingPriceLabelPosition, drawingPriceTargets } = load("model/drawing-price-labels.ts");
 const { OhlcLegend } = load("screens/terminal/OhlcLegend.tsx");
+const { OhlcCandleCard } = load("screens/terminal/OhlcCandleCard.tsx");
+const { TerminalContext } = load("screens/terminal/context.tsx");
 const bar = (open, close) => ({
   timestamp: 1000,
   open,
@@ -164,7 +167,7 @@ test("touch hold waits for the delay and stays pinned only after a completed hol
   elapsed();
   assert.equal(current(), null);
   inspection.down(tap, 3000);
-  inspection.move(1, { x: 22, y: 42 });
+  inspection.move(1, { x: 22, y: 42 }, () => 3000);
   elapsed();
   assert.equal(current(), 3000);
   inspection.up(1, point, 3000, 500);
@@ -181,7 +184,7 @@ test("drag, a second pointer and pointer cancellation each prevent a touch card"
   for (const onHold of [true, false]) {
     const { inspection, current, elapsed } = simulateInspection(onHold);
     for (const cancel of [
-      () => inspection.move(1, { x: 35, y: 40 }),
+      () => inspection.move(1, { x: 35, y: 40 }, () => 3000),
       () => inspection.down({ ...tap, id: 2 }, 7000),
       () => inspection.cancel(1)
     ]) {
@@ -206,6 +209,89 @@ test("OHLC direction follows the preceding close, including gaps opposite to can
   assert.equal(fall.color, "#b98452");
   assert.equal(fall.change, -5);
   assert.equal(fall.percent, -5);
+});
+
+function hitMark(x, y, { settings = {}, touch = false, engine = "tradingview" } = {}) {
+  const candles = [
+    { ...bar(100, 105), timestamp: 500 },
+    { ...bar(100, 110), high: 120, low: 90 },
+    { ...bar(110, 90), timestamp: 1500 }
+  ];
+  return ohlcHitTimestamp(
+    candles,
+    { x, y },
+    { timestamp: 1000, value: 200 - y },
+    ({ timestamp, value }) => ({ x: (timestamp / 500) * 20, y: 200 - value }),
+    settings,
+    engine,
+    touch
+  );
+}
+
+test("OHLC only hits the painted candle body or wick, in both engines and with touch tolerance", () => {
+  for (const engine of ["tradingview", "kline"]) {
+    assert.equal(hitMark(45, 95, { engine }), 1000);
+    assert.equal(hitMark(40, 84, { engine }), 1000);
+    assert.equal(hitMark(40, 117, { engine }), null);
+    assert.equal(hitMark(40, 77, { engine }), null);
+    assert.equal(hitMark(45, 84, { engine }), null);
+    assert.equal(hitMark(30.25, 95, { engine }), null);
+    assert.equal(hitMark(42.5, 84, { engine, touch: true }), 1000);
+    assert.equal(hitMark(42.5, 84, { engine }), null);
+  }
+  assert.equal(hitMark(40, 85, { settings: { wickVisible: false } }), null);
+  const noBody = { bodyVisible: false, borderVisible: false };
+  assert.equal(hitMark(40, 95, { settings: noBody }), null);
+  assert.equal(hitMark(40, 85, { settings: noBody }), 1000);
+});
+
+test("native OHLC bars and line or area only hit visible marks", () => {
+  const bars = { chartType: "bars" };
+  assert.equal(hitMark(34, 100, { settings: bars }), 1000);
+  assert.equal(hitMark(46, 90, { settings: bars }), 1000);
+  assert.equal(hitMark(46, 95, { settings: bars }), null);
+  for (const chartType of ["line", "area"]) {
+    assert.equal(hitMark(45, 95, { settings: { chartType } }), 1000);
+    assert.equal(hitMark(45, 105, { settings: { chartType } }), null);
+  }
+});
+
+test("leaving a mark during a hold or tap cancels even inside the same time column", () => {
+  const point = { x: 20, y: 40 };
+  const tap = { id: 1, point, touch: true, startedAt: 0 };
+  const hold = simulateInspection(true);
+  hold.inspection.down(tap, 1000);
+  hold.inspection.move(1, { x: 20, y: 42 }, () => null);
+  assert.equal(hold.pending(), undefined);
+  hold.elapsed();
+  assert.equal(hold.current(), null);
+  const fast = simulateInspection(false);
+  fast.inspection.down(tap, 1000);
+  fast.inspection.up(1, { x: 20, y: 42 }, null, 150);
+  assert.equal(fast.current(), null);
+  fast.inspection.down(tap, null);
+  assert.equal(fast.inspection.hasPress(1), false);
+  fast.inspection.up(1, { x: 20, y: 42 }, 1000, 150);
+  assert.equal(fast.current(), null);
+});
+
+test("repeated empty, blocked and same-candle events do not publish React selection updates", () => {
+  const transitions = [];
+  const inspection = createOhlcInspection(
+    false,
+    (timestamp) => transitions.push(timestamp),
+    () => assert.fail("fast hover should not schedule a card")
+  );
+  for (let i = 0; i < 20; i++) {
+    inspection.hover(null);
+    inspection.clear();
+  }
+  assert.deepEqual(transitions, []);
+  inspection.hover(1000);
+  inspection.hover(1000);
+  inspection.hover(null);
+  inspection.clear();
+  assert.deepEqual(transitions, [1000, null]);
 });
 
 test("unchanged close remains neutral even when the candle body is directional", () => {
@@ -332,4 +418,52 @@ test("legend exposes four separate neutral labels and selected-bar change withou
   assert.doesNotMatch(first, /class="ohlc-change"|%/);
   const missing = renderToStaticMarkup(createElement(OhlcLegend, { digits: 2 }));
   assert.equal((missing.match(/data-missing="true"/g) ?? []).length, 4);
+});
+
+function candleCard(candles, timestamp, chartSettings = {}) {
+  const state = { candles, rows: [], preferences: { chartSettings } };
+  const controller = { getSnapshot: () => state, subscribe: () => () => {} };
+  return renderToStaticMarkup(
+    createElement(
+      TerminalContext,
+      { value: controller },
+      createElement(OhlcCandleCard, { timestamp })
+    )
+  );
+}
+
+test("the adjacent card uses full translated price labels and volume of the selected candle", () => {
+  const markup = candleCard(
+    [
+      { ...bar(103, 100), timestamp: 500, volume: 40000 },
+      { ...bar(110, 105), volume: 123457.125 },
+      { ...bar(109, 108), timestamp: 2000, volume: 90000 }
+    ],
+    1000,
+    { theme: "light", upColor: "#123456" }
+  );
+  assert.match(markup, /<dl class="ohlc-card-fields">/);
+  assert.match(markup, /<dt>Открытие<\/dt><dd>110,00<\/dd>/);
+  assert.match(markup, /<dt>Максимум<\/dt><dd>112,00<\/dd>/);
+  assert.match(markup, /<dt>Минимум<\/dt><dd>103,00<\/dd>/);
+  assert.match(markup, /<dt>Закрытие<\/dt><dd>105,00<\/dd>/);
+  assert.match(markup, /<dt>Изменение<\/dt><dd><span>\+5,00<\/span><span>\(\+5,00%\)<\/span>/);
+  assert.match(markup, /<dt>Объём<\/dt><dd>123\s457,125<\/dd>/);
+  assert.match(markup, /--ohlc-card-change:#123456/);
+  assert.doesNotMatch(markup, /aria-live|class="ohlc ohlc-legend"/);
+});
+
+test("the adjacent card shows real zero volume and marks missing values without fabricated prices", () => {
+  const first = candleCard([{ ...bar(100, 105), volume: 0 }], 1000);
+  assert.match(first, /<dt>Объём<\/dt><dd>0<\/dd>/);
+  assert.match(first, /<dt>Изменение<\/dt><dd><span>—<\/span><\/dd>/);
+  const missing = candleCard([{ ...bar(100, 105), high: NaN, volume: undefined }], 1000);
+  assert.match(missing, /<dt>Максимум<\/dt><dd>—<\/dd>/);
+  assert.match(missing, /<dt>Объём<\/dt><dd>—<\/dd>/);
+  const falling = candleCard([{ ...bar(95, 100), timestamp: 500 }, bar(105, 90)], 1000, {
+    theme: "dark",
+    downColor: "#f23645"
+  });
+  assert.match(falling, /<dt>Изменение<\/dt><dd><span>-10,00<\/span><span>\(-10,00%\)<\/span>/);
+  assert.match(falling, /--ohlc-card-change:#f23645/);
 });

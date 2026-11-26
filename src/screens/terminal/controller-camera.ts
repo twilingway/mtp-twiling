@@ -1,10 +1,12 @@
 import { copyDepthChartView, loadChartView, saveChartView } from "../../services/chart-camera.js";
+import { saveWorkspaceView } from "../../services/workspace-camera.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import type { TerminalController } from "./controller.js";
 import type { TerminalPreferences } from "./state.js";
 import { viewKey } from "./controller-bridge.js";
 
-type Controller = Pick<TerminalController, "getSnapshot" | "chart" | "subscribe">;
+type Controller = Pick<TerminalController, "getSnapshot" | "chart" | "subscribe"> &
+  Partial<Pick<TerminalController, "workspaceSlot">>;
 
 /** Preserve the existing public saveView eligibility rules. */
 export async function saveControllerView(controller: Controller): Promise<void> {
@@ -28,7 +30,10 @@ export async function saveControllerView(controller: Controller): Promise<void> 
   )
     return;
   const view = chart?.getView();
-  if (view && state.owner !== "guest") await saveChartView(state.owner, key, view);
+  if (!view) return;
+  if (controller.workspaceSlot !== undefined)
+    await saveWorkspaceView(state.owner, controller.workspaceSlot, key, view);
+  else if (state.owner !== "guest") await saveChartView(state.owner, key, view);
 }
 
 export function historyDepthTransition(

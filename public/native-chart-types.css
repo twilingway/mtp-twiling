@@ -1,0 +1,76 @@
+.topbar .chart-symbol-controls {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 3px;
+}
+
+.topbar .chart-symbol-controls .symbol-button {
+  min-width: 0;
+}
+
+.topbar .native-chart-type-trigger {
+  display: grid;
+  width: 34px;
+  height: 32px;
+  flex: 0 0 34px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  background: var(--surface-input);
+}
+
+.topbar .native-chart-type-trigger:is(:hover, [aria-expanded="true"]) {
+  background: var(--accent-surface);
+  border-color: var(--accent);
+}
+
+.native-chart-type-menu {
+  box-sizing: border-box;
+  position: fixed;
+  z-index: 1160;
+  display: grid;
+  gap: 2px;
+  padding: 5px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--control-line);
+  border-radius: 8px;
+  background: var(--surface-raised);
+  box-shadow: 0 7px 24px #0005;
+}
+
+.native-chart-type-menu > button {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 12px;
+  align-items: center;
+  min-height: 36px;
+  gap: 8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  text-align: start;
+}
+
+.native-chart-type-menu > button:is(:hover, [aria-checked="true"]) {
+  background: var(--accent-surface);
+}
+
+.native-chart-type-menu > button[aria-checked="true"] > span {
+  color: var(--accent);
+}
+
+@media (max-width: 800px) {
+  .topbar .chart-symbol-controls {
+    grid-row: 1;
+    grid-column: 2;
+  }
+
+  .topbar .native-chart-type-trigger {
+    width: 32px;
+    height: 34px;
+    flex-basis: 32px;
+  }
+}

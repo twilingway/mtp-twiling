@@ -3,6 +3,7 @@ import { chartLayout } from "../../model/chart-workspace-layout.js";
 import { t } from "../../i18n/messages.js";
 import { useTerminal } from "./context.js";
 import { ChartEngineSelect } from "./ChartEngineSelect.js";
+import { NativeChartTypeMenu } from "./NativeChartTypeMenu.js";
 import { ChartLayoutPicker } from "./ChartLayoutPicker.js";
 import type { ChartLayoutPickerProps } from "./ChartLayoutPicker.js";
 import { publishWorkspaceTimeframe } from "./workspace-sync-controller.js";
@@ -44,22 +45,22 @@ export function Toolbar({
         </span>
       </a>
       <div className="divider" />
-      <button
-        type="button"
-        className="symbol-button"
-        id="symbol-button"
-        aria-haspopup="dialog"
-        aria-label={`${ticker} · ${searchLabel}`}
-        onClick={() =>
-          state.ready ? controller.setDialog("instruments") : account.setDialog("account")
-        }
-        title={searchLabel}
-      >
-        <span className="tiny-search" aria-hidden="true">
-          ⌕
-        </span>
-        <b id="top-symbol">{ticker}</b>
-      </button>
+      <div className="chart-symbol-controls">
+        <button
+          type="button"
+          className="symbol-button"
+          id="symbol-button"
+          aria-haspopup="dialog"
+          aria-label={`${ticker} · ${searchLabel}`}
+          onClick={() =>
+            state.ready ? controller.setDialog("instruments") : account.setDialog("account")
+          }
+          title={searchLabel}
+        >
+          <b id="top-symbol">{ticker}</b>
+        </button>
+        <NativeChartTypeMenu />
+      </div>
       <nav className="timeframes" aria-label={t("Таймфрейм")}>
         <TimeframeMenu
           value={p.timeframe}
