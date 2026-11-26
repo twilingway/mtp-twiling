@@ -30,6 +30,13 @@ HTTPS и SHA256, см. KELTNER_PRIMARY_CAPTURE.json.
 false/three choices после reload, заливки/слои, RU/EN mobile и сохранение старых 11 TA и рисунков из
 публичной PWA.
 
+Первый product gate кандидата 88d сохранён как NEEDS_FIX. 12 сочетаний boolean/choice,
+save/reload/switch/reorder/export/import и сохранение фактически импортированных 13 TA/двух рисунков
+прошли; 21 PNG просмотрен. Mobile/RU/dark не завершались после замечания о шкале. Независимая
+классификация разделила допустимый empty-domain при отключении всех plots и настоящий дефект
+inactive KLine precision members. Принятый scale contract не меняется; подробности и необходимые
+fresh gates — в `KELTNER_VISIBILITY_AND_SCALE.md`.
+
 Новые definitions неизвестны старому клиенту. Отдельные Git-source tests используют точный reader
 опубликованной .23 (`62a1a36f2409911f6bdb029f37e0bfe14e852489`): он отклоняет все шесть KC
 boolean/choice сочетаний с `unsupported-format`, не меняя входные данные. Старые 50 экземпляров
