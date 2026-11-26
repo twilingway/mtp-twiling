@@ -72,6 +72,20 @@ export function Toolbar() {
       <div className="divider" />
       <TerminalIndicatorControls />
       <div className="top-spacer" />
+      <div id="install-actions" className="install-actions" hidden>
+        <button type="button" id="install-app" className="install-button">
+          {t("Установить приложение")}
+        </button>
+        <a
+          className="install-certificate-link"
+          href="./android-certificate.html"
+          target="_blank"
+          rel="noopener"
+          aria-label={t("Сертификат Т‑Банка на Android")}
+        >
+          {t("Сертификат Т‑Банка")}
+        </a>
+      </div>
       <label className="engine-label" htmlFor="engine">
         {t("График")}
       </label>

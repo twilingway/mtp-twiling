@@ -141,3 +141,22 @@ dialog {
     max-width: 240px;
   }
 }
+.install-actions:not([hidden]) {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.install-button {
+  min-height: 32px;
+  padding-inline: 10px;
+  border: 1px solid var(--control-line);
+  border-radius: 5px;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.install-certificate-link {
+  display: none;
+}

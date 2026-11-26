@@ -1,4 +1,6 @@
 export const errorMessages = {
+  "Приложение установлено.": "The app has been installed.",
+  "Не удалось открыть установку приложения.": "Could not open the app installation dialog.",
   Загружено: "Loaded",
   частей: "parts",
   "новых запросов": "new requests",

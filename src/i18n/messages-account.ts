@@ -1,4 +1,5 @@
 export const accountMessages = {
+  "Сертификат Т‑Банка": "T-Bank certificate",
   "Сертификат Т‑Банка на Android": "T-Bank certificate on Android",
   "Поиск инструмента в хранилище": "Search stored instruments",
   "Тикер или название инструмента": "Ticker or instrument name",

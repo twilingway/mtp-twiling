@@ -7,9 +7,15 @@ interface PwaOptions {
   signal?: AbortSignal;
 }
 
+type InstallPrompt = Event & { prompt: () => unknown; userChoice: unknown };
+
+function isInstallPrompt(event: Event): event is InstallPrompt {
+  return "prompt" in event && typeof event.prompt === "function" && "userChoice" in event;
+}
+
 function element<T extends HTMLElement>(id: string, constructor: new () => T): T {
   const node = document.getElementById(id);
-  if (!(node instanceof constructor)) throw new Error(`Missing update element: ${id}`);
+  if (!(node instanceof constructor)) throw new Error(`Missing PWA element: ${id}`);
   return node;
 }
 
@@ -22,6 +28,8 @@ export async function setupPwa({
 }: PwaOptions): Promise<() => void> {
   const versionNode = element("app-version", HTMLElement);
   const banner = element("update-banner", HTMLElement);
+  const installActions = element("install-actions", HTMLElement);
+  const installButton = element("install-app", HTMLButtonElement);
   const updateButton = element("update-now", HTMLButtonElement);
   const laterButton = element("update-later", HTMLButtonElement);
   versionNode.textContent = `v${APP_VERSION}`;
@@ -29,12 +37,16 @@ export async function setupPwa({
   const listeners = new AbortController();
   const { signal } = listeners;
   let registration: ServiceWorkerRegistration | undefined;
+  let installPrompt: InstallPrompt | null = null;
+  let installPromptPending = false;
   let reloading = false;
   let updateRequested = false;
   let checkTimer: ReturnType<typeof setInterval> | undefined;
   const dispose = () => {
     if (signal.aborted) return;
     listeners.abort();
+    installPrompt = null;
+    installActions.hidden = true;
     clearInterval(checkTimer);
     parentSignal?.removeEventListener("abort", dispose);
   };
@@ -47,6 +59,47 @@ export async function setupPwa({
     if (!signal.aborted && registration?.waiting && navigator.serviceWorker.controller)
       banner.hidden = false;
   };
+  window.addEventListener(
+    "beforeinstallprompt",
+    (event) => {
+      if (!isInstallPrompt(event)) return;
+      event.preventDefault();
+      installPrompt = event;
+      installActions.hidden = installPromptPending;
+    },
+    { signal }
+  );
+  window.addEventListener(
+    "appinstalled",
+    () => {
+      installActions.hidden = true;
+      installPrompt = null;
+      notify("Приложение установлено.");
+    },
+    { signal }
+  );
+  installButton.addEventListener(
+    "click",
+    () => {
+      const prompt = installPrompt;
+      if (!prompt || installPromptPending) return;
+      installPrompt = null;
+      installPromptPending = true;
+      installActions.hidden = true;
+      void (async () => {
+        try {
+          await prompt.prompt();
+          await prompt.userChoice;
+        } catch {
+          if (!signal.aborted) notify("Не удалось открыть установку приложения.");
+        } finally {
+          installPromptPending = false;
+          if (!signal.aborted) installActions.hidden = !installPrompt;
+        }
+      })();
+    },
+    { signal }
+  );
   laterButton.addEventListener(
     "click",
     () => {
