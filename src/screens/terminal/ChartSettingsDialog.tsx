@@ -32,10 +32,21 @@ export function ChartSettingsDialog() {
         id="chart-settings-form"
         onSubmit={(e) => {
           e.preventDefault();
+          const form = e.currentTarget;
+          const current = () =>
+            form.isConnected && controller.getSnapshot().dialog === "chart-settings";
           const engineUpdate = engine && engine !== state.preferences.engine ? { engine } : {};
           void controller
             .setPreferences({ ...engineUpdate, locale, timeZone, chartSettings: settings })
-            .then(() => controller.setDialog(null));
+            .then(() => {
+              if (current()) controller.setDialog(null);
+            })
+            .catch((error: unknown) => {
+              if (current())
+                controller.notify(
+                  error instanceof Error ? error.message : t("Не удалось сохранить настройки.")
+                );
+            });
         }}
       >
         <div className="display-preferences">

@@ -29,6 +29,37 @@ function sources(overrides = {}) {
 }
 const load = sources(), { WelcomeModel } = load("model/welcome.ts"), { HistorySettingsModel, selectedHistory } = load("model/history-settings.ts");
 const deferred = () => { let resolve, reject; const promise = new Promise((done, fail) => { resolve = done; reject = fail; }); return { promise, resolve, reject }; };
+
+test("late chart settings completion only closes the original form", async () => {
+  for (const [dialog, isConnected, expected] of [
+    ["account", false, []],
+    ["chart-settings", false, []],
+    ["chart-settings", true, [null]]
+  ]) {
+    const saving = deferred();
+    const closed = [];
+    const state = { dialog: "chart-settings", preferences: { chartSettings: {}, engine: "tradingview" } };
+    const controller = {
+      getSnapshot: () => state,
+      marketNow: () => 0,
+      setPreferences: () => saving.promise,
+      setDialog: (value) => closed.push(value)
+    };
+    const modules = sources({
+      react: { ...React, useState: (value) => [value, () => {}] },
+      "screens/terminal/context.tsx": { useTerminal: () => ({ controller, state }) }
+    });
+    const { ChartSettingsDialog } = modules("screens/terminal/ChartSettingsDialog.tsx");
+    const form = { isConnected: true };
+    ChartSettingsDialog().props.children.props.onSubmit({ preventDefault() {}, currentTarget: form });
+    state.dialog = dialog;
+    form.isConnected = isConnected;
+    saving.resolve();
+    await saving.promise;
+    assert.deepEqual(closed, expected);
+  }
+});
+
 const stats = { bytes: 4800, bars: 100, blocks: 3, groups: [
   { uid: "one", timeframe: "1m", bytes: 2400, bars: 50, blocks: 1 },
   { uid: "one", timeframe: "1d", bytes: 1440, bars: 30, blocks: 1 },
