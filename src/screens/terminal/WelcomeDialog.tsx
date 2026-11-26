@@ -6,7 +6,7 @@ import { Modal } from "./Modal.js";
 import { useTerminal } from "./context.js";
 
 function WelcomeDialog({ model }: { model: WelcomeModel }) {
-  const { controller } = useTerminal(),
+  const { controller, state } = useTerminal(),
     status = useSyncExternalStore(model.subscribe, model.getSnapshot, model.getSnapshot),
     [choice, setHide] = useState<boolean | null>(null),
     hide = choice ?? status.hidden;
@@ -19,33 +19,48 @@ function WelcomeDialog({ model }: { model: WelcomeModel }) {
     <Modal id="welcome-dialog" title={t("Добро пожаловать в MTP TWILING")} onClose={() => finish()}>
       <p className="welcome-lead">
         {t(
-          "Личный терминал для графиков, индикаторов и разметки. Криптовалюты Bybit доступны без ключа. Для российских инструментов подключите свой ключ Т‑Банка."
+          state.authenticated
+            ? "Личный терминал для графиков, индикаторов и разметки."
+            : "Личный терминал для графиков, индикаторов и разметки. Криптовалюты Bybit доступны без ключа. Для российских инструментов подключите свой ключ Т‑Банка."
         )}
       </p>
       <ol className="welcome-steps">
         <li>
-          <h3>{t("Выберите источник котировок")}</h3>
-          <p>
-            {t(
-              "Чтобы открыть Bybit, продолжите без подключения банка и найдите монету через поиск инструментов."
-            )}
-          </p>
-          <p>
-            {t(
-              "Выпустите личный API-токен Т‑Инвестиций с правами только для чтения и вставьте его в настройках аккаунта. Приложение не совершает сделки."
-            )}
-          </p>
-          <a href="https://www.tbank.ru/invest/settings/" target="_blank" rel="noopener noreferrer">
-            {t("Открыть настройки Т‑Инвестиций")}
-          </a>
-          {" · "}
-          <a
-            href="https://developer.tbank.ru/invest/intro/intro/token"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {t("Официальная инструкция по токену")}
-          </a>
+          {state.authenticated ? (
+            <>
+              <h3>{t("Т‑Банк подключён")}</h3>
+              <p>{t("Инструменты Т‑Банка и Bybit можно найти через поиск инструментов.")}</p>
+            </>
+          ) : (
+            <>
+              <h3>{t("Выберите источник котировок")}</h3>
+              <p>
+                {t(
+                  "Чтобы открыть Bybit, продолжите без подключения банка и найдите монету через поиск инструментов."
+                )}
+              </p>
+              <p>
+                {t(
+                  "Выпустите личный API-токен Т‑Инвестиций с правами только для чтения и вставьте его в настройках аккаунта. Приложение не совершает сделки."
+                )}
+              </p>
+              <a
+                href="https://www.tbank.ru/invest/settings/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t("Открыть настройки Т‑Инвестиций")}
+              </a>
+              {" · "}
+              <a
+                href="https://developer.tbank.ru/invest/intro/intro/token"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {t("Официальная инструкция по токену")}
+              </a>
+            </>
+          )}
         </li>
         <li>
           <h3>{t("Переносите рабочее пространство")}</h3>
@@ -100,17 +115,20 @@ function WelcomeDialog({ model }: { model: WelcomeModel }) {
         </p>
       )}
       <div className="settings-actions">
-        <button
-          id="welcome-connect"
-          className="primary-button"
-          type="button"
-          disabled={status.saving || !status.ready}
-          onClick={() => finish(true)}
-        >
-          {t("Подключить Т‑Банк")}
-        </button>
+        {state.authenticated ? null : (
+          <button
+            id="welcome-connect"
+            className="primary-button"
+            type="button"
+            disabled={status.saving || !status.ready}
+            onClick={() => finish(true)}
+          >
+            {t("Подключить Т‑Банк")}
+          </button>
+        )}
         <button
           id="welcome-continue"
+          className={state.authenticated ? "primary-button" : undefined}
           type="button"
           disabled={status.saving || !status.ready}
           onClick={() => finish()}
@@ -128,7 +146,7 @@ function WelcomeDialog({ model }: { model: WelcomeModel }) {
   );
 }
 
-export function WelcomeGate() {
+export function WelcomeGate({ startupSettled }: { startupSettled: boolean }) {
   const { controller, state } = useTerminal(),
     [model] = useState(
       () => new WelcomeModel({ load: loadWelcomeHidden, save: saveWelcomeHidden })
@@ -139,15 +157,30 @@ export function WelcomeGate() {
     void model.load();
   }, [model]);
   useEffect(() => {
-    if (!status.ready) return;
-    if (status.hidden || state.dialog === "welcome") {
+    if (state.authenticated || status.hidden || state.dialog === "welcome") {
       consumed.current = true;
       return;
     }
-    if (state.ready && state.dialog === null && !consumed.current) {
+    if (
+      startupSettled &&
+      status.ready &&
+      state.ready &&
+      !state.profileTransition &&
+      state.dialog === null &&
+      !consumed.current
+    ) {
       consumed.current = true;
       controller.setDialog("welcome");
     }
-  }, [controller, state.ready, state.dialog, status.ready, status.hidden]);
+  }, [
+    controller,
+    startupSettled,
+    state.authenticated,
+    state.dialog,
+    state.profileTransition,
+    state.ready,
+    status.hidden,
+    status.ready
+  ]);
   return state.dialog === "welcome" ? <WelcomeDialog model={model} /> : null;
 }

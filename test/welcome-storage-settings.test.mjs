@@ -22,7 +22,7 @@ function sources(overrides = {}) {
     if (modules.has(file)) return modules.get(file).exports;
     const module = { exports: {} }; modules.set(file, module);
     const code = ts.transpileModule(readFileSync(file, "utf8"), { fileName: file, compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
-    vm.runInThisContext(`(function(require,module,exports){${code}\n})`, { filename: file })(specifier => specifier.startsWith(".") ? load(path.relative(root, path.resolve(path.dirname(file), specifier))) : require(specifier), module, module.exports);
+    vm.runInThisContext(`(function(require,module,exports){${code}\n})`, { filename: file })(specifier => specifier.startsWith(".") ? load(path.relative(root, path.resolve(path.dirname(file), specifier))) : overrides[specifier] ?? require(specifier), module, module.exports);
     return module.exports;
   }
   return load;
@@ -41,8 +41,8 @@ test("actual welcome/account components render English, official links and compa
   const { TerminalContext } = modules("screens/terminal/context.tsx"), { WelcomeGate } = modules("screens/terminal/WelcomeDialog.tsx"), { AccountDialog } = modules("screens/terminal/AccountDialog.tsx");
   let state = { owner: "guest", dialog: "welcome", ready: true, authenticated: false, name: "", status: "offline", error: null, historyHelp: "", preferences: { locale: "en" }, rows: [] };
   const controller = { getSnapshot: () => state, subscribe: () => () => {}, sessionKey: () => null, getStorageStats: async () => ({ candles: stats, browser: {} }), clearHistory: async () => {} };
-  const render = component => renderToStaticMarkup(React.createElement(TerminalContext, { value: controller }, React.createElement(component)));
-  const welcome = render(WelcomeGate);
+  const render = (component, props) => renderToStaticMarkup(React.createElement(TerminalContext, { value: controller }, React.createElement(component, props)));
+  const welcome = render(WelcomeGate, { startupSettled: true });
   for (const link of ["https://developer.tbank.ru/invest/intro/intro/token", "https://www.tbank.ru/invest/settings/", "https://github.com/twilingway/mtp-twiling", "./privacy.html"]) assert.ok(welcome.includes(link));
   assert.ok(welcome.includes("The installed app stores data on your device.")); assert.ok(welcome.includes("only on this device")); assert.ok(welcome.includes("personal Google Drive")); assert.ok(welcome.includes("welcome-do-not-show"));
   assert.equal(/[А-Яа-яЁё]/u.test(welcome), false);
@@ -53,6 +53,86 @@ test("actual welcome/account components render English, official links and compa
   assert.ok(account.includes('id="open-welcome"')); assert.ok(account.includes('id="google-drive-connect"'));
   // The existing license attribution uses a Cyrillic copyright letter in both locales.
   assert.equal(/[А-Яа-яЁё]/u.test(account.replace("Copyright (с) 2025 TradingView, Inc.", "")), false);
+
+  state = { ...state, dialog: "welcome", authenticated: true };
+  for (const [locale, status, continueLabel] of [
+    ["en", "T-Bank is connected", "Continue"],
+    ["ru", "Т‑Банк подключён", "Продолжить"]
+  ]) {
+    preferences.setDisplayPreferences({ locale });
+    const help = render(WelcomeGate, { startupSettled: true });
+    assert.ok(help.includes(status));
+    assert.ok(help.includes('id="welcome-continue" class="primary-button"'));
+    assert.ok(help.includes(continueLabel));
+    assert.doesNotMatch(help, /welcome-connect|invest\/intro\/intro\/token|tbank\.ru\/invest\/settings/);
+  }
+});
+
+test("automatic welcome waits for startup and opens only for the settled guest", async (t) => {
+  const beforeDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
+  Object.defineProperty(globalThis, "document", {
+    configurable: true,
+    value: Object.assign(new EventTarget(), { baseURI: "https://example.test/" })
+  });
+  t.after(() => {
+    if (beforeDocument) Object.defineProperty(globalThis, "document", beforeDocument);
+    else delete globalThis.document;
+  });
+
+  for (const outcome of ["bank", "guest", "rejected"]) {
+    const startup = deferred(), effects = [], dialogs = [], notices = [], consumed = { current: false };
+    const state = { ready: false, authenticated: false, profileTransition: false, dialog: null };
+    const controller = {
+      start: () => startup.promise,
+      dispose() {},
+      notify: (message) => notices.push(message),
+      setDialog: (dialog) => dialogs.push(dialog)
+    };
+    let settledController = null;
+    const modules = sources({
+      react: {
+        ...React,
+        useEffect: (effect) => effects.push(effect),
+        useRef: () => consumed,
+        useState: (initial) => typeof initial === "function"
+          ? [initial(), () => {}]
+          : [settledController, (value) => { settledController = value; }],
+        useSyncExternalStore: () => ({ ready: true, hidden: false })
+      },
+      "services/pwa.ts": { setupPwa: async () => () => {} },
+      "services/storage-db.ts": { get: async () => undefined, put: async () => {} },
+      "screens/terminal/context.tsx": { useTerminal: () => ({ controller, state }) },
+      "screens/terminal/controller-drive.ts": { startTerminalDrive: () => () => {} }
+    });
+    const { TerminalLifecycle } = modules("screens/terminal/TerminalLifecycle.tsx");
+    const { WelcomeGate } = modules("screens/terminal/WelcomeDialog.tsx");
+    const gateProps = () => TerminalLifecycle().props.children.find(({ type }) => type === WelcomeGate).props;
+    const runWelcomeEffect = () => {
+      WelcomeGate(gateProps());
+      const show = effects.pop();
+      effects.length = 0;
+      show();
+    };
+    assert.equal(gateProps().startupSettled, false);
+    const cleanup = effects.pop()();
+    try {
+      state.ready = true;
+      runWelcomeEffect();
+      assert.deepEqual(dialogs, [], "guest readiness alone must not open welcome during startup");
+      if (outcome === "rejected") startup.reject(new Error("Saved profile failed"));
+      else {
+        state.authenticated = outcome === "bank";
+        startup.resolve();
+      }
+      await new Promise(setImmediate);
+      assert.equal(gateProps().startupSettled, true);
+      runWelcomeEffect();
+      assert.deepEqual(dialogs, outcome === "bank" ? [] : ["welcome"]);
+      assert.deepEqual(notices, outcome === "rejected" ? ["Saved profile failed"] : []);
+    } finally {
+      cleanup();
+    }
+  }
 });
 
 test("welcome dismissal is device-level IDB data, works before bank login and reopens without losing preference", async () => {
