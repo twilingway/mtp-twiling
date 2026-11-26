@@ -108,6 +108,16 @@
   border-top: 1px solid var(--border);
   padding: 8px 0;
 }
+.technical-output-style > label:first-child {
+  justify-content: flex-start;
+}
+.technical-settings input[type="checkbox"] {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+}
 .technical-opacity input {
   flex: 1;
   min-width: 40px;
