@@ -2,11 +2,25 @@ import { get, put } from "../storage-db.js";
 import { isRecord } from "../../model/backup-format.js";
 import { uuidPattern, shaPattern } from "./backup.js";
 import type { DriveRecord } from "./coordinator-types.js";
+import { unsupportedDriveFormat } from "./reader-guard.js";
+import { DriveError } from "./types.js";
 
 export async function loadDriveRecord(owner: string): Promise<DriveRecord> {
   const value = await get("preferences", `drive-v2:${owner}`);
   if (isRecord(value) && isRecord(value.value)) {
     const record = value.value;
+    const fields = [
+      "schemaVersion",
+      "markerId",
+      "deviceId",
+      "baseHeads",
+      "automatic",
+      "pendingChanges",
+      "lastSyncedDigest",
+      "lastSyncedAt"
+    ];
+    if (record.schemaVersion !== 1 || Object.keys(record).some((key) => !fields.includes(key)))
+      throw unsupportedDriveFormat();
     if (
       record.schemaVersion === 1 &&
       typeof record.markerId === "string" &&
@@ -36,6 +50,8 @@ export async function loadDriveRecord(owner: string): Promise<DriveRecord> {
       };
     }
   }
+  if (value !== undefined)
+    throw new DriveError("remote-invalid", "Invalid local Drive association; data is retained.");
   const device = await get("preferences", "drive-device"),
     deviceId =
       isRecord(device) && typeof device.value === "string" && uuidPattern.test(device.value)

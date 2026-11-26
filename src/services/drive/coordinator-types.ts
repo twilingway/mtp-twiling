@@ -52,7 +52,7 @@ export interface DriveDependencies {
   online?(): boolean;
   sync(
     authorization: DriveAuthorization
-  ): Pick<DriveSync, "inspect" | "download" | "publish" | "resolve">;
+  ): Pick<DriveSync, "inspect" | "download" | "validateHeads" | "publish" | "resolve">;
   load(owner: string): Promise<DriveRecord>;
   save(owner: string, record: DriveRecord): Promise<void>;
 }

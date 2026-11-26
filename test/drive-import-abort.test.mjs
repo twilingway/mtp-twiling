@@ -247,7 +247,7 @@ for(const phase of ["owner","session","logout"]){
       importBackup:async(data,options)=>{importedSignal=options.signal;await transfers.import(data,options);}
     },{
       auth:{prepare:async()=>{},restore:async()=>undefined,suspend:()=>{if(authorized)a.controller.abort();},connectFromUserGesture:()=>{authorized=true;return Promise.resolve({connectionId:crypto.randomUUID(),signal:a.signal,getAccessToken:()=>"fake",invalidate:()=>a.controller.abort()});},disconnect:async()=>{if(authorized)a.controller.abort();}},
-      sync:()=>({inspect:async()=>({heads:[head],snapshots:[],conflict:false}),download:async()=>incoming,
+      sync:()=>({inspect:async()=>({heads:[head],snapshots:[],conflict:false}),download:async()=>incoming,validateHeads:async()=>{},
         publish:async()=>assert.fail("must pull"),resolve:async()=>assert.fail("must pull")}),
       load:async()=>({schemaVersion:1,deviceId:crypto.randomUUID(),markerId:crypto.randomUUID(),baseHeads:[base],lastSyncedDigest:await driveBackupDigest(initial),automatic:false}),
       save:async()=>assert.fail("aborted import cannot be accepted")
