@@ -2,6 +2,7 @@ import type { CumulativeHistoryRequirement } from "./momentum-volume/metadata.js
 import type { VolumeFlowHistoryRequirement, VolumeFlowId } from "./volume-flow/metadata.js";
 import type { VolumeAverage } from "./volume-flow/parameters.js";
 import type { PresentationDefinition } from "./presentation-types.js";
+import type { KeltnerParameters, KeltnerHistoryRequirement } from "./keltner-contract.js";
 import type { TrendPriceId, TrendPriceHistoryRequirement } from "./trend-price-contract.js";
 import type {
   ChannelPriceId,
@@ -54,7 +55,8 @@ export type TechnicalIndicatorId =
   | VolumeFlowId
   | StateOscillatorId
   | TrendPriceId
-  | ChannelPriceId;
+  | ChannelPriceId
+  | "keltner-channels";
 export type PriceSource = "open" | "high" | "low" | "close" | "hl2" | "hlc3" | "ohlc4" | "volume";
 export interface TechnicalBar {
   readonly timestamp: number;
@@ -65,6 +67,7 @@ export interface TechnicalBar {
   readonly volume: NumericValue;
 }
 export interface TechnicalParameters extends ChannelPriceParameters {
+  "keltner-channels": KeltnerParameters;
   "parabolic-sar": { start: number; increment: number; maximum: number };
   supertrend: { atrLength: number; factor: number };
   tsi: { longLength: number; shortLength: number; signalLength: number };
@@ -158,7 +161,8 @@ export type TechnicalIndicatorInstance = {
 export type ParameterDefinition =
   | { key: string; type: "integer" | "number"; defaultValue: number; min: number; max: number }
   | { key: string; type: "source"; defaultValue: PriceSource }
-  | { key: string; type: "choice"; defaultValue: VolumeAverage; choices: readonly ["EMA", "SMA"] };
+  | { key: string; type: "boolean"; defaultValue: boolean }
+  | { key: string; type: "choice"; defaultValue: string; choices: readonly [string, ...string[]] };
 export interface TechnicalOutputDefinition {
   id: string;
   title: string;
@@ -230,4 +234,5 @@ export type TechnicalHistoryRequirement =
   | VolumeFlowHistoryRequirement
   | StateOscillatorHistoryRequirement
   | TrendPriceHistoryRequirement
-  | ChannelPriceHistoryRequirement;
+  | ChannelPriceHistoryRequirement
+  | KeltnerHistoryRequirement;

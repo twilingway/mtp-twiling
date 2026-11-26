@@ -25,6 +25,8 @@ import {
 const labels: Readonly<Record<string, readonly [string, string]>> = {
   length: ["Период", "Length"],
   source: ["Источник", "Source"],
+  useExponentialMa: ["Экспоненциальная средняя", "Use Exponential MA"],
+  bandsStyle: ["Тип диапазона", "Bands Style"],
   offset: ["Смещение", "Offset"],
   sigma: ["Сигма", "Sigma"],
   atrLength: ["Период ATR", "ATR length"],
@@ -67,8 +69,13 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
   const definition = technicalIndicatorDefinitions.find(
     (item) => item.id === instance.definitionId
   )!;
-  const [parameters, setParameters] = useState<Record<string, string>>(() =>
-    Object.fromEntries(Object.entries(instance.params).map(([key, value]) => [key, String(value)]))
+  const [parameters, setParameters] = useState<Record<string, string | boolean>>(() =>
+    Object.fromEntries(
+      Object.entries(instance.params).map(([key, value]) => [
+        key,
+        typeof value === "boolean" ? value : String(value)
+      ])
+    )
   );
   const [pane, setPane] = useState(technicalPaneKey(instance.pane));
   const [styles, setStyles] = useState<Record<string, OutputStyle> | undefined>(instance.styles);
@@ -78,7 +85,7 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
     params: Object.fromEntries(
       definition.parameters.map((parameter) => [
         parameter.key,
-        parameter.type === "source" || parameter.type === "choice"
+        parameter.type === "source" || parameter.type === "choice" || parameter.type === "boolean"
           ? parameters[parameter.key]
           : Number(parameters[parameter.key])
       ])
@@ -130,7 +137,9 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
             params: Object.fromEntries(
               definition.parameters.map((parameter) => [
                 parameter.key,
-                parameter.type === "source" || parameter.type === "choice"
+                parameter.type === "source" ||
+                parameter.type === "choice" ||
+                parameter.type === "boolean"
                   ? parameters[parameter.key]
                   : Number(parameters[parameter.key])
               ])
@@ -164,16 +173,32 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
           {definition.parameters.map((parameter) => (
             <label key={parameter.key}>
               <span>{labels[parameter.key]?.[english ? 1 : 0] ?? parameter.key}</span>
-              {parameter.type === "source" || parameter.type === "choice" ? (
+              {parameter.type === "boolean" ? (
+                <input
+                  type="checkbox"
+                  checked={parameters[parameter.key] === true}
+                  onChange={(event) =>
+                    setParameters({ ...parameters, [parameter.key]: event.target.checked })
+                  }
+                />
+              ) : parameter.type === "source" || parameter.type === "choice" ? (
                 <select
-                  value={parameters[parameter.key]}
+                  value={String(parameters[parameter.key])}
                   onChange={(event) =>
                     setParameters({ ...parameters, [parameter.key]: event.target.value })
                   }
                 >
                   {(parameter.type === "source" ? PRICE_SOURCES : parameter.choices).map(
                     (source) => (
-                      <option key={source}>{source}</option>
+                      <option key={source} value={source}>
+                        {source === "Average True Range"
+                          ? text("Средний истинный диапазон", source)
+                          : source === "True Range"
+                            ? text("Истинный диапазон", source)
+                            : source === "Range"
+                              ? text("Диапазон", source)
+                              : source}
+                      </option>
                     )
                   )}
                 </select>
@@ -184,7 +209,7 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                   min={parameter.min}
                   max={parameter.max}
                   step={parameter.type === "integer" ? 1 : "any"}
-                  value={parameters[parameter.key]}
+                  value={String(parameters[parameter.key])}
                   onChange={(event) =>
                     setParameters({ ...parameters, [parameter.key]: event.target.value })
                   }
@@ -227,6 +252,17 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
           <legend>{text("Стиль", "Style")}</legend>
           {definition.outputs.map((output) => {
             const value = displayStyle(output.id, styles);
+            const title =
+              instance.definitionId === "keltner-channels"
+                ? text(
+                    output.id === "basis"
+                      ? "Основа"
+                      : output.id === "upper"
+                        ? "Верхняя граница"
+                        : "Нижняя граница",
+                    output.title
+                  )
+                : undefined;
             const cross = definition.presentation?.plots.some(
               (plot) => plot.id === output.id && plot.geometry.kind === "cross"
             );
@@ -238,15 +274,16 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                     checked={value.visible}
                     onChange={(event) => style(output.id, { visible: event.target.checked })}
                   />
-                  {output.id === "upTrend"
-                    ? text("Восходящий тренд", "Up Trend")
-                    : output.id === "downTrend"
-                      ? text("Нисходящий тренд", "Down Trend")
-                      : output.id === "longExit"
-                        ? text("Выход из длинной позиции", "Long Exit")
-                        : output.id === "shortExit"
-                          ? text("Выход из короткой позиции", "Short Exit")
-                          : output.title}
+                  {title ??
+                    (output.id === "upTrend"
+                      ? text("Восходящий тренд", "Up Trend")
+                      : output.id === "downTrend"
+                        ? text("Нисходящий тренд", "Down Trend")
+                        : output.id === "longExit"
+                          ? text("Выход из длинной позиции", "Long Exit")
+                          : output.id === "shortExit"
+                            ? text("Выход из короткой позиции", "Short Exit")
+                            : output.title)}
                 </label>
                 <label>
                   {text("Цвет", "Color")}

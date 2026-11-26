@@ -52,7 +52,8 @@ const implemented: Readonly<Record<string, TechnicalIndicatorId>> = {
   "STD;Supertrend": "supertrend",
   "STD;Arnaud%1Legoux%1Moving%1Average": "alma",
   "STD;Least%1Squares%1Moving%1Average": "lsma",
-  "STD;Chandelier_Exit": "chandelier-exit"
+  "STD;Chandelier_Exit": "chandelier-exit",
+  "STD;Keltner_Channels": "keltner-channels"
 };
 
 export function technicalDefinitionForCatalog(id: string): TechnicalIndicatorId | undefined {

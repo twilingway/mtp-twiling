@@ -1,0 +1,81 @@
+{
+  "id": "STD;Keltner_Channels",
+  "url": "https://pine-facade.tradingview.com/pine-facade/get/STD%3BKeltner_Channels/last",
+  "version": "35.0",
+  "sha256": "102f0093433635000a53bf731f0fabe2a1f17cc7a28de12de14af81b7d1417bb",
+  "status": 200,
+  "httpDate": "Thu, 26 Nov 2026 03:40:25 GMT",
+  "plots": [
+    {
+      "title": "Upper",
+      "colorTokens": ["#2962FF"]
+    },
+    {
+      "title": "Basis",
+      "colorTokens": ["#2962FF"]
+    },
+    {
+      "title": "Lower",
+      "colorTokens": ["#2962FF"]
+    }
+  ],
+  "fills": [
+    {
+      "title": "Background",
+      "colorTokens": ["color.rgb"],
+      "rgbaPine": [33.0, 150.0, 243.0, 95.0]
+    }
+  ],
+  "inputs": [
+    {
+      "variable": "length",
+      "default": 20,
+      "title": null,
+      "strings": [],
+      "numbers": ["20", "1"],
+      "trueToken": false
+    },
+    {
+      "variable": "mult",
+      "default": 2.0,
+      "title": null,
+      "strings": ["Multiplier"],
+      "numbers": ["2.0"],
+      "trueToken": false
+    },
+    {
+      "variable": "src",
+      "default": "close",
+      "title": "Source",
+      "strings": ["Source"],
+      "numbers": [],
+      "trueToken": false
+    },
+    {
+      "variable": "exp",
+      "default": true,
+      "title": null,
+      "strings": ["Use Exponential MA"],
+      "numbers": [],
+      "trueToken": true
+    },
+    {
+      "variable": "BandsStyle",
+      "default": "Average True Range",
+      "title": "Bands Style",
+      "strings": ["Average True Range", "Average True Range", "True Range", "Range", "Bands Style"],
+      "numbers": [],
+      "trueToken": false
+    },
+    {
+      "variable": "atrlength",
+      "default": 10,
+      "title": null,
+      "strings": ["ATR Length"],
+      "numbers": ["10"],
+      "trueToken": false
+    }
+  ],
+  "tls": "Python default CERT_REQUIRED/check_hostname, no proxy, no insecure flags",
+  "fullSourceSaved": false
+}
