@@ -312,6 +312,27 @@ test("library add enables original ranges and master without duplicating or disa
   );
 });
 
+test("enabling volume with an active average schedules optional backfill only", async () => {
+  const f = terminalFixture(),
+    { changeMenuIndicator } = f.load("screens/terminal/indicator-menu-actions.js"),
+    previous = f.controller.getSnapshot().preferences,
+    requests = [];
+  f.controller.update({
+    preferences: {
+      ...previous,
+      indicators: { ...previous.indicators, volume: false },
+      chartSettings: { ...previous.chartSettings, volumeAverage: { enabled: true, period: 20 } }
+    }
+  });
+  f.controller.scheduleOlderHistory = (average) => requests.push(average);
+  await changeMenuIndicator(f.controller, "volume");
+  assert.equal(f.controller.getSnapshot().preferences.indicators.volume, true);
+  assert.deepEqual(requests, [true]);
+  await changeMenuIndicator(f.controller, "volume");
+  assert.deepEqual(requests, [true]);
+  assert.equal(f.reloads(), 0);
+});
+
 test("collapse persists per owner through manual backup and Drive, while render config and camera stay identical", async () => {
   const f = terminalFixture(),
     { persistMtpMenuCollapsed } = f.load("screens/terminal/indicator-menu-actions.js");

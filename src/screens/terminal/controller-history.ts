@@ -3,7 +3,7 @@ import { loadChartView } from "../../services/chart-camera.js";
 import { activeMtpPeriods } from "../../model/mtp.js";
 import { volumeAverageWarmup } from "../../model/volume-average.js";
 import { mergeCandles, TIMEFRAMES } from "../../model/history-codec.js";
-import { olderHistoryStart } from "../../model/intervals/calendar.js";
+import { historyWindowStart, olderHistoryStart } from "../../model/intervals/calendar.js";
 import type { Candle, ChartEngine, Timeframe } from "../../model/types.js";
 import {
   historyFirstDate,
@@ -123,8 +123,7 @@ export class TerminalHistory {
       0,
       ...activeMtpPeriods(p.indicators),
       p.indicators.ma ? 20 : 0,
-      p.indicators.ema ? 50 : 0,
-      volumeAverageWarmup(p.chartSettings, p.indicators.volume)
+      p.indicators.ema ? 50 : 0
     );
     this.source = {
       symbol: p.symbol,
@@ -304,10 +303,18 @@ export class TerminalHistory {
         });
       }
     } finally {
-      if (this.current(id, client, owner)) this.bridge.update({ loading: false });
+      if (this.current(id, client, owner)) {
+        this.bridge.update({ loading: false });
+        if (this.bridge.getState().historyViewReady) this.scheduleOlder(true);
+      }
     }
   }
-  scheduleOlder(): void {
+  private volumeAverageDeficit(): number {
+    const { candles, preferences: p } = this.bridge.getState();
+    const period = p.indicators.volume ? volumeAverageWarmup(p.chartSettings, true) : 0;
+    return Math.max(0, period - candles.length);
+  }
+  scheduleOlder(volumeAverage = false): void {
     const state = this.bridge.getState();
     if (
       !this.bridge.isAlive() ||
@@ -315,16 +322,17 @@ export class TerminalHistory {
       this.olderBusy ||
       this.startReached ||
       this.clearing ||
-      !state.candles.length
+      !state.candles.length ||
+      (volumeAverage && (!navigator.onLine || !this.volumeAverageDeficit()))
     )
       return;
     if (this.olderTimer !== null) clearTimeout(this.olderTimer);
     this.olderTimer = setTimeout(() => {
       this.olderTimer = null;
-      void this.loadOlder();
+      void this.loadOlder(volumeAverage);
     }, 350);
   }
-  private async loadOlder(): Promise<void> {
+  private async loadOlder(volumeAverage: boolean): Promise<void> {
     const state = this.bridge.getState(),
       client = this.bridge.getClient(),
       first = state.candles[0];
@@ -343,6 +351,8 @@ export class TerminalHistory {
       owner = state.owner,
       p = state.preferences;
     const until = Math.min(this.cursor ?? first.timestamp, first.timestamp);
+    const missing = volumeAverage ? this.volumeAverageDeficit() : 0;
+    if (volumeAverage && (!navigator.onLine || !missing)) return;
 
     const parsed = Date.parse(
       (["1d", "1w", "1M"].includes(p.timeframe)
@@ -352,7 +362,12 @@ export class TerminalHistory {
         "1990-01-01"
     );
     const earliest = Number.isFinite(parsed) ? parsed : Date.parse("1990-01-01");
-    const from = Math.max(earliest, olderHistoryStart(until, p.timeframe));
+    const from = Math.max(
+      earliest,
+      volumeAverage
+        ? historyWindowStart(until, 0, p.timeframe, missing)
+        : olderHistoryStart(until, p.timeframe)
+    );
     if (from >= until) {
       this.startReached = true;
       return;

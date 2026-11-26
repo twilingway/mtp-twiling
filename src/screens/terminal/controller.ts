@@ -6,7 +6,6 @@ import type { BackupExportOptions } from "../../model/backup-export.js";
 import type { WatchlistMove } from "../../services/watchlist-order.js";
 import { marketCalendar } from "../../services/market-calendar.js";
 import { toggleIndicatorFlags } from "../../model/indicator-flags.js";
-import { volumeAverageWarmup } from "../../model/volume-average.js";
 import { historyDepthTransition, saveControllerView } from "./controller-camera.js";
 import {
   PreferenceRouting,
@@ -367,37 +366,22 @@ export class TerminalController {
     };
     this.update({ preferences: { ...this.state.preferences, indicators, chartSettings } });
     await this.savePreferences();
-    if (
-      (key !== "volume" || volumeAverageWarmup(chartSettings, indicators.volume) > 0) &&
-      this.session.matches(client) &&
-      owner === this.state.owner
-    )
-      await this.loadHistory(true);
+    if (!this.session.matches(client) || owner !== this.state.owner) return;
+    if (key === "volume") this.scheduleOlderHistory(true);
+    else await this.loadHistory(true);
   };
   setChartSettings = async (patch: ChartSettings): Promise<void> => {
     const owner = this.state.owner,
       client = this.client;
     await this.saveView();
     if (!this.session.matches(client) || !importWritable(this.state, owner)) return;
-    const previous = this.state.preferences,
-      chartSettings = { ...previous.chartSettings, ...patch },
-      needsHistory =
-        volumeAverageWarmup(chartSettings, previous.indicators.volume) >
-        volumeAverageWarmup(previous.chartSettings, previous.indicators.volume);
     this.update({
       preferences: {
-        ...previous,
-        chartSettings
+        ...this.state.preferences,
+        chartSettings: { ...this.state.preferences.chartSettings, ...patch }
       }
     });
     await this.savePreferences();
-    if (
-      needsHistory &&
-      this.session.matches(client) &&
-      this.state.owner === owner &&
-      this.state.preferences.chartSettings === chartSettings
-    )
-      await this.loadHistory(true);
   };
   setDrawings = async (drawings: Drawing[]): Promise<void> => {
     await this.editing.change({ drawings });
@@ -444,7 +428,7 @@ export class TerminalController {
       () => !this.session.disposed && owner === this.state.owner && this.session.matches(client)
     );
   };
-  scheduleOlderHistory = (): void => this.history.scheduleOlder();
+  scheduleOlderHistory = (volumeAverage = false): void => this.history.scheduleOlder(volumeAverage);
   searchInstruments = async (query: string, kind: InstrumentSearchKind, signal: AbortSignal) =>
     this.client?.searchInstruments(query, kind, signal) ?? [];
   addInstrument = async (

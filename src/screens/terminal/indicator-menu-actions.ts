@@ -10,13 +10,18 @@ import { importWritable } from "./controller-transfer-guard.js";
 
 type Controller = Pick<
   TerminalController,
-  "getSnapshot" | "subscribe" | "sessionKey" | "setPreferences" | "loadHistory"
+  | "getSnapshot"
+  | "subscribe"
+  | "sessionKey"
+  | "setPreferences"
+  | "loadHistory"
+  | "scheduleOlderHistory"
 >;
 
 async function persist(
   controller: Controller,
   patch: Partial<TerminalPreferences>,
-  refresh: boolean
+  refresh: "full" | "volume" | "none"
 ): Promise<void> {
   const initial = controller.getSnapshot(),
     client = controller.sessionKey();
@@ -38,12 +43,14 @@ async function persist(
   try {
     await controller.setPreferences(patch, false, valid);
     if (
-      refresh &&
+      refresh !== "none" &&
       currentBoundary &&
       boundary() &&
       controller.getSnapshot().preferences.indicators === patch.indicators
-    )
-      await controller.loadHistory(true);
+    ) {
+      if (refresh === "full") await controller.loadHistory(true);
+      else controller.scheduleOlderHistory(true);
+    }
   } finally {
     unsubscribe();
   }
@@ -67,7 +74,13 @@ export async function changeMenuIndicator(
     ...previous.chartSettings,
     ...(nextRemoved ? { removedIndicators: nextRemoved } : {})
   };
-  await persist(controller, { indicators, chartSettings }, key !== "volume");
+  const refresh =
+    key !== "volume"
+      ? "full"
+      : indicators.volume && chartSettings.volumeAverage?.enabled
+        ? "volume"
+        : "none";
+  await persist(controller, { indicators, chartSettings }, refresh);
 }
 
 export async function persistMtpMenuCollapsed(controller: Controller): Promise<void> {
@@ -75,6 +88,6 @@ export async function persistMtpMenuCollapsed(controller: Controller): Promise<v
   await persist(
     controller,
     { chartSettings: { ...settings, mtpMenuCollapsed: !settings.mtpMenuCollapsed } },
-    false
+    "none"
   );
 }

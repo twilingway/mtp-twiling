@@ -213,8 +213,13 @@ export function IndicatorSettingsDialog() {
               }
             })
             .then(() => {
-              if (controller.getSnapshot().dialog === "indicator-settings")
-                controller.setDialog(null);
+              const current = controller.getSnapshot();
+              if (
+                key === "volume" &&
+                current.preferences.chartSettings.volumeAverage === volumeAverage
+              )
+                controller.scheduleOlderHistory(true);
+              if (current.dialog === "indicator-settings") controller.setDialog(null);
             })
             .catch((error: unknown) =>
               controller.notify(
