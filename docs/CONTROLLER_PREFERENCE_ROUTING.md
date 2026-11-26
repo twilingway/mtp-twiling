@@ -23,7 +23,7 @@ deterministic source regressions в `../route-race-review/{REVIEW.md,probe.mjs,p
 
 ## Проверки
 
-Новый `node test/controller-preference-routing.test.mjs`: **16/16 PASS**. Реальные implementations
+Новый `node test/controller-preference-routing.test.mjs`: **19/19 PASS**. Реальные implementations
 controller/editing/history/camera/chart-lifecycle и JSX disabled props; fake
 storage/DB/market/native и controllable React hook/JSX boundary. Начальная ready history получена
 real loadHistory, а не вставкой неправдоподобного flags state. Network/DB gates управляют
@@ -62,3 +62,26 @@ Strict OpenSpec **48 passed, 0 failed**, scoped format и diff check PASS при
 persistence отклонён после staging, ошибка доходит до caller; eager history не выполняется.
 Browser/full integration/release находятся у root. Этот worktree не выполняет browser, build,
 prepare-version, server, credential access, push/merge/deploy и не меняет .22 интеграционный WT.
+
+## Follow-up independent review
+
+На ae4889f reviewer подтвердил дополнительный blocker: combined depth30 + valid forced sidebar ждали
+повторного camera save; actual toggleIndicator(ma) запускал refresh и отменял depth. Aggregate
+batch.finish() ошибочно разрешал обоих callers, теряя отдельный force/sidebar intent.
+
+Теперь record один раз получает собственный sticky depth guard внутри critical. Guard сохраняется
+через list-version retries, не создаётся заново после transient invalidation. При повторном выборе
+удаляются только invalid records целиком, включая собственные fields/forceReload. Остальные valid
+records повторно объединяются. При camera carry failure отменяются только atomic depth records;
+retry требует удаления минимум одного record, поэтому нет blind continue/livelock. Camera и
+scope/original-valid guards не ослаблены. Это отдельный follow-up поверх ae4889f, без amend.
+
+Три actual-controller cases: indicator refresh сохраняет forced sidebar; завершённый refresh с
+полным market fixture не rearm-ит depth/style record; retired adapter carry failure сохраняет
+отдельный forced preference и не пишет rejected depth key.
+
+Follow-up checks: routing19/19, прежние depth8/8/lifecycle11/11, independent readonly probes11/11,
+whole-source virtual-version noEmit, scoped ESLint/Prettier, strict change validation и diff check
+PASS. Header SHA в external reviewer probe — исторический label ae4889f, не assertion текущего
+worktree; повторный запуск читал этот follow-up source. Full build/browser/full suite не
+запускались.

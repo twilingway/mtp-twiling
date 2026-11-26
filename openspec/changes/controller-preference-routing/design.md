@@ -39,6 +39,11 @@ prefs. При новом intent во время save/flush/carry list version м
 повторный merge сохраняет concurrent nonrouting style/layout. Nonstrouting writes не ставятся в
 routing queue.
 
+Record сохраняет собственный sticky depth guard, впервые созданный внутри critical. Retry не
+rearm-ит transient-invalid record. При invalid aggregate/camera carry отменяются только atomic depth
+records, остальные valid force/TF/engine records повторно выбираются. Retry после carry failure
+обязан удалить минимум один record; blind continue запрещён.
+
 При actual reload commit увеличивается committed generation и одним update публикуются preferences,
 пустые candles/loadingfalse/**historyViewReadyfalse**. Поэтому depth select заблокирован и во время
 await savePreferences. После synchronous update повторяется owner/scope guard до persistence.

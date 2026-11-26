@@ -210,7 +210,8 @@ export async function routingFixture() {
         uid: options.uid,
         engine: controller.getSnapshot().preferences.engine
       });
-      await hooks.candles?.(symbol, timeframe, range, options);
+      const result = await hooks.candles?.(symbol, timeframe, range, options);
+      if (result) return result;
       return {
         candles: bars.filter((bar) => bar.timestamp >= range.from),
         requests: 0,

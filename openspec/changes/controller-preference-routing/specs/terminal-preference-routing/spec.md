@@ -28,6 +28,13 @@ scope. Для одного поля итог SHALL соответствоват�
 - **WHEN** TF уже committed, savePreferences ожидается, а depth request отклонён camera/ready guard
 - **THEN** TF history запускается после persistence и не остаётся пустой из-за rejected request
 
+#### Scenario: Depth и независимый force при indicator refresh
+
+- **WHEN** depth и отдельный forced sidebar intent ожидают camera save, а indicator refresh отменяет
+  depth
+- **THEN** depth record отклоняется целиком, отдельный valid force/sidebar применяется
+- **AND** transient loading/ready bounce не активирует уже отменённый depth record заново
+
 ### Requirement: Атомарный staged reload
 
 Система SHALL устанавливать historyViewReady=false в том же update, который меняет reload

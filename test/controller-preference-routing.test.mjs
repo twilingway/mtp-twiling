@@ -310,3 +310,124 @@ test("storage errors reject their callers without poisoning later routing reques
   assert.equal(f.controller.getSnapshot().preferences.timeframe, "1h");
   assert.equal(f.requests.length, 1);
 });
+
+test("invalidated depth cancels only its record, preserving force/sidebar during actual indicator refresh", async (t) => {
+  const f = await routingFixture();
+  t.after(() => f.close());
+  const first = deferred(),
+    firstEntered = deferred(),
+    second = deferred(),
+    secondEntered = deferred(),
+    network = deferred(),
+    networkEntered = deferred();
+  let saves = 0,
+    requests = 0;
+  f.hooks.saveView = async () => {
+    if (++saves === 1) {
+      firstEntered.resolve();
+      await first.promise;
+    } else if (saves === 2) {
+      secondEntered.resolve();
+      await second.promise;
+    }
+  };
+  f.hooks.candles = async () => {
+    if (++requests === 1) {
+      networkEntered.resolve();
+      await network.promise;
+    }
+  };
+  const before = f.controller.getSnapshot().preferences.indicators.ma;
+  const depth = f.controller.setPreferences({ rangeDays: 30 });
+  await firstEntered.promise;
+  const force = f.controller.setPreferences({ sidebarWidth: 431 }, true);
+  first.resolve();
+  await secondEntered.promise;
+  const refresh = f.controller.toggleIndicator("ma");
+  await networkEntered.promise;
+  second.resolve();
+  await Promise.all([depth, force]);
+  assert.equal(f.controller.getSnapshot().preferences.rangeDays, 365);
+  assert.equal(f.controller.getSnapshot().preferences.sidebarWidth, 431);
+  assert.equal(f.controller.getSnapshot().preferences.indicators.ma, !before);
+  assert.equal(
+    f.preferenceWrites.length,
+    2,
+    "indicator write plus independently valid force/sidebar write"
+  );
+  network.resolve();
+  await refresh;
+});
+
+test("transient loading bounce does not rearm a rejected atomic depth/style record", async (t) => {
+  const f = await routingFixture();
+  t.after(() => f.close());
+  const first = deferred(),
+    firstEntered = deferred(),
+    second = deferred(),
+    secondEntered = deferred();
+  let saves = 0;
+  f.hooks.saveView = async () => {
+    if (++saves === 1) {
+      firstEntered.resolve();
+      await first.promise;
+    } else if (saves === 2) {
+      secondEntered.resolve();
+      await second.promise;
+    }
+  };
+  const original = f.controller.getSnapshot().preferences.sidebarWidth;
+  const depth = f.controller.setPreferences({ rangeDays: 30, sidebarWidth: 439 });
+  await firstEntered.promise;
+  const force = f.controller.setPreferences({}, true);
+  first.resolve();
+  await secondEntered.promise;
+  f.hooks.candles = async (_symbol, _timeframe, range) => {
+    const day = 86400000,
+      today = Math.floor(Date.now() / day) * day;
+    return {
+      candles: Array.from({ length: 2001 }, (_, i) => ({
+        timestamp: today - (2000 - i) * day,
+        open: 10,
+        high: 12,
+        low: 9,
+        close: 11,
+        volume: 10
+      })).filter((bar) => bar.timestamp >= range.from && bar.timestamp <= range.to),
+      cached: true,
+      requests: 0
+    };
+  };
+  await f.controller.loadHistory(true);
+  assert.equal(f.controller.getSnapshot().loading, false);
+  assert.equal(f.controller.getSnapshot().historyViewReady, true);
+  second.resolve();
+  await Promise.all([depth, force]);
+  assert.equal(f.controller.getSnapshot().preferences.rangeDays, 365);
+  assert.equal(f.controller.getSnapshot().preferences.sidebarWidth, original);
+  assert.equal(f.preferenceWrites.length, 1);
+});
+
+test("camera carry failure cancels depth only and keeps a separately valid forced preference", async (t) => {
+  const f = await routingFixture();
+  t.after(() => f.close());
+  const gate = deferred(),
+    entered = deferred();
+  let transactions = 0;
+  f.hooks.transaction = async () => {
+    if (++transactions === 1) {
+      entered.resolve();
+      await gate.promise;
+    }
+  };
+  const depth = f.controller.setPreferences({ rangeDays: 30 });
+  await entered.promise;
+  const force = f.controller.setPreferences({ sidebarWidth: 433 }, true);
+  f.controller.chart.retired = true;
+  gate.resolve();
+  await Promise.all([depth, force]);
+  assert.equal(f.controller.getSnapshot().preferences.rangeDays, 365);
+  assert.equal(f.controller.getSnapshot().preferences.sidebarWidth, 433);
+  assert.equal(f.preferenceWrites.length, 1);
+  assert.ok(!f.log.some((entry) => entry.event === "transactionPut" && entry.key.endsWith(":30")));
+});

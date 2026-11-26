@@ -266,14 +266,7 @@ export class TerminalController {
   };
   private applyRoutingPreferences = async (): Promise<void> => {
     for (;;) {
-      const batch = this.preferenceRouting.batch((patch) => {
-        const candidate = historyDepthTransition(this, patch);
-        try {
-          return candidate.valid();
-        } finally {
-          candidate.dispose();
-        }
-      });
+      const batch = this.preferenceRouting.batch((patch) => historyDepthTransition(this, patch));
       if (!batch) return;
       const depth = historyDepthTransition(this, batch.patch);
       const merge = () => mergeRoutingPreferences(this.state, batch.patch);
@@ -282,19 +275,22 @@ export class TerminalController {
         await this.editing.flush();
         if (!batch.current()) continue;
         if (!depth.valid()) {
-          batch.finish();
-          return;
+          if (!batch.cancelDepth(this.state.preferences.rangeDays))
+            throw new Error("Invalid depth without a depth intent");
+          continue;
         }
         let next = merge();
         if (depth.active && !(await depth.carry(next, batch.current))) {
           if (!batch.current()) continue;
-          batch.finish();
-          return;
+          if (!batch.cancelDepth(this.state.preferences.rangeDays))
+            throw new Error("Failed depth without a depth intent");
+          continue;
         }
         if (!batch.current()) continue;
         if (!depth.valid()) {
-          batch.finish();
-          return;
+          if (!batch.cancelDepth(this.state.preferences.rangeDays))
+            throw new Error("Invalid depth without a depth intent");
+          continue;
         }
         next = merge();
         const previous = this.state.preferences,

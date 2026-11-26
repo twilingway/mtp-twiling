@@ -57,10 +57,16 @@ export function preferenceRoutingScope(
   };
 }
 type Scope = ReturnType<typeof preferenceRoutingScope>;
+interface DepthGuard {
+  active: boolean;
+  valid(): boolean;
+  dispose(): void;
+}
 interface Intent {
   patch: Partial<TerminalPreferences>;
   forceReload: boolean;
   scope: Scope;
+  depth?: DepthGuard;
   resolve(): void;
   reject(error: unknown): void;
 }
@@ -98,9 +104,14 @@ export class PreferenceRouting {
     if (!this.running) void this.drain(process);
     return result;
   }
-  batch(eligible: (patch: Partial<TerminalPreferences>) => boolean) {
-    for (const intent of [...this.pending])
-      if (!intent.scope.current() || !eligible(intent.patch)) this.finish([intent]);
+  batch(depthGuard: (patch: Partial<TerminalPreferences>) => DepthGuard) {
+    for (const intent of [...this.pending]) {
+      if (!intent.scope.current()) this.finish([intent]);
+      else {
+        intent.depth ??= depthGuard(intent.patch);
+        if (!intent.depth.valid()) this.finish([intent]);
+      }
+    }
     const intents = [...this.pending];
     if (!intents.length) return null;
     const version = this.version,
@@ -113,9 +124,20 @@ export class PreferenceRouting {
     return {
       patch,
       forceReload: intents.some((intent) => intent.forceReload),
-      current: () => version === this.version && intents.every((intent) => intent.scope.current()),
+      current: () =>
+        version === this.version &&
+        intents.every((intent) => intent.scope.current() && intent.depth?.valid()),
       accept: () => intents.forEach((intent) => intent.scope.accept()),
       ownersCurrent: () => intents.every((intent) => intent.scope.current()),
+      cancelDepth: (rangeDays: number) => {
+        const rejected = intents.filter(
+          (intent) =>
+            intent.depth?.active ||
+            (intent.patch.rangeDays !== undefined && intent.patch.rangeDays !== rangeDays)
+        );
+        this.finish(rejected);
+        return rejected.length > 0;
+      },
       finish: (loading?: Promise<void>) => this.finish(intents, loading),
       fail: (error: unknown) => this.rejectIntents(intents, error)
     };
@@ -129,12 +151,14 @@ export class PreferenceRouting {
       () => {
         for (const intent of intents) {
           intent.scope.dispose();
+          intent.depth?.dispose();
           intent.resolve();
         }
       },
       (error: unknown) => {
         for (const intent of intents) {
           intent.scope.dispose();
+          intent.depth?.dispose();
           intent.reject(error);
         }
       }
@@ -145,6 +169,7 @@ export class PreferenceRouting {
       const index = this.pending.indexOf(intent);
       if (index >= 0) this.pending.splice(index, 1);
       intent.scope.dispose();
+      intent.depth?.dispose();
       intent.reject(error);
     }
   }
