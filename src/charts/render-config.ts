@@ -1,5 +1,6 @@
 import { chartBackground, terminalTheme } from "../model/theme.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
+import { volumeAverageSettings } from "../model/volume-average.js";
 import type {
   ChartSettings,
   IndicatorFlags,
@@ -51,6 +52,9 @@ export function chartRenderConfigKey(settings: ChartSettings, flags: IndicatorFl
       wickVisible: settings.wickVisible !== false,
       priceLine: settings.priceLine !== false,
       indicatorOptions,
+      ...(flags.volume && !tools.indicatorsHidden
+        ? { volumeAverage: volumeAverageSettings(settings) }
+        : {}),
       drawingTools: {
         cursor: tools.cursor === "crosshair" ? "crosshair" : "arrow",
         indicatorsLocked: tools.indicatorsLocked

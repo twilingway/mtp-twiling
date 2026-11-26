@@ -140,6 +140,16 @@ export function TerminalIndicatorControls() {
                 {t(INDICATOR_NAMES[key])}
               </label>
             ))}
+            <button
+              type="button"
+              disabled={blocked}
+              onClick={() => {
+                close();
+                controller.editIndicator("volume");
+              }}
+            >
+              {t("Настройки объёма")}
+            </button>
           </div>
         </>
       )}

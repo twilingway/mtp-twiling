@@ -4,6 +4,7 @@ import type { ChartOptions } from "./adapter.js";
 import { lineColor } from "../model/candle-palette.js";
 import { activeMtpPeriods } from "../model/mtp.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
+import { volumeAverageSettings, volumeSma } from "../model/volume-average.js";
 
 /** Flags/styles are fixed for the adapter's lifetime by chartRenderConfigKey. */
 export function initializeKlineIndicators(
@@ -39,12 +40,44 @@ export function initializeKlineIndicators(
       { id: "candle_pane" }
     );
   }
-  if (indicators.volume)
-    chart.createIndicator("VOL", false, {
-      id: "volume_pane",
-      height: volumeHeight,
-      dragEnabled: !drawingToolbarSettings(settings).indicatorsLocked
-    });
+  if (indicators.volume) {
+    const average = volumeAverageSettings(settings),
+      style = settings.indicatorOptions?.volume;
+    chart.createIndicator(
+      {
+        name: "VOL",
+        calcParams: average.enabled ? [average.period] : [],
+        styles: {
+          lines: [
+            {
+              color: lineColor(style?.color ?? "#7b8fff", style?.opacity),
+              size: style?.width ?? 1,
+              style: LineType.Solid,
+              dashedValue: [],
+              smooth: false
+            }
+          ]
+        },
+        ...(average.enabled
+          ? {
+              calc(data) {
+                const values = volumeSma(data, average.period);
+                return data.map((bar, index) => ({
+                  volume: bar.volume,
+                  ma1: values[index] ?? undefined
+                }));
+              }
+            }
+          : {})
+      },
+      false,
+      {
+        id: "volume_pane",
+        height: volumeHeight,
+        dragEnabled: !drawingToolbarSettings(settings).indicatorsLocked
+      }
+    );
+  }
   if (activeMtpPeriods(indicators).length)
     chart.createIndicator("MTP_PERSONAL", true, { id: "candle_pane" });
   chart.createIndicator("DRAWINGS_PERSONAL", true, { id: "candle_pane" });

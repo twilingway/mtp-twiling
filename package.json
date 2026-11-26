@@ -1,9 +1,9 @@
 {
   "name": "mtp-twiling",
-  "version": "0.3.27",
+  "version": "0.3.29",
   "private": true,
   "type": "module",
-  "description": "Личный PWA-терминал с прямым T‑Invest API и локальными сохранениями",
+  "description": "Личный браузерный терминал с прямым T‑Invest API и локальными сохранениями",
   "engines": {
     "node": ">=22.21.0"
   },
@@ -14,8 +14,8 @@
     "build": "pnpm typecheck && node scripts/build.mjs",
     "test": "pnpm build && node --test test/*.test.mjs",
     "lint": "node scripts/prepare-version.mjs && eslint src --max-warnings 0",
-    "format": "prettier --write src scripts server.mjs public/*.css public/*.html public/*.webmanifest public/*.svg *.json docs openspec",
-    "format:check": "prettier --check src scripts server.mjs public/*.css public/*.html public/*.webmanifest public/*.svg *.json docs openspec",
+    "format": "prettier --write src scripts server.mjs public/*.css public/*.html public/*.svg *.json docs openspec",
+    "format:check": "prettier --check src scripts server.mjs public/*.css public/*.html public/*.svg *.json docs openspec",
     "check": "pnpm format:check && pnpm lint && pnpm test",
     "spec": "node scripts/spec.mjs",
     "spec:validate": "node scripts/spec.mjs validate --all --strict"

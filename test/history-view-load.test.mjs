@@ -29,6 +29,7 @@ function fixture({
   coverage = [],
   chartMissing = false,
   fastTimeout = false,
+  volumeAverage,
   now = NOW,
   timeframe = "1d",
   rangeDays = 365
@@ -59,7 +60,8 @@ function fixture({
           clock += 5001;
           return setImmediate(callback);
         }
-      : setTimeout,
+      : (callback, delay) =>
+          volumeAverage && delay === 350 ? setImmediate(callback) : setTimeout(callback, delay),
     clearTimeout: fastTimeout ? clearImmediate : clearTimeout
   });
   let state = {
@@ -73,7 +75,8 @@ function fixture({
       timeframe,
       engine: "tradingview",
       rangeDays,
-      indicators: {}
+      indicators: { volume: !!volumeAverage },
+      chartSettings: volumeAverage ? { volumeAverage } : {}
     },
     rows: [{ symbol: "SBER", uid: "uid", first1dayCandleDate: first }],
     drawings: [],
@@ -313,6 +316,49 @@ test("offline needs both enough candles and continuous cached coverage", async (
   await missing.history.load();
   assert.equal(missing.calls.length, 1);
   assert.equal(missing.state().historyViewReady, false);
+});
+
+test("volume SMA backfill cannot hide a covered saved window", async () => {
+  const left = NOW - 3 * DAY,
+    right = left + DAY,
+    bars = [bar(left), bar(right)];
+  for (const offline of [true, false]) {
+    const f = fixture({
+      offline,
+      view: { from: left / 1000, to: right / 1000 },
+      volumeAverage: { enabled: true, period: 20 },
+      coverage: [{ from: left, to: right }],
+      provider: ({ call }) => {
+        if (call > 1) throw new Error("Older volume history is unavailable");
+        return { candles: bars, requests: 1 };
+      }
+    });
+    await f.history.load();
+    assert.equal(f.state().historyViewReady, true);
+    assert.equal(f.calls.length, 1);
+    await tick();
+    assert.equal(f.calls.length, offline ? 1 : 2);
+    assert.equal(f.state().historyViewReady, true);
+    assert.equal(f.state().candles.length, 2);
+  }
+});
+
+test("volume SMA keeps loading productive older windows until the average has enough bars", async () => {
+  const left = NOW - 3 * DAY,
+    right = left + DAY;
+  const f = fixture({
+    view: { from: left / 1000, to: right / 1000 },
+    volumeAverage: { enabled: true, period: 4 },
+    provider: ({ call, range }) => ({
+      candles: call === 1 ? [bar(left), bar(right)] : [bar(range.to - DAY)],
+      requests: 1
+    })
+  });
+  await f.history.load();
+  for (let i = 0; i < 4; i++) await tick();
+  assert.equal(f.calls.length, 3);
+  assert.equal(f.state().candles.length, 4);
+  assert.equal(f.state().historyViewReady, true);
 });
 
 test("offline restored view remains pending when coverage misses its right side; proven closed-market gaps are allowed", async () => {

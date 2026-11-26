@@ -9,7 +9,7 @@ export function openLegacyIndicatorSettings(
 ): void {
   controller.update({
     editingIndicator: key,
-    dialog: key === "volume" ? "chart-settings" : "indicator-settings",
+    dialog: "indicator-settings",
     contextMenu: null
   });
 }

@@ -7,15 +7,9 @@ interface PwaOptions {
   signal?: AbortSignal;
 }
 
-type InstallPrompt = Event & { prompt: () => unknown; userChoice: unknown };
-
-function isInstallPrompt(event: Event): event is InstallPrompt {
-  return "prompt" in event && typeof event.prompt === "function" && "userChoice" in event;
-}
-
 function element<T extends HTMLElement>(id: string, constructor: new () => T): T {
   const node = document.getElementById(id);
-  if (!(node instanceof constructor)) throw new Error(`Missing PWA element: ${id}`);
+  if (!(node instanceof constructor)) throw new Error(`Missing update element: ${id}`);
   return node;
 }
 
@@ -28,7 +22,6 @@ export async function setupPwa({
 }: PwaOptions): Promise<() => void> {
   const versionNode = element("app-version", HTMLElement);
   const banner = element("update-banner", HTMLElement);
-  const installButton = element("install-app", HTMLButtonElement);
   const updateButton = element("update-now", HTMLButtonElement);
   const laterButton = element("update-later", HTMLButtonElement);
   versionNode.textContent = `v${APP_VERSION}`;
@@ -36,16 +29,12 @@ export async function setupPwa({
   const listeners = new AbortController();
   const { signal } = listeners;
   let registration: ServiceWorkerRegistration | undefined;
-  let installPrompt: InstallPrompt | null = null;
-  let installPromptPending = false;
   let reloading = false;
   let updateRequested = false;
   let checkTimer: ReturnType<typeof setInterval> | undefined;
   const dispose = () => {
     if (signal.aborted) return;
     listeners.abort();
-    installPrompt = null;
-    installButton.hidden = true;
     clearInterval(checkTimer);
     parentSignal?.removeEventListener("abort", dispose);
   };
@@ -58,47 +47,6 @@ export async function setupPwa({
     if (!signal.aborted && registration?.waiting && navigator.serviceWorker.controller)
       banner.hidden = false;
   };
-  window.addEventListener(
-    "beforeinstallprompt",
-    (event) => {
-      if (!isInstallPrompt(event)) return;
-      event.preventDefault();
-      installPrompt = event;
-      installButton.hidden = installPromptPending;
-    },
-    { signal }
-  );
-  window.addEventListener(
-    "appinstalled",
-    () => {
-      installButton.hidden = true;
-      installPrompt = null;
-      notify("Приложение установлено.");
-    },
-    { signal }
-  );
-  installButton.addEventListener(
-    "click",
-    () => {
-      const prompt = installPrompt;
-      if (!prompt || installPromptPending) return;
-      installPrompt = null;
-      installPromptPending = true;
-      installButton.hidden = true;
-      void (async () => {
-        try {
-          await prompt.prompt();
-          await prompt.userChoice;
-        } catch {
-          if (!signal.aborted) notify("Не удалось открыть установку приложения.");
-        } finally {
-          installPromptPending = false;
-          if (!signal.aborted) installButton.hidden = !installPrompt;
-        }
-      })();
-    },
-    { signal }
-  );
   laterButton.addEventListener(
     "click",
     () => {
@@ -127,10 +75,7 @@ export async function setupPwa({
     },
     { signal }
   );
-  if (!("serviceWorker" in navigator) || !window.isSecureContext) {
-    notify("Для установки PWA нужен HTTPS или localhost.");
-    return dispose;
-  }
+  if (!("serviceWorker" in navigator) || !window.isSecureContext) return dispose;
   try {
     const base = appBase ? new URL(appBase, document.baseURI) : new URL("./", document.baseURI);
     const activeRegistration = await navigator.serviceWorker.register(
@@ -173,7 +118,7 @@ export async function setupPwa({
         await fetch(new URL("version.json", base), { cache: "no-store", signal });
         showUpdate();
       } catch {
-        /* Keep the installed shell when offline. */
+        /* Keep the cached shell when offline. */
       }
     };
     await check();
@@ -196,7 +141,7 @@ export async function setupPwa({
       { signal }
     );
   } catch {
-    if (!signal.aborted) notify("Не удалось подготовить PWA для работы офлайн. Проверьте сеть.");
+    if (!signal.aborted) notify("Не удалось подготовить сайт для работы офлайн. Проверьте сеть.");
   }
   return dispose;
 }

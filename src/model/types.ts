@@ -199,6 +199,10 @@ export interface DrawingTemplate {
   settings: DrawingSettings;
   visibility?: DrawingVisibility;
 }
+export interface VolumeAverageSettings {
+  enabled: boolean;
+  period: number;
+}
 export interface ChartSettings {
   legendCollapsed?: boolean;
   mtpMenuCollapsed?: boolean;
@@ -222,6 +226,7 @@ export interface ChartSettings {
   showLegend?: boolean;
   priceLine?: boolean;
   indicatorOptions?: IndicatorOptions;
+  volumeAverage?: VolumeAverageSettings;
   drawingTemplates?: Record<string, DrawingTemplate>;
 }
 export interface IndicatorPaneLayout {
