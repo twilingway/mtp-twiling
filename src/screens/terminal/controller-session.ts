@@ -82,8 +82,8 @@ export class TerminalSession {
         if (this.current(lifecycle, activation)) this.bridge.notify(errorText(error));
       }
     } catch (error) {
-      if (!this.current(lifecycle, activation)) return;
-      this.failWatchlistStartup();
+      if (this.current(lifecycle, activation)) this.failWatchlistStartup();
+      else if (this.current(lifecycle)) return;
       throw error;
     }
   }
