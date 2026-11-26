@@ -8,6 +8,14 @@ const order: readonly IndicatorKey[] = [
   "ma",
   "ema"
 ];
+export function indicatorShown(
+  settings: ChartSettings,
+  flags: IndicatorFlags,
+  key: IndicatorKey
+): boolean {
+  return !!flags[key] && (key !== "mtpAll" || settings.mtpAllHidden !== true);
+}
+
 export function indicatorLegendKeys(
   settings: ChartSettings,
   flags: IndicatorFlags

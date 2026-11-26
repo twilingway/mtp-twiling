@@ -25,6 +25,7 @@ const indicatorKeys: readonly IndicatorKey[] = [
 /** Only settings read by native canvases belong to the adapter's lifetime. */
 export function chartRenderConfigKey(settings: ChartSettings, flags: IndicatorFlags): string {
   const tools = drawingToolbarSettings(settings),
+    mtpHidden = tools.indicatorsHidden || (!!flags.mtpAll && settings.mtpAllHidden === true),
     indicatorOptions: IndicatorOptions = {};
   for (const key of indicatorKeys) {
     const style = settings.indicatorOptions?.[key];
@@ -65,10 +66,10 @@ export function chartRenderConfigKey(settings: ChartSettings, flags: IndicatorFl
       ma: !tools.indicatorsHidden && flags.ma,
       ema: !tools.indicatorsHidden && flags.ema,
       volume: !tools.indicatorsHidden && flags.volume,
-      mtp160: !tools.indicatorsHidden && flags.mtp160,
-      mtp440: !tools.indicatorsHidden && flags.mtp440,
-      mtp640: !tools.indicatorsHidden && flags.mtp640,
-      mtpAll: !tools.indicatorsHidden && !!flags.mtpAll
+      mtp160: !mtpHidden && flags.mtp160,
+      mtp440: !mtpHidden && flags.mtp440,
+      mtp640: !mtpHidden && flags.mtp640,
+      mtpAll: !mtpHidden && !!flags.mtpAll
     }
   };
   return JSON.stringify(config);

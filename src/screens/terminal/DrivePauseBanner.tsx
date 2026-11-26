@@ -4,26 +4,28 @@ import type { DriveStatus } from "../../services/drive/coordinator-types.js";
 import { TerminalContext } from "./context.js";
 import { terminalDrive } from "./controller-drive.js";
 
-function pauseMessage(status: DriveStatus, online: boolean): string | null {
-  if (status.automaticBlockedByFormat)
-    return "Обновите приложение, чтобы прочитать данные Google Диска.";
+const notices = {
+  format: ["Обновите приложение", "Обновите приложение, чтобы прочитать данные Google Диска."],
+  legacy: ["Старые версии", "Откройте Google Диск и проверьте снимки старого формата."],
+  conflict: ["Конфликт версий", "Откройте Google Диск и выберите версию рабочего пространства."],
+  auth: ["Нужен вход", "Войдите в Google повторно."],
+  offline: ["Нет интернета", "Нет интернета. Проверим Google Диск при восстановлении связи."],
+  checking: ["Ожидаем проверки", "Связь восстановлена. Ожидаем проверки Google Диска."],
+  network: ["Нет связи", "Нет связи с Google Диском. Можно повторить синхронизацию в настройках."]
+} as const;
+
+function pauseReason(status: DriveStatus, online: boolean): keyof typeof notices | null {
+  if (status.automaticBlockedByFormat) return "format";
   if (
     !status.automatic ||
     !(status.connected || status.connectedThisSession || status.lastSyncedAt)
   )
     return null;
-  if (status.phase === "conflict")
-    return status.legacyAvailable
-      ? "Откройте Google Диск и проверьте снимки старого формата."
-      : "Откройте Google Диск и выберите версию рабочего пространства.";
-  if (status.phase === "auth-required" || status.pauseReason === "auth-required")
-    return "Войдите в Google повторно.";
-  if (status.connected && !online)
-    return "Нет интернета. Проверим Google Диск при восстановлении связи.";
-  if (status.pauseReason === "offline")
-    return "Связь восстановлена. Ожидаем проверки Google Диска.";
-  if (status.pauseReason === "network")
-    return "Нет связи с Google Диском. Можно повторить синхронизацию в настройках.";
+  if (status.phase === "conflict") return status.legacyAvailable ? "legacy" : "conflict";
+  if (status.phase === "auth-required" || status.pauseReason === "auth-required") return "auth";
+  if (status.connected && !online) return "offline";
+  if (status.pauseReason === "offline") return "checking";
+  if (status.pauseReason === "network") return "network";
   return null;
 }
 
@@ -48,22 +50,50 @@ export const DrivePauseBanner = memo(function DrivePauseBanner() {
     () => navigator.onLine !== false,
     () => true
   );
-  const message = pauseMessage(status, online);
+  const reason = pauseReason(status, online);
+  const details = reason
+    ? [
+        t(notices[reason][1], locale),
+        status.pendingChanges ? t("Изменения ещё не синхронизированы.", locale) : ""
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : "";
 
   return (
-    <aside id="drive-pause-banner" className="drive-pause-banner" data-active={message !== null}>
-      <div role="status" aria-atomic="true">
-        {message ? (
-          <>
-            <strong>{t("Автосинхронизация с Google Диском приостановлена.", locale)}</strong>{" "}
-            {t(message, locale)}{" "}
-            {status.pendingChanges ? t("Изменения ещё не синхронизированы.", locale) : null}
-          </>
-        ) : null}
+    <aside
+      id="drive-pause-banner"
+      className="drive-pause-banner"
+      data-active={reason !== null}
+      data-reason={reason ?? undefined}
+      hidden={reason === null}
+    >
+      <div
+        id="drive-pause-description"
+        className="drive-pause-description"
+        role="status"
+        aria-atomic="true"
+      >
+        {details}
       </div>
-      {message ? (
-        <button type="button" onClick={() => controller.setDialog("account", "drive")}>
-          {t("Открыть настройки Google Диска", locale)}
+      {reason ? (
+        <button
+          type="button"
+          aria-describedby="drive-pause-description"
+          title={details}
+          onClick={() => controller.setDialog("account", "drive")}
+        >
+          <span className="drive-pause-service">{t("Google Диск", locale)}</span>
+          <span className="drive-pause-reason">{t(notices[reason][0], locale)}</span>
+          {status.pendingChanges && (
+            <span className="drive-pause-pending">{t("Не отправлено", locale)}</span>
+          )}
+          <span className="drive-pause-description">
+            {t("Открыть настройки Google Диска", locale)}
+          </span>
+          <svg viewBox="0 0 16 16" aria-hidden="true">
+            <path d="m6 4 4 4-4 4" />
+          </svg>
         </button>
       ) : null}
     </aside>

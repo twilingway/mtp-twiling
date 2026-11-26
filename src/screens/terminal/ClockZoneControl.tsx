@@ -35,13 +35,8 @@ export function TimeZonePicker({
   const id = useId();
   const minute = Math.floor(now / 60000);
   const zones = useMemo(
-    () =>
-      searchTimeZones(query, locale).map((zone) => ({
-        zone,
-        label: timeZoneLabel(zone, locale),
-        offset: timeZoneOffset(zone, minute * 60000)
-      })),
-    [query, locale, minute]
+    () => (open ? searchTimeZones(query, locale, minute * 60000) : []),
+    [open, query, locale, minute]
   );
   useEffect(() => {
     if (!open) return;

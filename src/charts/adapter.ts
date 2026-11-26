@@ -7,6 +7,7 @@ import type {
   IndicatorPaneLayout,
   MarketRow,
   PixelPoint,
+  PriceAxisLabelColors,
   Timeframe
 } from "../model/types.js";
 export { logicalForTime, timeForLogical } from "../model/intervals/projected-time.js";
@@ -57,6 +58,7 @@ export interface ChartAdapter {
   setData(data: Candle[], fit: boolean): void;
   updateBar(bar: Candle): void;
   updatePriceFormat?(metadata: PriceMetadata): void;
+  setLastPriceLabelColors?(colors: PriceAxisLabelColors | null): void;
   updateTechnicalInputs?(inputs: TechnicalSupplementalInputs): void;
   updateTechnicalIndicators?(
     instances: readonly TechnicalIndicatorInstance[],

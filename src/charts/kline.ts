@@ -12,7 +12,7 @@ import { PendingChartView, signedRightOffset } from "./view-camera.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { stablePriceAxisWidth } from "./price-axis-layout.js";
 import { chartPalette } from "../model/theme.js";
-import { lastPriceStyle } from "../model/last-price-style.js";
+import { klineLastPrice } from "./kline-last-price.js";
 import { attachCalendarXAxis } from "./kline-calendar-axis.js";
 import { klineDateFormatter } from "../i18n/chart-formatters.js";
 import { intlLocale } from "../i18n/preferences.js";
@@ -48,9 +48,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     container.clientWidth
   );
   const palette = chartPalette(settings);
-  const lastPriceUp = lastPriceStyle(settings, true);
-  const lastPriceDown = lastPriceStyle(settings, false);
-  let lastPriceText = lastPriceUp.text;
+  const lastPrice = klineLastPrice(settings);
   const model = new MtpModel();
   if (settings.indicatorOptions) model.styles = settings.indicatorOptions;
   model.styleKey = indicators.mtpAll ? "mtpAll" : undefined;
@@ -112,14 +110,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
         },
         tooltip: { showRule: TooltipShowRule.None },
         priceMark: {
-          last: {
-            show: true,
-            line: { show: settings.priceLine !== false },
-            upColor: lastPriceUp.color,
-            downColor: lastPriceDown.color,
-            noChangeColor: lastPriceUp.color,
-            text: { color: lastPriceText, paddingLeft: 4, paddingRight: 4 }
-          }
+          last: lastPrice.styles()
         }
       },
       xAxis: {
@@ -137,13 +128,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     }
   });
   if (!chart) throw new Error("Не удалось создать KLineChart.");
-  const updateLastPriceText = () => {
-    const latest = data.at(-1);
-    const text = latest && latest.close < latest.open ? lastPriceDown.text : lastPriceUp.text;
-    if (text === lastPriceText) return;
-    lastPriceText = text;
-    chart.setStyles({ candle: { priceMark: { last: { text: { color: text } } } } });
-  };
+  const updateLastPriceText = () => lastPrice.update(chart, data.at(-1));
   const detachCalendarXAxis = attachCalendarXAxis(
     chart,
     () => data,
@@ -192,6 +177,13 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     if (!ctx) return;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, size.width, size.height);
+    lastPrice.paint(
+      ctx,
+      data.at(-1),
+      size.width,
+      size.height,
+      (bar) => pointToPixel({ timestamp: bar.timestamp, value: bar.close })?.y
+    );
     options.paint(ctx, size.width, size.height, pointToPixel, "front");
   }
   const resize = new ResizeObserver(() => {
@@ -266,6 +258,12 @@ export function makeKline(options: ChartOptions): ChartAdapter {
   volumeLayout.apply();
   const detachCanvasResize = attachKlineCanvasResize(chart, () => axisWidth);
   const adapter: ChartAdapter = {
+    setLastPriceLabelColors(colors) {
+      if (live.retired) return;
+      camera.programmatic(() => {
+        if (lastPrice.configure(chart, colors, data.at(-1))) paintFront();
+      });
+    },
     updatePriceFormat(metadata) {
       if (
         live.retired ||

@@ -61,9 +61,16 @@ test("Drive banner waits for a linked automatic profile and opens its existing s
   hidden();
   f.status.automatic = true;
   assert.match(markup(), /role="status" aria-atomic="true"/);
+  assert.match(markup(), /data-reason="auth"/);
   assert.match(markup(), /Войдите в Google повторно/);
   assert.match(markup(), /Изменения ещё не синхронизированы/);
-  f.render().props.children[1].props.onClick();
+  const action = f.render().props.children[1];
+  assert.equal(action.props["aria-describedby"], "drive-pause-description");
+  assert.deepEqual(
+    action.props.children.slice(0, 3).map(({ props }) => props.children),
+    ["Google Диск", "Нужен вход", "Не отправлено"]
+  );
+  action.props.onClick();
   assert.equal(f.state.dialog, "account");
   assert.match(f.account(), /id="account-section-drive">/);
 
@@ -71,6 +78,7 @@ test("Drive banner waits for a linked automatic profile and opens its existing s
   f.status.pendingChanges = false;
   assert.match(markup(), /Sign in to Google again/);
   assert.doesNotMatch(markup(), /Changes haven.t synced yet/);
+  assert.doesNotMatch(markup(), /class="drive-pause-pending"/);
   f.status.pauseReason = undefined;
   hidden();
 });
@@ -87,12 +95,17 @@ test("Drive banner distinguishes offline, remote failure, conflicts and forced f
   Object.assign(f.status, { phase: "syncing", pauseReason: "network" });
   assert.match(markup(), /Нет связи с Google Диском/);
   Object.assign(f.status, { phase: "conflict", pauseReason: undefined });
+  assert.match(markup(), /data-reason="conflict"/);
+  assert.match(markup(), /class="drive-pause-reason">Конфликт версий/);
   assert.match(markup(), /выберите версию рабочего пространства/);
   f.status.legacyAvailable = true;
+  assert.match(markup(), /data-reason="legacy"/);
+  assert.match(markup(), /class="drive-pause-reason">Старые версии/);
   assert.match(markup(), /проверьте снимки старого формата/);
   Object.assign(f.status, { phase: "error", error: "unsupported-format", automatic: false });
   assert.match(markup(), /data-active="false"/);
   f.status.automaticBlockedByFormat = true;
+  assert.match(markup(), /data-reason="format"/);
   assert.match(markup(), /Обновите приложение/);
   assert.doesNotMatch(markup(), /Изменения ещё не синхронизированы/);
 });

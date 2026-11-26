@@ -7,6 +7,7 @@ import type { ChartLayoutCount } from "./ChartLayoutControl.js";
 import type { TerminalController } from "./controller.js";
 import { TerminalFullscreenControl } from "./TerminalFullscreenControl.js";
 import { TerminalIndicatorControls } from "./TerminalIndicatorControls.js";
+import { MobileChartTools } from "./MobileChartTools.js";
 import { TimeframeMenu } from "./intervals/TimeframeMenu.js";
 import { isNativeIntervalId } from "../../model/intervals/registry.js";
 import { DERIVED_INTERVAL_UNAVAILABLE } from "../../model/intervals/native-timeframes.js";
@@ -90,22 +91,30 @@ export function Toolbar({
       {onChartCountChange && (
         <ChartLayoutControl value={chartCount} onChange={onChartCountChange} />
       )}
-      <TerminalFullscreenControl />
-      <div className="top-spacer" />
-      <div id="install-actions" className="install-actions" hidden>
-        <button type="button" id="install-app" className="install-button">
-          {t("Установить приложение")}
-        </button>
-        <a
-          className="install-certificate-link"
-          href="./android-certificate.html"
-          target="_blank"
-          rel="noopener"
-          aria-label={t("Сертификат Т‑Банка на Android")}
-        >
-          {t("Сертификат Т‑Банка")}
-        </a>
-      </div>
+      <MobileChartTools
+        controller={account}
+        panelOpen={!!accountState.mobilePanelOpen && !accountState.preferences.rightPanelCollapsed}
+        objectsOpen={accountState.objectPanel}
+        count={chartCount}
+        onChartCountChange={onChartCountChange}
+      >
+        <TerminalFullscreenControl />
+        <div className="top-spacer" />
+        <div id="install-actions" className="install-actions" hidden>
+          <button type="button" id="install-app" className="install-button">
+            {t("Установить приложение")}
+          </button>
+          <a
+            className="install-certificate-link"
+            href="./android-certificate.html"
+            target="_blank"
+            rel="noopener"
+            aria-label={t("Сертификат Т‑Банка на Android")}
+          >
+            {t("Сертификат Т‑Банка")}
+          </a>
+        </div>
+      </MobileChartTools>
       <label className="engine-label" htmlFor="engine">
         {t("График")}
       </label>

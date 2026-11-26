@@ -1,5 +1,7 @@
 export const chartWorkspaceMessages = {
   "Раскладка графиков": "Chart layout",
+  "Управление графиками": "Chart controls",
+  "Настройки рисунка": "Drawing settings",
   "Один график": "One chart",
   "Два графика": "Two charts",
   "Три графика": "Three charts",
