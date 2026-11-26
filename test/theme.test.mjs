@@ -146,7 +146,7 @@ test("both theme values survive backup serialization; unsupported values are rej
   }
 });
 
-test("chart text and scale labels remain readable on custom dark, light and midtone backgrounds", () => {
+test("scale labels and the crosshair remain readable on custom dark, light and midtone backgrounds", () => {
   const luminance = (hex) => {
     const channels = hex.match(/[0-9a-f]{2}/gi).map((part) => {
       const value = Number.parseInt(part, 16) / 255;
@@ -169,7 +169,7 @@ test("chart text and scale labels remain readable on custom dark, light and midt
         palette.background,
         theme === "dark" && background === "#131722" ? "#000000" : background
       );
-      for (const color of [palette.text, palette.muted]) {
+      for (const color of [palette.text, palette.muted, palette.crosshair]) {
         const values = [luminance(palette.background), luminance(color)].sort((a, b) => a - b);
         assert.ok((values[1] + 0.05) / (values[0] + 0.05) >= 4.5, `${color} on ${background}`);
       }

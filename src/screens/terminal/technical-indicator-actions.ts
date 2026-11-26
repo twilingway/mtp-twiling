@@ -145,13 +145,72 @@ export function changeTechnicalPane(
   paneId: string,
   collapsed: boolean
 ): Promise<void> {
+  return changeTechnicalPreferences(controller, (preferences) =>
+    changePanePreference(preferences, paneId, (pane) =>
+      pane.collapsed === collapsed ? pane : { ...pane, collapsed }
+    )
+  );
+}
+
+function paneLayout(preferences: TerminalPreferences): TechnicalPaneLayout {
+  return technicalIndicatorGroups(
+    preferences.technicalIndicators ?? [],
+    preferences.technicalPaneLayout
+  ).flatMap(({ pane, preference }) =>
+    pane.kind === "pane"
+      ? [
+          preference ?? {
+            paneId: pane.id,
+            collapsed: false,
+            heightRatio: DEFAULT_TECHNICAL_PANE_HEIGHT_RATIO
+          }
+        ]
+      : []
+  );
+}
+
+function changePanePreference(
+  preferences: TerminalPreferences,
+  paneId: string,
+  transform: (pane: TechnicalPaneLayout[number]) => TechnicalPaneLayout[number]
+): Patch | null {
+  const layout = paneLayout(preferences);
+  const previous = layout.find((item) => item.paneId === paneId);
+  if (!previous) return null;
+  const next = transform(previous);
+  return next === previous
+    ? null
+    : { technicalPaneLayout: layout.map((item) => (item === previous ? next : item)) };
+}
+
+export function resizeTechnicalPane(
+  controller: TerminalController,
+  paneId: string,
+  direction: -1 | 1
+): Promise<void> {
+  return changeTechnicalPreferences(controller, (preferences) =>
+    changePanePreference(preferences, paneId, (pane) => {
+      const heightRatio = Math.min(
+        0.8,
+        Math.max(0.05, Number((pane.heightRatio + direction * 0.05).toFixed(3)))
+      );
+      return !pane.collapsed && heightRatio !== pane.heightRatio ? { ...pane, heightRatio } : pane;
+    })
+  );
+}
+
+export function removeTechnicalPane(controller: TerminalController, paneId: string): Promise<void> {
   return changeTechnicalPreferences(controller, (preferences) => {
-    const layout = preferences.technicalPaneLayout ?? [];
-    return {
-      technicalPaneLayout: layout.some((item) => item.paneId === paneId)
-        ? layout.map((item) => (item.paneId === paneId ? { ...item, collapsed } : item))
-        : [...layout, { paneId, heightRatio: 0.2, collapsed }]
-    };
+    const instances = preferences.technicalIndicators ?? [];
+    const remaining = instances.filter(({ pane }) => pane.kind !== "pane" || pane.id !== paneId);
+    return remaining.length === instances.length
+      ? null
+      : {
+          technicalIndicators: remaining,
+          technicalPaneLayout: (preferences.technicalPaneLayout ?? []).filter(
+            (pane) => pane.paneId !== paneId
+          )
+        };
   });
 }
 
@@ -162,8 +221,9 @@ export function moveTechnicalPane(
   placement: "before" | "after"
 ): Promise<void> {
   return changeTechnicalPreferences(controller, (preferences) => {
-    const layout = preferences.technicalPaneLayout ?? [];
-    return { technicalPaneLayout: [...reorderTechnicalPanes(layout, paneId, target, placement)] };
+    const layout = paneLayout(preferences);
+    const next = reorderTechnicalPanes(layout, paneId, target, placement);
+    return next === layout ? null : { technicalPaneLayout: [...next] };
   });
 }
 

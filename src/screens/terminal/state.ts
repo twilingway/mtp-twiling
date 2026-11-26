@@ -106,6 +106,8 @@ export interface TerminalState {
   marketReady?: boolean;
   profileTransition?: boolean;
   pendingPublicSource?: string | null;
+  /** An auxiliary chart cannot replace a document before its objects have been loaded. */
+  annotationReady?: boolean;
   importingBackup?: boolean;
   importRecoveryRequired?: boolean;
   backupBusy?: boolean;

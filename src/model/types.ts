@@ -154,6 +154,7 @@ export interface DrawingSettings {
   fontSize?: number;
   textEnabled?: boolean;
   text?: string;
+  textColor?: string | undefined;
   textAlign?: "left" | "center" | "right";
   textVertical?: "top" | "center" | "bottom";
   levelStyles?: FibLevelStyle[];

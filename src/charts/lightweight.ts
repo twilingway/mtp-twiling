@@ -19,6 +19,7 @@ import { calendarAxisDisplay } from "../i18n/calendar-axis.js";
 import { lightweightNavigation } from "./lightweight-navigation.js";
 import { UserCameraEvents } from "./camera-events.js";
 import { lightweightLegacy } from "./lightweight-legacy.js";
+import { observeWorkspaceTouchScroll } from "./workspace-touch.js";
 import { lightweightTechnical } from "./lightweight-technical.js";
 import {
   preserveLightweightCamera,
@@ -88,6 +89,9 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       timeFormatter: dateFormatters.timeFormatter
     }
   });
+  const stopTouchScroll = observeWorkspaceTouchScroll(container, (vertTouchDrag) =>
+    chart.applyOptions({ handleScroll: { vertTouchDrag } })
+  );
   const series = chart.addSeries(CandlestickSeries, {
     upColor: settings.bodyVisible === false ? "transparent" : (settings.upColor ?? "#53b987"),
     downColor: settings.bodyVisible === false ? "transparent" : (settings.downColor ?? "#eb4d5c"),
@@ -101,7 +105,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     lastValueVisible: false,
     priceFormat: lightweightPriceFormat(priceFormat)
   });
-  const legacy = lightweightLegacy(chart, options);
+  const legacy = lightweightLegacy(chart, options, lightweightPriceFormat(priceFormat));
   series.setSeriesOrder(3);
   const model = new MtpModel();
   if (settings.indicatorOptions) model.styles = settings.indicatorOptions;
@@ -306,7 +310,11 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
         priceFormat
       );
       if (next.minMove === priceFormat.minMove && next.precision === priceFormat.precision) return;
-      camera.programmatic(() => series.applyOptions({ priceFormat: lightweightPriceFormat(next) }));
+      camera.programmatic(() => {
+        const format = lightweightPriceFormat(next);
+        series.applyOptions({ priceFormat: format });
+        legacy.setPriceFormat(format);
+      });
       priceFormat = next;
       technical.refreshNativeMetadata();
     },
@@ -387,6 +395,12 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     },
     pointToPixel,
     technicalPaneMetrics: () => technical.metrics(),
+    setTechnicalPaneFocus(focus) {
+      if (!live.retired)
+        camera.programmatic(() =>
+          preserveLightweightCamera(chart, series, () => technical.setFocus(focus), projectionDelta)
+        );
+    },
     timeAxisTop: () => technical.timeAxisTop(),
     updateTechnicalInputs(inputs) {
       if (!live.retired)
@@ -458,6 +472,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     },
     redrawDrawings: () => updateDrawings(),
     destroy() {
+      stopTouchScroll();
       if (restoreFrame !== null) cancelAnimationFrame(restoreFrame);
       if (settleFrame !== null) cancelAnimationFrame(settleFrame);
       mtp.destroy();

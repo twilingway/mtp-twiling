@@ -28,7 +28,7 @@ const visibility: Shape = Object.fromEntries(
 );
 const drawingSettings: Shape = {
   ...scalars(
-    "color width lineStyle lineOpacity trendLine trendColor trendWidth trendStyle trendOpacity fill opacity extendLeft extendRight reverse labels prices labelSide labelVertical labelFormat fontSize textEnabled text textAlign textVertical oneColor extend"
+    "color width lineStyle lineOpacity trendLine trendColor trendWidth trendStyle trendOpacity fill opacity extendLeft extendRight reverse labels prices labelSide labelVertical labelFormat fontSize textEnabled text textAlign textVertical oneColor extend textColor"
   ),
   levels: [true],
   levelStyles: [scalars("value enabled color text")]

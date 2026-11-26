@@ -1,6 +1,6 @@
 import { marketAvailable } from "./market-readiness.js";
 import type { ChartAdapter } from "../../charts/adapter.js";
-import { chartPriceFormat, positivePriceStep } from "../../charts/price-format.js";
+import { chartPriceFormat, nativePriceStep } from "../../charts/price-format.js";
 import type { ChartPriceFormat } from "../../charts/price-format.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { viewKey } from "./controller-bridge.js";
@@ -38,7 +38,7 @@ export function watchChartPriceMetadata(
     )
       return;
     if (
-      !positivePriceStep(row.step) &&
+      nativePriceStep(row) === null &&
       !(typeof row.price === "number" && Number.isFinite(row.price))
     )
       return;

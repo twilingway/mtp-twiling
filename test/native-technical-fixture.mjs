@@ -68,7 +68,8 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
   const window = events(),
     changes = [],
     metricEvents = [],
-    calls = [];
+    calls = [],
+    precisionWrites = [];
   let frameId = 0,
     data = [],
     spacing = 6,
@@ -403,7 +404,9 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
               reflow();
             }
           },
-          setPriceVolumePrecision() {},
+          setPriceVolumePrecision(price, volume) {
+            precisionWrites.push([price, volume]);
+          },
           setStyles() {},
           resize: reflow,
           subscribeAction(type, callback) {
@@ -583,6 +586,7 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
     changes,
     metricEvents,
     calls,
+    precisionWrites,
     ready,
     queueFrame: globals.requestAnimationFrame,
     primaryWrites: () => primaryWrites,

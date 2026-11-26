@@ -7,6 +7,7 @@ import type { MarketClient } from "../../services/market-client.js";
 import type { TerminalState } from "./state.js";
 import type { TerminalEditing } from "./controller-editing.js";
 import type { TerminalSession } from "./controller-session.js";
+import { flushWorkspaceAnnotations } from "./workspace-annotations.js";
 
 interface ImportBridge {
   getState: () => TerminalState;
@@ -102,6 +103,7 @@ export async function importTerminalBackup(
   if (!valid()) return;
   assertImportCurrent(options.valid);
   await bridge.saveView();
+  await flushWorkspaceAnnotations(owner);
   if (!valid()) return;
   assertImportCurrent(options.valid);
   const outgoing = bridge.getChart(),

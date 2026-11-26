@@ -1,11 +1,12 @@
 import { t } from "../../i18n/messages.js";
-import { useTerminal } from "./context.js";
+import { TerminalContext, useTerminal } from "./context.js";
+import type { TerminalController } from "./controller.js";
 import { Watchlist } from "./Watchlist.js";
 import { ObjectTree } from "./drawings/ObjectTree.js";
 import { PanelDivider } from "./PanelDivider.js";
 import { useMobileLayout } from "./use-mobile-layout.js";
 
-export function RightPanel() {
+export function RightPanel({ chartEditor }: { chartEditor?: TerminalController } = {}) {
   const { controller, state } = useTerminal();
   const mobile = useMobileLayout();
   const collapsed = !!state.preferences.rightPanelCollapsed || (mobile && !state.mobilePanelOpen);
@@ -26,7 +27,7 @@ export function RightPanel() {
         aria-labelledby="watchlist-button"
         hidden={collapsed || state.objectPanel}
       >
-        <Watchlist />
+        <Watchlist chartEditor={chartEditor ?? controller} />
       </div>
       <div
         id="objects-view"
@@ -35,7 +36,9 @@ export function RightPanel() {
         aria-labelledby="objects-button"
         hidden={collapsed || !state.objectPanel}
       >
-        <ObjectTree />
+        <TerminalContext value={chartEditor ?? controller}>
+          <ObjectTree />
+        </TerminalContext>
       </div>
       <nav
         className="right-panel-tools"

@@ -1,11 +1,12 @@
 import { t } from "../../i18n/messages.js";
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useEffectEvent, useState } from "react";
 import { setupPwa } from "../../services/pwa.js";
 import { DRAWING_CLIPBOARD_MIME } from "../../model/drawing-editing.js";
 import { useTerminal } from "./context.js";
 import { startTerminalDrive } from "./controller-drive.js";
 import { TransferMutationBarrier } from "./TransferMutationBarrier.js";
 import { WelcomeGate } from "./WelcomeDialog.js";
+import type { TerminalController } from "./controller.js";
 export const UpdateBanner = memo(function UpdateBanner() {
   useTerminal();
   return (
@@ -21,11 +22,13 @@ export const UpdateBanner = memo(function UpdateBanner() {
     </aside>
   );
 });
-export function TerminalLifecycle() {
+export function TerminalLifecycle({ chartEditor }: { chartEditor?: TerminalController } = {}) {
   const { controller } = useTerminal();
+  const selectedEditor = useEffectEvent(() => chartEditor ?? controller);
   const [settledController, setSettledController] = useState<typeof controller | null>(null);
   useEffect(() => {
     const disposeDrive = startTerminalDrive(controller);
+    const stopAnnotations = controller.editing.observeWorkspaceAnnotations();
     const lifecycle = new AbortController();
     let active = true,
       disposePwa: (() => void) | null = null;
@@ -57,13 +60,13 @@ export function TerminalLifecycle() {
       !!window.getSelection()?.toString();
     const run = (action: Promise<unknown>) =>
       void action.catch((error: unknown) =>
-        controller.notify(
+        selectedEditor().notify(
           error instanceof Error ? error.message : t("Не удалось изменить разметку.")
         )
       );
     const copy = (event: ClipboardEvent) => {
       if (editingText(event.target) || !event.clipboardData) return;
-      const text = controller.editing.copySelected();
+      const text = selectedEditor().editing.copySelected();
       if (!text) return;
       event.clipboardData.setData(DRAWING_CLIPBOARD_MIME, text);
       event.clipboardData.setData("text/plain", text);
@@ -74,37 +77,38 @@ export function TerminalLifecycle() {
       const text =
         event.clipboardData.getData(DRAWING_CLIPBOARD_MIME) ||
         event.clipboardData.getData("text/plain");
-      if (!controller.editing.acceptsClipboard(text)) return;
+      const editor = selectedEditor();
+      if (!editor.editing.acceptsClipboard(text)) return;
       event.preventDefault();
-      run(controller.editing.paste(text));
+      run(editor.editing.paste(text));
     };
     const keydown = (e: KeyboardEvent) => {
       if (editingText(e.target)) return;
+      const editor = selectedEditor();
       if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.code === "KeyZ" || e.code === "KeyY")) {
         e.preventDefault();
-        if (!controller.getSnapshot().loading)
-          run(
-            e.code === "KeyY" || e.shiftKey ? controller.editing.redo() : controller.undoDrawings()
-          );
+        if (!editor.getSnapshot().loading)
+          run(e.code === "KeyY" || e.shiftKey ? editor.editing.redo() : editor.undoDrawings());
         return;
       }
       if (e.key === "/") {
         e.preventDefault();
-        controller.setDialog(controller.getSnapshot().ready ? "instruments" : "account");
+        if (controller.getSnapshot().ready) editor.setDialog("instruments");
+        else controller.setDialog("account");
       }
       if (e.key === "Escape") {
-        controller.editing.cancelGesture();
-        controller.setTool(null);
-        controller.setContext(null);
-        controller.selectObject(null);
+        editor.editing.cancelGesture();
+        editor.setTool(null);
+        editor.setContext(null);
+        editor.selectObject(null);
       }
       if (e.altKey && e.code === "KeyF") {
         e.preventDefault();
-        run(controller.tools.choose("fibonacciLine"));
+        run(editor.tools.choose("fibonacciLine"));
       }
       if (e.altKey && e.code === "KeyT") {
         e.preventDefault();
-        run(controller.tools.choose("segment"));
+        run(editor.tools.choose("segment"));
       }
     };
     document.addEventListener("keydown", keydown);
@@ -118,6 +122,7 @@ export function TerminalLifecycle() {
       document.removeEventListener("copy", copy);
       document.removeEventListener("paste", paste);
       disposeDrive();
+      stopAnnotations();
       controller.dispose();
     };
   }, [controller]);

@@ -123,6 +123,7 @@ export function isDrawingSettings(value: unknown): value is DrawingSettings {
       fontSize: numberBetween(1, 100),
       textEnabled: boolean,
       text: string,
+      textColor: color,
       textAlign: member(["left", "center", "right"]),
       textVertical: member(["top", "center", "bottom"]),
       levelStyles: list(isFibLevel, 40),

@@ -1,6 +1,39 @@
 import { t } from "../../i18n/messages.js";
+import {
+  CHART_LAYOUT_COUNTS,
+  chartLayoutRowWidths,
+  isChartLayoutCount
+} from "../../model/chart-workspace-layout.js";
+import type { ChartLayoutCount } from "../../model/chart-workspace-layout.js";
 
-export type ChartLayoutCount = 1 | 2 | 3;
+export type { ChartLayoutCount } from "../../model/chart-workspace-layout.js";
+
+function chartCountLabel(count: ChartLayoutCount) {
+  switch (count) {
+    case 1:
+      return t("Один график");
+    case 2:
+      return t("Два графика");
+    case 3:
+      return t("Три графика");
+    default:
+      return `${t("Число графиков")}: ${count}`;
+  }
+}
+
+function LayoutPreview({ count }: { count: ChartLayoutCount }) {
+  return (
+    <span className="chart-layout-icon" data-layout-preview={count} aria-hidden="true">
+      {chartLayoutRowWidths(count).map((width, row) => (
+        <span className="chart-layout-icon-row" key={row}>
+          {Array.from({ length: width }, (_, column) => (
+            <span className="chart-layout-icon-cell" key={column} />
+          ))}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 export function ChartLayoutControl({
   value,
@@ -12,25 +45,21 @@ export function ChartLayoutControl({
   const label = t("Раскладка графиков");
   return (
     <label className="chart-layout-control" title={label}>
-      <span className="chart-layout-icon" aria-hidden="true" />
+      <LayoutPreview count={value} />
       <select
         value={value}
         aria-label={label}
         aria-controls="chart-workspace"
         onChange={(event) => {
           const count = Number(event.currentTarget.value);
-          if (count === 1 || count === 2 || count === 3) onChange(count);
+          if (isChartLayoutCount(count)) onChange(count);
         }}
       >
-        <option value={1} aria-label={t("Один график")}>
-          1
-        </option>
-        <option value={2} aria-label={t("Два графика")}>
-          2
-        </option>
-        <option value={3} aria-label={t("Три графика")}>
-          3
-        </option>
+        {CHART_LAYOUT_COUNTS.map((count) => (
+          <option key={count} value={count} aria-label={chartCountLabel(count)}>
+            {count}
+          </option>
+        ))}
       </select>
     </label>
   );

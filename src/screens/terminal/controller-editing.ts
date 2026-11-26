@@ -1,4 +1,3 @@
-import * as storage from "../../services/storage-v2.js";
 import {
   DrawingUndoHistory,
   copyDrawing,
@@ -15,6 +14,10 @@ import type { Drawing, DrawingPoint, ImageAsset } from "../../model/types.js";
 import type { ChartAdapter } from "../../charts/adapter.js";
 import type { TerminalState } from "./state.js";
 import { importWritable } from "./controller-transfer-guard.js";
+import {
+  subscribeWorkspaceAnnotations,
+  writeWorkspaceAnnotations
+} from "./workspace-annotations.js";
 
 interface EditingBridge {
   getState(): TerminalState;
@@ -51,11 +54,12 @@ export class TerminalEditing {
   private persist(after: ObjectSnapshot): Promise<void> {
     // Capture the scope before awaiting; never write one instrument into another.
     const key = JSON.stringify([after.owner, after.symbol]);
-    const write = this.writes.then(async () => {
-      await storage.saveAnnotationDocument(after.owner, after.symbol, after.drawings, after.images);
+    const write = writeWorkspaceAnnotations({ ...after, editor: this });
+    const recorded = this.writes.then(async () => {
+      await write;
       this.writeErrors.delete(key);
     });
-    this.writes = write.catch((error: unknown) => {
+    this.writes = recorded.catch((error: unknown) => {
       this.writeErrors.set(
         key,
         error instanceof Error
@@ -64,8 +68,25 @@ export class TerminalEditing {
       );
       this.bridge.notify(error instanceof Error ? error.message : "Не удалось сохранить разметку.");
     });
-    return write;
+    return recorded;
   }
+  observeWorkspaceAnnotations = (): (() => void) =>
+    subscribeWorkspaceAnnotations(({ editor, owner, symbol, drawings, images }) => {
+      const state = this.bridge.getState();
+      if (editor === this || !importWritable(state, owner) || state.preferences.symbol !== symbol)
+        return;
+      this.cancelGesture();
+      this.history.clear();
+      const id = state.selectedObject;
+      this.bridge.update({
+        drawings,
+        images,
+        selectedObject:
+          id && (drawings.some((item) => item.id === id) || images.some((item) => item.id === id))
+            ? id
+            : null
+      });
+    });
   flush = async (): Promise<void> => {
     await this.writes;
     const error = this.writeErrors.values().next().value;
@@ -144,6 +165,32 @@ export class TerminalEditing {
     await this.persist(after);
   };
   setImages = (images: ImageAsset[]): Promise<void> => this.change({ images });
+  attachImage = async (file: File): Promise<void> => {
+    const chart = this.bridge.getChart();
+    const state = this.bridge.getState();
+    if (
+      !chart ||
+      !["image/png", "image/jpeg", "image/webp", "image/gif"].includes(file.type) ||
+      file.size > 20 * 1024 * 1024
+    )
+      throw new Error("Выберите PNG/JPEG/WebP/GIF до 20 МБ.");
+    const size = chart.plotSize();
+    const point = chart.pixelToPoint(size.width * 0.55, size.height * 0.25);
+    if (!point) throw new Error("Не удалось определить координаты изображения.");
+    await this.setImages([
+      ...state.images,
+      {
+        id: crypto.randomUUID(),
+        owner: state.owner,
+        symbol: state.preferences.symbol,
+        name: file.name,
+        blob: file,
+        point,
+        width: Math.min(220, size.width * 0.55),
+        createdAt: Date.now()
+      }
+    ]);
+  };
   private placement(points: DrawingPoint[]): ClipboardPlacement | undefined {
     const chart = this.bridge.getChart();
     if (!chart) return undefined;

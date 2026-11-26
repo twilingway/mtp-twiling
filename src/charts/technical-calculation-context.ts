@@ -5,11 +5,13 @@ import type {
   TechnicalIndicatorInstance
 } from "../model/technical-indicators/types.js";
 import { DAY_MS } from "../model/technical-indicators/ta-batch-sessions-calendar.js";
+import { nativePriceStep } from "../model/market-price-step.js";
+import type { MarketTickSource } from "../model/market-price-step.js";
 
 /** Match the reviewed builtin HV rule; annualization is a calculation input, never saved per instance. */
 export function technicalCalculationContext(
   timeframe: Timeframe,
-  row?: Pick<MarketRow, "providerRef" | "assetClass" | "exchange" | "realExchange" | "step">
+  row?: MarketTickSource & Pick<MarketRow, "assetClass">
 ): TechnicalCalculationContext {
   const duration = TIMEFRAMES[timeframe].ms;
   const continuousSession = !!row?.providerRef && row.assetClass === "crypto";
@@ -18,16 +20,14 @@ export function technicalCalculationContext(
     : row?.realExchange === "REAL_EXCHANGE_MOEX" || row?.exchange === "MOEX"
       ? "Europe/Moscow"
       : undefined;
-  const priceStep = row?.step;
+  const priceStep = nativePriceStep(row);
   return {
     historicalVolatilityPeriodsPerYear: duration !== null && duration <= DAY_MS ? 365 : 365 / 7,
     chartInterval: timeframe,
     chartIntervalDays: duration === null ? 30 : duration / DAY_MS,
     continuousSession,
     ...(exchangeTimeZone ? { exchangeTimeZone } : {}),
-    ...(typeof priceStep === "number" && Number.isFinite(priceStep) && priceStep > 0
-      ? { priceStep }
-      : {})
+    ...(priceStep === null ? {} : { priceStep })
   };
 }
 

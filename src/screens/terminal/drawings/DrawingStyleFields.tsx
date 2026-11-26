@@ -1,5 +1,4 @@
 import { t } from "../../../i18n/messages.js";
-import { drawingHasLineText } from "../../../model/drawing-model.js";
 import type { DrawingSettings, DrawingTool, FibLevelStyle } from "../../../model/types.js";
 import { Swatch } from "./DrawingStylePopover.js";
 import type { ColorTarget } from "./DrawingStylePopover.js";
@@ -9,6 +8,7 @@ import { draftNumber } from "./drawing-settings-model.js";
 import type { DraftSettings } from "./drawing-settings-model.js";
 type CheckKey = "trendLine" | "oneColor" | "fill" | "reverse" | "prices" | "labels" | "textEnabled";
 type Change = <K extends keyof DraftSettings>(key: K, value: DraftSettings[K]) => void;
+const fontSizes = Array.from({ length: 72 }, (_, index) => index + 1);
 export function DrawingStyleFields({
   name,
   settings,
@@ -197,35 +197,41 @@ export function DrawingStyleFields({
           {rectangle && fillControl("Заливка")}
         </>
       )}
-      {(fib || drawingHasLineText(name)) && (
-        <>
-          <div className="setting-row">
-            {checked("textEnabled", t("Текст"))}
-            <input
-              name="text"
-              placeholder={t("Текст")}
-              aria-label={t("Текст рисунка")}
-              maxLength={300}
-              value={settings.text}
-              onChange={(event) => change("text", event.currentTarget.value)}
-            />
-          </div>
-          {choice("textAlign", "Текст по горизонтали", [
-            ["left", t("Слева")],
-            ["center", t("По центру")],
-            ["right", t("Справа")]
-          ])}
-          {choice("textVertical", "Текст по вертикали", [
-            ["top", t("Сверху")],
-            ["center", t("По центру")],
-            ["bottom", t("Снизу")]
-          ])}
-          {choice(
-            "fontSize",
-            t("Размер шрифта"),
-            [10, 11, 12, 13, 14, 16, 18, 20, 24].map((size) => [size, String(size)])
-          )}
-        </>
+      <div className="setting-row">
+        {checked("textEnabled", t("Текст"))}
+        <input
+          name="text"
+          placeholder={t("Текст")}
+          aria-label={t("Текст рисунка")}
+          maxLength={300}
+          value={settings.text}
+          onChange={(event) => change("text", event.currentTarget.value)}
+        />
+      </div>
+      <div className="setting-row">
+        <span>{t("Цвет текста")}</span>
+        <Swatch
+          color={settings.textColor ?? settings.color}
+          label={t("Цвет текста")}
+          onClick={() => setColorTarget({ kind: "text" })}
+        />
+      </div>
+      {choice("textAlign", "Текст по горизонтали", [
+        ["left", t("Слева")],
+        ["center", t("По центру")],
+        ["right", t("Справа")]
+      ])}
+      {choice("textVertical", "Текст по вертикали", [
+        ["top", t("Сверху")],
+        ["center", t("По центру")],
+        ["bottom", t("Снизу")]
+      ])}
+      {choice(
+        "fontSize",
+        t("Размер шрифта"),
+        (fontSizes.includes(settings.fontSize) ? fontSizes : [...fontSizes, settings.fontSize]).map(
+          (size) => [size, String(size)]
+        )
       )}
     </>
   );

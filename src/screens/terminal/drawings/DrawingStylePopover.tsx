@@ -9,7 +9,7 @@ const PALETTE =
   "#ffffff #dbdbdb #b8b8b8 #959595 #757575 #565656 #363636 #1a1a1a #000000 #f23645 #ff9800 #ffeb3b #4caf50 #00bcd4 #2196f3 #673ab7 #9c27b0 #e91e63 #ffcdd2 #ffe0b2 #fff9c4 #c8e6c9 #b2ebf2 #bbdefb #d1c4e9 #e1bee7 #f8bbd0 #ef9a9a #ffcc80 #fff59d #a5d6a7 #80deea #90caf9 #b39ddb #ce93d8 #f48fb1 #e57373 #ffb74d #fff176 #81c784 #4dd0e1 #64b5f6 #9575cd #ba68c8 #f06292 #ef5350 #ffa726 #ffee58 #66bb6a #26c6da #42a5f5 #7e57c2 #ab47bc #ec407a #b71c1c #e65100 #f57f17 #1b5e20 #006064 #0d47a1 #311b92 #4a148c #880e4f".split(
     " "
   );
-export type ColorTarget = { kind: "line" | "trend" } | { kind: "level"; index: number };
+export type ColorTarget = { kind: "line" | "trend" | "text" } | { kind: "level"; index: number };
 export function Swatch({
   color,
   label,
@@ -46,7 +46,9 @@ export function DrawingStylePopover({ target, settings, onColor, onChange, onClo
       ? (settings.levelStyles[target.index]?.color ?? settings.color)
       : trend
         ? settings.trendColor
-        : settings.color;
+        : target.kind === "text"
+          ? (settings.textColor ?? settings.color)
+          : settings.color;
   const opacity = trend ? settings.trendOpacity : settings.lineOpacity;
   const width = trend ? settings.trendWidth : settings.width;
   const lineStyle = trend ? settings.trendStyle : settings.lineStyle;
@@ -71,7 +73,12 @@ export function DrawingStylePopover({ target, settings, onColor, onChange, onClo
           onChange={(event) => onColor(event.currentTarget.value)}
         />
       </label>
-      {target.kind !== "level" && (
+      {target.kind === "text" && (
+        <button type="button" onClick={() => onChange({ textColor: undefined })}>
+          {t("Использовать цвет линии")}
+        </button>
+      )}
+      {(target.kind === "line" || trend) && (
         <>
           <OpacityControl
             name={trend ? "trendOpacity" : "lineOpacity"}

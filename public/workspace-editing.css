@@ -1,0 +1,78 @@
+.chart-panel .chart-heading {
+  z-index: 6;
+}
+
+.chart-instrument-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font-size: 14px;
+  font-weight: 400;
+  text-align: start;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.chart-instrument-button > span:last-child {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chart-instrument-button:hover {
+  background: var(--surface-hover);
+}
+
+.auxiliary-chart > .chart-panel {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.workspace-empty-chart {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+  padding: 6px;
+}
+
+.auxiliary-chart .instrument-title {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.auxiliary-chart .chart-range-control {
+  gap: 4px;
+  padding-inline: 4px;
+}
+
+.auxiliary-chart .chart-range-control select {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.chart-workspace:not(
+    [data-chart-count="1"],
+    [data-chart-count="2"],
+    [data-chart-count="3"],
+    [data-chart-count="4"]
+  )
+  .chart-range-control
+  :is(.clock-zone-control, .chart-range-note) {
+  display: none;
+}
+
+@media (max-width: 1050px) {
+  .chart-workspace:not([data-chart-count="1"]) .chart-scroll-host {
+    overscroll-behavior-y: auto;
+  }
+}

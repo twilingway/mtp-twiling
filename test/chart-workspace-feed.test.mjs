@@ -207,15 +207,46 @@ test("workspace renders one primary and distinct comparison instruments from mix
     uid: "okx:spot:BTC-USDT",
     providerRef: { provider: "okx", category: "spot", symbol: "BTC-USDT" }
   };
+  const instrumentButtons = new Map();
+  const openedDialogs = [];
   const chartLoad = createSourceLoader({
     react: React,
-    "react/jsx-runtime": jsxRuntime,
-    "screens/terminal/ChartPanel.js": {
-      ChartPanel: () => React.createElement("div", { id: "primary-chart" })
+    "react/jsx-runtime": {
+      ...jsxRuntime,
+      jsxs(type, props, key) {
+        if (type === "button" && props.className === "chart-instrument-button")
+          instrumentButtons.set(props["aria-label"], props.onClick);
+        return jsxRuntime.jsxs(type, props, key);
+      }
     },
-    "screens/terminal/AuxiliaryChart.js": {
-      AuxiliaryChart: ({ row, preferences }) =>
-        React.createElement("div", { "data-uid": row.uid, "data-timeframe": preferences.timeframe })
+    "screens/terminal/ChartPanel.js": {
+      ChartPanel: ({ slot = 1 }) =>
+        React.createElement("div", {
+          id: slot === 1 ? "primary-chart" : undefined,
+          "data-rendered-chart-slot": slot
+        })
+    },
+    "screens/terminal/WorkspacePanelRuntime.js": {
+      WorkspacePanelRuntime: ({ controller, row, children }) =>
+        React.createElement(
+          "div",
+          { "data-panel-runtime": controller.slot, "data-uid": row?.uid },
+          children
+        )
+    },
+    "screens/terminal/workspace-panel-controller.js": {
+      WorkspacePanelController: class {
+        constructor(_parent, slot) {
+          this.slot = slot;
+        }
+        setDialog(name) {
+          openedDialogs.push([this.slot, name]);
+        }
+      }
+    },
+    "screens/terminal/workspace-panel-preferences.js": {
+      loadWorkspaceInstrument: () => undefined,
+      saveWorkspaceInstrument: () => {}
     },
     "screens/terminal/context.js": {
       useTerminal: () => ({
@@ -233,23 +264,38 @@ test("workspace renders one primary and distinct comparison instruments from mix
   setDisplayPreferences({ locale: "en" });
   const { ChartWorkspace } = chartLoad("screens/terminal/ChartWorkspace.js");
   const { ChartLayoutControl } = chartLoad("screens/terminal/ChartLayoutControl.js");
-  const render = (count) => renderToStaticMarkup(React.createElement(ChartWorkspace, { count }));
-  const one = render(1);
-  const two = render(2);
-  const three = render(3);
-  for (const markup of [one, two, three])
+  const render = (count) =>
+    renderToStaticMarkup(
+      React.createElement(ChartWorkspace, { count, activeSlot: 1, onActivate: () => {} })
+    );
+  for (let count = 1; count <= 16; count++) {
+    const markup = render(count);
     assert.equal(markup.match(/id="primary-chart"/g)?.length, 1);
-  assert.doesNotMatch(one, /class="auxiliary-chart"/);
-  assert.equal(two.match(/class="auxiliary-chart"/g)?.length, 1);
-  assert.equal(three.match(/class="auxiliary-chart"/g)?.length, 2);
-  assert.match(three, /data-uid="bybit:spot:BTCUSDT" data-timeframe="1m"/);
-  assert.match(three, /data-uid="okx:spot:BTC-USDT" data-timeframe="1m"/);
-  assert.match(three, /aria-label="Chart instrument 2"/);
-  assert.match(three, /aria-label="Chart instrument 3"/);
-  assert.equal(three.match(/<option value="bybit:spot:BTCUSDT"/g)?.length, 2);
+    assert.equal(markup.match(/class="auxiliary-chart"/g)?.length ?? 0, count - 1);
+    assert.doesNotMatch(markup, /<select/);
+  }
+  const three = render(3);
+  assert.match(
+    three,
+    /data-panel-runtime="2" data-uid="bybit:spot:BTCUSDT"><div data-rendered-chart-slot="2"/
+  );
+  assert.match(
+    three,
+    /data-panel-runtime="3" data-uid="okx:spot:BTC-USDT"><div data-rendered-chart-slot="3"/
+  );
+  assert.equal(three.match(/data-uid="bybit:spot:BTCUSDT"/g)?.length, 1);
+  assert.doesNotMatch(render(4), /data-panel-runtime="4" data-uid=/);
+  const sixteen = render(16);
+  assert.match(
+    sixteen,
+    /<button type="button" class="chart-instrument-button" aria-label="Chart instrument 16 · Select a symbol"/
+  );
+  instrumentButtons.get("Chart instrument 16 · Select a symbol")();
+  assert.deepEqual(openedDialogs, [[16, "instruments"]]);
   const control = renderToStaticMarkup(
-    React.createElement(ChartLayoutControl, { value: 3, onChange: () => {} })
+    React.createElement(ChartLayoutControl, { value: 16, onChange: () => {} })
   );
   assert.match(control, /aria-label="Chart layout"/);
-  assert.match(control, /value="3" aria-label="Three charts" selected=""/);
+  assert.equal(control.match(/<option /g)?.length, 16);
+  assert.match(control, /value="16" aria-label="Chart count: 16" selected=""/);
 });

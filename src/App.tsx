@@ -24,24 +24,66 @@ import { TerminalIndicatorLibrary } from "./screens/terminal/TerminalIndicatorLi
 import { TechnicalIndicatorSettings } from "./screens/terminal/TechnicalIndicatorSettings.js";
 import { MarketBreadthProvider } from "./screens/terminal/MarketBreadthContext.js";
 function Terminal() {
-  const { state } = useTerminal();
+  const { controller, state } = useTerminal();
   const [chartCount, setChartCount] = useState<ChartLayoutCount>(1);
+  const [selection, setSelection] = useState<{
+    owner: string;
+    slot: number;
+    editor: TerminalController;
+  }>();
+  const active =
+    selection?.owner === state.owner && selection.slot <= chartCount && !state.profileTransition
+      ? selection
+      : undefined;
+  const editor = active?.editor ?? controller;
+  const select = (slot: number, next: TerminalController) => {
+    if (editor === next || state.profileTransition || state.importingBackup) return;
+    editor.editing.cancelGesture();
+    editor.setTool(null);
+    editor.setContext(null);
+    if (editor.getSnapshot().dialog !== "account") editor.setDialog(null);
+    setSelection(slot === 1 ? undefined : { owner: state.owner, slot, editor: next });
+  };
+  const resize = (count: ChartLayoutCount) => {
+    if (active && active.slot > count) select(1, controller);
+    setChartCount(count);
+  };
   return (
     <>
       <ThemeEffect />
       <LocaleEffect />
-      <Toolbar chartCount={chartCount} onChartCountChange={setChartCount} />
+      <TerminalContext value={editor}>
+        <Toolbar
+          chartCount={chartCount}
+          onChartCountChange={resize}
+          accountController={controller}
+        />
+      </TerminalContext>
       <DrivePauseBanner />
       <main
         className="workspace"
         data-right-panel-collapsed={!!state.preferences.rightPanelCollapsed}
         data-mobile-panel-open={!!state.mobilePanelOpen && !state.preferences.rightPanelCollapsed}
       >
-        <DrawingToolbar />
-        <ChartWorkspace count={chartCount} />
-        <RightPanel />
+        <TerminalContext value={editor}>
+          <DrawingToolbar />
+        </TerminalContext>
+        <ChartWorkspace count={chartCount} activeSlot={active?.slot ?? 1} onActivate={select} />
+        <RightPanel chartEditor={editor} />
       </main>
       {state.dialog === "account" && <AccountDialog />}
+      <TerminalContext value={editor}>
+        <ChartDialogs />
+      </TerminalContext>
+      <UpdateBanner />
+      <TerminalLifecycle chartEditor={editor} />
+    </>
+  );
+}
+function ChartDialogs() {
+  const { state } = useTerminal();
+  return (
+    <>
       {state.dialog === "instruments" && <InstrumentSearch />}
       {state.dialog === "chart-settings" && <ChartSettingsDialog />}
       {state.dialog === "indicator-settings" && <IndicatorSettingsDialog />}
@@ -58,8 +100,6 @@ function Terminal() {
           {systemText(state.toast)}
         </div>
       )}
-      <UpdateBanner />
-      <TerminalLifecycle />
     </>
   );
 }

@@ -37,6 +37,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
   const camera = new UserCameraEvents(options);
   const instrumentUid = options.row.uid;
   let priceFormat = chartPriceFormat(options.row);
+  let priceHint = options.row.price;
   const { container, settings, timeframe, indicators } = options;
   let data: Candle[] = [],
     dataReady = false;
@@ -195,9 +196,10 @@ export function makeKline(options: ChartOptions): ChartAdapter {
   }
   const resize = new ResizeObserver(() => {
     const width = stablePriceAxisWidth(
-      options.row,
+      { ...options.row, price: priceHint },
       settings.scaleFontSize ?? 11,
-      container.clientWidth
+      container.clientWidth,
+      priceFormat.precision
     );
     if (width !== axisWidth) {
       axisWidth = width;
@@ -279,12 +281,19 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       );
       const changed = next.precision !== priceFormat.precision;
       priceFormat = next;
+      priceHint = metadata.priceHint ?? priceHint;
       if (!changed) return;
       camera.programmatic(() => {
         chart.setPriceVolumePrecision(next.precision, 0);
         technical?.refreshNativeMetadata();
         // KLine 9.8 updates only its precision store; invalidate native labels via public API.
-        chart.setStyles({});
+        axisWidth = stablePriceAxisWidth(
+          { ...options.row, price: priceHint },
+          settings.scaleFontSize ?? 11,
+          container.clientWidth,
+          next.precision
+        );
+        chart.setStyles({ yAxis: { size: axisWidth } });
       });
     },
     ...klineNavigation(
@@ -364,6 +373,10 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     },
     pointToPixel,
     technicalPaneMetrics: () => technical?.metrics() ?? [],
+    setTechnicalPaneFocus(focus) {
+      if (!live.retired)
+        camera.programmatic(() => preserveKlineCamera(chart, () => technical?.setFocus(focus)));
+    },
     timeAxisTop: () => technical?.timeAxisTop() ?? container.clientHeight - 28,
     updateTechnicalInputs(inputs) {
       if (!live.retired)

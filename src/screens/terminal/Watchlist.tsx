@@ -1,6 +1,6 @@
 import { t, systemText } from "../../i18n/messages.js";
 import { timeZoneOffset } from "../../i18n/timezones.js";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { precision } from "../../charts/adapter.js";
 import { useTerminal } from "./context.js";
@@ -12,14 +12,17 @@ import { InstrumentIcon } from "./WatchlistQuoteRow.js";
 import { InstrumentDetails } from "./InstrumentDetails.js";
 import { DetailsDivider } from "./DetailsDivider.js";
 import { providerLabel } from "./provider-label.js";
+import type { TerminalController } from "./controller.js";
 export { InstrumentIcon } from "./WatchlistQuoteRow.js";
 type SortKey = "symbol" | "price" | "change" | "changePercent";
-export function Watchlist() {
+export function Watchlist({ chartEditor }: { chartEditor?: TerminalController } = {}) {
   const { controller, state } = useTerminal();
+  const editor = chartEditor ?? controller;
+  const chartState = useSyncExternalStore(editor.subscribe, editor.getSnapshot, editor.getSnapshot);
   const [query, setQuery] = useState(""),
     [sort, setSort] = useState<SortKey | null>(null),
     [direction, setDirection] = useState(-1);
-  const selected = selectedMarketRow(state.rows, state.preferences);
+  const selected = selectedMarketRow(state.rows, chartState.preferences);
   const source = selected?.providerRef ? providerLabel(selected.providerRef) : null;
   const visible = state.rows.filter(
     (row) =>
@@ -41,7 +44,9 @@ export function Watchlist() {
             id="add-instrument"
             title={t("Добавить инструмент")}
             aria-label={t("Добавить инструмент")}
-            onClick={() => controller.setDialog(state.ready ? "instruments" : "account")}
+            onClick={() =>
+              state.ready ? editor.setDialog("instruments") : controller.setDialog("account")
+            }
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
               <path d="M12 5v14M5 12h14" />
@@ -84,6 +89,8 @@ export function Watchlist() {
             setSort(key);
           }}
           onManualOrder={() => setSort(null)}
+          chartEditor={editor}
+          activeInstrument={selected ?? null}
         />
         <div className="watchlist-meta">
           <span id="quote-count">

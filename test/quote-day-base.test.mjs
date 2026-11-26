@@ -186,7 +186,7 @@ test("transient failure retries after 60s or reconnect without per-tick requests
   }
 });
 
-function fixture(initialRows, { closeError=false, prices, closes=[], cachedRows, candles, clock=()=>now }={}) {
+function fixture(initialRows, { closeError=false, prices, closes=[], cachedRows, candles, clock=()=>now, futures=[] }={}) {
   const requests=[];
   let receive;
   class Transport {
@@ -209,7 +209,7 @@ function fixture(initialRows, { closeError=false, prices, closes=[], cachedRows,
   }
   const cache={
     loadMarket:async()=>cachedRows ? {rows:cachedRows,at:now} : undefined,
-    loadCatalog:async()=>({at:Date.now(),shares:[],futures:[],indicatives:[]}),
+    loadCatalog:async()=>({at:Date.now(),shares:[],futures,indicatives:[],currencies:[]}),
     loadWatchlist:async()=>initialRows,
     saveWatchlist:async()=>{},saveMarket:async()=>{},saveWatchlistSnapshot:async()=>{}
   };
@@ -217,6 +217,26 @@ function fixture(initialRows, { closeError=false, prices, closes=[], cachedRows,
   return {client:new TBankClient("safe-unit-test-value","Test",cache),requests,
     receive: packet => receive(packet)};
 }
+
+test("bank startup refreshes the saved price tick by instrument UID", async () => {
+  const current = {
+    ...row("CNYRUBF"),
+    step: 1,
+    uid: "exact-cny",
+    type: "future",
+    exchange: "forts_futures"
+  };
+  const { client } = fixture([current], {
+    prices: [{ instrumentUid: current.uid, price: q(12.298), time: tick }],
+    futures: [
+      { uid: "foreign-cny", ticker: current.ticker, minPriceIncrement: q(0.05) },
+      { uid: current.uid, ticker: current.ticker, minPriceIncrement: q(0.001) }
+    ]
+  });
+  await client.start();
+  assert.equal(client.rows[0].step, 0.001);
+  assert.equal(client.rows[0].price, 12.298);
+});
 
 test("initial snapshot and added instrument retain last when GetClosePrices fails",async()=>{
   for(const add of [false,true]){

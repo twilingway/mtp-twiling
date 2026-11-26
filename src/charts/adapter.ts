@@ -31,6 +31,11 @@ export interface TechnicalPaneMetric {
   width: number;
 }
 
+export interface TechnicalPaneFocus {
+  key: string;
+  height: number;
+}
+
 export type TechnicalSupplementalInputs = Pick<
   TechnicalCalculationContext,
   | "openInterest"
@@ -58,6 +63,7 @@ export interface ChartAdapter {
     layout?: readonly TechnicalPanePreference[]
   ): void;
   technicalPaneMetrics?(): readonly TechnicalPaneMetric[];
+  setTechnicalPaneFocus?(focus: TechnicalPaneFocus | null): void;
   /** Global X-axis location can differ from the price-pane bottom. */
   timeAxisTop?(): number;
   getView(): ChartView | null;

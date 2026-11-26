@@ -23,6 +23,7 @@ import { QuoteRow } from "./WatchlistQuoteRow.js";
 import { WatchlistMenu } from "./WatchlistMenu.js";
 import { WatchlistSectionHeader } from "./WatchlistSectionHeader.js";
 import { WatchlistSectionMenu } from "./WatchlistSectionMenu.js";
+import type { TerminalController } from "./controller.js";
 
 type Menu = { x: number; y: number; owner: string } & (
   | { kind: "row"; row: MarketRow; key: string; mode?: "flag"; fromAction?: boolean }
@@ -34,15 +35,20 @@ export function WatchlistSectionsTable({
   sort,
   direction,
   onSort,
-  onManualOrder
+  onManualOrder,
+  chartEditor,
+  activeInstrument
 }: {
   query: string;
   sort: WatchlistSortKey | null;
   direction: number;
   onSort: (key: WatchlistSortKey) => void;
   onManualOrder: () => void;
+  chartEditor?: TerminalController;
+  activeInstrument?: MarketRow | null;
 }) {
   const { controller, state } = useTerminal();
+  const editor = chartEditor ?? controller;
   const rowMenuId = useId();
   const [menu, setMenu] = useState<Menu | null>(null),
     [dragSource, setDragSource] = useState<string | null>(null),
@@ -163,7 +169,7 @@ export function WatchlistSectionsTable({
     if (drag.current || Date.now() < suppressClickUntil.current || disabled) return;
     const owner = state.owner;
     if (window.matchMedia("(max-width: 800px)").matches) controller.panel.closeMobile();
-    void controller.setPreferences({ symbol, instrumentUid }).catch((error: unknown) => {
+    void editor.setPreferences({ symbol, instrumentUid }).catch((error: unknown) => {
       if (controller.getSnapshot().owner === owner)
         controller.notify(
           error instanceof Error ? error.message : t("Не удалось открыть инструмент.")
@@ -260,7 +266,10 @@ export function WatchlistSectionsTable({
     sort,
     direction
   );
-  const selected = selectedMarketRow(state.rows, state.preferences),
+  const selected =
+      activeInstrument === undefined
+        ? selectedMarketRow(state.rows, state.preferences)
+        : activeInstrument,
     sections = groups.flatMap((group) => (group.section ? [group.section] : []));
   const rowActions =
     menu?.kind === "row"

@@ -6,10 +6,18 @@ import type {
   TechnicalIndicatorGroup,
   TechnicalPanePreference
 } from "../model/technical-indicator-layout.js";
-import type { ChartOptions, TechnicalPaneMetric, TechnicalSupplementalInputs } from "./adapter.js";
+import type {
+  ChartOptions,
+  TechnicalPaneFocus,
+  TechnicalPaneMetric,
+  TechnicalSupplementalInputs
+} from "./adapter.js";
 import { TechnicalRenderData } from "./technical-render-data.js";
 import { hasVisibleAverage, technicalCalculationContext } from "./technical-calculation-context.js";
-import { captureTechnicalPaneLayout } from "./technical-pane-geometry.js";
+import {
+  captureTechnicalPaneLayout,
+  expandedFocusedTechnicalPane
+} from "./technical-pane-geometry.js";
 import { klinePaneGeometry } from "./kline-pane-geometry.js";
 import { attachTechnicalPaneEvents } from "./technical-pane-events.js";
 import { klineCompactCrosshair } from "./technical-compact-crosshair.js";
@@ -56,7 +64,8 @@ export function klineTechnical(
   let groups: TechnicalIndicatorGroup[] = [],
     paneOrder: string[] = [];
   let instances: readonly TechnicalIndicatorInstance[] = [],
-    layout: readonly TechnicalPanePreference[] = [];
+    layout: readonly TechnicalPanePreference[] = [],
+    focus: TechnicalPaneFocus | null = null;
   let disposed = false,
     lastMetrics = "",
     applying = false,
@@ -133,7 +142,8 @@ export function klineTechnical(
         options.container.clientHeight,
         groups,
         options.indicators.volume ? { heightRatio: legacyRatio() } : null,
-        timeHeight()
+        timeHeight(),
+        focus
       );
       for (const target of targets) {
         if (target.key === "price") continue;
@@ -158,6 +168,10 @@ export function klineTechnical(
       changed,
       capture(before, after) {
         if (disposed || !alive()) return;
+        if (focus) {
+          apply();
+          return;
+        }
         const next = captureTechnicalPaneLayout(layout, before, after);
         if (next) {
           layout = next.layout;
@@ -184,7 +198,7 @@ export function klineTechnical(
     if (disposed || !alive()) return;
     if (hasVisibleAverage(instances)) readViewport();
     const complete = nativeSettled(weakSettlement, ++settlement.revision);
-    const compiled = calculation.compile(instances, layout);
+    const compiled = calculation.compile(instances, expandedFocusedTechnicalPane(layout, focus));
     calendar.update(compiled.priceRegions);
     groups = compiled.groups;
     const nextOrder = groups.filter((group) => group.key !== "price").map((group) => group.key);
@@ -218,6 +232,13 @@ export function klineTechnical(
       events?.cancel();
       instances = next;
       layout = nextLayout;
+      reconcile();
+    },
+    setFocus(next: TechnicalPaneFocus | null) {
+      if (disposed || !alive() || (focus?.key === next?.key && focus?.height === next?.height))
+        return;
+      events?.cancel();
+      focus = next;
       reconcile();
     },
     refreshNativeMetadata: members.refreshNativeMetadata,

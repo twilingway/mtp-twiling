@@ -7,7 +7,7 @@ import { persistLegendCollapsed } from "./indicator-preferences.js";
 import { t } from "../../i18n/messages.js";
 import { TechnicalPriceLegend } from "./TechnicalIndicatorPanels.js";
 
-export function IndicatorLegend() {
+export function IndicatorLegend({ slot = 1 }: { slot?: number } = {}) {
   const { controller, state } = useTerminal(),
     p = state.preferences;
   const keys = indicatorLegendKeys(p.chartSettings, p.indicators),
@@ -15,15 +15,16 @@ export function IndicatorLegend() {
       keys.length +
       (p.technicalIndicators ?? []).filter((item) => item.pane.kind === "overlay").length,
     collapsed = p.chartSettings.legendCollapsed === true;
+  const itemsId = slot === 1 ? "indicator-legend-items" : `indicator-legend-items-${slot}`;
   const blocked = !!(state.backupBusy || state.importingBackup || state.importRecoveryRequired);
   return (
     <div
-      id="indicator-legend"
+      id={slot === 1 ? "indicator-legend" : `indicator-legend-${slot}`}
       className="indicator-legend"
       aria-label={t("Индикаторы графика")}
       hidden={p.chartSettings.showLegend === false}
     >
-      <div id="indicator-legend-items" className="indicator-legend-list" hidden={collapsed}>
+      <div id={itemsId} className="indicator-legend-list" hidden={collapsed}>
         <TechnicalPriceLegend />
         {keys.map((key) => (
           <div
@@ -65,7 +66,7 @@ export function IndicatorLegend() {
         className="legend-collapse"
         disabled={blocked}
         aria-expanded={!collapsed}
-        aria-controls="indicator-legend-items"
+        aria-controls={itemsId}
         aria-label={
           collapsed
             ? `${t("Показать названия индикаторов")} (${count})`

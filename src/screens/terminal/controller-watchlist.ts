@@ -4,6 +4,7 @@ import type { WatchlistMove } from "../../services/watchlist-order.js";
 import { pinSelectedInstrument, selectedMarketRow } from "../../model/selected-instrument.js";
 import { watchlistSelectionFallback } from "../../model/watchlist-sections.js";
 import type { MarketRow } from "../../model/types.js";
+import type { MarketClient } from "../../services/market-client.js";
 import type { TerminalController } from "./controller.js";
 import type { TerminalSession } from "./controller-session.js";
 import { importWritable } from "./controller-transfer-guard.js";
@@ -13,6 +14,20 @@ type Controller = Pick<
   "getSnapshot" | "subscribe" | "update" | "flush" | "setPreferences"
 >;
 type Session = Pick<TerminalSession, "client" | "matches" | "applyBankState">;
+
+export async function addWatchlistInstrument(
+  controller: Controller,
+  session: Session,
+  instrument: Parameters<MarketClient["addInstrument"]>[0]
+) {
+  const client = session.client,
+    owner = controller.getSnapshot().owner;
+  if (!client || !importWritable(controller.getSnapshot(), owner)) return;
+  const row = await client.addInstrument(instrument);
+  if (!session.matches(client) || !importWritable(controller.getSnapshot(), owner)) return;
+  session.applyBankState(client.snapshot());
+  return row;
+}
 
 /** Cancels permanently when a transfer/profile boundary is crossed, even if its final state returns. */
 function mutationGuard(controller: Controller, session: Session, owner: string) {

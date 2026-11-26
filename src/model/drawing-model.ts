@@ -1,5 +1,5 @@
 import { intlLocale } from "../i18n/preferences.js";
-import { paintLineText } from "./drawing-line-text.js";
+import { paintAreaText, paintLineText } from "./drawing-line-text.js";
 import { rectangleBounds, rectangleEdges } from "./drawing-screen-geometry.js";
 import type { DrawingRectangle } from "./drawing-screen-geometry.js";
 import type {
@@ -78,9 +78,9 @@ export const DEFAULT_FIB_LEVELS: FibLevelStyle[] = [
   text: ""
 }));
 export type ResolvedDrawingStyle = Required<
-  Omit<DrawingSettings, "levelStyles" | "oneColor" | "extend">
+  Omit<DrawingSettings, "levelStyles" | "oneColor" | "extend" | "textColor">
 > &
-  Pick<DrawingSettings, "levelStyles" | "oneColor" | "extend">;
+  Pick<DrawingSettings, "levelStyles" | "oneColor" | "extend" | "textColor">;
 export function drawingHasLineText(name: DrawingTool): boolean {
   return name !== "rectangle" && !name.startsWith("fibonacci");
 }
@@ -396,25 +396,14 @@ export function paintDrawings(
       }
       ctx.setLineDash([]);
       ctx.globalAlpha = 1;
-      if (g.style.textEnabled && g.style.text) {
-        const ys = g.points.map((p) => p.y),
-          y =
-            g.style.textVertical === "top"
-              ? Math.min(...ys) + 15
-              : g.style.textVertical === "bottom"
-                ? Math.max(...ys) - 15
-                : ((ys[0] ?? 0) + (ys[1] ?? 0)) / 2;
-        ctx.textAlign = g.style.textAlign;
-        ctx.textBaseline = "middle";
-        ctx.fillStyle = g.style.color;
-        ctx.fillText(
-          g.style.text,
-          g.style.textAlign === "left"
-            ? g.from + 8
-            : g.style.textAlign === "right"
-              ? g.to - 8
-              : (g.from + g.to) / 2,
-          y
+      if (g.style.textEnabled && g.style.text.trim()) {
+        const ys = [...g.points, ...g.levels].map(({ y }) => y);
+        paintAreaText(
+          ctx,
+          { left: g.from, right: g.to, top: Math.min(...ys), bottom: Math.max(...ys) },
+          g.style,
+          width,
+          height
         );
       }
     } else if (g.rectangle) {
@@ -426,6 +415,7 @@ export function paintDrawings(
         ctx.globalAlpha = g.style.lineOpacity;
       }
       ctx.strokeRect(left, top, right - left, bottom - top);
+      paintAreaText(ctx, g.rectangle, g.style, width, height);
     } else {
       for (const [a, b] of g.lines) {
         ctx.beginPath();
@@ -434,7 +424,7 @@ export function paintDrawings(
         ctx.stroke();
       }
       const line = g.lines[0];
-      if (line && drawingHasLineText(d.name)) paintLineText(ctx, line, g.style, width, height);
+      if (line) paintLineText(ctx, line, g.style, width, height);
     }
     ctx.globalAlpha = 1;
     ctx.setLineDash([]);

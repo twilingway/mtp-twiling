@@ -144,9 +144,12 @@ test("actual price/lower legend rows use the same O1 status helper and clear sta
         react: {
           createContext: (defaultValue) => ({ defaultValue }),
           useContext: (context) => context.defaultValue,
+          useLayoutEffect: () => {},
+          useState: (value) => [value, () => {}],
           useRef: (v) => ({ current: v })
         },
         "react/jsx-runtime": jsx,
+        "react-dom": { createPortal: (children) => children },
         "screens/terminal/context.js": { useTerminal: () => ({ state, controller: {} }) },
         "screens/terminal/useIndicatorMenuAction.js": {
           useIndicatorMenuAction: () => ({ pending: false, run: () => {} })
