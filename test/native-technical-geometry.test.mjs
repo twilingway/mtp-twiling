@@ -63,8 +63,8 @@ for (const engine of ["lightweight", "kline"]) {
     if (engine === "lightweight") {
       const output = f.activeSeries().slice(4),
         histogram = output.find((series) => series.type === "Histogram");
-      assert.equal(histogram.options.color, "rgba(171,205,239,0.25)");
-      assert.equal(histogram.options.lineStyle, undefined);
+      assert.equal(histogram.options().color, "rgba(171,205,239,0.25)");
+      assert.equal(histogram.options().lineStyle, undefined);
       assert.equal(
         output.reduce((sum, series) => sum + series.labels.length, 0),
         4

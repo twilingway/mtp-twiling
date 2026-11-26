@@ -10,9 +10,21 @@ import {
 import type { BybitCatalog, BybitCategory, BybitInstrument } from "./providers/bybit/types.js";
 import type { BybitStreamOptions } from "./providers/bybit/websocket.js";
 import type { BybitInterval } from "./providers/bybit/market.js";
+import {
+  loadBybitOpenInterest,
+  supportsBybitOpenInterestInterval
+} from "./providers/bybit/open-interest.js";
+import type { OpenInterestObservations } from "../model/technical-indicators/ta-batch-external.js";
+import type { TurnoverInterval } from "../model/technical-indicators/ta-batch-volume-flow-turnover.js";
+import { loadPublicQuoteTurnover } from "./market-turnover.js";
 import { okxNativeInterval } from "./providers/okx/market.js";
 import type { OkxInstrument } from "./providers/okx/types.js";
-import { okxCatalogInstrument, publicCatalogInstrument } from "./market-public-mapping.js";
+import {
+  marketTuple,
+  okxCatalogInstrument,
+  okxRefs,
+  publicCatalogInstrument
+} from "./market-public-mapping.js";
 import type { PublicQuote } from "./market-public-mapping.js";
 import { OkxMarket, PUBLIC_CATALOG_MAX_AGE_MS } from "./market-okx.js";
 import type { OkxMarketOptions } from "./market-okx.js";
@@ -20,7 +32,7 @@ import { CandleLeases } from "./candle-leases.js";
 import { TIMEFRAMES, mergeCandles, subtractRanges } from "../model/history-codec.js";
 import { shiftTimeframe } from "../model/intervals/calendar.js";
 import { providerSeriesId } from "../model/market-provider.js";
-import type { MarketProviderRef, OkxProviderRef } from "../model/market-provider.js";
+import type { MarketProviderRef } from "../model/market-provider.js";
 import { isNativeIntervalId } from "../model/intervals/registry.js";
 import type {
   Candle,
@@ -66,15 +78,6 @@ function supportedBybitInstrument(item: BybitInstrument): boolean {
   );
 }
 
-function marketTuple(item: BybitInstrument | OkxInstrument): string {
-  return JSON.stringify([
-    item.ref.category,
-    item.baseCoin.toUpperCase(),
-    item.quoteCoin.toUpperCase(),
-    item.settleCoin?.toUpperCase() ?? null
-  ]);
-}
-
 function knownBybitMarkets(catalog: BybitCatalog): Set<string> {
   const categories = new Set(catalog.instruments.map((item) => item.ref.category));
   if (!catalog.complete || !categories.has("spot") || !categories.has("linear"))
@@ -100,10 +103,6 @@ function okxMatches(item: OkxInstrument, query: string): boolean {
   return [item.ref.symbol, item.baseCoin, item.quoteCoin].some((part) =>
     searchKey(part).includes(query)
   );
-}
-
-function okxRefs(rows: readonly MarketRow[]): OkxProviderRef[] {
-  return rows.flatMap((row) => (row.providerRef?.provider === "okx" ? [row.providerRef] : []));
 }
 
 export class PublicMarket {
@@ -154,6 +153,47 @@ export class PublicMarket {
   }
   private signal(signal?: AbortSignal): AbortSignal {
     return signal ? AbortSignal.any([signal, this.lifetime.signal]) : this.lifetime.signal;
+  }
+  loadQuoteTurnover(
+    row: MarketRow,
+    interval: TurnoverInterval,
+    range: HistoryRange,
+    signal: AbortSignal
+  ) {
+    if (this.cachePaused) return Promise.resolve(null);
+    return loadPublicQuoteTurnover(
+      row,
+      interval,
+      range,
+      this.signal(signal),
+      (ref, timeframe, part, active) => loadHistory(this.http, ref, timeframe, part, active),
+      (ref, timeframe, part, active) => this.okx.history(ref, timeframe, part, active)
+    );
+  }
+  loadOpenInterest(
+    row: MarketRow,
+    timeframe: Timeframe,
+    range: HistoryRange,
+    signal: AbortSignal,
+    onPage?: (page: OpenInterestObservations) => void
+  ): Promise<OpenInterestObservations | null> {
+    const ref = row.providerRef;
+    if (
+      ref?.provider !== "bybit" ||
+      ref.category !== "linear" ||
+      !row.baseCoin ||
+      !supportsBybitOpenInterestInterval(timeframe)
+    )
+      return Promise.resolve(null);
+    return loadBybitOpenInterest(
+      this.http,
+      ref,
+      row.baseCoin,
+      timeframe,
+      range,
+      this.signal(signal),
+      onPage
+    );
   }
   async search(
     query: string,

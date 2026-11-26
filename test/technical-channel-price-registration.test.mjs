@@ -68,7 +68,7 @@ test("three reviewed definitions retain their old47 append/defaults/native price
   );
   // The first50 and historical witnesses stay fixed; KC is a separately reviewed append at51.
   assert.equal(catalog.technicalDefinitionForCatalog("STD;Keltner_Channels"), "keltner-channels");
-  assert.equal(catalog.technicalDefinitionForCatalog("STD;Donchian_Channels"), undefined);
+  assert.equal(catalog.technicalDefinitionForCatalog("STD;Donchian_Channels"), "donchian-channels");
 });
 
 test("reviewed math package is byte-identical780e9c5; old47 definitions/params/styles/results/history are exact7cc9df9 witnesses", () => {

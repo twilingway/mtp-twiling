@@ -1,4 +1,8 @@
 import { useRef, useState } from "react";
+import {
+  technicalChoiceLabel,
+  technicalParameterLabel
+} from "../../i18n/messages-technical-settings.js";
 import { useTerminal } from "./context.js";
 import { Modal } from "./Modal.js";
 import { useIndicatorMenuAction } from "./useIndicatorMenuAction.js";
@@ -22,49 +26,11 @@ import {
   technicalPaneKey
 } from "../../model/technical-indicator-layout.js";
 
-const labels: Readonly<Record<string, readonly [string, string]>> = {
-  length: ["Период", "Length"],
-  source: ["Источник", "Source"],
-  useExponentialMa: ["Экспоненциальная средняя", "Use Exponential MA"],
-  bandsStyle: ["Тип диапазона", "Bands Style"],
-  offset: ["Смещение", "Offset"],
-  sigma: ["Сигма", "Sigma"],
-  atrLength: ["Период ATR", "ATR length"],
-  factor: ["Множитель", "Factor"],
-  start: ["Начальное ускорение", "Start"],
-  increment: ["Шаг ускорения", "Increment"],
-  maximum: ["Максимальное ускорение", "Maximum"],
-  multiplier: ["Множитель", "Multiplier"],
-  fastLength: ["Быстрый период", "Fast length"],
-  slowLength: ["Медленный период", "Slow length"],
-  middleLength: ["Средний период", "Middle length"],
-  signalLength: ["Сигнальный период", "Signal length"],
-  longLength: ["Длинный период", "Long length"],
-  shortLength: ["Короткий период", "Short length"],
-  roc1Length: ["Период ROC №1", "ROC length #1"],
-  roc2Length: ["Период ROC №2", "ROC length #2"],
-  roc3Length: ["Период ROC №3", "ROC length #3"],
-  roc4Length: ["Период ROC №4", "ROC length #4"],
-  sma1Length: ["Период SMA №1", "SMA length #1"],
-  sma2Length: ["Период SMA №2", "SMA length #2"],
-  sma3Length: ["Период SMA №3", "SMA length #3"],
-  sma4Length: ["Период SMA №4", "SMA length #4"],
-  diLength: ["Период DI", "DI length"],
-  adxSmoothing: ["Сглаживание ADX", "ADX smoothing"],
-  smoothK: ["Сглаживание K", "K smoothing"],
-  smoothD: ["Сглаживание D", "D smoothing"],
-  expansionLength: ["Период максимального расширения", "Highest expansion length"],
-  contractionLength: ["Период минимального сжатия", "Lowest contraction length"],
-  divisor: ["Делитель", "Divisor"],
-  emaLength: ["Период EMA", "EMA length"],
-  oscillatorAverage: ["Тип средней осциллятора", "Oscillator MA type"],
-  signalAverage: ["Тип сигнальной средней", "Signal MA type"]
-};
-
 export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIndicatorInstance }) {
   const { controller, state } = useTerminal();
   const initial = useRef({ state, session: controller.sessionKey(), instance }).current;
-  const english = state.preferences.locale === "en";
+  const locale = state.preferences.locale ?? "ru";
+  const english = locale === "en";
   const text = (ru: string, en: string) => (english ? en : ru);
   const definition = technicalIndicatorDefinitions.find(
     (item) => item.id === instance.definitionId
@@ -80,14 +46,14 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
   const [pane, setPane] = useState(technicalPaneKey(instance.pane));
   const [styles, setStyles] = useState<Record<string, OutputStyle> | undefined>(instance.styles);
   const [error, setError] = useState("");
-  const draft: unknown = {
+  const draft = {
     ...instance,
     params: Object.fromEntries(
       definition.parameters.map((parameter) => [
         parameter.key,
-        parameter.type === "source" || parameter.type === "choice" || parameter.type === "boolean"
-          ? parameters[parameter.key]
-          : Number(parameters[parameter.key])
+        parameter.type === "integer" || parameter.type === "number"
+          ? Number(parameters[parameter.key])
+          : parameters[parameter.key]
       ])
     )
   };
@@ -112,12 +78,35 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
     state.preferences.instrumentUid === initial.state.preferences.instrumentUid &&
     state.preferences.timeframe === initial.state.preferences.timeframe &&
     state.preferences.engine === initial.state.preferences.engine;
+  const styleOutputs = [
+    ...definition.outputs,
+    ...(definition.priceRegionStyles ?? []),
+    ...(definition.presentation?.referenceLevels ?? []).map((level) => ({
+      id: level.id,
+      title: level.title,
+      color: level.color
+    })),
+    ...(definition.presentation?.fills ?? [])
+      .filter((fill) => fill.extent === "pane")
+      .map((fill) => ({ id: fill.id, title: "Background", color: fill.color }))
+  ];
   const displayStyle = (id: string, stored: typeof styles): OutputStyle => ({
-    color: definition.outputs.find((output) => output.id === id)!.color,
+    color: styleOutputs.find((output) => output.id === id)!.color,
     width: 1,
     visible: true,
-    opacity: 1,
+    opacity: definition.priceRegionStyles?.find((item) => item.id === id)?.opacity ?? 1,
     lineStyle: "solid",
+    ...(definition.presentation?.referenceLevels?.some((level) => level.id === id)
+      ? {
+          opacity: definition.presentation.referenceLevels.find((level) => level.id === id)!
+            .opacity,
+          lineStyle: definition.presentation.referenceLevels.find((level) => level.id === id)!
+            .lineStyle
+        }
+      : {}),
+    ...(id === "background"
+      ? { opacity: definition.presentation?.fills.find((fill) => fill.id === id)?.opacity ?? 1 }
+      : {}),
     ...stored?.[id]
   });
   const style = (id: string, patch: Partial<OutputStyle>) =>
@@ -133,17 +122,7 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
         onSubmit={(event) => {
           event.preventDefault();
           const candidate: unknown = {
-            ...instance,
-            params: Object.fromEntries(
-              definition.parameters.map((parameter) => [
-                parameter.key,
-                parameter.type === "source" ||
-                parameter.type === "choice" ||
-                parameter.type === "boolean"
-                  ? parameters[parameter.key]
-                  : Number(parameters[parameter.key])
-              ])
-            ),
+            ...draft,
             pane: pane === "price" ? { kind: "overlay" } : { kind: "pane", id: pane.slice(5) },
             ...(styles === undefined ? {} : { styles })
           };
@@ -172,7 +151,7 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
           <legend>{text("Параметры", "Inputs")}</legend>
           {definition.parameters.map((parameter) => (
             <label key={parameter.key}>
-              <span>{labels[parameter.key]?.[english ? 1 : 0] ?? parameter.key}</span>
+              <span>{technicalParameterLabel(parameter.key, locale)}</span>
               {parameter.type === "boolean" ? (
                 <input
                   type="checkbox"
@@ -191,17 +170,21 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                   {(parameter.type === "source" ? PRICE_SOURCES : parameter.choices).map(
                     (source) => (
                       <option key={source} value={source}>
-                        {source === "Average True Range"
-                          ? text("Средний истинный диапазон", source)
-                          : source === "True Range"
-                            ? text("Истинный диапазон", source)
-                            : source === "Range"
-                              ? text("Диапазон", source)
-                              : source}
+                        {technicalChoiceLabel(source, locale)}
                       </option>
                     )
                   )}
                 </select>
+              ) : parameter.type === "text" ? (
+                <input
+                  type={parameter.format ?? "text"}
+                  maxLength={parameter.maxLength}
+                  required={parameter.format === "time"}
+                  value={String(parameters[parameter.key])}
+                  onChange={(event) =>
+                    setParameters({ ...parameters, [parameter.key]: event.target.value })
+                  }
+                />
               ) : (
                 <input
                   type="number"
@@ -217,27 +200,29 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
               )}
             </label>
           ))}
-          <label>
-            <span>{text("Расположение", "Location")}</span>
-            <select value={pane} onChange={(event) => setPane(event.target.value)}>
-              <option value="price">{text("На графике цены", "On the price chart")}</option>
-              {availablePanes.map((key, index) => (
-                <option key={key} value={key}>
-                  {key === ownPane
-                    ? text("Своя отдельная панель", "Own separate pane")
-                    : `${text("Панель", "Pane")} ${index + 1}: ${groups
-                        .find((group) => group.key === key)
-                        ?.instances.map((item) => {
-                          const entry = getTechnicalIndicatorDefinition(item.definitionId);
-                          return entry?.status === "computed"
-                            ? entry.shortTitle
-                            : item.definitionId;
-                        })
-                        .join(", ")}`}
-                </option>
-              ))}
-            </select>
-          </label>
+          {!definition.priceRegionStyles && (
+            <label>
+              <span>{text("Расположение", "Location")}</span>
+              <select value={pane} onChange={(event) => setPane(event.target.value)}>
+                <option value="price">{text("На графике цены", "On the price chart")}</option>
+                {availablePanes.map((key, index) => (
+                  <option key={key} value={key}>
+                    {key === ownPane
+                      ? text("Своя отдельная панель", "Own separate pane")
+                      : `${text("Панель", "Pane")} ${index + 1}: ${groups
+                          .find((group) => group.key === key)
+                          ?.instances.map((item) => {
+                            const entry = getTechnicalIndicatorDefinition(item.definitionId);
+                            return entry?.status === "computed"
+                              ? entry.shortTitle
+                              : item.definitionId;
+                          })
+                          .join(", ")}`}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
         </fieldset>
         {instance.definitionId === "lsma" && (
           <p>
@@ -250,7 +235,7 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
         {limited && <p role="status">{calculationLimitMessage(english)}</p>}
         <fieldset disabled={pending || !current}>
           <legend>{text("Стиль", "Style")}</legend>
-          {definition.outputs.map((output) => {
+          {styleOutputs.map((output) => {
             const value = displayStyle(output.id, styles);
             const title =
               instance.definitionId === "keltner-channels"
@@ -263,6 +248,17 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                     output.title
                   )
                 : undefined;
+            const background = output.id === "background";
+            const referenceTitle =
+              output.id === "upperBand"
+                ? text("Верхняя граница", "Upper Band")
+                : output.id === "middleBand"
+                  ? text("Средняя граница", "Middle Band")
+                  : output.id === "lowerBand"
+                    ? text("Нижняя граница", "Lower Band")
+                    : background
+                      ? text("Фон", "Background")
+                      : undefined;
             const cross = definition.presentation?.plots.some(
               (plot) => plot.id === output.id && plot.geometry.kind === "cross"
             );
@@ -274,7 +270,8 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                     checked={value.visible}
                     onChange={(event) => style(output.id, { visible: event.target.checked })}
                   />
-                  {title ??
+                  {referenceTitle ??
+                    title ??
                     (output.id === "upTrend"
                       ? text("Восходящий тренд", "Up Trend")
                       : output.id === "downTrend"
@@ -293,18 +290,20 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                     onChange={(event) => style(output.id, { color: event.target.value })}
                   />
                 </label>
-                <label>
-                  {cross ? text("Размер", "Size") : text("Толщина", "Width")}
-                  <input
-                    type="number"
-                    min="1"
-                    max="4"
-                    required
-                    value={value.width}
-                    onChange={(event) => style(output.id, { width: Number(event.target.value) })}
-                  />
-                </label>
-                {!cross && (
+                {!background && (
+                  <label>
+                    {cross ? text("Размер", "Size") : text("Толщина", "Width")}
+                    <input
+                      type="number"
+                      min="1"
+                      max="4"
+                      required
+                      value={value.width}
+                      onChange={(event) => style(output.id, { width: Number(event.target.value) })}
+                    />
+                  </label>
+                )}
+                {!background && !cross && (
                   <label>
                     {text("Линия", "Line")}
                     <select
@@ -369,6 +368,13 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
               "График изменился. Откройте настройки заново.",
               "The chart changed. Reopen settings."
             )}
+          </p>
+        )}
+        {definition.attribution && (
+          <p>
+            <a href={definition.attribution.url} target="_blank" rel="noreferrer">
+              {definition.attribution.line}
+            </a>
           </p>
         )}
         <footer>

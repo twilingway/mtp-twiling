@@ -1,4 +1,5 @@
 import { technicalCatalogData } from "./catalog-data.js";
+import { catalogExpansionDefinitionId } from "./catalog-expansion/registry.js";
 import type { IndicatorLibraryEntry } from "../indicator-library.js";
 import type { TechnicalIndicatorId } from "./types.js";
 
@@ -53,11 +54,16 @@ const implemented: Readonly<Record<string, TechnicalIndicatorId>> = {
   "STD;Arnaud%1Legoux%1Moving%1Average": "alma",
   "STD;Least%1Squares%1Moving%1Average": "lsma",
   "STD;Chandelier_Exit": "chandelier-exit",
-  "STD;Keltner_Channels": "keltner-channels"
+  "STD;Keltner_Channels": "keltner-channels",
+  "STD;Stochastic_RSI": "stochastic-rsi",
+  "STD;Coppock%1Curve": "coppock-curve",
+  "STD;Relative_Vigor_Index": "relative-vigor-index",
+  "STD;Relative_Volatility_Index": "relative-volatility-index",
+  "STD;Bull%Bear%Power": "bull-bear-power"
 };
 
 export function technicalDefinitionForCatalog(id: string): TechnicalIndicatorId | undefined {
-  return Object.hasOwn(implemented, id) ? implemented[id] : undefined;
+  return Object.hasOwn(implemented, id) ? implemented[id] : catalogExpansionDefinitionId(id);
 }
 
 /** Named entries remain searchable even while their actual calculation is not implemented. */

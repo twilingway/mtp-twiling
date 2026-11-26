@@ -1,3 +1,5 @@
+import { lightweightReferenceContext } from "./lightweight-reference-context.js";
+import { lightweightReferenceLevels } from "./lightweight-reference-levels.js";
 import { HistogramSeries, LineSeries } from "lightweight-charts";
 import type {
   IChartApi,
@@ -14,9 +16,9 @@ import type {
   TechnicalIndicatorGroup,
   TechnicalPanePreference
 } from "../model/technical-indicator-layout.js";
-import type { ChartOptions, TechnicalPaneMetric } from "./adapter.js";
+import type { ChartOptions, TechnicalPaneMetric, TechnicalSupplementalInputs } from "./adapter.js";
 import { TechnicalRenderData } from "./technical-render-data.js";
-import { technicalCalculationContext } from "./technical-calculation-context.js";
+import { hasVisibleAverage, technicalCalculationContext } from "./technical-calculation-context.js";
 import type { TechnicalRenderOutput } from "./technical-render-data.js";
 import { captureTechnicalPaneLayout, technicalPaneGeometry } from "./technical-pane-geometry.js";
 import { attachTechnicalPaneEvents } from "./technical-pane-events.js";
@@ -25,6 +27,7 @@ import { chartPalette } from "../model/theme.js";
 import { presentationColor } from "../model/technical-indicators/presentation.js";
 import { LightweightTechnicalPrimitive } from "./lightweight-technical-primitives.js";
 import { lightweightCompactCrosshair } from "./technical-compact-crosshair.js";
+import { lightweightCalendarRegions } from "./lightweight-calendar-regions.js";
 
 type Series = ISeriesApi<"Line"> | ISeriesApi<"Histogram">;
 interface Entry {
@@ -39,9 +42,13 @@ interface Entry {
 export function lightweightTechnical(
   chart: IChartApi,
   options: ChartOptions,
-  alive: () => boolean
+  alive: () => boolean,
+  primary?: () => ISeriesApi<"Candlestick"> | ISeriesApi<"Line">
 ) {
-  const calculation = new TechnicalRenderData(technicalCalculationContext(options.timeframe));
+  const calculation = new TechnicalRenderData(
+    technicalCalculationContext(options.timeframe, options.row)
+  );
+  const calendar = lightweightCalendarRegions(chart, options, alive, primary);
   const owned = new Map<string, Entry>(),
     panes = new Map<string, IPaneApi<Time>>();
   const fills = new Map<string, { primitive: LightweightTechnicalPrimitive; series: Series }>();
@@ -49,9 +56,18 @@ export function lightweightTechnical(
     layout: readonly TechnicalPanePreference[] = [];
   let groups: TechnicalIndicatorGroup[] = [],
     disposed = false,
-    lastMetrics = "";
+    lastMetrics = "",
+    candleCount = 0,
+    projected = false,
+    viewportFrame = 0;
   let events: ReturnType<typeof attachTechnicalPaneEvents> | undefined;
   const nativePanes = () => (typeof chart.panes === "function" ? chart.panes() : []);
+  const referenceContext = lightweightReferenceContext(chart, () => primary?.());
+  const referenceLevels = lightweightReferenceLevels(
+    chart,
+    referenceContext,
+    () => !disposed && alive()
+  );
   const timeHeight = () =>
     typeof chart.timeScale().height === "function" ? chart.timeScale().height() : 28;
   const metrics = (): TechnicalPaneMetric[] => {
@@ -141,13 +157,34 @@ export function lightweightTechnical(
     }
   }
   const primitivePlot = (output: TechnicalRenderOutput) =>
+    output.presentation?.precisionPolicy === "fixed-2" ||
     output.presentation?.geometry.kind === "cross" ||
+    output.presentation?.geometry.kind === "range-bars" ||
+    output.presentation?.geometry.kind === "marker" ||
     (output.presentation?.geometry.kind === "line" &&
       output.presentation.geometry.gaps === "break");
   function outputOptions(output: TechnicalRenderOutput, fillCarrier = false) {
-    const autoscaleInfoProvider: AutoscaleInfoProvider = (original) =>
+    const policy = output.presentation?.precisionPolicy;
+    const original: AutoscaleInfoProvider = (original) =>
       !disposed && alive() && output.style.visible ? original() : null;
+    const autoscaleInfoProvider =
+      policy === "fixed-2"
+        ? referenceContext.autoscale(
+            output.instanceId,
+            output.paneKey,
+            () => referenceContext.first(output.values, output.timestamps, false),
+            null,
+            original
+          )
+        : original;
     return {
+      ...(policy === "fixed-2"
+        ? { priceFormat: { type: "price" as const, precision: 2, minMove: 0.01 } }
+        : policy === "compact-number" && output.paneKey !== "price"
+          ? { priceFormat: { type: "volume" as const, precision: 2, minMove: 0.01 } }
+          : (policy === "native-price" || policy === "compact-number") && primary
+            ? { priceFormat: primary().options().priceFormat }
+            : {}),
       color: lineColor(output.style.color, output.style.opacity),
       visible: output.style.visible || fillCarrier,
       priceScaleId: "right",
@@ -187,9 +224,24 @@ export function lightweightTechnical(
       }
     chart.removeSeries(entry.series);
   }
+  const readViewport = () => {
+    const range = chart.timeScale().getVisibleLogicalRange?.();
+    return calculation.setVisibleBars(range?.from ?? Infinity, range?.to ?? -Infinity);
+  };
+  const onViewportChange = () => {
+    if (disposed || !alive() || viewportFrame || !hasVisibleAverage(instances)) return;
+    viewportFrame = requestAnimationFrame(() => {
+      viewportFrame = 0;
+      if (!disposed && alive() && hasVisibleAverage(instances) && readViewport()) reconcile();
+    });
+  };
+  chart.timeScale().subscribeVisibleLogicalRangeChange?.(onViewportChange);
   function reconcile() {
     if (disposed || !alive()) return;
+    if (hasVisibleAverage(instances)) readViewport();
     const compiled = calculation.compile(instances, layout);
+    projected = compiled.outputs.some((output) => output.timestamps.length > candleCount);
+    calendar.update(compiled.priceRegions);
     groups = compiled.groups;
     const lower = groups.filter((group) => group.key !== "price");
     const activePanes = new Set(lower.map((group) => group.key));
@@ -233,7 +285,12 @@ export function lightweightTechnical(
           entry.primitive = new LightweightTechnicalPrimitive(chart, entry.series, alive);
           entry.series.attachPrimitive(entry.primitive);
         }
-        entry.primitive.updatePlot(output);
+        entry.primitive.updatePlot(
+          output,
+          output.presentation?.precisionPolicy === "fixed-2"
+            ? (value) => referenceContext.project(output.instanceId, output.paneKey, value)
+            : undefined
+        );
       } else if (entry.primitive) {
         entry.primitive.dispose();
         entry.series.detachPrimitive(entry.primitive);
@@ -247,7 +304,7 @@ export function lightweightTechnical(
           const color =
             output.presentation?.geometry.kind === "columns"
               ? output.style.visible
-                ? presentationColor(output.presentation, index)
+                ? (presentationColor(output.presentation, index) ?? "transparent")
                 : "transparent"
               : null;
           return color
@@ -279,7 +336,16 @@ export function lightweightTechnical(
         entry.levelKey = levelKey;
       }
     }
-    const activeFills = new Set(compiled.fills.map((fill) => fill.key));
+    referenceContext.update(
+      compiled.outputs,
+      new Map([...owned].map(([key, entry]) => [key, entry.series]))
+    );
+    referenceLevels.update(compiled.references ?? [], compiled.fills, (key) =>
+      key === "price" ? 0 : panes.get(key)!.paneIndex()
+    );
+    const activeFills = new Set(
+      compiled.fills.filter((fill) => fill.extent !== "pane").map((fill) => fill.key)
+    );
     for (const [key, fill] of fills)
       if (!activeFills.has(key)) {
         fill.primitive.dispose();
@@ -287,6 +353,7 @@ export function lightweightTechnical(
         fills.delete(key);
       }
     for (const fill of compiled.fills) {
+      if (fill.extent === "pane") continue;
       const carrier = owned.get(fill.scalePlotKey);
       if (!carrier) continue;
       let entry = fills.get(fill.key);
@@ -350,8 +417,13 @@ export function lightweightTechnical(
     events?.schedule();
   }
   return {
+    updateInputs(inputs: TechnicalSupplementalInputs) {
+      if (!disposed && alive() && calculation.setSupplementalInputs(inputs, options.row.uid))
+        reconcile();
+    },
     setData(data: readonly Candle[]) {
       if (disposed || !alive()) return;
+      candleCount = data.length;
       calculation.setData(data);
       reconcile();
     },
@@ -366,6 +438,7 @@ export function lightweightTechnical(
       reconcile();
     },
     metrics,
+    hasProjectedPlots: () => projected,
     timeAxisTop: () => {
       if (disposed) return 0;
       const all = nativePanes();
@@ -373,9 +446,14 @@ export function lightweightTechnical(
         ? all.reduce((sum, pane) => sum + pane.getHeight(), 0) + all.length - 1
         : options.container.clientHeight - timeHeight();
     },
+    refreshNativeMetadata: reconcile,
     dispose() {
+      calendar.dispose();
+      referenceLevels.dispose();
       crosshair.dispose();
       disposed = true;
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange?.(onViewportChange);
+      if (viewportFrame) cancelAnimationFrame(viewportFrame);
       events?.dispose();
       calculation.dispose();
       for (const entry of owned.values()) removeEntry(entry);

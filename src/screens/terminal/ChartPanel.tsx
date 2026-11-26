@@ -2,6 +2,7 @@ import { marketAvailable } from "./market-readiness.js";
 import { providerLabel } from "./provider-label.js";
 import { t, systemText } from "../../i18n/messages.js";
 import { memo, useMemo, useState } from "react";
+import type { TechnicalSupplementalInputs } from "../../charts/adapter.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { precision } from "../../charts/adapter.js";
 import { useTerminal } from "./context.js";
@@ -18,6 +19,9 @@ import { ChartRangeControl } from "./intervals/ChartRangeControl.js";
 import { ChartNavigation } from "./ChartNavigation.js";
 import { TechnicalIndicatorPanels } from "./TechnicalIndicatorPanels.js";
 import { useTechnicalPaneMetrics } from "./use-technical-pane-metrics.js";
+import { SupplementalStudyStatusContext } from "./SupplementalStudyStatus.js";
+import { useOpenInterest } from "./use-open-interest.js";
+import { useQuoteTurnover } from "./use-quote-turnover.js";
 const Version = memo(function Version() {
   return <span id="app-version" hidden />;
 });
@@ -37,6 +41,18 @@ export function ChartPanel() {
     bar = state.candles[barIndex] ?? state.crosshairBar ?? undefined,
     digits = row ? precision(row) : 2,
     busy = available && (state.loading || state.importingBackup === true);
+  const openInterest = useOpenInterest(controller, state, row);
+  const quoteTurnover = useQuoteTurnover(controller, state, row);
+  const observations = openInterest.observations;
+  const volumeStudies = quoteTurnover.volumeStudies;
+  const supplemental = useMemo<TechnicalSupplementalInputs>(
+    () => ({
+      ...(observations ? { openInterest: observations } : {}),
+      ...(volumeStudies ? { volumeStudies } : {})
+    }),
+    [observations, volumeStudies]
+  );
+  const studyStatus = { openInterest, quoteTurnover };
   return (
     <section
       id="chart-panel"
@@ -89,18 +105,22 @@ export function ChartPanel() {
               : t("Выберите источник котировок")}
           </span>
         </div>
-        <IndicatorLegend />
+        <SupplementalStudyStatusContext.Provider value={studyStatus}>
+          <IndicatorLegend />
+        </SupplementalStudyStatusContext.Provider>
       </div>
       <div
         className="chart-scroll-host"
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       >
         <ChartGestures>
-          <ChartCanvas drawingProjection={drawingProjection} />
+          <ChartCanvas supplemental={supplemental} drawingProjection={drawingProjection} />
           <ImageLayer />
           <DrawingAxisLabels drawingProjection={drawingProjection} />
           <CandleCountdown />
-          <TechnicalIndicatorPanels metrics={metrics} />
+          <SupplementalStudyStatusContext.Provider value={studyStatus}>
+            <TechnicalIndicatorPanels metrics={metrics} />
+          </SupplementalStudyStatusContext.Provider>
           {(!available ||
             ((!state.candles.length || state.historyViewReady === false) && !state.loading)) && (
             <div className="chart-message" id="chart-message">

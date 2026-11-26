@@ -1,7 +1,9 @@
 import { getTechnicalIndicatorDefinition, PRICE_SOURCES } from "./definitions.js";
+import { catalogExpansionParamsValid } from "./catalog-expansion/registry.js";
 import type {
   IndicatorPane,
   OutputStyle,
+  TechnicalIndicatorDefinition,
   TechnicalIndicatorId,
   TechnicalIndicatorInstance,
   TechnicalParameters
@@ -51,6 +53,18 @@ function style(value: unknown): value is OutputStyle {
         ["solid", "dashed", "dotted"].includes(value.lineStyle)))
   );
 }
+export function technicalIndicatorStyleIds(
+  definition: TechnicalIndicatorDefinition
+): readonly string[] {
+  return [
+    ...definition.outputs.map((output) => output.id),
+    ...(definition.presentation?.referenceLevels ?? []).map((level) => level.id),
+    ...(definition.presentation?.fills ?? [])
+      .filter((fill) => fill.extent === "pane")
+      .map((fill) => fill.id),
+    ...(definition.priceRegionStyles ?? []).map(({ id }) => id)
+  ];
+}
 export function isTechnicalIndicatorInstance(value: unknown): value is TechnicalIndicatorInstance {
   if (
     !record(value) ||
@@ -81,6 +95,7 @@ export function isTechnicalIndicatorInstance(value: unknown): value is Technical
   if (
     !definition ||
     definition.status !== "computed" ||
+    (definition.priceRegionStyles !== undefined && value.pane.kind !== "overlay") ||
     !exact(
       params,
       definition.parameters.map((item) => item.key)
@@ -96,21 +111,21 @@ export function isTechnicalIndicatorInstance(value: unknown): value is Technical
           ? typeof entry === "boolean"
           : parameter.type === "choice"
             ? parameter.choices.some((choice) => choice === entry)
-            : typeof entry === "number" &&
-              Number.isFinite(entry) &&
-              entry >= parameter.min &&
-              entry <= parameter.max &&
-              (parameter.type !== "integer" || Number.isInteger(entry));
-    })
+            : parameter.type === "text"
+              ? typeof entry === "string" && entry.length <= parameter.maxLength
+              : typeof entry === "number" &&
+                Number.isFinite(entry) &&
+                entry >= parameter.min &&
+                entry <= parameter.max &&
+                (parameter.type !== "integer" || Number.isInteger(entry));
+    }) ||
+    !catalogExpansionParamsValid(value.definitionId, params)
   )
     return false;
   return (
     value.styles === undefined ||
     (record(value.styles) &&
-      exact(
-        value.styles,
-        definition.outputs.map((output) => output.id)
-      ) &&
+      exact(value.styles, technicalIndicatorStyleIds(definition)) &&
       Object.values(value.styles).every(style))
   );
 }

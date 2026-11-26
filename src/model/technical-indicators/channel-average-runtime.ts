@@ -1,4 +1,8 @@
 import {
+  isRelativeRegisteredInstance,
+  relativeRegisteredLimit
+} from "./relative-registration-runtime.js";
+import {
   alma,
   lsma,
   chandelierExit,
@@ -6,6 +10,10 @@ import {
   MAX_DIRECT_WINDOW_OPERATIONS
 } from "./channel-average/index.js";
 import { priceSource } from "./data.js";
+import {
+  catalogExpansionUnavailable,
+  isCatalogExpansionInstance
+} from "./catalog-expansion/registry.js";
 import { prices } from "./channel-average/inputs.js";
 import type { ChannelPriceId, ChannelPriceHistoryRequirement } from "./channel-average-contract.js";
 import type {
@@ -30,6 +38,11 @@ export function technicalCalculationUnavailableReason(
   instance: TechnicalIndicatorInstance,
   barCount: number
 ): "calculation-limit" | undefined {
+  if (isCatalogExpansionInstance(instance))
+    return catalogExpansionUnavailable(instance, barCount) === "calculation-limit"
+      ? "calculation-limit"
+      : undefined;
+  if (isRelativeRegisteredInstance(instance)) return relativeRegisteredLimit(instance, barCount);
   if (instance.definitionId === "keltner-channels")
     return barCount > MAX_CHANNEL_AVERAGE_BARS ? "calculation-limit" : undefined;
   if (!isChannelPriceInstance(instance)) return undefined;

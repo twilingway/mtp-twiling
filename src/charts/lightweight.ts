@@ -20,7 +20,11 @@ import { lightweightNavigation } from "./lightweight-navigation.js";
 import { UserCameraEvents } from "./camera-events.js";
 import { lightweightLegacy } from "./lightweight-legacy.js";
 import { lightweightTechnical } from "./lightweight-technical.js";
-import { preserveLightweightCamera } from "./lightweight-preserve-camera.js";
+import {
+  preserveLightweightCamera,
+  preserveLightweightProjection,
+  projectedBaseDelta
+} from "./lightweight-preserve-camera.js";
 
 export function makeLightweight(options: ChartOptions): ChartAdapter {
   const camera = new UserCameraEvents(options);
@@ -263,7 +267,10 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
           (scale.width() * (1 - view.anchor.xFraction) - 1) / spacing -
           0.5
         : view.camera?.rightOffsetBars;
-      scale.applyOptions({ barSpacing: spacing, ...(rightOffset != null ? { rightOffset } : {}) });
+      scale.applyOptions({
+        barSpacing: spacing,
+        ...(rightOffset != null ? { rightOffset: rightOffset - projectionDelta() } : {})
+      });
     } else if (view.from != null && view.to != null && view.from < view.to) {
       scale.setVisibleRange({ from: view.from as UTCTimestamp, to: view.to as UTCTimestamp });
     }
@@ -282,6 +289,8 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     });
   }
   chart.timeScale().subscribeSizeChange(scheduleViewRestore);
+  const projectionDelta = () =>
+    technical.hasProjectedPlots() ? projectedBaseDelta(chart.timeScale(), data.length) : 0;
   const adapter: ChartAdapter = {
     updatePriceFormat(metadata) {
       if (
@@ -299,12 +308,14 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       if (next.minMove === priceFormat.minMove && next.precision === priceFormat.precision) return;
       camera.programmatic(() => series.applyOptions({ priceFormat: lightweightPriceFormat(next) }));
       priceFormat = next;
+      technical.refreshNativeMetadata();
     },
     ...lightweightNavigation(
       chart,
       series,
       () => data.length,
-      () => !settingData && !viewStaged && restoreFrame === null && settleFrame === null
+      () => !settingData && !viewStaged && restoreFrame === null && settleFrame === null,
+      projectionDelta
     ),
     setData(next, fit) {
       if (live.retired) return;
@@ -314,7 +325,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       series.setData(data.map((bar) => ({ ...bar, time: time(bar) })));
       updateLastPriceLabel();
       legacy.setData(data);
-      technical.setData(data);
+      preserveLightweightProjection(chart, () => technical.setData(data), projectionDelta);
       mtp.update();
       updateDrawings();
       if (fit && data.length) {
@@ -344,7 +355,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       updateLastPriceLabel();
       if (historical && index < 0) legacy.setData(data);
       else legacy.update(data, bar, historical);
-      technical.setData(data);
+      preserveLightweightProjection(chart, () => technical.setData(data), projectionDelta);
       mtp.update();
     },
     getView() {
@@ -357,7 +368,10 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
         x = scale.logicalToCoordinate(index as Logical),
         view = scale.getVisibleRange();
       return {
-        camera: { barSpace: scale.options().barSpacing, rightOffsetBars: scale.scrollPosition() },
+        camera: {
+          barSpace: scale.options().barSpacing,
+          rightOffsetBars: scale.scrollPosition() + projectionDelta()
+        },
         ...(bar && x != null
           ? { anchor: { timestamp: bar.timestamp, xFraction: x / scale.width() } }
           : {}),
@@ -374,10 +388,26 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     pointToPixel,
     technicalPaneMetrics: () => technical.metrics(),
     timeAxisTop: () => technical.timeAxisTop(),
+    updateTechnicalInputs(inputs) {
+      if (!live.retired)
+        camera.programmatic(() =>
+          preserveLightweightCamera(
+            chart,
+            series,
+            () => technical.updateInputs(inputs),
+            projectionDelta
+          )
+        );
+    },
     updateTechnicalIndicators: (instances, layout) => {
       if (!live.retired)
         camera.programmatic(() =>
-          preserveLightweightCamera(chart, series, () => technical.update(instances, layout))
+          preserveLightweightCamera(
+            chart,
+            series,
+            () => technical.update(instances, layout),
+            projectionDelta
+          )
         );
     },
     focusPoints(points) {
@@ -436,7 +466,12 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     }
   };
   const live = camera.wrap(adapter);
-  const technical = lightweightTechnical(chart, options, () => !live.retired);
+  const technical = lightweightTechnical(
+    chart,
+    options,
+    () => !live.retired,
+    () => series
+  );
   technical.update(options.technicalIndicators ?? [], options.technicalPaneLayout);
   return live;
 }

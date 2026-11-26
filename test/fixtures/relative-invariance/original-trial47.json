@@ -1,0 +1,480 @@
+{
+  "trial": 47,
+  "kernel": "stochasticRsi",
+  "options": {
+    "rsiLength": 6,
+    "stochasticLength": 6,
+    "smoothK": 3,
+    "smoothD": 4
+  },
+  "bars": [
+    {
+      "timestamp": -500,
+      "open": 3,
+      "high": 8,
+      "low": 0,
+      "close": 4,
+      "volume": 7
+    },
+    {
+      "timestamp": 1473,
+      "open": 12,
+      "high": 15,
+      "low": 7,
+      "close": 11,
+      "volume": 9
+    },
+    {
+      "timestamp": 3446,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 2
+    },
+    {
+      "timestamp": 5419,
+      "open": 7,
+      "high": 12,
+      "low": 4,
+      "close": 8,
+      "volume": 1
+    },
+    {
+      "timestamp": 7392,
+      "open": null,
+      "high": 0,
+      "low": -8,
+      "close": -4,
+      "volume": 3
+    },
+    {
+      "timestamp": 9365,
+      "open": null,
+      "high": -11,
+      "low": -19,
+      "close": -15,
+      "volume": 1
+    },
+    {
+      "timestamp": 11338,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 1
+    },
+    {
+      "timestamp": 13311,
+      "open": 16,
+      "high": 22,
+      "low": 14,
+      "close": 18,
+      "volume": 3
+    },
+    {
+      "timestamp": 15284,
+      "open": -12,
+      "high": -8,
+      "low": -16,
+      "close": -12,
+      "volume": 6
+    },
+    {
+      "timestamp": 17257,
+      "open": 15,
+      "high": 19,
+      "low": 11,
+      "close": 15,
+      "volume": 4
+    },
+    {
+      "timestamp": 19230,
+      "open": null,
+      "high": -3,
+      "low": -11,
+      "close": -7,
+      "volume": 3
+    },
+    {
+      "timestamp": 21203,
+      "open": 15,
+      "high": 19,
+      "low": 11,
+      "close": 15,
+      "volume": 2
+    },
+    {
+      "timestamp": 23176,
+      "open": 15,
+      "high": 16,
+      "low": 8,
+      "close": 12,
+      "volume": 8
+    },
+    {
+      "timestamp": 25149,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 0
+    },
+    {
+      "timestamp": 27122,
+      "open": 15,
+      "high": 21,
+      "low": 13,
+      "close": 17,
+      "volume": 6
+    },
+    {
+      "timestamp": 29095,
+      "open": -12,
+      "high": -7,
+      "low": null,
+      "close": -11,
+      "volume": 7
+    },
+    {
+      "timestamp": 31068,
+      "open": -15,
+      "high": -10,
+      "low": -18,
+      "close": -14,
+      "volume": 2
+    },
+    {
+      "timestamp": 33041,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 7
+    },
+    {
+      "timestamp": 35014,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 0
+    },
+    {
+      "timestamp": 36987,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 4
+    },
+    {
+      "timestamp": 38960,
+      "open": 4,
+      "high": 8,
+      "low": 0,
+      "close": 4,
+      "volume": 0
+    },
+    {
+      "timestamp": 40933,
+      "open": -21,
+      "high": -14,
+      "low": -22,
+      "close": -18,
+      "volume": 1
+    },
+    {
+      "timestamp": 42906,
+      "open": -2,
+      "high": 5,
+      "low": -3,
+      "close": 1,
+      "volume": null
+    },
+    {
+      "timestamp": 44879,
+      "open": -10,
+      "high": -3,
+      "low": -11,
+      "close": -7,
+      "volume": 4
+    },
+    {
+      "timestamp": 46852,
+      "open": -12,
+      "high": -6,
+      "low": -14,
+      "close": -10,
+      "volume": 0
+    },
+    {
+      "timestamp": 48825,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 8
+    },
+    {
+      "timestamp": 50798,
+      "open": null,
+      "high": 20,
+      "low": 12,
+      "close": 16,
+      "volume": null
+    },
+    {
+      "timestamp": 52771,
+      "open": 13,
+      "high": 20,
+      "low": 12,
+      "close": 16,
+      "volume": 5
+    },
+    {
+      "timestamp": 54744,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": null
+    },
+    {
+      "timestamp": 56717,
+      "open": -18,
+      "high": -14,
+      "low": -22,
+      "close": -18,
+      "volume": 8
+    },
+    {
+      "timestamp": 58690,
+      "open": 10,
+      "high": null,
+      "low": null,
+      "close": 13,
+      "volume": 9
+    },
+    {
+      "timestamp": 60663,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 6
+    },
+    {
+      "timestamp": 62636,
+      "open": 6,
+      "high": 8,
+      "low": 0,
+      "close": 4,
+      "volume": 2
+    },
+    {
+      "timestamp": 64609,
+      "open": -6,
+      "high": 1,
+      "low": -7,
+      "close": -3,
+      "volume": 6
+    },
+    {
+      "timestamp": 66582,
+      "open": null,
+      "high": null,
+      "low": -17,
+      "close": -13,
+      "volume": 3
+    },
+    {
+      "timestamp": 68555,
+      "open": -17,
+      "high": -13,
+      "low": -21,
+      "close": -17,
+      "volume": 9
+    },
+    {
+      "timestamp": 70528,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 1
+    },
+    {
+      "timestamp": 72501,
+      "open": 15,
+      "high": 17,
+      "low": 9,
+      "close": 13,
+      "volume": 6
+    }
+  ],
+  "actual": {
+    "k": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      93.14618848085783,
+      89.71928272128673,
+      62.091831703369195,
+      32.18540412960695,
+      2.2789765558447015,
+      0,
+      0,
+      0,
+      0,
+      33.33333333333333,
+      58.880122531662806,
+      81.34223912544769,
+      70.47102238589923,
+      67.38634978135462,
+      44.924233187569754,
+      22.462116593784877,
+      0,
+      33.33333333333333,
+      66.66666666666666,
+      100,
+      92.87702623626629,
+      76.07647431799509,
+      42.74314098466176,
+      16.53278141506213,
+      0
+    ],
+    "d": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      69.28567675878017,
+      46.568873777526896,
+      24.139053097205213,
+      8.616095171362913,
+      0.5697441389611754,
+      0,
+      8.333333333333332,
+      23.053363966249034,
+      43.38892374761096,
+      61.00667934408577,
+      69.51993345609108,
+      66.03096112006783,
+      51.31093048715212,
+      33.69317489067731,
+      25.17992077867199,
+      30.615529148446214,
+      50,
+      73.21925655906657,
+      83.905041805232,
+      77.9241603847308,
+      57.05735573849631,
+      33.83809917942975
+    ]
+  },
+  "expected": {
+    "k": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      93.14618848085782,
+      89.71928272128673,
+      62.09183170336916,
+      32.185404129606916,
+      2.2789765558446713,
+      0,
+      0,
+      0,
+      0,
+      33.333333333333336,
+      58.88012253166282,
+      81.3422391254477,
+      70.47102238589926,
+      67.38634978135465,
+      44.92423318756977,
+      22.462116593784884,
+      22.462116593784884,
+      33.333333333333336,
+      66.66666666666667,
+      100,
+      92.8770262362663,
+      76.07647431799508,
+      42.74314098466176,
+      16.532781415062125,
+      0
+    ],
+    "d": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      69.28567675878016,
+      46.56887377752687,
+      24.139053097205185,
+      8.616095171362897,
+      0.5697441389611678,
+      0,
+      8.333333333333334,
+      23.053363966249037,
+      43.38892374761097,
+      61.00667934408578,
+      69.5199334560911,
+      66.03096112006786,
+      51.31093048715214,
+      39.30870403912355,
+      30.795449927118216,
+      36.23105829689244,
+      55.61552914844622,
+      73.21925655906657,
+      83.905041805232,
+      77.92416038473078,
+      57.05735573849632,
+      33.83809917942974
+    ]
+  }
+}

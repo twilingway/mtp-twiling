@@ -1,7 +1,5 @@
 import test from "node:test";
-import { EXPECTED_DRIVE_PARAMETER_KEYS } from "./technical-registry-expectation.mjs";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 import {
   core,
   load,
@@ -101,14 +99,32 @@ test("raw root/JSON/Drive reject array/null/unknown/extra params and styles befo
     );
   }
 });
-test("Drive parameter allowlist retains exactly the reviewed scalar keys", () => {
-  const source = readFileSync(new URL("../src/services/drive/backup.ts", import.meta.url), "utf8");
-  const keys = source.match(/params:\s*scalars\(\s*"([^"]+)"/)[1].split(" ");
-  const previous =
-    "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength diLength adxSmoothing divisor emaLength oscillatorAverage signalAverage".split(
-      " "
+test("Drive preserves only the scalar parameters of each reviewed state oscillator", () => {
+  const expected = {
+    tsi: ["longLength", "shortLength", "signalLength"],
+    kst: [
+      "roc1Length",
+      "roc2Length",
+      "roc3Length",
+      "roc4Length",
+      "sma1Length",
+      "sma2Length",
+      "sma3Length",
+      "sma4Length",
+      "signalLength"
+    ],
+    "fisher-transform": ["length"]
+  };
+  for (const id of ids) {
+    const instance = customInstance(id, 0);
+    const [saved] = sanitizeDriveBackup(backup([instance])).layout.technicalIndicators;
+    assert.deepEqual(Object.keys(saved.params).sort(), expected[id].toSorted());
+    assert.throws(
+      () =>
+        sanitizeDriveBackup(
+          backup([{ ...instance, params: { ...instance.params, anchor: "week" } }])
+        ),
+      (error) => error.code === "remote-invalid"
     );
-  assert.deepEqual(keys, EXPECTED_DRIVE_PARAMETER_KEYS);
-  assert.ok(previous.every((k) => keys.includes(k)));
-  assert.equal(keys.length, new Set(keys).size);
+  }
 });

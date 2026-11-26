@@ -26,7 +26,7 @@ export function klineNativeDomain(chart: Chart): NativeDomain | null {
     data = chart.getDataList();
   return {
     first: Number.isInteger(range.realFrom) ? Math.max(0, range.realFrom) : 0,
-    end: Number.isInteger(range.realTo) ? Math.min(data.length, range.realTo) : 0,
+    end: Number.isInteger(range.realTo) ? range.realTo : 0,
     data,
     pricePrecision: chart.getPriceVolumePrecision().price
   };
@@ -44,6 +44,9 @@ export function eligiblePublicPlots(
   domain: NativeDomain
 ) {
   return outputs.some((output) => output.style.visible && finiteInDomain(output.values, domain));
+}
+export function klinePlotPrecision(policy: PlotPrecisionPolicy, paneId: string): number {
+  return policy === "fixed-2" || (policy === "compact-number" && paneId !== "candle_pane") ? 2 : 6;
 }
 function eligibleNative(indicator: Indicator, domain: NativeDomain): boolean {
   if (!indicator.visible) return false;
@@ -71,7 +74,7 @@ export function neutralKlinePrecision(
   const precisions: number[] = [];
   if (paneId === "candle_pane") {
     const candle = chart.getStyles().candle;
-    for (let i = domain.first; i < domain.end; i++) {
+    for (let i = domain.first; i < Math.min(domain.end, domain.data.length); i++) {
       const bar = domain.data[i];
       if (
         bar &&
@@ -86,7 +89,11 @@ export function neutralKlinePrecision(
   }
   for (const plan of activePlans)
     if (plan.paneId === paneId)
-      precisions.push(plan.policy === "native-price" ? domain.pricePrecision : 6);
+      precisions.push(
+        plan.policy === "native-price"
+          ? domain.pricePrecision
+          : klinePlotPrecision(plan.policy, paneId)
+      );
   const native = chart.getIndicatorByPaneId(paneId) as Map<string, Indicator> | null;
   if (native && typeof native.entries === "function")
     for (const [name, indicator] of native.entries())

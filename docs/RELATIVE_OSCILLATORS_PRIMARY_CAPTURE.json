@@ -1,0 +1,329 @@
+[
+  {
+    "id": "STD;Stochastic_RSI",
+    "url": "https://pine-facade.tradingview.com/pine-facade/get/STD%3BStochastic_RSI/last",
+    "version": "33.0",
+    "pineVersion": ["6"],
+    "headerFacts": {
+      "strings": ["Stochastic RSI", "Stoch RSI", ""],
+      "format": ["price"],
+      "precision": ["2"],
+      "overlay": [],
+      "timeframeGaps": ["true"]
+    },
+    "sha256": "1efda9937d6f197cefac02598b8fe6d53fd25aa004ca74fddf2d8038a0c2090e",
+    "status": 200,
+    "httpDate": "Thu, 26 Nov 2026 04:31:43 GMT",
+    "inputs": [
+      {
+        "variable": "smoothK",
+        "default": 3,
+        "strings": ["K"],
+        "min": ["1"],
+        "max": []
+      },
+      {
+        "variable": "smoothD",
+        "default": 3,
+        "strings": ["D"],
+        "min": ["1"],
+        "max": []
+      },
+      {
+        "variable": "lengthRSI",
+        "default": 14,
+        "strings": ["RSI Length"],
+        "min": ["1"],
+        "max": []
+      },
+      {
+        "variable": "lengthStoch",
+        "default": 14,
+        "strings": ["Stochastic Length"],
+        "min": ["1"],
+        "max": []
+      },
+      {
+        "variable": "src",
+        "default": "close",
+        "strings": ["RSI Source"],
+        "min": [],
+        "max": []
+      }
+    ],
+    "plots": [
+      {
+        "title": "K",
+        "seriesNames": ["k"],
+        "masked": false,
+        "offset": [],
+        "colorTokens": ["#2962FF"],
+        "colorComparison": [],
+        "style": []
+      },
+      {
+        "title": "D",
+        "seriesNames": ["d"],
+        "masked": false,
+        "offset": [],
+        "colorTokens": ["#FF6D00"],
+        "colorComparison": [],
+        "style": []
+      }
+    ],
+    "levels": ["80", "50", "20"],
+    "tls": "Python default CERT_REQUIRED/check_hostname; no proxy/insecure flags",
+    "fullSourceSaved": false
+  },
+  {
+    "id": "STD;Relative_Vigor_Index",
+    "url": "https://pine-facade.tradingview.com/pine-facade/get/STD%3BRelative_Vigor_Index/last",
+    "version": "32.0",
+    "pineVersion": ["6"],
+    "headerFacts": {
+      "strings": ["Relative vigor index", "RVGI", ""],
+      "format": ["price"],
+      "precision": ["4"],
+      "overlay": [],
+      "timeframeGaps": ["true"]
+    },
+    "sha256": "21c618cff8c90a7825980363860abe2dc001160bbc7ca43e0ec793ed9db136f6",
+    "status": 200,
+    "httpDate": "Thu, 26 Nov 2026 04:31:43 GMT",
+    "inputs": [
+      {
+        "variable": "len",
+        "default": 10,
+        "strings": ["Length"],
+        "min": ["1"],
+        "max": []
+      },
+      {
+        "variable": "offset",
+        "default": 0,
+        "strings": ["Offset"],
+        "min": ["-500"],
+        "max": ["500"]
+      }
+    ],
+    "plots": [
+      {
+        "title": "RVGI",
+        "seriesNames": ["rvi"],
+        "masked": false,
+        "offset": ["offset"],
+        "colorTokens": ["#008000"],
+        "colorComparison": [],
+        "style": []
+      },
+      {
+        "title": "Signal",
+        "seriesNames": ["sig"],
+        "masked": false,
+        "offset": ["offset"],
+        "colorTokens": ["#FF0000"],
+        "colorComparison": [],
+        "style": []
+      }
+    ],
+    "levels": [],
+    "tls": "Python default CERT_REQUIRED/check_hostname; no proxy/insecure flags",
+    "fullSourceSaved": false
+  },
+  {
+    "id": "STD;Relative_Volatility_Index",
+    "url": "https://pine-facade.tradingview.com/pine-facade/get/STD%3BRelative_Volatility_Index/last",
+    "version": "37.0",
+    "pineVersion": ["6"],
+    "headerFacts": {
+      "strings": ["Relative volatility index", "Rel volatility idx", ""],
+      "format": ["price"],
+      "precision": ["2"],
+      "overlay": [],
+      "timeframeGaps": ["true"]
+    },
+    "sha256": "0f62213d96162efdb39d87a4dcbebd60973002cbf9b15110d73d39acea243e99",
+    "status": 200,
+    "httpDate": "Thu, 26 Nov 2026 04:31:43 GMT",
+    "inputs": [
+      {
+        "variable": "length",
+        "default": 10,
+        "strings": [],
+        "min": ["1"],
+        "max": []
+      },
+      {
+        "variable": "offset",
+        "default": 0,
+        "strings": ["Offset"],
+        "min": ["-500"],
+        "max": ["500"]
+      },
+      {
+        "variable": "maTypeInput",
+        "default": "SMA",
+        "strings": [
+          "SMA",
+          "Type",
+          "None",
+          "SMA",
+          "SMA + Bollinger Bands",
+          "EMA",
+          "SMMA (RMA)",
+          "WMA",
+          "VWMA"
+        ],
+        "min": [],
+        "max": []
+      },
+      {
+        "variable": "maLengthInput",
+        "default": 14,
+        "strings": ["Length", "None"],
+        "min": [],
+        "max": []
+      },
+      {
+        "variable": "bbMultInput",
+        "default": 2.0,
+        "strings": ["BB StdDev"],
+        "min": ["0.001"],
+        "max": ["50"]
+      }
+    ],
+    "plots": [
+      {
+        "title": "RVI",
+        "seriesNames": ["rvi"],
+        "masked": false,
+        "offset": ["offset"],
+        "colorTokens": ["#7E57C2"],
+        "colorComparison": [],
+        "style": []
+      },
+      {
+        "title": "RVI-based MA",
+        "seriesNames": ["smoothingMA"],
+        "masked": false,
+        "offset": [],
+        "colorTokens": ["color.yellow"],
+        "colorComparison": [],
+        "style": []
+      },
+      {
+        "title": "Upper Bollinger Band",
+        "seriesNames": ["smoothingMA", "smoothingStDev"],
+        "masked": false,
+        "offset": [],
+        "colorTokens": ["color.green"],
+        "colorComparison": [],
+        "style": []
+      },
+      {
+        "title": "Lower Bollinger Band",
+        "seriesNames": ["smoothingMA", "smoothingStDev"],
+        "masked": false,
+        "offset": [],
+        "colorTokens": ["color.green"],
+        "colorComparison": [],
+        "style": []
+      }
+    ],
+    "levels": ["80", "50", "20"],
+    "tls": "Python default CERT_REQUIRED/check_hostname; no proxy/insecure flags",
+    "fullSourceSaved": false
+  },
+  {
+    "id": "STD;Coppock%1Curve",
+    "url": "https://pine-facade.tradingview.com/pine-facade/get/STD%3BCoppock%251Curve/last",
+    "version": "30.0",
+    "pineVersion": ["6"],
+    "headerFacts": {
+      "strings": ["Coppock curve", ""],
+      "format": [],
+      "precision": [],
+      "overlay": [],
+      "timeframeGaps": ["true"]
+    },
+    "sha256": "2964f27cca48f4ae0ccfa3eaa97c3ea2f6549400344208533be228cc93fdf255",
+    "status": 200,
+    "httpDate": "Thu, 26 Nov 2026 04:31:44 GMT",
+    "inputs": [
+      {
+        "variable": "wmaLength",
+        "default": 10,
+        "strings": ["WMA Length"],
+        "min": [],
+        "max": []
+      },
+      {
+        "variable": "longRoCLength",
+        "default": 14,
+        "strings": ["Long RoC Length"],
+        "min": [],
+        "max": []
+      },
+      {
+        "variable": "shortRoCLength",
+        "default": 11,
+        "strings": ["Short RoC Length"],
+        "min": [],
+        "max": []
+      }
+    ],
+    "plots": [
+      {
+        "title": "Coppock Curve",
+        "seriesNames": ["curve"],
+        "masked": false,
+        "offset": [],
+        "colorTokens": [],
+        "colorComparison": [],
+        "style": []
+      }
+    ],
+    "levels": [],
+    "tls": "Python default CERT_REQUIRED/check_hostname; no proxy/insecure flags",
+    "fullSourceSaved": false
+  },
+  {
+    "id": "STD;Bull%Bear%Power",
+    "url": "https://pine-facade.tradingview.com/pine-facade/get/STD%3BBull%25Bear%25Power/last",
+    "version": "7.0",
+    "pineVersion": ["6"],
+    "headerFacts": {
+      "strings": ["Bull bear power", "BBP"],
+      "format": [],
+      "precision": [],
+      "overlay": [],
+      "timeframeGaps": []
+    },
+    "sha256": "d92b835970edc8fc513895ec5ebb1729ba82c52f06661462ba88100e7e3aed30",
+    "status": 200,
+    "httpDate": "Thu, 26 Nov 2026 04:31:44 GMT",
+    "inputs": [
+      {
+        "variable": "lengthInput",
+        "default": 13,
+        "strings": ["Length"],
+        "min": [],
+        "max": []
+      }
+    ],
+    "plots": [
+      {
+        "title": "BBPower",
+        "seriesNames": ["bbp"],
+        "masked": false,
+        "offset": [],
+        "colorTokens": ["#089981", "#f23645"],
+        "colorComparison": [["bbp", ">=", "0"]],
+        "style": ["plot.style_columns"]
+      }
+    ],
+    "levels": ["0"],
+    "tls": "Python default CERT_REQUIRED/check_hostname; no proxy/insecure flags",
+    "fullSourceSaved": false
+  }
+]

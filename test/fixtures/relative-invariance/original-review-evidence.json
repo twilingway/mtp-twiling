@@ -1,0 +1,58 @@
+{
+  "sourceSHA": "a906f02d28bd2ea2eaed08d0f5892afcc3d14b78",
+  "groups": 6,
+  "randomKernelComparisons": 2200,
+  "rationalOracles": true,
+  "ordinaryStddevOracle": "pairwise differences, no production tree/arithmetic imports for expected",
+  "pineExecution": false,
+  "failures": [
+    {
+      "trial": 47,
+      "kernel": "stochasticRsi",
+      "options": {
+        "rsiLength": 6,
+        "stochasticLength": 6,
+        "smoothK": 3,
+        "smoothD": 4
+      },
+      "error": "47/stochasticRsi/k/29: 0 vs 22.462116593784884"
+    },
+    {
+      "trial": 113,
+      "kernel": "stochasticRsi",
+      "options": {
+        "rsiLength": 6,
+        "stochasticLength": 2,
+        "smoothK": 3,
+        "smoothD": 2
+      },
+      "error": "113/stochasticRsi/k/12\n+ actual - expected\n\n+ 66.66666666666666\n- null\n"
+    }
+  ],
+  "results": [
+    {
+      "name": "independent manual rational ledgers",
+      "pass": true
+    },
+    {
+      "name": "200 independent random rational/direct-window fixtures, all seven smoothing modes",
+      "pass": false
+    },
+    {
+      "name": "exact prefix causality, dense timestamps and frozen inputs",
+      "pass": true
+    },
+    {
+      "name": "scale homogeneity across 1800 exponent bits and sparse nulls",
+      "pass": true
+    },
+    {
+      "name": "MAX/subnormal ratios, zero denominators and inactive outputs",
+      "pass": true
+    },
+    {
+      "name": "all price sources, output orders, defaults and actual source metadata",
+      "pass": true
+    }
+  ]
+}

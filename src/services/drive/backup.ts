@@ -3,6 +3,7 @@ import { withRequiredProviders } from "../../model/backup-export.js";
 import { isWatchlistFlags } from "../../model/watchlist-flags.js";
 import { validWatchlistSectionsField } from "../../model/watchlist-sections.js";
 import { isTechnicalIndicatorInstanceList } from "../../model/technical-indicators/instances.js";
+import { technicalIndicatorDefinitions } from "../../model/technical-indicators/definitions.js";
 import type { Backup } from "../../model/types.js";
 import { DriveError } from "./types.js";
 import type { ContentReference, SnapshotManifest } from "./types.js";
@@ -10,6 +11,17 @@ import type { ContentReference, SnapshotManifest } from "./types.js";
 type Shape = true | { [key: string]: Shape } | readonly [Shape];
 const scalars = (keys: string): Record<string, Shape> =>
   Object.fromEntries(keys.split(" ").map((key) => [key, true]));
+// Preserve the order of serialized legacy backups. New trusted definition keys follow them.
+const technicalParams: Shape = {
+  ...scalars(
+    "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength diLength adxSmoothing divisor emaLength oscillatorAverage signalAverage longLength shortLength roc1Length roc2Length roc3Length roc4Length sma1Length sma2Length sma3Length sma4Length atrLength factor start increment maximum offset sigma useExponentialMa bandsStyle rsiLength stochasticLength wmaLength longRocLength shortRocLength maType maLength bbMultiplier"
+  ),
+  ...Object.fromEntries(
+    technicalIndicatorDefinitions.flatMap(({ parameters }) =>
+      parameters.map(({ key }) => [key, true])
+    )
+  )
+};
 const point: Shape = scalars("timestamp value");
 const visibility: Shape = Object.fromEntries(
   ["minutes", "hours", "days", "weeks"].map((key) => [key, scalars("enabled from to")])
@@ -52,9 +64,7 @@ const backupShape: Shape = {
     technicalIndicators: [
       {
         ...scalars("schemaVersion id definitionId visible order"),
-        params: scalars(
-          "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength diLength adxSmoothing divisor emaLength oscillatorAverage signalAverage longLength shortLength roc1Length roc2Length roc3Length roc4Length sma1Length sma2Length sma3Length sma4Length atrLength factor start increment maximum offset sigma useExponentialMa bandsStyle"
-        ),
+        params: technicalParams,
         pane: scalars("kind id"),
         styles: { $: scalars("color width visible opacity lineStyle") }
       }

@@ -83,7 +83,12 @@ export class OkxMarket {
     );
   }
 
-  history(ref: OkxProviderRef, timeframe: Timeframe, range: HistoryRange, signal: AbortSignal) {
+  history(
+    ref: OkxProviderRef,
+    timeframe: Timeframe,
+    range: HistoryRange & { maxPages?: number },
+    signal: AbortSignal
+  ) {
     return loadOkxHistory(this.http, ref, timeframe, range, signal);
   }
 

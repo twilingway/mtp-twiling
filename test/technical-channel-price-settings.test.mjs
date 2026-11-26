@@ -141,7 +141,11 @@ test("actual price/lower legend rows use the same O1 status helper and clear sta
         preferences: { locale, technicalIndicators: [i], technicalPaneLayout: [] }
       };
       const ui = createSourceLoader({
-        react: { useRef: (v) => ({ current: v }) },
+        react: {
+          createContext: (defaultValue) => ({ defaultValue }),
+          useContext: (context) => context.defaultValue,
+          useRef: (v) => ({ current: v })
+        },
         "react/jsx-runtime": jsx,
         "screens/terminal/context.js": { useTerminal: () => ({ state, controller: {} }) },
         "screens/terminal/useIndicatorMenuAction.js": {

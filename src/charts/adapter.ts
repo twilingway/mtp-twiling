@@ -13,7 +13,10 @@ export { logicalForTime, timeForLogical } from "../model/intervals/projected-tim
 import type { DisplayPreferences } from "../i18n/preferences.js";
 import { chartPriceFormat } from "./price-format.js";
 import type { PriceMetadata } from "./price-format.js";
-import type { TechnicalIndicatorInstance } from "../model/technical-indicators/types.js";
+import type {
+  TechnicalCalculationContext,
+  TechnicalIndicatorInstance
+} from "../model/technical-indicators/types.js";
 import type {
   TechnicalPaneLayout,
   TechnicalPaneCaptureContext,
@@ -28,6 +31,11 @@ export interface TechnicalPaneMetric {
   width: number;
 }
 
+export type TechnicalSupplementalInputs = Pick<
+  TechnicalCalculationContext,
+  "openInterest" | "volumeStudies"
+>;
+
 export interface ChartAdapter {
   source?: { owner: string; viewKey: string; uid: string };
   persistView?: boolean;
@@ -36,6 +44,7 @@ export interface ChartAdapter {
   setData(data: Candle[], fit: boolean): void;
   updateBar(bar: Candle): void;
   updatePriceFormat?(metadata: PriceMetadata): void;
+  updateTechnicalInputs?(inputs: TechnicalSupplementalInputs): void;
   updateTechnicalIndicators?(
     instances: readonly TechnicalIndicatorInstance[],
     layout?: readonly TechnicalPanePreference[]

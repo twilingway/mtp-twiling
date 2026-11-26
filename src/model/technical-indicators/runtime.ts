@@ -1,3 +1,8 @@
+import {
+  isRelativeRegisteredInstance,
+  relativeRegisteredMetadata,
+  calculateRelativeRegistered
+} from "./relative-registration-runtime.js";
 import { atr, bollingerBands, macd, rsi, stochastic } from "./calculations.js";
 import { isKeltnerInstance, keltnerMetadata, calculateKeltner } from "./keltner-runtime.js";
 import {
@@ -6,6 +11,11 @@ import {
   calculateChannelPrice
 } from "./channel-average-runtime.js";
 import { assertTechnicalBars, priceSource } from "./data.js";
+import {
+  calculateCatalogExpansion,
+  catalogExpansionHistory,
+  isCatalogExpansionInstance
+} from "./catalog-expansion/registry.js";
 import { getTechnicalIndicatorDefinition } from "./definitions.js";
 import { isTechnicalIndicatorInstance } from "./instances.js";
 import { assertLength, ema, sma } from "./primitives.js";
@@ -64,6 +74,9 @@ import type {
 } from "./types.js";
 
 export function technicalIndicatorWarmup(instance: TechnicalIndicatorInstance): number | null {
+  if (isCatalogExpansionInstance(instance)) return catalogExpansionHistory(instance).warmupBars;
+  if (isRelativeRegisteredInstance(instance))
+    return relativeRegisteredMetadata(instance).warmupBars;
   if (isKeltnerInstance(instance)) return keltnerMetadata(instance).warmupBars;
   if (isChannelPriceInstance(instance)) return channelPriceMetadata(instance).warmupBars;
   if (isTrendPriceInstance(instance)) return trendPriceMetadata(instance).warmupBars;
@@ -131,6 +144,10 @@ export function technicalIndicatorWarmup(instance: TechnicalIndicatorInstance): 
 export function technicalIndicatorHistoryRequirement(
   instance: TechnicalIndicatorInstance
 ): TechnicalHistoryRequirement {
+  if (isCatalogExpansionInstance(instance))
+    return catalogExpansionHistory(instance).historyRequirement;
+  if (isRelativeRegisteredInstance(instance))
+    return relativeRegisteredMetadata(instance).historyRequirement;
   if (isKeltnerInstance(instance)) return keltnerMetadata(instance).historyRequirement;
   if (isChannelPriceInstance(instance)) return channelPriceMetadata(instance).historyRequirement;
   if (isTrendPriceInstance(instance)) return trendPriceMetadata(instance).historyRequirement;
@@ -243,7 +260,10 @@ export function calculateTechnicalIndicator(
         : "Invalid technical indicator instance"
     );
   }
+  if (isRelativeRegisteredInstance(instance)) return calculateRelativeRegistered(instance, bars);
   assertTechnicalBars(bars);
+  if (isCatalogExpansionInstance(instance))
+    return calculateCatalogExpansion(instance, bars, context);
   if (isKeltnerInstance(instance)) return calculateKeltner(instance, bars);
   if (isChannelPriceInstance(instance)) return calculateChannelPrice(instance, bars);
   if (isTrendPriceInstance(instance)) return calculateTrendPrice(instance, bars);

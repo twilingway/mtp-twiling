@@ -365,6 +365,12 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     pointToPixel,
     technicalPaneMetrics: () => technical?.metrics() ?? [],
     timeAxisTop: () => technical?.timeAxisTop() ?? container.clientHeight - 28,
+    updateTechnicalInputs(inputs) {
+      if (!live.retired)
+        camera.programmatic(() =>
+          preserveKlineCamera(chart, () => technical?.updateInputs(inputs))
+        );
+    },
     updateTechnicalIndicators(instances, layout) {
       if (live.retired) return;
       camera.programmatic(() =>

@@ -6,7 +6,8 @@ export function lightweightNavigation(
   chart: Pick<IChartApi, "timeScale">,
   series: Pick<ISeriesApi<"Candlestick">, "priceScale">,
   count: () => number,
-  ready: () => boolean
+  ready: () => boolean,
+  projectionDelta: () => number = () => 0
 ): Pick<ChartAdapter, "zoom" | "scroll" | "resetView"> {
   function geometry() {
     if (!ready() || !count()) return null;
@@ -42,7 +43,7 @@ export function lightweightNavigation(
       // Apply the entire camera together: public scale writes settle on the next frame.
       scale.applyOptions({
         barSpacing: spacing,
-        rightOffset: anchor - (count() - 1) + (width - x - 1) / spacing - 0.5
+        rightOffset: anchor - (count() - 1) - projectionDelta() + (width - x - 1) / spacing - 0.5
       });
     },
     scroll(direction, fraction) {
@@ -65,8 +66,9 @@ export function lightweightNavigation(
       const scale = chart.timeScale();
       series.priceScale().applyOptions({ autoScale: true });
       // LW resetTimeScale restores mutable options, not the chart's initial camera.
-      scale.applyOptions({ barSpacing: 6, rightOffset: 8 });
-      scale.scrollToPosition(8, false);
+      const offset = 8 - projectionDelta();
+      scale.applyOptions({ barSpacing: 6, rightOffset: offset });
+      scale.scrollToPosition(offset, false);
     }
   };
 }

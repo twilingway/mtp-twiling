@@ -3,7 +3,11 @@ import { useEffect, useMemo, useRef } from "react";
 import type { RefObject } from "react";
 import type { Candle, ChartView, Drawing } from "../../model/types.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
-import type { ChartAdapter, ChartOptions } from "../../charts/adapter.js";
+import type {
+  ChartAdapter,
+  ChartOptions,
+  TechnicalSupplementalInputs
+} from "../../charts/adapter.js";
 import { drawingLayer, paintDrawings } from "../../model/drawing-model.js";
 import { loadChartView, saveAdapterView, saveChartView } from "../../services/chart-camera.js";
 import { useTerminal } from "./context.js";
@@ -27,13 +31,15 @@ function technicalInputs(preferences: TerminalPreferences) {
 export function useChartCanvas(
   ref: RefObject<HTMLDivElement | null>,
   visibleDrawings: (state: TerminalState) => Drawing[],
+  supplemental: TechnicalSupplementalInputs,
   drawingProjection?: EventTarget
 ): void {
   const { controller, state } = useTerminal(),
     dataRef = useRef<Candle[]>([]),
     pendingSavedView = useRef<ChartView | undefined>(undefined),
     dataFallback = useRef(false),
-    adapterRef = useRef<ChartAdapter | null>(null);
+    adapterRef = useRef<ChartAdapter | null>(null),
+    supplementalRef = useRef(supplemental);
   const p = state.preferences,
     available = marketAvailable(state),
     session = controller.sessionKey(),
@@ -44,6 +50,11 @@ export function useChartCanvas(
     indicatorsHidden = drawingToolbarSettings(p.chartSettings).indicatorsHidden,
     technicalInstances = p.technicalIndicators,
     technicalLayout = p.technicalPaneLayout;
+  useEffect(() => {
+    supplementalRef.current = supplemental;
+    const adapter = adapterRef.current;
+    if (adapter && !adapter.retired) adapter.updateTechnicalInputs?.(supplemental);
+  }, [supplemental]);
   useEffect(() => {
     const container = ref.current,
       owner = state.owner,
@@ -166,6 +177,7 @@ export function useChartCanvas(
         technicalInputs(currentPreferences),
         currentPreferences.technicalPaneLayout ?? []
       );
+      owned.updateTechnicalInputs?.(supplementalRef.current);
       stopPriceMetadata = watchChartPriceMetadata(controller, owned, matches);
       dataRef.current = ready ? candles : [];
       dataFallback.current = showingFallback;

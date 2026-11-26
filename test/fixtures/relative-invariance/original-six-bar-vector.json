@@ -1,0 +1,55 @@
+{
+  "sourceSHA": "a906f02d28bd2ea2eaed08d0f5892afcc3d14b78",
+  "values": [
+    0,
+    -8,
+    -8,
+    -6,
+    -6,
+    null
+  ],
+  "options": {
+    "rsiLength": 3,
+    "stochasticLength": 2,
+    "smoothK": 1,
+    "smoothD": 1
+  },
+  "at": 5,
+  "actual": {
+    "k": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      0
+    ],
+    "d": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      0
+    ]
+  },
+  "expected": {
+    "k": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "d": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "oracle": "exact-rational RSI is unchanged on zero-change and missing-change; window2 denominator is0"
+}

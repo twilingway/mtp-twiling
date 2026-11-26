@@ -1,6 +1,6 @@
 // Independently reviewed, ordered public implementation set. Update only after accepting a registry
 // addition; never derive this expectation from production definitions or alter historical witnesses.
-export const EXPECTED_COMPUTED_IDS = Object.freeze([
+export const EXPECTED_PRE_EXPANSION_IDS = Object.freeze([
   "momentum",
   "roc",
   "cci",
@@ -51,13 +51,84 @@ export const EXPECTED_COMPUTED_IDS = Object.freeze([
   "alma",
   "lsma",
   "chandelier-exit",
-  "keltner-channels"
+  "keltner-channels",
+  "stochastic-rsi",
+  "coppock-curve",
+  "relative-vigor-index",
+  "relative-volatility-index",
+  "bull-bear-power"
+]);
+// Open Interest and both Fibonacci studies enter this snapshot only with their runtime wiring.
+export const EXPECTED_EXPANSION_IDS = Object.freeze([
+  "vwap",
+  "vwap-auto-anchored",
+  "twap",
+  "visible-average-price",
+  "ichimoku-cloud",
+  "williams-alligator",
+  "kama",
+  "mcginley-dynamic",
+  "moving-average-cross",
+  "moving-average-ribbon",
+  "donchian-channels",
+  "envelope",
+  "median",
+  "chande-kroll-stop",
+  "volatility-stop",
+  "bbtrend",
+  "bollinger-bars",
+  "woodies-cci",
+  "rsi-divergence",
+  "booker-reversal",
+  "advance-decline-ratio-bars",
+  "technical-ratings",
+  "open-interest",
+  "williams-fractals",
+  "zigzag",
+  "pivot-points-high-low",
+  "average-daily-range",
+  "auto-fib-retracement",
+  "auto-fib-extension",
+  "pmo",
+  "ppo",
+  "smi",
+  "smi-ergodic-indicator",
+  "smi-ergodic-oscillator",
+  "connors-rsi",
+  "dpo",
+  "gaps",
+  "trading-sessions",
+  "moon-phases",
+  "trend-strength-index",
+  "linear-regression-channel",
+  "mass-index",
+  "ulcer-index",
+  "pring-special-k",
+  "chop-zone",
+  "rank-correlation-index",
+  "rci-ribbon",
+  "klinger-oscillator",
+  "relative-volume-at-time",
+  "volume-24-hours"
+]);
+export const EXPECTED_COMPUTED_IDS = Object.freeze([
+  ...EXPECTED_PRE_EXPANSION_IDS,
+  ...EXPECTED_EXPANSION_IDS
 ]);
 export const EXPECTED_COMPUTED_COUNT = EXPECTED_COMPUTED_IDS.length;
 export const EXPECTED_TECHNICAL_COUNT = EXPECTED_COMPUTED_COUNT + 1; // Existing Volume.
 export const EXPECTED_LIBRARY_COUNT = EXPECTED_TECHNICAL_COUNT + 4; // Existing MTP scripts.
-export const EXPECTED_DRIVE_PARAMETER_KEYS = Object.freeze(
-  "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength diLength adxSmoothing divisor emaLength oscillatorAverage signalAverage longLength shortLength roc1Length roc2Length roc3Length roc4Length sma1Length sma2Length sma3Length sma4Length atrLength factor start increment maximum offset sigma useExponentialMa bandsStyle".split(
+export const EXPECTED_PRE_EXPANSION_DRIVE_PARAMETER_KEYS = Object.freeze(
+  "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength diLength adxSmoothing divisor emaLength oscillatorAverage signalAverage longLength shortLength roc1Length roc2Length roc3Length roc4Length sma1Length sma2Length sma3Length sma4Length atrLength factor start increment maximum offset sigma useExponentialMa bandsStyle rsiLength stochasticLength wmaLength longRocLength shortRocLength maType maLength bbMultiplier".split(
     " "
   )
 );
+export const EXPECTED_DRIVE_PARAMETER_KEYS = Object.freeze([
+  ...EXPECTED_PRE_EXPANSION_DRIVE_PARAMETER_KEYS,
+  ..."anchor intradayOnly bandMode band1 bandMultiplier1 band2 bandMultiplier2 band3 bandMultiplier3 conversionLength baseLength spanBLength displacement jawLength teethLength lipsLength jawOffset teethOffset lipsOffset erLength ma1Average ma1Source ma1Length ma2Average ma2Source ma2Length ma3Average ma3Source ma3Length ma4Average ma4Source ma4Length displayOffset percent stopLength left right minimumDistance maximumDistance showHiddenBullish showHiddenBearish kLength slowing overbought oversold group radius pivotLegs deviationPercent highLeft highRight lowLeft lowRight firstLength secondLength dLength priceLength streakLength rankLength centered closePartially maxGaps limitTrail maxTrailBars showSessionNames showOpenClose showTickRange showAverage session1Enabled session1Name session1Start session1End session1TimeZone session2Enabled session2Name session2Start session2End session2TimeZone session3Enabled session3Name session3Start session3End session3TimeZone useUpperDeviation upperDeviation useLowerDeviation lowerDeviation sumLength firstSignalLength secondSignalLength mode".split(
+    " "
+  ),
+  ..."depth deviation reverse extend showPrices showLevels levelFormat labelSide level0 level1 level2 level3 level4 level5 level6 level7 level8 level9 level10".split(
+    " "
+  )
+]);

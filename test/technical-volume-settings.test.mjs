@@ -182,7 +182,21 @@ test("new divisor/EMA labels and numeric/source controls retain their existing i
   tree = legacy.render();
   const source = legacy.control(tree, "Source");
   assert.equal(source.type, "select");
-  assert.deepEqual(walk(source, (node) => node.type === "option").map(text), core.PRICE_SOURCES);
+  const sourceOptions = walk(source, (node) => node.type === "option");
+  assert.deepEqual(
+    sourceOptions.map((option) => option.props.value),
+    core.PRICE_SOURCES
+  );
+  assert.deepEqual(sourceOptions.map(text), [
+    "Open",
+    "High",
+    "Low",
+    "Close",
+    "High–low average (HL2)",
+    "Typical price (HLC3)",
+    "OHLC average (OHLC4)",
+    "Volume"
+  ]);
   source.props.onChange({ target: { value: "hl2" } });
   await legacy.submit(legacy.render());
   assert.deepEqual(legacy.controller.getSnapshot().preferences.technicalIndicators[0].params, {

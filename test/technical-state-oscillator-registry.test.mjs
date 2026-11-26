@@ -52,10 +52,14 @@ test("reviewed available TA includes price renderers and keeps unsupported items
       assert.equal(entries.find((e) => e.id === publicId).available, true);
     for (const id of ["STD;Supertrend", "STD;PSAR"])
       assert.equal(entries.find((e) => e.id === id).available, true);
-    for (const id of ["STD;DPO", "STD;Trend%1Strength%1Index"]) {
-      assert.equal(catalog.technicalDefinitionForCatalog(id), undefined);
-      assert.equal(entries.find((e) => e.id === id).available, false);
+    for (const [id, definitionId] of [
+      ["STD;DPO", "dpo"],
+      ["STD;Trend%1Strength%1Index", "trend-strength-index"]
+    ]) {
+      assert.equal(catalog.technicalDefinitionForCatalog(id), definitionId);
+      assert.equal(entries.find((e) => e.id === id).available, true);
     }
+    assert.equal(entries.find((e) => e.id === "STD;Advance%1Decline%1Line").available, false);
     assert.equal(
       catalog.technicalCatalogEntries(locale, "blocked").filter((e) => e.available).length,
       0
