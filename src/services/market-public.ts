@@ -275,7 +275,8 @@ export class PublicMarket {
       candles: bars.filter((bar) => bar.timestamp >= range.from && bar.timestamp <= range.to),
       source: "Bybit · напрямую · последняя сделка",
       cached,
-      requests: gaps.length
+      requests: gaps.length,
+      requestedRangeCovered: true
     };
   }
   private queue(uid: string, timeframe: Timeframe, bar: Candle): void {

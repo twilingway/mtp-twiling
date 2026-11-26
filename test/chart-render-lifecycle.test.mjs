@@ -405,4 +405,17 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
     0,
     "native remount cleanup cannot save while saved history is pending"
   );
+
+  const oldView = { from: 1658361600, to: 1658448000 };
+  savedView = oldView;
+  state = { ...state, chartRevision: state.chartRevision + 1, candles: [] };
+  await render();
+  state = { ...state, candles, historyViewReady: true, historyViewFallback: true };
+  await render();
+  assert.equal(controller.chart.persistView, false, "fallback cannot save over the previous camera");
+  assert.notEqual(controller.chart.getView(), oldView, "fallback must skip the stored camera");
+  state = { ...state, chartRevision: state.chartRevision + 1 };
+  await render();
+  assert.equal(controller.chart.persistView, false);
+  assert.notEqual(controller.chart.getView(), oldView, "remount must also skip the stored camera");
 });

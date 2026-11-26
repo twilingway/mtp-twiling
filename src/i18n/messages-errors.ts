@@ -40,6 +40,8 @@ export const errorMessages = {
     "History boundary reached; saved view is not fully covered.",
   "Источник не дал свечей за год: сохранённое окно ещё не восстановлено.":
     "The source returned no candles for a year; saved view is not restored yet.",
+  "Сохранённое окно раньше первой свечи Bybit. Показана доступная история.":
+    "The saved view is before the first Bybit candle. Showing the available history.",
   "Восстанавливаем левый край сохранённого окна…": "Restoring the left edge of the saved view…",
   "Офлайн: покрытие сохранённого окна в кеше не подтверждено.":
     "Offline: cached coverage of the saved view is unconfirmed.",

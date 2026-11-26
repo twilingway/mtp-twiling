@@ -29,6 +29,7 @@ function fixture({
   coverage = [],
   chartMissing = false,
   fastTimeout = false,
+  now = NOW,
   timeframe = "1d",
   rangeDays = 365
 } = {}) {
@@ -37,7 +38,7 @@ function fixture({
     notices = [],
     cells = new Map(),
     navigator = { onLine: !offline };
-  let clock = NOW;
+  let clock = now;
   class Clock extends Date {
     static now() {
       return clock;
@@ -234,6 +235,62 @@ test("known listing boundary allows unavailable pre-listing warmup; no view keep
   assert.equal(plain.calls[0].range.from, Date.parse("2023-11-16"));
   assert.equal(plain.calls.length, 1);
   assert.equal(plain.state().historyViewReady, true);
+});
+
+test("BTCUSD daily shows real candles at the confirmed spot history boundary", async () => {
+  const now = Date.parse("2026-11-26T12:00:00Z"),
+    first = Date.parse("2026-04-16"),
+    bars = Array.from({ length: 225 }, (_, index) => bar(first + index * DAY)),
+    uid = "bybit:spot:BTCUSD",
+    providerRef = { provider: "bybit", category: "spot", symbol: "BTCUSD" };
+  for (const outcome of ["in-range", "before-first", "network-error", "offline"]) {
+    const time = outcome === "in-range" ? first : Date.parse("2022-07-21"),
+      view = { from: time / 1000, to: (time + DAY) / 1000 };
+    const f = fixture({
+      now,
+      period: 640,
+      view,
+      offline: outcome === "offline",
+      provider: ({ call, range }) => {
+        if (call === 2 && outcome === "network-error") throw new Error("Upstream unavailable");
+        return {
+          candles: bars.filter(({ timestamp }) => timestamp >= range.from && timestamp <= range.to),
+          requests: outcome === "offline" ? 0 : 1,
+          requestedRangeCovered: outcome !== "offline"
+        };
+      }
+    });
+    f.change({
+      preferences: { ...f.state().preferences, symbol: uid, instrumentUid: uid },
+      rows: [{ symbol: uid, uid, providerRef }]
+    });
+    await f.history.load();
+    assert.equal(f.state().candles.length, 225);
+    assert.equal(f.state().candles[0].timestamp, first);
+    assert.equal(f.calls[0].timeframe, "1d");
+    assert.equal(f.calls.length, outcome === "offline" ? 1 : 2);
+    if (outcome !== "offline") {
+      assert.equal(f.calls[1].range.from, Date.parse("1990-01-01"));
+      assert.equal(f.calls[1].range.to, f.calls[0].range.from - 1);
+    }
+    assert.equal(
+      f.state().historyViewReady,
+      outcome !== "offline" && outcome !== "network-error",
+      outcome
+    );
+    assert.equal(f.state().historyViewFallback, outcome === "before-first", outcome);
+    if (outcome === "before-first") {
+      assert.match(f.state().historyHelp, /раньше первой свечи Bybit/);
+      assert.deepEqual(f.notices, [f.state().historyHelp]);
+    }
+    if (outcome === "network-error") {
+      await f.history.load();
+      assert.equal(f.calls.length, 4);
+      assert.equal(f.state().candles.length, 225);
+      assert.equal(f.state().historyViewReady, true);
+      assert.equal(f.state().historyViewFallback, true);
+    }
+  }
 });
 
 test("offline needs both enough candles and continuous cached coverage", async () => {
