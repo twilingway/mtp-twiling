@@ -207,11 +207,21 @@ export interface VolumeAverageSettings {
 }
 export type OhlcDisplay = "candle" | "corner" | "icon" | "hidden";
 
+export interface PriceAxisLabelColors {
+  fill?: string;
+  text?: string;
+}
+export interface PriceAxisLabelPalette {
+  lastPrice?: PriceAxisLabelColors;
+  drawings?: PriceAxisLabelColors;
+}
+export type PriceAxisLabelThemes = Partial<Record<"light" | "dark", PriceAxisLabelPalette>>;
 export interface ChartSettings {
   ohlcDisplay?: OhlcDisplay;
   ohlcOnHold?: boolean;
   legendCollapsed?: boolean;
   mtpMenuCollapsed?: boolean;
+  mtpAllHidden?: boolean;
   theme?: "dark" | "light";
   drawingTools?: DrawingToolbarSettings;
   removedIndicators?: IndicatorKey[];
@@ -232,6 +242,7 @@ export interface ChartSettings {
   showLegend?: boolean;
   priceLine?: boolean;
   lastPriceColor?: string;
+  priceAxisLabels?: PriceAxisLabelThemes;
   indicatorOptions?: IndicatorOptions;
   volumeAverage?: VolumeAverageSettings;
   drawingTemplates?: Record<string, DrawingTemplate>;

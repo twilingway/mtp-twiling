@@ -2,7 +2,7 @@ import { useTerminal } from "./context.js";
 import { INDICATOR_NAMES } from "./state.js";
 import { VisibilityIcon } from "./VisibilityIcon.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
-import { indicatorLegendKeys } from "../../model/indicator-legend.js";
+import { indicatorLegendKeys, indicatorShown } from "../../model/indicator-legend.js";
 import { persistLegendCollapsed } from "./indicator-preferences.js";
 import { t } from "../../i18n/messages.js";
 import { TechnicalPriceLegend } from "./TechnicalIndicatorPanels.js";
@@ -17,6 +17,7 @@ export function IndicatorLegend({ slot = 1 }: { slot?: number } = {}) {
     collapsed = p.chartSettings.legendCollapsed === true;
   const itemsId = slot === 1 ? "indicator-legend-items" : `indicator-legend-items-${slot}`;
   const blocked = !!(state.backupBusy || state.importingBackup || state.importRecoveryRequired);
+  const indicatorsHidden = drawingToolbarSettings(p.chartSettings).indicatorsHidden;
   return (
     <div
       id={slot === 1 ? "indicator-legend" : `indicator-legend-${slot}`}
@@ -26,40 +27,44 @@ export function IndicatorLegend({ slot = 1 }: { slot?: number } = {}) {
     >
       <div id={itemsId} className="indicator-legend-list" hidden={collapsed}>
         <TechnicalPriceLegend />
-        {keys.map((key) => (
-          <div
-            key={key}
-            className={`legend-row ${p.indicators[key] && !drawingToolbarSettings(p.chartSettings).indicatorsHidden ? "" : "legend-hidden"}`}
-            onContextMenu={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              controller.setContext({
-                x: event.clientX,
-                y: event.clientY,
-                target: { kind: "indicator", key }
-              });
-            }}
-          >
-            <button
-              data-legend-indicator={key}
-              onClick={() => {
-                void controller.toggleIndicator(key);
+        {keys.map((key) => {
+          const shown = indicatorShown(p.chartSettings, p.indicators, key);
+          const action = `${t(shown ? "Скрыть" : "Показать")} ${t(INDICATOR_NAMES[key])}`;
+          return (
+            <div
+              key={key}
+              className={`legend-row ${shown && !indicatorsHidden ? "" : "legend-hidden"}`}
+              onContextMenu={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                controller.setContext({
+                  x: event.clientX,
+                  y: event.clientY,
+                  target: { kind: "indicator", key }
+                });
               }}
-              title={`${t(p.indicators[key] ? "Скрыть" : "Показать")} ${t(INDICATOR_NAMES[key])}`}
             >
-              {t(INDICATOR_NAMES[key])}
-            </button>
-            <button
-              data-legend-indicator={key}
-              onClick={() => {
-                void controller.toggleIndicator(key);
-              }}
-              aria-label={`${t(p.indicators[key] ? "Скрыть" : "Показать")} ${t(INDICATOR_NAMES[key])}`}
-            >
-              <VisibilityIcon hidden={!p.indicators[key]} />
-            </button>
-          </div>
-        ))}
+              <button
+                data-legend-indicator={key}
+                onClick={() => {
+                  void controller.toggleIndicator(key);
+                }}
+                title={action}
+              >
+                {t(INDICATOR_NAMES[key])}
+              </button>
+              <button
+                data-legend-indicator={key}
+                onClick={() => {
+                  void controller.toggleIndicator(key);
+                }}
+                aria-label={action}
+              >
+                <VisibilityIcon hidden={!shown} />
+              </button>
+            </div>
+          );
+        })}
       </div>
       <button
         type="button"

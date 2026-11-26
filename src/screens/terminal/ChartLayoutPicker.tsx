@@ -36,7 +36,7 @@ function layoutName({ id, rows }: ChartLayoutDefinition) {
   return t("Равномерно");
 }
 
-function LayoutThumbnail({ layout }: { layout: ChartLayoutDefinition }) {
+export function ChartLayoutThumbnail({ layout }: { layout: ChartLayoutDefinition }) {
   return (
     <span
       className="chart-layout-thumbnail"
@@ -103,7 +103,7 @@ export function ChartLayoutOptions({
               aria-pressed={layout.id === layoutId}
               onClick={() => onLayoutChange(layout.id)}
             >
-              <LayoutThumbnail layout={layout} />
+              <ChartLayoutThumbnail layout={layout} />
               <span>{layoutName(layout)}</span>
             </button>
           ))}
@@ -171,7 +171,7 @@ export function ChartLayoutPicker(props: ChartLayoutPickerProps) {
         title={label}
         onClick={() => setOpen(!open)}
       >
-        {layout && <LayoutThumbnail layout={layout} />}
+        {layout && <ChartLayoutThumbnail layout={layout} />}
         <span>{count}</span>
         <span aria-hidden="true" className="chart-layout-picker-chevron" />
       </button>

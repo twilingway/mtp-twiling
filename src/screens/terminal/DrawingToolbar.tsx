@@ -33,6 +33,7 @@ const disabledReason = "Пока не реализовано";
 export function DrawingToolbar() {
   const { controller, state } = useTerminal();
   const settings = drawingToolbarSettings(state.preferences.chartSettings);
+  const showValuesOnHold = state.preferences.chartSettings.ohlcOnHold === true;
   const [menu, setMenu] = useState<OpenMenu | null>(null);
   const [confirmation, setConfirmation] = useState<{
     target: DrawingTarget;
@@ -162,15 +163,9 @@ export function DrawingToolbar() {
           id: "values-tooltip-on-long-press",
           label: t("Подсказывать значения при удержании"),
           kind: "checkbox",
-          checked: state.preferences.chartSettings.ohlcOnHold === true,
+          checked: showValuesOnHold,
           action: () =>
-            run(
-              () =>
-                controller.setChartSettings({
-                  ohlcOnHold: state.preferences.chartSettings.ohlcOnHold !== true
-                }),
-              false
-            )
+            run(() => controller.setChartSettings({ ohlcOnHold: !showValuesOnHold }), false)
         }
       ]
     });

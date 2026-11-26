@@ -9,7 +9,7 @@ import { nativeInterval } from "../../services/providers/bybit/market.js";
 import { okxNativeInterval } from "../../services/providers/okx/market.js";
 import { TerminalController } from "./controller.js";
 import { importWritable } from "./controller-transfer-guard.js";
-import { changeMenuIndicator } from "./indicator-menu-actions.js";
+import { changeMenuIndicator, toggleCombinedMtpVisibility } from "./indicator-menu-actions.js";
 import { marketAvailable } from "./market-readiness.js";
 import type { TerminalPreferences, TerminalState } from "./state.js";
 import { readWorkspaceAnnotations } from "./workspace-annotations.js";
@@ -355,7 +355,9 @@ export class WorkspacePanelController extends TerminalController {
     });
 
   override toggleIndicator: TerminalController["toggleIndicator"] = (key) =>
-    changeMenuIndicator(this, key);
+    key === "mtpAll" && this.getSnapshot().preferences.indicators.mtpAll
+      ? toggleCombinedMtpVisibility(this)
+      : changeMenuIndicator(this, key);
 
   private async readAnnotations(route: PanelRoute): Promise<void> {
     if (this.getSnapshot().annotationReady !== false || this.annotationRequest === route) return;

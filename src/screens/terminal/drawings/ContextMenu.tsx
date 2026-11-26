@@ -1,6 +1,7 @@
 import { t } from "../../../i18n/messages.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { TOOL_NAMES } from "../../../model/drawing-model.js";
+import { indicatorShown } from "../../../model/indicator-legend.js";
 import type { Drawing, ImageAsset } from "../../../model/types.js";
 import { INDICATOR_NAMES } from "../state.js";
 import { useTerminal } from "../context.js";
@@ -274,7 +275,13 @@ export function ContextMenu() {
             role="menuitem"
             onClick={() => act(() => run(controller.toggleIndicator(target.key)))}
           >
-            {state.preferences.indicators[target.key] ? t("Скрыть") : t("Показать")}
+            {indicatorShown(
+              state.preferences.chartSettings,
+              state.preferences.indicators,
+              target.key
+            )
+              ? t("Скрыть")
+              : t("Показать")}
           </button>
           <button role="menuitem" onClick={() => act(() => controller.editIndicator(target.key))}>
             {t("Настройки…")}

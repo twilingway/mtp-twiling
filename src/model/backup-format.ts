@@ -192,6 +192,35 @@ function isIndicatorOptions(value: unknown): boolean {
     )
   );
 }
+function axisColorFields(value: unknown, check: (key: string, field: unknown) => boolean): boolean {
+  if (!isRecord(value)) return false;
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype && Object.getPrototypeOf(prototype) !== null) return false;
+  return Reflect.ownKeys(value).every((key) => {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return (
+      typeof key === "string" &&
+      !!descriptor &&
+      "value" in descriptor &&
+      check(key, descriptor.value)
+    );
+  });
+}
+
+export function isPriceAxisLabelThemes(value: unknown): boolean {
+  return axisColorFields(
+    value,
+    (theme, palette) =>
+      (theme === "light" || theme === "dark") &&
+      axisColorFields(
+        palette,
+        (label, style) =>
+          (label === "lastPrice" || label === "drawings") &&
+          axisColorFields(style, (key, value) => (key === "fill" || key === "text") && color(value))
+      )
+  );
+}
+
 export function isChartSettings(value: unknown): value is ChartSettings {
   return (
     isRecord(value) &&
@@ -220,8 +249,10 @@ export function isChartSettings(value: unknown): value is ChartSettings {
       ohlcOnHold: boolean,
       legendCollapsed: boolean,
       mtpMenuCollapsed: boolean,
+      mtpAllHidden: boolean,
       priceLine: boolean,
       lastPriceColor: color,
+      priceAxisLabels: isPriceAxisLabelThemes,
       showCandleCountdown: boolean,
       indicatorOptions: isIndicatorOptions,
       volumeAverage: (value) =>

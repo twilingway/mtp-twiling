@@ -179,15 +179,18 @@ export function ChartGestures({
     const current = controller.getSnapshot(),
       options = drawingToolbarSettings(current.preferences.chartSettings);
     const mode = temporary ? (options.magnet === "off" ? "weak" : "off") : options.magnet;
+    const flags = current.preferences.indicators;
+    const indicators =
+      flags.mtpAll && current.preferences.chartSettings.mtpAllHidden
+        ? { ...flags, mtpAll: false, mtp160: false, mtp440: false, mtp640: false }
+        : flags;
     const point = snapDrawingPoint(
       raw,
       p,
       current.candles,
       (point) => chart.pointToPixel(point),
       mode,
-      options.snapIndicators && !options.indicatorsHidden
-        ? current.preferences.indicators
-        : undefined
+      options.snapIndicators && !options.indicatorsHidden ? indicators : undefined
     );
     const step = nativePriceStep(selectedMarketRow(current.rows, current.preferences));
     return { ...point, value: roundPriceToStep(point.value, step) };

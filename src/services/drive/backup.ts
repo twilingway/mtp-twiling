@@ -1,4 +1,10 @@
-import { fromBase64, isRecord, toBase64, validateBackup } from "../../model/backup-format.js";
+import {
+  fromBase64,
+  isPriceAxisLabelThemes,
+  isRecord,
+  toBase64,
+  validateBackup
+} from "../../model/backup-format.js";
 import { withRequiredProviders } from "../../model/backup-export.js";
 import { isWatchlistFlags } from "../../model/watchlist-flags.js";
 import { validWatchlistSectionsField } from "../../model/watchlist-sections.js";
@@ -34,9 +40,10 @@ const drawingSettings: Shape = {
   levelStyles: [scalars("value enabled color text")]
 };
 const indicators = "ma ema volume mtp160 mtp440 mtp640 mtpAll";
+const priceAxisLabelPalette = { lastPrice: scalars("fill text"), drawings: scalars("fill text") };
 const chartSettings: Shape = {
   ...scalars(
-    "theme legendCollapsed mtpMenuCollapsed showCandleCountdown bodyVisible wickUpColor wickDownColor borderUpColor borderDownColor borderVisible wickVisible candlePaletteVersion grid upColor downColor background scaleFontSize showLegend priceLine lastPriceColor ohlcDisplay ohlcOnHold"
+    "theme legendCollapsed mtpMenuCollapsed mtpAllHidden showCandleCountdown bodyVisible wickUpColor wickDownColor borderUpColor borderDownColor borderVisible wickVisible candlePaletteVersion grid upColor downColor background scaleFontSize showLegend priceLine lastPriceColor ohlcDisplay ohlcOnHold"
   ),
   removedIndicators: [true],
   volumeAverage: scalars("enabled period"),
@@ -50,7 +57,8 @@ const chartSettings: Shape = {
   indicatorOptions: Object.fromEntries(
     indicators.split(" ").map((key) => [key, scalars("opacity color width")])
   ),
-  drawingTemplates: { $: { settings: drawingSettings, visibility } }
+  drawingTemplates: { $: { settings: drawingSettings, visibility } },
+  priceAxisLabels: { light: priceAxisLabelPalette, dark: priceAxisLabelPalette }
 };
 const backupShape: Shape = {
   ...scalars("application schemaVersion exportedAt"),
@@ -147,6 +155,15 @@ function project(value: unknown, shape: Shape): unknown {
 
 /** Deep allowlist; never serializes local owner, history, tokens or market quote fields. */
 export function sanitizeDriveBackup(value: unknown): Backup {
+  if (isRecord(value) && isRecord(value.layout) && isRecord(value.layout.chartSettings)) {
+    const labels = Object.getOwnPropertyDescriptor(value.layout.chartSettings, "priceAxisLabels");
+    if (
+      labels &&
+      (!("value" in labels) ||
+        (labels.value !== undefined && !isPriceAxisLabelThemes(labels.value)))
+    )
+      throw new DriveError("remote-invalid", "Некорректные цвета ценовых меток.");
+  }
   if (
     isRecord(value) &&
     isRecord(value.layout) &&

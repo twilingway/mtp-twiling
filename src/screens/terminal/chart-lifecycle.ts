@@ -15,6 +15,7 @@ import { useTerminal } from "./context.js";
 import { viewKey } from "./controller-bridge.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { chartRenderConfigFromKey, chartRenderConfigKey } from "../../charts/render-config.js";
+import { lastPriceLabelColors } from "../../model/last-price-style.js";
 import type { TerminalState } from "./state.js";
 import { persistIndicatorPaneLayout } from "./indicator-preferences.js";
 import { cameraCallbacks } from "./controller-camera-sync.js";
@@ -63,11 +64,16 @@ export function useChartCanvas(
     indicatorsHidden = drawingToolbarSettings(p.chartSettings).indicatorsHidden,
     technicalInstances = p.technicalIndicators,
     technicalLayout = p.technicalPaneLayout;
+  const colors = lastPriceLabelColors(p.chartSettings);
   useEffect(() => {
     supplementalRef.current = supplemental;
     const adapter = adapterRef.current;
     if (adapter && !adapter.retired) adapter.updateTechnicalInputs?.(supplemental);
   }, [supplemental]);
+  useEffect(() => {
+    const adapter = adapterRef.current;
+    if (adapter && !adapter.retired) adapter.setLastPriceLabelColors?.(colors);
+  }, [colors]);
   useEffect(() => {
     const container = ref.current,
       owner = state.owner,
@@ -198,6 +204,7 @@ export function useChartCanvas(
       adapterRef.current = owned;
       controller.chart = owned;
       const currentPreferences = controller.getSnapshot().preferences;
+      owned.setLastPriceLabelColors?.(lastPriceLabelColors(currentPreferences.chartSettings));
       owned.updateTechnicalIndicators?.(
         technicalInputs(currentPreferences),
         currentPreferences.technicalPaneLayout ?? []

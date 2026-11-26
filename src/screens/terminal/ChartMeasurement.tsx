@@ -134,6 +134,19 @@ function elapsedText(milliseconds: number, locale: Locale): string {
   return parts.join(" ");
 }
 
+function arrowPath(from: PixelPoint, to: PixelPoint): string | undefined {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy);
+  if (!length) return undefined;
+  const head = Math.min(6, length / 3) / length;
+  const baseX = to.x - dx * head;
+  const baseY = to.y - dy * head;
+  const wingX = dy * head * 0.55;
+  const wingY = dx * head * 0.55;
+  return `M${from.x} ${from.y}L${to.x} ${to.y}M${baseX - wingX} ${baseY + wingY}L${to.x} ${to.y}L${baseX + wingX} ${baseY - wingY}`;
+}
+
 export function ChartMeasurementOverlay({
   controller,
   state,
@@ -178,6 +191,15 @@ export function ChartMeasurementOverlay({
   const maxY = Math.max(from.y, to.y);
   if (maxX < 0 || minX > width || maxY < 0 || minY > height) return null;
   const result = end && measureChartRange(start, end, state.candles);
+  const change = result?.change ?? 0;
+  const direction = change > 0 ? "up" : change < 0 ? "down" : "flat";
+  const midX = (minX + maxX) / 2;
+  const midY = (minY + maxY) / 2;
+  const timeArrow =
+    end && start.timestamp !== end.timestamp
+      ? arrowPath({ x: from.x, y: midY }, { x: to.x, y: midY })
+      : undefined;
+  const priceArrow = change ? arrowPath({ x: midX, y: from.y }, { x: midX, y: to.y }) : undefined;
   const row = selectedMarketRow(state.rows, state.preferences);
   const step = nativePriceStep(row);
   const digits = step
@@ -191,24 +213,28 @@ export function ChartMeasurementOverlay({
       ? `${formatNumber(result.percent, 2, true, { locale })}%`
       : "—";
   const cardWidth = Math.max(0, Math.min(188, width - 8));
-  const left = Math.max(4, Math.min(width - cardWidth - 4, (minX + maxX - cardWidth) / 2));
+  const left = Math.max(4, Math.min(width - cardWidth - 4, midX - cardWidth / 2));
   const top = Math.max(4, Math.min(height - 66, maxY + 10));
   return (
-    <div className="chart-measurement" style={{ width, height }} data-measurement={selection.phase}>
+    <div
+      className="chart-measurement"
+      style={{ width, height }}
+      data-measurement={selection.phase}
+      data-measurement-direction={direction}
+    >
       <svg width={width} height={height} aria-hidden="true">
-        {view.to && (
-          <>
-            <rect
-              x={minX}
-              y={minY}
-              width={maxX - minX}
-              height={maxY - minY}
-              className="chart-measurement-area"
-            />
-            <path d={`M${from.x} ${from.y}H${to.x}V${to.y}`} className="chart-measurement-path" />
-            <circle cx={to.x} cy={to.y} r="4" />
-          </>
+        {minX < maxX && minY < maxY && (
+          <rect
+            x={minX}
+            y={minY}
+            width={maxX - minX}
+            height={maxY - minY}
+            className="chart-measurement-area"
+          />
         )}
+        {timeArrow && <path d={timeArrow} className="chart-measurement-arrow" />}
+        {priceArrow && <path d={priceArrow} className="chart-measurement-arrow" />}
+        {(minX < maxX || minY < maxY) && <circle cx={to.x} cy={to.y} r="4" />}
         <circle cx={from.x} cy={from.y} r="4" />
       </svg>
       <div

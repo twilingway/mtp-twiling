@@ -43,6 +43,94 @@ test("empty projected times do not invent candles and zero reference omits the p
   );
 });
 
+function renderMeasurement(start, end, from, to, preview = false) {
+  const jsx = (type, props) => ({ type, ...props });
+  const load = createSourceLoader({
+    react: {
+      useEffect() {},
+      useLayoutEffect() {},
+      useState: () => [{ from, to, width: 400, height: 200 }],
+      useSyncExternalStore: (_subscribe, get) => get()
+    },
+    "react/jsx-runtime": { jsx, jsxs: jsx },
+    "screens/terminal/context.js": {}
+  });
+  const { ChartMeasurementOverlay } = load("screens/terminal/ChartMeasurement.js");
+  const { chartMeasurement } = load("screens/terminal/chart-measurement-session.js");
+  const controller = {};
+  const session = chartMeasurement(controller);
+  session.select(start);
+  if (end) {
+    if (preview) session.preview(end);
+    else session.select(end);
+  }
+  const state = { preferences: { locale: "en" }, rows: [], candles };
+  const overlay = ChartMeasurementOverlay({ controller, state });
+  const [svg, card] = overlay.children;
+  const shapes = svg.children.filter(Boolean);
+  return {
+    phase: overlay["data-measurement"],
+    direction: overlay["data-measurement-direction"],
+    arrows: shapes.filter((shape) => shape.type === "path").map((shape) => shape.d),
+    area: shapes.find((shape) => shape.type === "rect"),
+    points: shapes.filter((shape) => shape.type === "circle"),
+    card
+  };
+}
+
+test("the ruler colors growth and decline by price and points independently along both axes", () => {
+  const lower = point(fridayClose, -20);
+  const higher = point(mondayOpen, -10);
+  const leftBottom = { x: 20, y: 80 };
+  const rightTop = { x: 80, y: 20 };
+  const rise = renderMeasurement(lower, higher, leftBottom, rightTop, true);
+  assert.equal(rise.phase, "tracking");
+  assert.equal(rise.direction, "up");
+  assert.deepEqual(rise.arrows, [
+    "M20 50L80 50M74 53.3L80 50L74 46.7",
+    "M50 80L50 20M53.3 26L50 20L46.7 26"
+  ]);
+  assert.deepEqual(
+    { x: rise.area.x, y: rise.area.y, width: rise.area.width, height: rise.area.height },
+    { x: 20, y: 20, width: 60, height: 60 }
+  );
+  const fall = renderMeasurement(higher, lower, rightTop, leftBottom);
+  assert.equal(fall.phase, "result");
+  assert.equal(fall.direction, "down");
+  assert.deepEqual(fall.arrows, [
+    "M80 50L20 50M26 46.7L20 50L26 53.3",
+    "M50 20L50 80M46.7 74L50 80L53.3 74"
+  ]);
+  assert.equal(fall.card["aria-label"], "Measurement");
+  const reverseRise = renderMeasurement(
+    point(mondayOpen, -20),
+    point(fridayClose, -10),
+    { x: 80, y: 80 },
+    { x: 20, y: 20 }
+  );
+  assert.equal(reverseRise.direction, "up");
+  assert.deepEqual(reverseRise.arrows, [fall.arrows[0], rise.arrows[1]]);
+});
+
+test("the ruler omits zero-length axes and keeps the other arrow and result", () => {
+  const start = point(fridayClose, 100);
+  const from = { x: 20, y: 30 };
+  const flat = renderMeasurement(start, point(mondayOpen, 100), from, { x: 23, y: 30 });
+  assert.equal(flat.direction, "flat");
+  assert.equal(flat.area, undefined);
+  assert.deepEqual(flat.arrows, ["M20 30L23 30M22 30.55L23 30L22 29.45"]);
+  const vertical = renderMeasurement(start, point(fridayClose, 80), from, { x: 20, y: 60 });
+  assert.equal(vertical.direction, "down");
+  assert.equal(vertical.area, undefined);
+  assert.deepEqual(vertical.arrows, ["M20 30L20 60M16.7 54L20 60L23.3 54"]);
+  const samePoint = renderMeasurement(start, start, from, from);
+  assert.equal(samePoint.direction, "flat");
+  assert.equal(samePoint.area, undefined);
+  assert.deepEqual(samePoint.arrows, []);
+  assert.equal(samePoint.points.length, 1);
+  assert.equal(samePoint.card["aria-label"], "Measurement");
+});
+
 function setup() {
   const cleanup = [];
   const load = createSourceLoader({

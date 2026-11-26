@@ -71,7 +71,8 @@ function initialSettings(settings: ChartSettings): ChartSettings {
     "indicatorOptions",
     "volumeAverage",
     "legendCollapsed",
-    "mtpMenuCollapsed"
+    "mtpMenuCollapsed",
+    "mtpAllHidden"
   ] as const)
     delete appearance[key];
   return appearance;
