@@ -120,6 +120,7 @@ export type DrawingTool =
   | "horizontalStraightLine"
   | "horizontalRayLine"
   | "verticalStraightLine"
+  | "rectangle"
   | "fibonacciLine"
   | "fibonacciExtension";
 export type LineStyle = "solid" | "dashed" | "dotted";
@@ -182,7 +183,7 @@ export type DrawingShape =
       points: [DrawingPoint];
     }
   | {
-      name: "segment" | "rayLine" | "straightLine" | "fibonacciLine";
+      name: "segment" | "rayLine" | "straightLine" | "rectangle" | "fibonacciLine";
       points: [DrawingPoint, DrawingPoint];
     }
   | {
@@ -225,6 +226,7 @@ export interface ChartSettings {
   scaleFontSize?: number;
   showLegend?: boolean;
   priceLine?: boolean;
+  lastPriceColor?: string;
   indicatorOptions?: IndicatorOptions;
   volumeAverage?: VolumeAverageSettings;
   drawingTemplates?: Record<string, DrawingTemplate>;

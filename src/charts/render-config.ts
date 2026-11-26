@@ -51,6 +51,7 @@ export function chartRenderConfigKey(settings: ChartSettings, flags: IndicatorFl
       borderVisible: settings.borderVisible !== false,
       wickVisible: settings.wickVisible !== false,
       priceLine: settings.priceLine !== false,
+      ...(settings.lastPriceColor && { lastPriceColor: settings.lastPriceColor }),
       indicatorOptions,
       ...(flags.volume && !tools.indicatorsHidden
         ? { volumeAverage: volumeAverageSettings(settings) }

@@ -4,6 +4,7 @@ import { candleCloseAt, formatCountdown } from "../../model/candle-clock.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import type { TradingCalendarDay } from "../../model/candle-clock.js";
 import { useTerminal } from "./context.js";
+import { lastPriceStyle } from "../../model/last-price-style.js";
 
 interface CountdownPosition {
   key: string;
@@ -96,10 +97,7 @@ export function CandleCountdown() {
       ? candleCloseAt(timestamp, timeframe, now, calendar.days)
       : null;
   if (!closesAt || !position || position.key !== key || position.width < 38 || !bar) return null;
-  const color =
-    bar.close >= bar.open
-      ? (chartSettings.upColor ?? "#53b987")
-      : (chartSettings.downColor ?? "#eb4d5c");
+  const { color, text } = lastPriceStyle(chartSettings, bar.close >= bar.open);
   const countdown = formatCountdown(closesAt - now).replace("д", t("д"));
   return (
     <time
@@ -112,7 +110,7 @@ export function CandleCountdown() {
         top: position.top,
         width: position.width,
         background: color,
-        color: "#fff"
+        color: text
       }}
     >
       {countdown}

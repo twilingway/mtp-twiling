@@ -11,7 +11,7 @@ const instrument = (symbol, base, symbolType = "", extra = {}) => ({
   priceFilter: { tickSize: "0.000000000001" },
   ...extra
 });
-function fixture({ token = null, holdCatalog, holdHistory } = {}) {
+function fixture({ token = null, holdCatalog, holdHistory, holdHistoryWrite } = {}) {
   const calls = [],
     writes = [],
     streams = [],
@@ -43,7 +43,10 @@ function fixture({ token = null, holdCatalog, holdHistory } = {}) {
     saveCatalog: async () => {},
     loadHistory: async () => [],
     loadCoverage: async () => [],
-    saveHistory: async (...args) => writes.push({ history: args })
+    saveHistory: async (...args) => {
+      if (holdHistoryWrite) await holdHistoryWrite();
+      writes.push({ history: args });
+    }
   };
   const bank = new (class extends EventTarget {
     rows = [bankRow];
@@ -119,8 +122,7 @@ function fixture({ token = null, holdCatalog, holdHistory } = {}) {
           }
         };
       if (path.endsWith("kline")) {
-        if (holdHistory) await holdHistory(signal);
-        signal?.throwIfAborted();
+        if (holdHistory) await holdHistory(signal, params);
         return {
           time: start,
           result: {
@@ -274,6 +276,14 @@ test("mixed watchlist keeps order; bank cache and requests receive only bank ide
     assert.equal(f.stored.get("bank-owner").length, 2);
     await f.client.candles("SBER", "1m", { from: start, to: start + 60_000 }, { uid: "bank-uid" });
     assert.ok(f.calls.some((x) => x.bankCandles));
+    const deselects = f.calls.filter((x) => x.bankUnsubscribe).length;
+    await f.client.loadCandles(
+      publicRow.symbol,
+      "1m",
+      { from: start, to: start + 60_000 },
+      { uid: publicRow.uid }
+    );
+    assert.equal(f.calls.filter((x) => x.bankUnsubscribe).length, deselects);
     assert.throws(
       () => f.client.request("MarketDataService", "GetCandles", { instrumentId: publicRow.uid }),
       /Bybit/
@@ -328,4 +338,177 @@ test("cancelled catalog caller does not poison a concurrent search; close cancel
   await g.client.close();
   await rejected;
   assert.equal(g.writes.filter((x) => x.history).length, 0);
+});
+
+test("background candle history and reference-counted streams leave other charts live", async () => {
+  let requested;
+  const entered = new Promise((resolve) => {
+    requested = resolve;
+  });
+  const f = fixture({
+    holdHistory: (signal, params) =>
+      params.category === "linear"
+        ? new Promise((_resolve, reject) => {
+            requested();
+            signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+          })
+        : Promise.resolve()
+  });
+  await f.client.start();
+  try {
+    const instruments = await f.client.searchInstruments("BTCUSDT", "crypto");
+    const spot = await f.client.addInstrument(
+      instruments.find((item) => item.providerRef.category === "spot")
+    );
+    const linear = await f.client.addInstrument(
+      instruments.find((item) => item.providerRef.category === "linear")
+    );
+    const spotStream = f.streams.find((item) => item.category === "spot");
+    const linearStream = f.streams.find((item) => item.category === "linear");
+    const range = { from: start, to: start + 60_000 };
+    const update = (stream, row, interval, close) =>
+      stream.options.onEvent({
+        kind: "candles",
+        ref: row.providerRef,
+        interval,
+        candles: [{ timestamp: start, open: 100, high: 115, low: 99, close, baseVolume: 2 }]
+      });
+    f.client.subscribeCandles(spot.uid, "1m");
+    const spotEvents = [],
+      linearEvents = [],
+      peerEvents = [];
+    const releaseSpot = f.client.watchCandles(spot.uid, "1m", ({ bar }) =>
+      spotEvents.push(bar.close)
+    );
+    const stop = new AbortController();
+    const releaseLinear = f.client.watchCandles(
+      linear.uid,
+      "5m",
+      ({ bar }) => linearEvents.push(bar.close),
+      stop.signal
+    );
+    const releasePeer = f.client.watchCandles(linear.uid, "5m", ({ bar }) =>
+      peerEvents.push(bar.close)
+    );
+    const concurrent = f.client.loadCandles(linear.symbol, "5m", range, {
+      uid: linear.uid,
+      signal: stop.signal
+    });
+    const rejected = assert.rejects(concurrent, { name: "AbortError" });
+    await entered;
+    assert.deepEqual(spotStream.subscriptions.candles, [{ symbol: "BTCUSDT", interval: "1m" }]);
+    assert.deepEqual(linearStream.subscriptions.candles, [{ symbol: "BTCUSDT", interval: "5m" }]);
+    update(spotStream, spot, "1m", 101);
+    update(linearStream, linear, "1m", 104);
+    update(linearStream, linear, "5m", 106);
+    stop.abort();
+    await rejected;
+    assert.equal(f.writes.filter((write) => write.history?.[4]).length, 0);
+    update(linearStream, linear, "5m", 107);
+    releasePeer();
+    releaseLinear();
+    update(linearStream, linear, "5m", 108);
+    assert.deepEqual(linearStream.subscriptions.candles, []);
+    releaseSpot();
+    assert.deepEqual(spotStream.subscriptions.candles, [{ symbol: "BTCUSDT", interval: "1m" }]);
+    assert.deepEqual(spotEvents, [101]);
+    assert.deepEqual(linearEvents, [106]);
+    assert.deepEqual(peerEvents, [106, 107]);
+    assert.equal(
+      (
+        await f.client.loadCandles(spot.symbol, "5m", range, {
+          uid: spot.uid
+        })
+      ).timeframe,
+      "5m"
+    );
+    assert.deepEqual(spotStream.subscriptions.candles, [{ symbol: "BTCUSDT", interval: "1m" }]);
+  } finally {
+    await f.client.close();
+  }
+});
+
+test("a history purge fences a delayed auxiliary response without releasing its live stream", async () => {
+  let release, entered;
+  const pending = new Promise((resolve) => (release = resolve));
+  const serverStarted = new Promise((resolve) => (entered = resolve));
+  // Return a response even after cancellation to test the fence beyond the network transport.
+  const f = fixture({
+    holdHistory: (signal) => {
+      entered(signal);
+      return pending;
+    }
+  });
+  await f.client.start();
+  try {
+    const [instrument] = await f.client.searchInstruments("BTCUSDT", "crypto");
+    const row = await f.client.addInstrument(instrument);
+    const stream = f.streams.find((item) => item.category === row.providerRef.category);
+    const live = [];
+    f.client.watchCandles(row.uid, "1m", ({ bar }) => live.push(bar.close));
+    const read = () =>
+      f.client.loadCandles(row.symbol, "1m", { from: start, to: start + 60_000 }, { uid: row.uid });
+    const rejected = assert.rejects(read(), { name: "AbortError" });
+    const requestSignal = await serverStarted;
+    f.client.cachePaused = true;
+    assert.equal(requestSignal.aborted, true);
+    await assert.rejects(read(), { name: "AbortError" });
+    await f.client.flush();
+    f.client.cachePaused = false;
+    release();
+    await rejected;
+    assert.equal(f.writes.filter((entry) => entry.history).length, 0);
+    assert.deepEqual(stream.subscriptions.candles, [{ symbol: "BTCUSDT", interval: "1m" }]);
+    stream.options.onEvent({
+      kind: "candles",
+      ref: row.providerRef,
+      interval: "1m",
+      candles: [{ timestamp: start, open: 100, high: 115, low: 99, close: 108, baseVolume: 2 }]
+    });
+    assert.deepEqual(live, [108]);
+    assert.equal((await read()).candles.length, 1);
+    assert.equal(f.writes.filter((entry) => entry.history).length, 1);
+  } finally {
+    release();
+    await f.client.close();
+  }
+});
+
+test("a history purge waits for writes accepted before it paused the cache", async () => {
+  let release, entered;
+  const pending = new Promise((resolve) => (release = resolve));
+  const writeStarted = new Promise((resolve) => (entered = resolve));
+  const f = fixture({
+    holdHistoryWrite: () => {
+      entered();
+      return pending;
+    }
+  });
+  await f.client.start();
+  try {
+    const [instrument] = await f.client.searchInstruments("BTCUSDT", "crypto");
+    const row = await f.client.addInstrument(instrument);
+    const read = f.client.loadCandles(
+      row.symbol,
+      "1m",
+      { from: start, to: start + 60_000 },
+      { uid: row.uid }
+    );
+    const rejected = assert.rejects(read, { name: "AbortError" });
+    await writeStarted;
+    f.client.cachePaused = true;
+    let flushed = false;
+    const flushing = f.client.flush().then(() => {
+      flushed = true;
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.equal(flushed, false);
+    release();
+    await flushing;
+    await rejected;
+    assert.equal(f.writes.filter((entry) => entry.history).length, 1);
+  } finally {
+    release();
+    await f.client.close();
+  }
 });

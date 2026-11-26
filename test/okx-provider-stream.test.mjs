@@ -115,7 +115,7 @@ test("OKX starts lazily, batches unique ticker IDs, and uses a business candle c
   assert.equal(f.sockets.length, 0);
   f.stream.setSubscriptions({
     tickers: [spot, swap, spot],
-    candle: { ref: swap, timeframe: "1d" }
+    candles: [{ ref: swap, timeframe: "1d" }]
   });
   const [publicSocket, business] = f.sockets;
   assert.equal(publicSocket.url, "wss://ws.okx.com/ws/v5/public");
@@ -135,7 +135,7 @@ test("OKX starts lazily, batches unique ticker IDs, and uses a business candle c
 
 test("OKX accepts ticker updates only after matching ACK and rejects stale or duplicate updates", () => {
   const f = fixture();
-  f.stream.setSubscriptions({ tickers: [spot, swap], candle: null });
+  f.stream.setSubscriptions({ tickers: [spot, swap], candles: [] });
   f.stream.start();
   const socket = f.sockets[0];
   socket.open();
@@ -170,7 +170,7 @@ test("OKX accepts ticker updates only after matching ACK and rejects stale or du
 
 test("OKX candle changes wait for ACKs and allow late closes without regressing confirmed bars", () => {
   const f = fixture();
-  f.stream.setSubscriptions({ tickers: [], candle: { ref: swap, timeframe: "4h" } });
+  f.stream.setSubscriptions({ tickers: [], candles: [{ ref: swap, timeframe: "4h" }] });
   f.stream.start();
   const socket = f.sockets[0];
   socket.open();
@@ -196,8 +196,8 @@ test("OKX candle changes wait for ACKs and allow late closes without regressing 
       ["4h", true, 111, 2.5]
     ]
   );
-  f.stream.setSubscriptions({ tickers: [], candle: { ref: spot, timeframe: "1d" } });
-  f.stream.setSubscriptions({ tickers: [], candle: { ref: spot, timeframe: "1w" } });
+  f.stream.setSubscriptions({ tickers: [], candles: [{ ref: spot, timeframe: "1d" }] });
+  f.stream.setSubscriptions({ tickers: [], candles: [{ ref: spot, timeframe: "1w" }] });
   assert.equal(socket.sent.length, 2);
   assert.equal(socket.sent[1].op, "unsubscribe");
   socket.message(candle(swap, "candle4H", start, "1", "113"));
@@ -211,9 +211,41 @@ test("OKX candle changes wait for ACKs and allow late closes without regressing 
   f.stream.dispose();
 });
 
+test("OKX unsubscribes one candle topic without interrupting its siblings", () => {
+  const f = fixture();
+  const daily = { ref: spot, timeframe: "1d" };
+  const hourly = { ref: swap, timeframe: "1h" };
+  f.stream.setSubscriptions({ tickers: [], candles: [daily, hourly, daily] });
+  f.stream.start();
+  const socket = f.sockets[0];
+  socket.open();
+  const initial = socket.sent[0];
+  assert.deepEqual(initial.args, [
+    { channel: "candle1Dutc", instId: spot.symbol },
+    { channel: "candle1H", instId: swap.symbol }
+  ]);
+  for (const arg of initial.args) socket.ack(initial, arg);
+  socket.message(candle(spot, "candle1Dutc", start));
+  socket.message(candle(swap, "candle1H", start));
+  f.stream.setSubscriptions({ tickers: [], candles: [hourly] });
+  const removal = socket.sent[1];
+  assert.equal(removal.op, "unsubscribe");
+  assert.deepEqual(removal.args, [initial.args[0]]);
+  socket.message(candle(spot, "candle1Dutc", start + 86_400_000));
+  socket.message(candle(swap, "candle1H", start + 3_600_000));
+  socket.ack(removal);
+  assert.deepEqual(
+    f.candles.map(({ timeframe }) => timeframe),
+    ["1d", "1h", "1h"]
+  );
+  assert.equal(socket.sent.length, 2);
+  assert.equal(f.sockets.length, 1);
+  f.stream.dispose();
+});
+
 test("OKX heartbeat is driven by silence and an acknowledged business reconnect refreshes history", () => {
   const f = fixture();
-  f.stream.setSubscriptions({ tickers: [], candle: { ref: spot, timeframe: "1m" } });
+  f.stream.setSubscriptions({ tickers: [], candles: [{ ref: spot, timeframe: "1m" }] });
   f.stream.start();
   const first = f.sockets[0];
   first.open();
@@ -246,7 +278,7 @@ test("OKX heartbeat is driven by silence and an acknowledged business reconnect 
 test("OKX bounds failed subscription retries and cancels all callbacks on abort", () => {
   const f = fixture();
   const abort = new AbortController();
-  f.stream.setSubscriptions({ tickers: [spot], candle: null });
+  f.stream.setSubscriptions({ tickers: [spot], candles: [] });
   f.stream.start(abort.signal);
   const first = f.sockets[0];
   first.open();
@@ -256,9 +288,9 @@ test("OKX bounds failed subscription retries and cancels all callbacks on abort"
   assert.equal(f.sockets.length, 6);
   assert.ok(f.sockets.every((socket) => socket.readyState === 3));
   assert.equal(f.clock.timers.size, 0);
-  f.stream.setSubscriptions({ tickers: [spot], candle: null });
+  f.stream.setSubscriptions({ tickers: [spot], candles: [] });
   assert.equal(f.sockets.length, 6);
-  f.stream.setSubscriptions({ tickers: [swap], candle: { ref: swap, timeframe: "1m" } });
+  f.stream.setSubscriptions({ tickers: [swap], candles: [{ ref: swap, timeframe: "1m" }] });
   assert.equal(f.sockets.length, 8);
   abort.abort();
   assert.ok(f.sockets.every((socket) => socket.readyState === 3 && socket.onmessage === null));
@@ -267,14 +299,14 @@ test("OKX bounds failed subscription retries and cancels all callbacks on abort"
 
 test("OKX ticker reconnect does not refresh charts or reopen a removed candle socket", () => {
   const f = fixture();
-  f.stream.setSubscriptions({ tickers: [spot], candle: { ref: swap, timeframe: "1d" } });
+  f.stream.setSubscriptions({ tickers: [spot], candles: [{ ref: swap, timeframe: "1d" }] });
   f.stream.start();
   const [publicSocket, business] = f.sockets;
   publicSocket.open();
   business.open();
   publicSocket.ack(publicSocket.sent[0]);
   business.ack(business.sent[0]);
-  f.stream.setSubscriptions({ tickers: [spot], candle: null });
+  f.stream.setSubscriptions({ tickers: [spot], candles: [] });
   assert.equal(business.readyState, 3);
   assert.equal(publicSocket.readyState, 1);
   publicSocket.close();
@@ -290,7 +322,7 @@ test("OKX ticker reconnect does not refresh charts or reopen a removed candle so
 
 test("OKX partial ACKs and their data do not restart the retry budget", () => {
   const f = fixture();
-  f.stream.setSubscriptions({ tickers: [spot, swap], candle: null });
+  f.stream.setSubscriptions({ tickers: [spot, swap], candles: [] });
   f.stream.start();
   for (let attempt = 0; attempt <= 5; attempt++) {
     const socket = f.sockets[attempt];
@@ -317,7 +349,7 @@ test("Browser online revives exhausted OKX subscriptions and disposal removes it
     if (oldWindow === undefined) delete globalThis.window;
     else globalThis.window = oldWindow;
   });
-  const sameTopics = { tickers: [spot], candle: { ref: spot, timeframe: "1d" } };
+  const sameTopics = { tickers: [spot], candles: [{ ref: spot, timeframe: "1d" }] };
   f.stream.setSubscriptions(sameTopics);
   f.stream.start();
   const [publicSocket, business] = f.sockets;

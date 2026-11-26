@@ -1,7 +1,7 @@
 import { intlLocale } from "../i18n/preferences.js";
 import type { Candle, ChartSettings } from "./types.js";
 import { TRADINGVIEW_CANDLE_STYLE } from "./candle-palette.js";
-import { chartPalette } from "./theme.js";
+import { chartPalette, readableChartColor } from "./theme.js";
 
 export type OhlcDirection = "up" | "down" | "neutral";
 export interface OhlcLegendModel {
@@ -38,14 +38,21 @@ export function createOhlcLegend(
   const comparison = previous ?? values.open;
   const movement = values.close !== null && comparison !== null ? values.close - comparison : 0;
   const direction = movement > 0 ? "up" : movement < 0 ? "down" : "neutral";
-  const labelColor = chartPalette(settings).muted;
+  const { background, muted: labelColor } = chartPalette(settings);
   const color =
     direction === "up"
       ? (settings.upColor ?? TRADINGVIEW_CANDLE_STYLE.upColor)
       : direction === "down"
         ? (settings.downColor ?? TRADINGVIEW_CANDLE_STYLE.downColor)
         : labelColor;
-  return { values, change, percent, direction, color, labelColor };
+  return {
+    values,
+    change,
+    percent,
+    direction,
+    color: readableChartColor(color, background, 4.5),
+    labelColor
+  };
 }
 
 export function formatOhlcValue(value: number | null, digits: number, signed = false): string {

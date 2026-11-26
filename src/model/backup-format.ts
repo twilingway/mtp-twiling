@@ -218,6 +218,7 @@ export function isChartSettings(value: unknown): value is ChartSettings {
       legendCollapsed: boolean,
       mtpMenuCollapsed: boolean,
       priceLine: boolean,
+      lastPriceColor: color,
       showCandleCountdown: boolean,
       indicatorOptions: isIndicatorOptions,
       volumeAverage: (value) =>

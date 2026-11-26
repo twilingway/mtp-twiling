@@ -433,7 +433,7 @@ test("Lightweight binds real and visible future calendar grid to the bottom prim
   assert.equal(bars.length, 91);
 });
 
-test("last-price label stays white for both candle directions and removes stale prices on empty data", () => {
+test("last-price label contrasts with both directional fills and removes stale prices on empty data", () => {
   const f = harness("lightweight");
   const bar = { timestamp: Date.UTC(2026, 0, 1), open: 10, high: 12, low: 9, close: 11, volume: 1 };
   f.adapter.setData([bar], false);
@@ -441,12 +441,12 @@ test("last-price label stays white for both candle directions and removes stale 
   assert.equal(f.priceLabels.size, 1);
   const label = [...f.priceLabels][0];
   assert.equal(label.options.price, 11);
-  assert.equal(label.options.axisLabelTextColor, "#fff");
+  assert.equal(label.options.axisLabelTextColor, "#000000");
   f.adapter.setData([{ ...bar, close: 9.5 }], false);
   assert.equal(f.priceLabels.size, 1);
   assert.equal([...f.priceLabels][0], label);
   assert.equal(label.options.price, 9.5);
-  assert.equal(label.options.axisLabelTextColor, "#fff");
+  assert.equal(label.options.axisLabelTextColor, "#000000");
   f.adapter.setData([], false);
   assert.equal(f.priceLabels.size, 0);
 });

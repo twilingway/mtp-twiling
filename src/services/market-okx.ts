@@ -55,15 +55,15 @@ export class OkxMarket {
 
   sync(
     tickers: readonly OkxProviderRef[],
-    candle: { ref: OkxProviderRef; timeframe: string } | null
+    candles: readonly { ref: OkxProviderRef; timeframe: string }[]
   ): void {
     if (this.signal.aborted) return;
-    if (!tickers.length && !candle) {
+    if (!tickers.length && !candles.length) {
       this.close();
       return;
     }
     this.stream ??= this.makeStream(this.events);
-    this.stream.setSubscriptions({ tickers, candle });
+    this.stream.setSubscriptions({ tickers, candles });
     this.stream.start(this.signal);
   }
 
