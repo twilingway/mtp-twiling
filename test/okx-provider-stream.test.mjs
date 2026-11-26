@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { getEventListeners } from "node:events";
 import test from "node:test";
 import { sourceLoader } from "./helpers/market-source-loader.mjs";
 
@@ -304,4 +305,56 @@ test("OKX partial ACKs and their data do not restart the retry budget", () => {
   assert.equal(f.sockets.length, 6);
   assert.equal(f.clock.timers.size, 0);
   f.stream.dispose();
+});
+
+test("Browser online revives exhausted OKX subscriptions and disposal removes its listener", (t) => {
+  const network = new EventTarget();
+  const oldWindow = globalThis.window;
+  globalThis.window = network;
+  const f = fixture();
+  t.after(() => {
+    f.stream.dispose();
+    if (oldWindow === undefined) delete globalThis.window;
+    else globalThis.window = oldWindow;
+  });
+  const sameTopics = { tickers: [spot], candle: { ref: spot, timeframe: "1d" } };
+  f.stream.setSubscriptions(sameTopics);
+  f.stream.start();
+  const [publicSocket, business] = f.sockets;
+  for (const socket of [publicSocket, business]) {
+    socket.open();
+    socket.ack(socket.sent[0]);
+    socket.close();
+  }
+  f.clock.tick(200_000);
+  assert.equal(f.sockets.length, 12);
+  assert.equal(f.clock.timers.size, 0);
+  f.stream.setSubscriptions(sameTopics);
+  f.stream.start();
+  assert.equal(f.sockets.length, 12);
+  assert.equal(getEventListeners(network, "online").length, 1);
+
+  network.dispatchEvent(new Event("online"));
+  network.dispatchEvent(new Event("online"));
+  assert.equal(f.sockets.length, 14);
+  const publicRetry = f.sockets[12],
+    businessRetry = f.sockets[13];
+  publicRetry.open();
+  businessRetry.open();
+  publicRetry.message(ticker(spot));
+  businessRetry.message(candle(spot, "candle1Dutc", start));
+  assert.equal(f.quotes.length + f.candles.length, 0);
+  publicRetry.ack(publicRetry.sent[0]);
+  businessRetry.ack(businessRetry.sent[0]);
+  publicRetry.message(ticker(spot));
+  businessRetry.message(candle(spot, "candle1Dutc", start));
+  assert.equal(f.quotes[0].seriesId, "okx:spot:BTC-USDT");
+  assert.equal(f.candles[0].timeframe, "1d");
+  assert.equal(f.reconnects(), 1);
+
+  f.stream.dispose();
+  assert.equal(getEventListeners(network, "online").length, 0);
+  assert.equal(f.clock.timers.size, 0);
+  network.dispatchEvent(new Event("online"));
+  assert.equal(f.sockets.length, 14);
 });

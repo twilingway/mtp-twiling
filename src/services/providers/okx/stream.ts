@@ -86,6 +86,12 @@ class OkxChannel {
     this.pump();
   }
 
+  wake(): void {
+    if (this.retries <= channelLimits.retries) return;
+    this.retries = 0;
+    this.pump();
+  }
+
   dispose(): void {
     this.running = false;
     for (const key of this.desired.keys()) this.marketFrames.forget(key);
@@ -276,10 +282,15 @@ function topicFor(ref: OkxProviderRef, timeframe?: string): OkxTopic {
 export class OkxStream {
   private readonly tickers: OkxChannel;
   private readonly candles: OkxChannel;
+  private readonly network = typeof window === "undefined" ? undefined : window;
   private started = false;
   private disposed = false;
   private signal: AbortSignal | undefined;
   private readonly abort = () => this.dispose();
+  private readonly online = () => {
+    this.tickers.wake();
+    this.candles.wake();
+  };
 
   constructor(options: OkxStreamOptions) {
     this.tickers = new OkxChannel("public", options);
@@ -310,6 +321,7 @@ export class OkxStream {
     this.started = true;
     this.signal = signal;
     signal?.addEventListener("abort", this.abort, { once: true });
+    this.network?.addEventListener("online", this.online);
     this.tickers.start();
     if (!this.disposed) this.candles.start();
   }
@@ -318,6 +330,7 @@ export class OkxStream {
     if (this.disposed) return;
     this.disposed = true;
     this.signal?.removeEventListener("abort", this.abort);
+    this.network?.removeEventListener("online", this.online);
     this.signal = undefined;
     this.tickers.dispose();
     this.candles.dispose();
