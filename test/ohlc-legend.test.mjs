@@ -38,7 +38,10 @@ function load(relative) {
   return module.exports;
 }
 
-const { createOhlcLegend, formatOhlcValue } = load("model/ohlc-legend.ts");
+const { createOhlcLegend, formatOhlcValue, ohlcDisplayMode, ohlcCandleIndex, placeOhlcCard } =
+  load("model/ohlc-legend.ts");
+const { createOhlcInspection, OHLC_HOLD_MS } = load("model/ohlc-inspection.ts");
+const { isChartSettings } = load("model/backup-format.ts");
 const { chartContrast } = load("model/theme.ts");
 const { DEFAULT_LAST_PRICE_COLOR, lastPriceStyle } = load("model/last-price-style.ts");
 const { drawingPriceLabelPosition, drawingPriceTargets } = load("model/drawing-price-labels.ts");
@@ -50,6 +53,145 @@ const bar = (open, close) => ({
   low: Math.min(open, close) - 2,
   close,
   volume: 5
+});
+
+function simulateInspection(onHold) {
+  const shown = [];
+  let pending;
+  const inspection = createOhlcInspection(
+    onHold,
+    (timestamp) => shown.push(timestamp),
+    (run, delay) => {
+      assert.equal(delay, OHLC_HOLD_MS);
+      assert.equal(pending, undefined);
+      pending = run;
+      return () => {
+        pending = undefined;
+      };
+    }
+  );
+  return {
+    inspection,
+    current: () => shown.at(-1) ?? null,
+    pending: () => pending,
+    elapsed: () => {
+      const run = pending;
+      pending = undefined;
+      run?.();
+    }
+  };
+}
+
+test("OHLC settings accept every mode and old backups default to near the candle", () => {
+  assert.equal(ohlcDisplayMode(), "candle");
+  assert.equal(ohlcDisplayMode({ showLegend: false }), "candle");
+  for (const mode of ["candle", "corner", "icon", "hidden"]) {
+    const settings = { ohlcDisplay: mode, ohlcOnHold: true };
+    assert.equal(isChartSettings(settings), true);
+    assert.equal(ohlcDisplayMode(settings), mode);
+  }
+  assert.equal(isChartSettings({ ohlcDisplay: "invalid" }), false);
+  assert.equal(isChartSettings({ ohlcOnHold: "true" }), false);
+});
+
+test("OHLC looks up exact market bars and places the card within the visible price pane", () => {
+  const candles = [1000, 3000, 7000].map((timestamp) => ({ ...bar(10, 11), timestamp }));
+  assert.equal(ohlcCandleIndex(candles, 3000), 1);
+  for (const timestamp of [0, 2000, 8000, NaN])
+    assert.equal(ohlcCandleIndex(candles, timestamp), -1);
+  const plot = { width: 260, height: 125, top: 35 };
+  const card = { width: 100, height: 36 };
+  assert.deepEqual(placeOhlcCard({ x: 25, y: 90 }, plot, card), { x: 33, y: 46 });
+  assert.deepEqual(placeOhlcCard({ x: 255, y: 36 }, plot, card), { x: 147, y: 44 });
+  assert.deepEqual(placeOhlcCard({ x: 55, y: 40 }, { width: 60, height: 45, top: 30 }, card), {
+    x: 0,
+    y: 30
+  });
+});
+
+test("hold mode restarts on a different mouse candle, keeps the timer on the same one, and clears on leave", () => {
+  const { inspection, current, pending, elapsed } = simulateInspection(true);
+  inspection.hover(3000);
+  const initialTimer = pending();
+  assert.ok(initialTimer);
+  assert.equal(current(), null);
+  inspection.hover(3000);
+  assert.equal(pending(), initialTimer);
+  inspection.hover(7000);
+  assert.notEqual(pending(), initialTimer);
+  elapsed();
+  assert.equal(current(), 7000);
+  inspection.leave();
+  assert.equal(current(), null);
+  inspection.hover(9000);
+  inspection.leave();
+  elapsed();
+  assert.equal(current(), null);
+});
+
+test("fast mode shows mouse values immediately and a second touch dismisses the pinned card", () => {
+  const { inspection, current } = simulateInspection(false);
+  const point = { x: 20, y: 40 };
+  const tap = { id: 1, point, touch: true, startedAt: 10 };
+  inspection.hover(1000);
+  assert.equal(current(), 1000);
+  inspection.down(tap, 3000);
+  inspection.up(1, point, 3000, 30);
+  inspection.leave();
+  assert.equal(current(), 3000);
+  inspection.down(tap, 7000);
+  inspection.up(1, point, 7000, 30);
+  assert.equal(current(), null);
+});
+
+test("holding a mouse button also shows values after the delay and clears on release", () => {
+  const { inspection, current, elapsed } = simulateInspection(true);
+  const point = { x: 20, y: 40 };
+  inspection.down({ id: 1, point, touch: false, startedAt: 0 }, 3000);
+  assert.equal(current(), null);
+  elapsed();
+  assert.equal(current(), 3000);
+  inspection.up(1, point, 3000, 500);
+  assert.equal(current(), null);
+});
+
+test("touch hold waits for the delay and stays pinned only after a completed hold", () => {
+  const { inspection, current, elapsed } = simulateInspection(true);
+  const point = { x: 20, y: 40 };
+  const tap = { id: 1, point, touch: true, startedAt: 10 };
+  inspection.down(tap, 3000);
+  inspection.up(1, point, 3000, 200);
+  elapsed();
+  assert.equal(current(), null);
+  inspection.down(tap, 3000);
+  inspection.move(1, { x: 22, y: 42 });
+  elapsed();
+  assert.equal(current(), 3000);
+  inspection.up(1, point, 3000, 500);
+  inspection.leave();
+  assert.equal(current(), 3000);
+  inspection.down(tap, 7000);
+  inspection.up(1, point, 7000, 30);
+  assert.equal(current(), null);
+});
+
+test("drag, a second pointer and pointer cancellation each prevent a touch card", () => {
+  const point = { x: 20, y: 40 };
+  const tap = { id: 1, point, touch: true, startedAt: 0 };
+  for (const onHold of [true, false]) {
+    const { inspection, current, elapsed } = simulateInspection(onHold);
+    for (const cancel of [
+      () => inspection.move(1, { x: 35, y: 40 }),
+      () => inspection.down({ ...tap, id: 2 }, 7000),
+      () => inspection.cancel(1)
+    ]) {
+      inspection.down(tap, 3000);
+      cancel();
+      elapsed();
+      inspection.up(1, point, 3000, 10);
+      assert.equal(current(), null);
+    }
+  }
 });
 
 test("OHLC direction follows the preceding close, including gaps opposite to candle body", () => {
@@ -126,23 +268,37 @@ test("monochrome candles keep OHLC, last price and its label readable on both ba
     for (const rising of [true, false]) {
       const settings = { background, upColor: background, downColor: background };
       const close = rising ? 2 : 0.5;
-      assert.ok(chartContrast(createOhlcLegend(bar(1, close), 1, settings).color, background) >= 4.5);
+      assert.ok(
+        chartContrast(createOhlcLegend(bar(1, close), 1, settings).color, background) >= 4.5
+      );
       const last = lastPriceStyle(settings, rising);
       assert.ok(chartContrast(last.color, background) >= 3);
       assert.ok(chartContrast(last.text, last.color) >= 4.5);
     }
   }
   for (const background of ["#ffffff", "#000000"]) {
-    assert.equal(lastPriceStyle({ background, lastPriceColor: DEFAULT_LAST_PRICE_COLOR }, false).color, DEFAULT_LAST_PRICE_COLOR);
+    assert.equal(
+      lastPriceStyle({ background, lastPriceColor: DEFAULT_LAST_PRICE_COLOR }, false).color,
+      DEFAULT_LAST_PRICE_COLOR
+    );
   }
 });
 
 test("drawing level targets preserve horizontal labels and avoid covering the live price", () => {
-  const points = [{ timestamp: 1000, value: 100 }, { timestamp: 2000, value: 90 }];
+  const points = [
+    { timestamp: 1000, value: 100 },
+    { timestamp: 2000, value: 90 }
+  ];
   const horizontal = { name: "horizontalStraightLine", points: points.slice(0, 1) };
   const sloped = { name: "rayLine", points };
-  assert.deepEqual(drawingPriceTargets([horizontal, sloped]).map(({ point, anchor }) => [point.value, anchor]), [[100, "always"]]);
-  assert.deepEqual(drawingPriceTargets([horizontal, sloped], sloped).map(({ point }) => point.value), [100, 100, 90]);
+  assert.deepEqual(
+    drawingPriceTargets([horizontal, sloped]).map(({ point, anchor }) => [point.value, anchor]),
+    [[100, "always"]]
+  );
+  assert.deepEqual(
+    drawingPriceTargets([horizontal, sloped], sloped).map(({ point }) => point.value),
+    [100, 100, 90]
+  );
   assert.equal(drawingPriceLabelPosition(110, 220, [110]), 94);
   assert.equal(drawingPriceLabelPosition(10, 100, [10]), 26);
   assert.equal(drawingPriceLabelPosition(-1, 100, []), null);

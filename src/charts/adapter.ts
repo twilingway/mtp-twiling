@@ -49,6 +49,10 @@ export type TechnicalSupplementalInputs = Pick<
   | "marketBreadth"
 > & { readonly instrumentUid?: string };
 
+/** Market times in Unix milliseconds, independent of either native scale's units. */
+export type LinkedTimeWindow =
+  { kind: "time"; to: number } | { kind: "dateRange"; from: number; to: number };
+
 export interface ChartAdapter {
   source?: { owner: string; viewKey: string; uid: string };
   persistView?: boolean;
@@ -68,8 +72,11 @@ export interface ChartAdapter {
   timeAxisTop?(): number;
   getView(): ChartView | null;
   setView(view: ChartView): void;
+  setLinkedCrosshair?(timestamp: number | null): void;
+  setLinkedTimeWindow?(window: LinkedTimeWindow): void;
   fit(): void;
   zoom?(direction: -1 | 1): void;
+  zoomToSelection?(from: DrawingPoint, to: DrawingPoint): void;
   /** Fractional repeat follows beginPan; a missing fraction keeps the one-shot Y freeze. */
   scroll?(direction: -1 | 1, fraction?: number): void;
   resetView?(): void;

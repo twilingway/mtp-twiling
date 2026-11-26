@@ -2,8 +2,9 @@ import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { t } from "../../i18n/messages.js";
 import { useTerminal } from "./context.js";
 import { ChartEngineSelect } from "./ChartEngineSelect.js";
-import { ChartLayoutControl } from "./ChartLayoutControl.js";
-import type { ChartLayoutCount } from "./ChartLayoutControl.js";
+import { ChartLayoutPicker } from "./ChartLayoutPicker.js";
+import type { ChartLayoutPickerProps } from "./ChartLayoutPicker.js";
+import { publishWorkspaceTimeframe } from "./workspace-sync-controller.js";
 import type { TerminalController } from "./controller.js";
 import { TerminalFullscreenControl } from "./TerminalFullscreenControl.js";
 import { TerminalIndicatorControls } from "./TerminalIndicatorControls.js";
@@ -15,12 +16,10 @@ import {
   toggleIntervalFavorite
 } from "../../model/intervals/favorites.js";
 export function Toolbar({
-  chartCount = 1,
-  onChartCountChange,
+  layout,
   accountController
 }: {
-  chartCount?: ChartLayoutCount;
-  onChartCountChange?: (value: ChartLayoutCount) => void;
+  layout?: ChartLayoutPickerProps;
   accountController?: TerminalController;
 } = {}) {
   const { controller, state } = useTerminal(),
@@ -73,7 +72,20 @@ export function Toolbar({
               : {})
           }}
           onSelect={(id) => {
-            if (isNativeIntervalId(id)) void controller.setTimeframe(id);
+            if (!isNativeIntervalId(id)) return;
+            const owner = state.owner;
+            void controller
+              .setTimeframe(id)
+              .then(() => {
+                if (controller.getSnapshot().owner === owner)
+                  publishWorkspaceTimeframe(controller, id);
+              })
+              .catch((error: unknown) => {
+                if (controller.getSnapshot().owner === owner)
+                  controller.notify(
+                    error instanceof Error ? error.message : t("Не удалось выполнить действие.")
+                  );
+              });
           }}
           onToggleFavorite={(id) => {
             void controller.setPreferences({
@@ -87,9 +99,7 @@ export function Toolbar({
       </nav>
       <div className="divider" />
       <TerminalIndicatorControls />
-      {onChartCountChange && (
-        <ChartLayoutControl value={chartCount} onChange={onChartCountChange} />
-      )}
+      {layout && <ChartLayoutPicker {...layout} />}
       <TerminalFullscreenControl />
       <div className="top-spacer" />
       <div id="install-actions" className="install-actions" hidden>

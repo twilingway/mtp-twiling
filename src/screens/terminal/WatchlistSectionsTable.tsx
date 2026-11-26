@@ -24,6 +24,7 @@ import { WatchlistMenu } from "./WatchlistMenu.js";
 import { WatchlistSectionHeader } from "./WatchlistSectionHeader.js";
 import { WatchlistSectionMenu } from "./WatchlistSectionMenu.js";
 import type { TerminalController } from "./controller.js";
+import { publishWorkspaceInstrument } from "./workspace-sync-controller.js";
 
 type Menu = { x: number; y: number; owner: string } & (
   | { kind: "row"; row: MarketRow; key: string; mode?: "flag"; fromAction?: boolean }
@@ -169,12 +170,18 @@ export function WatchlistSectionsTable({
     if (drag.current || Date.now() < suppressClickUntil.current || disabled) return;
     const owner = state.owner;
     if (window.matchMedia("(max-width: 800px)").matches) controller.panel.closeMobile();
-    void editor.setPreferences({ symbol, instrumentUid }).catch((error: unknown) => {
-      if (controller.getSnapshot().owner === owner)
-        controller.notify(
-          error instanceof Error ? error.message : t("Не удалось открыть инструмент.")
-        );
-    });
+    void editor
+      .setPreferences({ symbol, instrumentUid })
+      .then(() => {
+        if (controller.getSnapshot().owner === owner)
+          publishWorkspaceInstrument(editor, instrumentUid);
+      })
+      .catch((error: unknown) => {
+        if (controller.getSnapshot().owner === owner)
+          controller.notify(
+            error instanceof Error ? error.message : t("Не удалось открыть инструмент.")
+          );
+      });
   };
   const placement = (event: DragEvent<HTMLTableRowElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();

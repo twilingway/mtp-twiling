@@ -3,6 +3,50 @@ import type { Candle, ChartSettings } from "./types.js";
 import { TRADINGVIEW_CANDLE_STYLE } from "./candle-palette.js";
 import { chartPalette, readableChartColor } from "./theme.js";
 
+export const ohlcDisplayMode = (settings?: ChartSettings) => settings?.ohlcDisplay ?? "candle";
+
+export function ohlcCandleIndex(candles: readonly Candle[], timestamp: number): number {
+  if (!Number.isFinite(timestamp)) return -1;
+  let left = 0,
+    right = candles.length - 1;
+  while (left <= right) {
+    const middle = Math.floor((left + right) / 2);
+    const { timestamp: barTime } = candles[middle]!;
+    if (barTime === timestamp) return middle;
+    if (barTime < timestamp) left = middle + 1;
+    else right = middle - 1;
+  }
+  return -1;
+}
+
+interface OhlcBox {
+  width: number;
+  height: number;
+}
+
+export function placeOhlcCard(
+  anchor: { x: number; y: number },
+  plot: OhlcBox & { top: number },
+  card: OhlcBox
+) {
+  const gap = 8;
+  const right = Math.max(0, plot.width - card.width);
+  const bottom = Math.max(plot.top, plot.height - card.height);
+  return {
+    x: Math.min(
+      right,
+      Math.max(0, anchor.x + gap <= right ? anchor.x + gap : anchor.x - gap - card.width)
+    ),
+    y: Math.min(
+      bottom,
+      Math.max(
+        plot.top,
+        anchor.y - gap - card.height >= plot.top ? anchor.y - gap - card.height : anchor.y + gap
+      )
+    )
+  };
+}
+
 export type OhlcDirection = "up" | "down" | "neutral";
 export interface OhlcLegendModel {
   values: Record<"open" | "high" | "low" | "close", number | null>;

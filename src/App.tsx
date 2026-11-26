@@ -1,12 +1,13 @@
 import { systemText } from "./i18n/messages.js";
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useMemo, useState } from "react";
 import { TerminalContext, useTerminal } from "./screens/terminal/context.js";
 import { TerminalController } from "./screens/terminal/controller.js";
 import { Toolbar } from "./screens/terminal/Toolbar.js";
 import { DrivePauseBanner } from "./screens/terminal/DrivePauseBanner.js";
 import { RightPanel } from "./screens/terminal/RightPanel.js";
 import { ChartWorkspace } from "./screens/terminal/ChartWorkspace.js";
-import type { ChartLayoutCount } from "./screens/terminal/ChartLayoutControl.js";
+import { chartLayout } from "./model/chart-workspace-layout.js";
+import type { ChartLayoutId } from "./model/chart-workspace-layout.js";
 import { DrawingToolbar } from "./screens/terminal/DrawingToolbar.js";
 import { AccountDialog } from "./screens/terminal/AccountDialog.js";
 import { DeleteObjectDialog } from "./screens/terminal/DeleteObjectDialog.js";
@@ -24,9 +25,21 @@ import { TerminalIndicatorLibrary } from "./screens/terminal/TerminalIndicatorLi
 import { TechnicalIndicatorSettings } from "./screens/terminal/TechnicalIndicatorSettings.js";
 import { MarketBreadthProvider } from "./screens/terminal/MarketBreadthContext.js";
 import { setActiveWorkspaceChart } from "./screens/terminal/workspace-active-chart.js";
+import { WorkspaceSync } from "./screens/terminal/workspace-sync.js";
+import type { WorkspaceSyncFlags } from "./screens/terminal/workspace-sync.js";
+import {
+  loadWorkspacePresentation,
+  saveWorkspacePresentation
+} from "./screens/terminal/workspace-presentation.js";
+import type { WorkspacePresentation } from "./screens/terminal/workspace-presentation.js";
 function Terminal() {
   const { controller, state } = useTerminal();
-  const [chartCount, setChartCount] = useState<ChartLayoutCount>(1);
+  const [updated, setUpdated] = useState<{ owner: string; presentation: WorkspacePresentation }>();
+  const owner = state.owner;
+  const saved = useMemo(() => loadWorkspacePresentation(owner), [owner]);
+  const presentation = updated?.owner === owner ? updated.presentation : saved;
+  const chartCount = chartLayout(presentation.layoutId)?.count ?? 1;
+  const sync = useMemo(() => ({ owner, coordinator: new WorkspaceSync() }), [owner]).coordinator;
   const [selection, setSelection] = useState<{
     owner: string;
     slot: number;
@@ -37,7 +50,13 @@ function Terminal() {
       ? selection
       : undefined;
   const editor = active?.editor ?? controller;
+  const activeSlot = active?.slot ?? 1;
   useLayoutEffect(() => setActiveWorkspaceChart(controller, editor), [controller, editor]);
+  useLayoutEffect(() => () => sync.reset(), [sync]);
+  useLayoutEffect(
+    () => sync.configure(presentation.flags, activeSlot),
+    [sync, presentation.flags, activeSlot]
+  );
   const select = (slot: number, next: TerminalController) => {
     if (editor === next || state.profileTransition || state.importingBackup) return;
     editor.editing.cancelGesture();
@@ -46,9 +65,18 @@ function Terminal() {
     if (editor.getSnapshot().dialog !== "account") editor.setDialog(null);
     setSelection(slot === 1 ? undefined : { owner: state.owner, slot, editor: next });
   };
-  const resize = (count: ChartLayoutCount) => {
+  const updatePresentation = (next: WorkspacePresentation) => {
+    saveWorkspacePresentation(owner, next);
+    setUpdated({ owner, presentation: next });
+  };
+  const chooseLayout = (layoutId: ChartLayoutId) => {
+    const count = chartLayout(layoutId)?.count;
+    if (count === undefined) return;
     if (active && active.slot > count) select(1, controller);
-    setChartCount(count);
+    updatePresentation({ ...presentation, layoutId });
+  };
+  const changeFlag = (key: keyof WorkspaceSyncFlags, enabled: boolean) => {
+    updatePresentation({ ...presentation, flags: { ...presentation.flags, [key]: enabled } });
   };
   return (
     <>
@@ -56,8 +84,7 @@ function Terminal() {
       <LocaleEffect />
       <TerminalContext value={editor}>
         <Toolbar
-          chartCount={chartCount}
-          onChartCountChange={resize}
+          layout={{ ...presentation, onLayoutChange: chooseLayout, onFlagChange: changeFlag }}
           accountController={controller}
         />
       </TerminalContext>
@@ -70,7 +97,13 @@ function Terminal() {
         <TerminalContext value={editor}>
           <DrawingToolbar />
         </TerminalContext>
-        <ChartWorkspace count={chartCount} activeSlot={active?.slot ?? 1} onActivate={select} />
+        <ChartWorkspace
+          count={chartCount}
+          layoutId={presentation.layoutId}
+          activeSlot={activeSlot}
+          onActivate={select}
+          sync={sync}
+        />
         <RightPanel chartEditor={editor} />
       </main>
       {state.dialog === "account" && <AccountDialog />}

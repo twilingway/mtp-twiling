@@ -205,7 +205,11 @@ export interface VolumeAverageSettings {
   enabled: boolean;
   period: number;
 }
+export type OhlcDisplay = "candle" | "corner" | "icon" | "hidden";
+
 export interface ChartSettings {
+  ohlcDisplay?: OhlcDisplay;
+  ohlcOnHold?: boolean;
   legendCollapsed?: boolean;
   mtpMenuCollapsed?: boolean;
   theme?: "dark" | "light";

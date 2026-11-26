@@ -9,12 +9,15 @@ import { useTerminal } from "./context.js";
 import { PERIOD_LABELS, number, signClass } from "./state.js";
 import { InstrumentIcon } from "./Watchlist.js";
 import { ChartCanvas, ChartGestures } from "./ChartSurface.js";
+import { ChartDemonstration } from "./ChartDemonstration.js";
+import { ChartRangeZoom } from "./ChartRangeZoom.js";
 import { ImageLayer } from "./ImageLayer.js";
 import { DrawingAxisLabels } from "./DrawingAxisLabels.js";
 import { SelectedDrawingLock } from "./SelectedDrawingLock.js";
 import { CandleCountdown } from "./CandleCountdown.js";
 import { IndicatorLegend } from "./IndicatorLegend.js";
-import { OhlcLegend } from "./OhlcLegend.js";
+import { ohlcCandleIndex, ohlcDisplayMode } from "../../model/ohlc-legend.js";
+import { OhlcLegend, OhlcLegendIcon } from "./OhlcLegend.js";
 import { ChartRangeControl } from "./intervals/ChartRangeControl.js";
 import { ChartNavigation } from "./ChartNavigation.js";
 import { TechnicalIndicatorPanels } from "./TechnicalIndicatorPanels.js";
@@ -46,10 +49,12 @@ export function ChartPanel({
     available = marketAvailable(state),
     p = state.preferences,
     row = selectedMarketRow(state.rows, p),
-    barIndex = state.crosshairBar
-      ? state.candles.findIndex((bar) => bar.timestamp === state.crosshairBar?.timestamp)
-      : state.candles.length - 1,
-    bar = state.candles[barIndex] ?? state.crosshairBar ?? undefined,
+    ohlcMode = ohlcDisplayMode(p.chartSettings),
+    hoveredIndex =
+      ohlcMode === "corner" && state.crosshairBar
+        ? ohlcCandleIndex(state.candles, state.crosshairBar.timestamp)
+        : -1,
+    barIndex = hoveredIndex >= 0 ? hoveredIndex : state.candles.length - 1,
     digits = row ? precision(row) : 2,
     busy = available && (state.loading || state.importingBackup === true);
   const openInterest = useOpenInterest(controller, state, row);
@@ -162,13 +167,24 @@ export function ChartPanel({
           </span>
           <span id={slot === 1 ? "chart-period" : undefined}>{t(PERIOD_LABELS[p.timeframe])}</span>
           <SelectedDrawingLock />
+          {ohlcMode === "icon" && (
+            <OhlcLegendIcon
+              key={JSON.stringify([state.owner, p.symbol, p.instrumentUid, p.timeframe])}
+              bar={state.candles[barIndex]}
+              previousClose={state.candles[barIndex - 1]?.close}
+              digits={digits}
+              settings={p.chartSettings}
+            />
+          )}
         </div>
-        <OhlcLegend
-          bar={bar}
-          previousClose={state.candles[barIndex - 1]?.close}
-          digits={digits}
-          settings={p.chartSettings}
-        />
+        {ohlcMode === "corner" && (
+          <OhlcLegend
+            bar={state.candles[barIndex]}
+            previousClose={state.candles[barIndex - 1]?.close}
+            digits={digits}
+            settings={p.chartSettings}
+          />
+        )}
         <div className="chart-price">
           <strong id={slot === 1 ? "chart-price" : undefined}>{number(row?.price, digits)}</strong>
           <span id={slot === 1 ? "chart-change" : undefined} className={signClass(row?.change)}>
@@ -191,6 +207,8 @@ export function ChartPanel({
             supplemental={supplemental}
             drawingProjection={drawingProjection}
           />
+          <ChartDemonstration active={active} />
+          <ChartRangeZoom active={active} />
           <CalendarAnalysisTables
             tables={extra.calendar.tables}
             refresh={extra.calendar.refresh}

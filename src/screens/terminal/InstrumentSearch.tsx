@@ -7,6 +7,7 @@ import { Modal } from "./Modal.js";
 import { intlLocale } from "../../i18n/preferences.js";
 import { providerAttributes } from "../../model/market-provider.js";
 import { orderedWatchlistRows } from "../../model/watchlist-sections.js";
+import { publishWorkspaceInstrument } from "./workspace-sync-controller.js";
 type Kind = InstrumentSearchKind;
 const KINDS: { kind: Kind; label: string }[] = [
   { kind: "all", label: "Все" },
@@ -248,6 +249,13 @@ export function InstrumentSearch() {
                     : controller.addInstrument(item);
                   if (row) controller.setDialog(null);
                   void action
+                    .then(() => {
+                      if (controller.getSnapshot().owner === owner)
+                        publishWorkspaceInstrument(
+                          controller,
+                          row?.uid ?? item.uid ?? item.instrumentUid
+                        );
+                    })
                     .catch((error: unknown) => {
                       if (controller.getSnapshot().owner === owner)
                         controller.notify(

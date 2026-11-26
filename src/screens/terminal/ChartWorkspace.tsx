@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
+import type { CSSProperties } from "react";
 import { t } from "../../i18n/messages.js";
+import { chartLayout, defaultChartLayout } from "../../model/chart-workspace-layout.js";
+import type {
+  ChartLayoutCount,
+  ChartLayoutId,
+  ChartLayoutPane
+} from "../../model/chart-workspace-layout.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import type { MarketRow } from "../../model/types.js";
-import type { ChartLayoutCount } from "./ChartLayoutControl.js";
 import { ChartPanel } from "./ChartPanel.js";
 import { useTerminal } from "./context.js";
 import type { TerminalController } from "./controller.js";
@@ -11,10 +17,30 @@ import { WorkspacePanelRuntime } from "./WorkspacePanelRuntime.js";
 import { WorkspaceGridDividers } from "./WorkspaceGridDividers.js";
 import { WorkspacePanelController } from "./workspace-panel-controller.js";
 import { loadWorkspaceInstrument, saveWorkspaceInstrument } from "./workspace-panel-preferences.js";
+import type { WorkspaceSync } from "./workspace-sync.js";
+import { registerWorkspaceSync } from "./workspace-sync-controller.js";
 
 interface WorkspaceSelection {
   activeSlot: number;
   onActivate: (slot: number, controller: TerminalController) => void;
+  sync?: WorkspaceSync | undefined;
+}
+
+type WorkspacePlacement = CSSProperties & {
+  "--chart-pane-column": string;
+  "--chart-pane-row": string;
+};
+
+function panePlacement({
+  columnStart,
+  columnEnd,
+  rowStart,
+  rowEnd
+}: ChartLayoutPane): WorkspacePlacement {
+  return {
+    "--chart-pane-column": `${columnStart + 1} / ${columnEnd + 1}`,
+    "--chart-pane-row": `${rowStart + 1} / ${rowEnd + 1}`
+  };
 }
 
 function EmptyChartTitle({ slot, open }: { slot: number; open: () => void }) {
@@ -34,18 +60,20 @@ function EmptyChartTitle({ slot, open }: { slot: number; open: () => void }) {
 }
 
 function ComparisonPanel({
-  slot,
+  pane,
   initialUid,
   parent,
   parentState,
   activeSlot,
-  onActivate
+  onActivate,
+  sync
 }: WorkspaceSelection & {
-  slot: number;
+  pane: ChartLayoutPane;
   initialUid: string;
   parent: TerminalController;
   parentState: TerminalState;
 }) {
+  const { slot } = pane;
   const [uid, setUid] = useState(
     () => loadWorkspaceInstrument(parentState.owner, slot) ?? initialUid
   );
@@ -60,6 +88,7 @@ function ComparisonPanel({
         saveWorkspaceInstrument(parentState.owner, slot, next);
       })
   );
+  useEffect(() => sync && registerWorkspaceSync(sync, slot, controller), [controller, slot, sync]);
   const row = parentState.rows.find(
     (candidate): candidate is MarketRow & { uid: string } =>
       !!candidate.uid &&
@@ -72,6 +101,7 @@ function ComparisonPanel({
       className="auxiliary-chart"
       data-chart-slot={slot}
       data-chart-active={activeSlot === slot}
+      style={panePlacement(pane)}
       onPointerDownCapture={activate}
       onFocusCapture={activate}
       onContextMenuCapture={activate}
@@ -89,10 +119,15 @@ function ComparisonPanel({
 
 export function ChartWorkspace({
   count,
+  layoutId,
   activeSlot,
-  onActivate
-}: WorkspaceSelection & { count: ChartLayoutCount }) {
+  onActivate,
+  sync
+}: WorkspaceSelection & { count: ChartLayoutCount; layoutId?: ChartLayoutId }) {
   const { controller, state } = useTerminal();
+  useEffect(() => sync && registerWorkspaceSync(sync, 1, controller), [controller, sync]);
+  const choice = chartLayout(layoutId);
+  const layout = choice?.count === count ? choice : defaultChartLayout(count);
   const primaryUid = selectedMarketRow(state.rows, state.preferences)?.uid;
   const saved = Array.from({ length: count - 1 }, (_, i) =>
     loadWorkspaceInstrument(state.owner, i + 2)
@@ -114,6 +149,9 @@ export function ChartWorkspace({
       id="chart-workspace"
       className="chart-workspace"
       data-chart-count={count}
+      data-chart-layout={layout.id}
+      data-chart-stacked={layout.id.endsWith("-stack") || undefined}
+      style={panePlacement(layout.panes[0]!)}
       aria-label={t("График")}
     >
       {count > 1 && !primaryUid ? (
@@ -134,21 +172,21 @@ export function ChartWorkspace({
       ) : (
         <ChartPanel active={activeSlot === 1} activate={activatePrimary} />
       )}
-      {instruments.map((initialUid, index) => {
-        const slot = index + 2;
+      {layout.panes.slice(1).map((pane, index) => {
         return (
           <ComparisonPanel
-            key={`${state.owner}:${slot}`}
-            slot={slot}
-            initialUid={initialUid}
+            key={`${state.owner}:${pane.slot}`}
+            pane={pane}
+            initialUid={instruments[index] ?? ""}
             parent={controller}
             parentState={state}
             activeSlot={activeSlot}
             onActivate={onActivate}
+            sync={sync}
           />
         );
       })}
-      <WorkspaceGridDividers count={count} />
+      <WorkspaceGridDividers count={count} definition={layout} owner={state.owner} />
     </div>
   );
 }

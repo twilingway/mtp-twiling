@@ -36,7 +36,7 @@ const drawingSettings: Shape = {
 const indicators = "ma ema volume mtp160 mtp440 mtp640 mtpAll";
 const chartSettings: Shape = {
   ...scalars(
-    "theme legendCollapsed mtpMenuCollapsed showCandleCountdown bodyVisible wickUpColor wickDownColor borderUpColor borderDownColor borderVisible wickVisible candlePaletteVersion grid upColor downColor background scaleFontSize showLegend priceLine lastPriceColor"
+    "theme legendCollapsed mtpMenuCollapsed showCandleCountdown bodyVisible wickUpColor wickDownColor borderUpColor borderDownColor borderVisible wickVisible candlePaletteVersion grid upColor downColor background scaleFontSize showLegend priceLine lastPriceColor ohlcDisplay ohlcOnHold"
   ),
   removedIndicators: [true],
   volumeAverage: scalars("enabled period"),

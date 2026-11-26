@@ -1,6 +1,7 @@
 import { DomPosition } from "klinecharts";
 import type { Chart } from "klinecharts";
 import type { PixelPoint } from "../model/types.js";
+import { resetKlineSelectionPrice } from "./kline-selection-zoom.js";
 
 /** KLine 9 exposes its axis DOM but no public method for disabling price autoscale. */
 export function freezeKlinePriceScale(chart: Pick<Chart, "getDom">): boolean {
@@ -38,6 +39,7 @@ export function beginKlinePan(chart: Pick<Chart, "getDom">, start?: PixelPoint):
 }
 
 export function resetKlinePriceScale(chart: Pick<Chart, "getDom">): void {
+  if (resetKlineSelectionPrice(chart)) return;
   const axis = chart.getDom("candle_pane", DomPosition.YAxis);
   if (!axis) return;
   const rect = axis.getBoundingClientRect();

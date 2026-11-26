@@ -1,0 +1,8 @@
+.chart-demonstration {
+  position: absolute;
+  inset: 0 auto auto 0;
+  z-index: 5;
+  max-inline-size: 100%;
+  max-block-size: 100%;
+  pointer-events: none;
+}
