@@ -1,3 +1,4 @@
+import { EXPECTED_COMPUTED_IDS } from "./technical-registry-expectation.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -194,7 +195,10 @@ test("Stochastic extrema count bar positions, ignoring missing extrema without s
 
 test("all definitions are immutable serializable data; independent instances and styles round-trip with exact output keys", () => {
   const json = JSON.stringify(core.technicalIndicatorDefinitions);
-  assert.equal(JSON.parse(json).length, 47);
+  assert.deepEqual(
+    JSON.parse(json).map((definition) => definition.id),
+    EXPECTED_COMPUTED_IDS
+  );
   assert.ok(
     core.technicalIndicatorDefinitions.every(
       (definition) => definition.status === "computed" && definition.references.length

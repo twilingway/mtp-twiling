@@ -1,3 +1,4 @@
+import { EXPECTED_COMPUTED_COUNT } from "./technical-registry-expectation.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -45,8 +46,8 @@ const equalSeries = (actual, expected) => {
   );
 };
 
-test("all47 registry definitions create validated instances with independently verified presets", () => {
-  assert.equal(core.technicalIndicatorDefinitions.length, 47);
+test("reviewed registry definitions create validated instances with independently verified presets", () => {
+  assert.equal(core.technicalIndicatorDefinitions.length, EXPECTED_COMPUTED_COUNT);
   const defaults = { wma: 9, vwma: 20, dema: 9, tema: 9, hma: 9, smma: 7 };
   for (const [id, length] of Object.entries(defaults)) {
     const instance = make(id, `instance-${id}`);

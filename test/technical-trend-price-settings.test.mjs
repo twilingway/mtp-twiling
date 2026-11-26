@@ -1,3 +1,7 @@
+import {
+  EXPECTED_LIBRARY_COUNT,
+  EXPECTED_TECHNICAL_COUNT
+} from "./technical-registry-expectation.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as jsx from "react/jsx-runtime";
@@ -170,7 +174,7 @@ test("actual form submit rejects out-of-bounds/non-numeric/fractional-period val
       }
 });
 
-test("actual local library exposes52 entries:48 technical with Volume and4 scripts; availability honors block", () => {
+test("actual local library exposes the reviewed technical set and4 scripts; availability honors block", () => {
   for (const locale of ["ru", "en"]) {
     const state = { preferences: { locale, indicators: {}, technicalIndicators: [] } },
       reader = createSourceLoader({
@@ -191,10 +195,10 @@ test("actual local library exposes52 entries:48 technical with Volume and4 scrip
         "screens/terminal/indicator-menu-actions.js": { changeMenuIndicator: () => {} }
       });
     const tree = reader("screens/terminal/TerminalIndicatorLibrary.js").TerminalIndicatorLibrary();
-    assert.equal(tree.props.entries.filter((e) => e.available).length, 52);
+    assert.equal(tree.props.entries.filter((e) => e.available).length, EXPECTED_LIBRARY_COUNT);
     assert.equal(
       tree.props.entries.filter((e) => e.available && e.category === "technicals").length,
-      48
+      EXPECTED_TECHNICAL_COUNT
     );
     assert.equal(
       tree.props.entries.filter((e) => e.available && e.category === "scripts").length,

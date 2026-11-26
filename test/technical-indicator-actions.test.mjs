@@ -1,3 +1,4 @@
+import { EXPECTED_TECHNICAL_COUNT } from "./technical-registry-expectation.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -72,12 +73,12 @@ function controller(instances = []) {
 }
 const tick = () => new Promise((resolve) => setImmediate(resolve));
 
-test("all127 public names are searchable in Russian and English with honest47-plus-volume availability", () => {
+test("all127 public names are searchable in Russian and English with reviewed availability", () => {
   for (const locale of ["ru", "en"]) {
     const entries = catalog.technicalCatalogEntries(locale);
     assert.equal(entries.length, 127);
     assert.equal(new Set(entries.map((entry) => entry.id)).size, 127);
-    assert.equal(entries.filter((entry) => entry.available).length, 48);
+    assert.equal(entries.filter((entry) => entry.available).length, EXPECTED_TECHNICAL_COUNT);
     assert.ok(
       filterIndicatorLibrary(entries, "technicals", "RSI").some((entry) => entry.id === "STD;RSI")
     );

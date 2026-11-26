@@ -1,3 +1,4 @@
+import { EXPECTED_COMPUTED_COUNT } from "./technical-registry-expectation.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { nativeFixture } from "./native-technical-fixture.mjs";
@@ -191,14 +192,14 @@ for (const engine of ["lightweight", "kline"]) {
     f.adapter.destroy();
   });
 
-  test(`${engine}: actual adapter renders all 47 common formulas, warmup and real timestamps`, () => {
+  test(`${engine}: actual adapter renders the reviewed formula set, warmup and real timestamps`, () => {
     const f = nativeFixture(engine),
       { createTechnicalIndicatorInstance: create, technicalIndicatorDefinitions: definitions } =
         api(f);
     const instances = definitions.map((definition, i) =>
       create(definition.id, `instance-${i}`, { order: i })
     );
-    assert.equal(instances.length, 47);
+    assert.equal(instances.length, EXPECTED_COMPUTED_COUNT);
     f.adapter.setData(bars);
     const writes = f.primaryWrites(),
       camera = f.camera();

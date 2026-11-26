@@ -1,3 +1,7 @@
+import {
+  EXPECTED_COMPUTED_COUNT,
+  EXPECTED_TECHNICAL_COUNT
+} from "./technical-registry-expectation.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -18,10 +22,10 @@ const catalog = load("model/technical-indicators/catalog.js"),
   { compilePresentation } = load("model/technical-indicators/presentation.js"),
   { TechnicalRenderData } = load("charts/technical-render-data.js");
 
-test("append2 declares47 computed definitions and48 local catalog entries including Volume", () => {
-  assert.equal(core.technicalIndicatorDefinitions.length, 47);
+test("append2 price indicators occupy their reviewed slots and expose local catalog entries", () => {
+  assert.equal(core.technicalIndicatorDefinitions.length, EXPECTED_COMPUTED_COUNT);
   assert.deepEqual(
-    core.technicalIndicatorDefinitions.slice(45).map((d) => d.id),
+    core.technicalIndicatorDefinitions.slice(45, 47).map((d) => d.id),
     ids
   );
   for (const [i, id] of ids.entries()) {
@@ -45,7 +49,7 @@ test("append2 declares47 computed definitions and48 local catalog entries includ
   for (const locale of ["ru", "en"]) {
     const entries = catalog.technicalCatalogEntries(locale);
     assert.equal(entries.length, 127);
-    assert.equal(entries.filter((e) => e.available).length, 48);
+    assert.equal(entries.filter((e) => e.available).length, EXPECTED_TECHNICAL_COUNT);
     assert.equal(
       catalog.technicalCatalogEntries(locale, "blocked").filter((e) => e.available).length,
       0

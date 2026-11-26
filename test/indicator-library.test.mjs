@@ -1,3 +1,4 @@
+import { EXPECTED_LIBRARY_COUNT } from "./technical-registry-expectation.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
@@ -415,7 +416,10 @@ test("terminal library exposes the searchable catalog and creates real TA instan
     ["mtpAll", "mtp160", "mtp440", "mtp640"]
   );
   assert.equal(dialog.props.entries.length, 131);
-  assert.equal(dialog.props.entries.filter((entry) => entry.available).length, 52);
+  assert.equal(
+    dialog.props.entries.filter((entry) => entry.available).length,
+    EXPECTED_LIBRARY_COUNT
+  );
   assert.ok(
     dialog.props.entries.filter((entry) => !entry.available).every((entry) => entry.reason)
   );
