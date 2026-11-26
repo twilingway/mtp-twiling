@@ -44,7 +44,10 @@ const implemented: Readonly<Record<string, TechnicalIndicatorId>> = {
   "STD;EOM": "eom",
   "STD;Volume%1Oscillator": "volume-oscillator",
   "STD;Negative_Volume_Index": "nvi",
-  "STD;Positive_Volume_Index": "pvi"
+  "STD;Positive_Volume_Index": "pvi",
+  "STD;True%1Strength%1Indicator": "tsi",
+  "STD;Know_Sure_Thing": "kst",
+  "STD;Fisher_Transform": "fisher-transform"
 };
 
 export function technicalDefinitionForCatalog(id: string): TechnicalIndicatorId | undefined {

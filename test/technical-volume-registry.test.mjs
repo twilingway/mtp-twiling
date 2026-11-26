@@ -47,10 +47,10 @@ function series(actual, expected) {
   );
 }
 
-test("42 definitions append seven exact presets after an unchanged frozen35 contract", () => {
-  assert.equal(core.technicalIndicatorDefinitions.length, 42);
+test("45 definitions retain seven exact volume presets after an unchanged frozen35 contract", () => {
+  assert.equal(core.technicalIndicatorDefinitions.length, 45);
   assert.deepEqual(
-    core.technicalIndicatorDefinitions.slice(35).map((item) => item.id),
+    core.technicalIndicatorDefinitions.slice(35, 42).map((item) => item.id),
     ids
   );
   // Recorded directly from 220b227 source, including every definition, default instance and
@@ -90,7 +90,7 @@ test("catalog retains all127 entries and exposes43 available TA with exact publi
   for (const locale of ["ru", "en"]) {
     const entries = catalog.technicalCatalogEntries(locale);
     assert.equal(entries.length, 127);
-    assert.equal(entries.filter((entry) => entry.available).length, 43);
+    assert.equal(entries.filter((entry) => entry.available).length, 46);
     for (const [i, publicId] of publicIds.entries()) {
       assert.equal(catalog.technicalDefinitionForCatalog(publicId), ids[i]);
       const entry = entries.find((item) => item.id === publicId);

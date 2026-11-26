@@ -93,6 +93,29 @@ test("LW pane metrics tolerate the model existing before its widget is created",
 });
 
 for (const engine of ["lightweight", "kline"]) {
+  test(`${engine}: Fisher length one keeps both plots empty and retains its undefined metadata`, () => {
+    const f = nativeFixture(engine),
+      { createTechnicalIndicatorInstance: create, calculateTechnicalIndicator: calculate } = api(f),
+      instance = create("fisher-transform", "undefined-fisher", { params: { length: 1 } });
+    f.adapter.setData(bars);
+    const camera = f.camera(),
+      writes = f.primaryWrites(),
+      result = calculate(instance, bars);
+    assert.equal(result.warmupBars, null);
+    assert.equal(result.alwaysUndefined, true);
+    assert.equal(result.historyRequirement.seedBars, null);
+    assert.deepEqual(Object.keys(result.series), ["value", "trigger"]);
+    assert.ok(
+      Object.values(result.series).every((values) => values.every((value) => value === null))
+    );
+    f.adapter.updateTechnicalIndicators([instance], []);
+    f.ready();
+    assertValues(f, [instance]);
+    assert.equal(f.primaryWrites(), writes);
+    assert.deepEqual(f.camera(), camera);
+    f.adapter.destroy();
+  });
+
   test(`${engine}: unavailable volume stays empty and positive data restores all eleven volume outputs without resetting the camera`, () => {
     const f = nativeFixture(engine),
       { createTechnicalIndicatorInstance: create, calculateTechnicalIndicator: calculate } = api(f),
@@ -151,14 +174,14 @@ for (const engine of ["lightweight", "kline"]) {
     f.adapter.destroy();
   });
 
-  test(`${engine}: actual adapter renders all 42 common formulas, warmup and real timestamps`, () => {
+  test(`${engine}: actual adapter renders all 45 common formulas, warmup and real timestamps`, () => {
     const f = nativeFixture(engine),
       { createTechnicalIndicatorInstance: create, technicalIndicatorDefinitions: definitions } =
         api(f);
     const instances = definitions.map((definition, i) =>
       create(definition.id, `instance-${i}`, { order: i })
     );
-    assert.equal(instances.length, 42);
+    assert.equal(instances.length, 45);
     f.adapter.setData(bars);
     const writes = f.primaryWrites(),
       camera = f.camera();
@@ -202,7 +225,10 @@ for (const engine of ["lightweight", "kline"]) {
       "eom",
       "volume-oscillator",
       "nvi",
-      "pvi"
+      "pvi",
+      "tsi",
+      "kst",
+      "fisher-transform"
     ]);
     assert.deepEqual(
       f.adapter.technicalPaneMetrics().map((item) => item.key),

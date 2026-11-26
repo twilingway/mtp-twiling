@@ -5,6 +5,11 @@ import { isTechnicalIndicatorInstance } from "./instances.js";
 import { assertLength, ema, sma } from "./primitives.js";
 import { isVolumeFlowInstance, calculateVolumeIndicator } from "./volume-runtime.js";
 import { volumeFlowMetadata } from "./volume-flow/metadata.js";
+import {
+  isStateOscillatorInstance,
+  stateOscillatorMetadata,
+  calculateStateOscillator
+} from "./state-oscillator-runtime.js";
 import { wma, vwma, dema, tema, hma, smma, movingAverageMetadata } from "./averages/index.js";
 import {
   momentum,
@@ -43,10 +48,12 @@ import type {
   TechnicalIndicatorInstance,
   TechnicalIndicatorResult,
   TechnicalHistoryRequirement,
-  TechnicalCalculationContext
+  TechnicalCalculationContext,
+  LegacyRecursiveHistoryRequirement
 } from "./types.js";
 
 export function technicalIndicatorWarmup(instance: TechnicalIndicatorInstance): number | null {
+  if (isStateOscillatorInstance(instance)) return stateOscillatorMetadata(instance).warmupBars;
   if (isVolumeFlowInstance(instance))
     return volumeFlowMetadata(instance.definitionId, instance.params).warmupBars;
   switch (instance.definitionId) {
@@ -110,6 +117,8 @@ export function technicalIndicatorWarmup(instance: TechnicalIndicatorInstance): 
 export function technicalIndicatorHistoryRequirement(
   instance: TechnicalIndicatorInstance
 ): TechnicalHistoryRequirement {
+  if (isStateOscillatorInstance(instance))
+    return stateOscillatorMetadata(instance).historyRequirement;
   if (isVolumeFlowInstance(instance))
     return volumeFlowMetadata(instance.definitionId, instance.params).historyRequirement;
   const finite = (lookbackBars: number): TechnicalHistoryRequirement => ({
@@ -120,7 +129,7 @@ export function technicalIndicatorHistoryRequirement(
   });
   const recursive = (
     seedBars: number,
-    seedPolicy: Extract<TechnicalHistoryRequirement, { kind: "recursive" }>["seedPolicy"]
+    seedPolicy: LegacyRecursiveHistoryRequirement["seedPolicy"]
   ): TechnicalHistoryRequirement => ({
     kind: "recursive",
     lookbackBars: null,
@@ -218,6 +227,7 @@ export function calculateTechnicalIndicator(
     );
   }
   assertTechnicalBars(bars);
+  if (isStateOscillatorInstance(instance)) return calculateStateOscillator(instance, bars);
   if (isVolumeFlowInstance(instance)) return calculateVolumeIndicator(instance, bars);
   let series: Record<string, NumericSeries>, present: readonly boolean[];
   if (instance.definitionId === "atr") {
