@@ -29,6 +29,7 @@ export const QuoteRow = memo(function QuoteRow({
   onSelect,
   onRemove,
   onContext,
+  menuId,
   onFlag,
   position,
   dragClass,
@@ -44,6 +45,7 @@ export const QuoteRow = memo(function QuoteRow({
   onSelect: (symbol: string, uid: string | null) => void;
   onRemove: (row: MarketRow) => void;
   onContext: (event: MouseEvent, row: MarketRow) => void;
+  menuId: string | undefined;
   onFlag: (event: MouseEvent<HTMLButtonElement>, row: MarketRow) => void;
   position: WatchlistPosition;
   dragClass: string;
@@ -128,10 +130,31 @@ export const QuoteRow = memo(function QuoteRow({
         {number(row.change, digits, true)}
       </td>
       <td className={signClass(row.changePercent)} title={changeTitle}>
-        <span className="quote-percent">
-          {number(row.changePercent, 2, true)}
-          {row.changePercent != null ? "%" : ""}
-        </span>
+        <div className="quote-row-actions">
+          <span className="quote-percent">
+            {number(row.changePercent, 2, true)}
+            {row.changePercent != null ? "%" : ""}
+          </span>
+          <button
+            type="button"
+            className="quote-more"
+            draggable={false}
+            aria-label={t("Действия с инструментом") + " " + row.ticker}
+            aria-haspopup="menu"
+            aria-expanded={!!menuId}
+            aria-controls={menuId}
+            onPointerDown={(event) => {
+              if (menuId) event.stopPropagation();
+            }}
+            onClick={(event) => {
+              event.currentTarget.focus({ preventScroll: true });
+              onContext(event, row);
+            }}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
+            <span aria-hidden="true">⋯</span>
+          </button>
+        </div>
         <button
           className="quote-remove"
           draggable={false}

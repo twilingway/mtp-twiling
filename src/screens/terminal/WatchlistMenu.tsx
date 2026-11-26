@@ -13,6 +13,7 @@ import type { WatchlistSection } from "../../model/watchlist-sections.js";
 import { SectionIcon } from "./WatchlistSectionMenu.js";
 
 export function WatchlistMenu({
+  id,
   row,
   x,
   y,
@@ -25,6 +26,7 @@ export function WatchlistMenu({
   canDown = false,
   onClose
 }: {
+  id: string;
   row: MarketRow;
   x: number;
   y: number;
@@ -108,6 +110,7 @@ export function WatchlistMenu({
   }, [onClose, controller]);
   return (
     <div
+      id={id}
       ref={ref}
       role="menu"
       className="chart-context-menu watchlist-context-menu"
@@ -207,8 +210,7 @@ export function WatchlistMenu({
           <button role="menuitem" onClick={remove} disabled={disabled}>
             <DeleteIcon />{" "}
             <span>
-              {t("Удалить")}
-              {row.ticker} {t("из списка")}
+              {t("Удалить")} {row.ticker} {t("из списка")}
             </span>{" "}
             <kbd>Del</kbd>
           </button>
