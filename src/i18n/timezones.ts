@@ -6,6 +6,7 @@ const cities: Readonly<Record<string, string>> = {
   "Europe/Astrakhan": "Астрахань",
   "Europe/Samara": "Самара",
   "Europe/Kaliningrad": "Калининград",
+  "Europe/Kirov": "Киров",
   "Europe/Volgograd": "Волгоград",
   "Europe/Saratov": "Саратов",
   "Europe/Ulyanovsk": "Ульяновск",
@@ -24,6 +25,7 @@ const cities: Readonly<Record<string, string>> = {
   "Asia/Tomsk": "Томск",
   "Asia/Novokuznetsk": "Новокузнецк",
   "Asia/Khandyga": "Хандыга",
+  "Asia/Ust-Nera": "Усть-Нера",
   "Asia/Srednekolymsk": "Среднеколымск",
   "Asia/Anadyr": "Анадырь",
   "Europe/London": "Лондон",
@@ -91,8 +93,15 @@ export function supportedTimeZones(): TimeZoneChoice[] {
   return [...new Set([DEFAULT_TIME_ZONE, "UTC", "local", "exchange", ...zones])];
 }
 export function searchTimeZones(query: string, locale: Locale): TimeZoneChoice[] {
-  const needle = query.trim().toLocaleLowerCase(intlLocale(locale));
-  return supportedTimeZones().filter((zone) =>
-    `${timeZoneLabel(zone, locale)} ${zone}`.toLocaleLowerCase(intlLocale(locale)).includes(needle)
-  );
+  const language = intlLocale(locale);
+  const needle = query.trim().toLocaleLowerCase(language);
+  const collator = new Intl.Collator(language);
+  const matches = supportedTimeZones()
+    .map((zone) => ({ zone, label: timeZoneLabel(zone, locale) }))
+    .filter(({ zone, label }) => `${label} ${zone}`.toLocaleLowerCase(language).includes(needle));
+  const modes = new Set<TimeZoneChoice>(["UTC", "local", "exchange"]);
+  const cities = matches
+    .filter(({ zone }) => !modes.has(zone))
+    .sort((a, b) => collator.compare(a.label, b.label) || collator.compare(a.zone, b.zone));
+  return [...matches.filter(({ zone }) => modes.has(zone)), ...cities].map(({ zone }) => zone);
 }
