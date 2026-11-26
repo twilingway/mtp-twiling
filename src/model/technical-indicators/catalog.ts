@@ -73,9 +73,17 @@ export function technicalCatalogEntries(
 ): IndicatorLibraryEntry[] {
   return technicalCatalogData.map(([id, ru, en, short, overlay]) => {
     const ready = !!technicalDefinitionForCatalog(id) || id === "Volume@tv-basicstudies";
+    const label =
+      id === "BookerKnoxvilleDivergence@tv-basicstudies"
+        ? locale === "ru"
+          ? "Дивергенция Knoxville (MTP)"
+          : "Knoxville Divergence (MTP)"
+        : locale === "ru"
+          ? ru
+          : en;
     return {
       id,
-      label: locale === "ru" ? ru : en,
+      label,
       aliases: [ru, en, short],
       category: "technicals",
       available: ready && !blockedReason,

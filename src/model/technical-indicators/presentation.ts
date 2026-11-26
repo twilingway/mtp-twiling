@@ -29,6 +29,10 @@ function validColor(policy: PlotColorPolicy): boolean {
 function validGeometry(geometry: PlotGeometry): boolean {
   if (geometry.kind === "line") return geometry.gaps === "legacy" || geometry.gaps === "break";
   if (geometry.kind === "columns") return geometry.base === 0;
+  if (geometry.kind === "candles") {
+    const keys = [geometry.openSeriesKey, geometry.highSeriesKey, geometry.lowSeriesKey];
+    return keys.every((key) => key.length > 0) && new Set(keys).size === keys.length;
+  }
   if (geometry.kind === "range-bars")
     return (
       geometry.otherSeriesKey.length > 0 &&
@@ -36,7 +40,7 @@ function validGeometry(geometry: PlotGeometry): boolean {
     );
   if (
     geometry.kind === "marker" &&
-    (!["triangle-up", "triangle-down", "circle"].includes(geometry.shape) ||
+    (!["triangle-up", "triangle-down", "circle", "dash"].includes(geometry.shape) ||
       !["above", "below", "center"].includes(geometry.placement))
   )
     return false;
@@ -106,7 +110,13 @@ export function compilePresentation(
     assert(!hidden.has(plot.seriesKey), "hidden anchor cannot create a visible plot");
     assert(validGeometry(plot.geometry) && size(plot.width), "plot geometry or width");
     assert(validColor(plot.color), "plot color");
-    assert(plot.color.kind === "solid" || plot.geometry.kind === "columns", "palette geometry");
+    assert(
+      plot.color.kind === "solid" ||
+        plot.geometry.kind === "columns" ||
+        (plot.color.kind === "indexed" &&
+          (plot.geometry.kind === "candles" || plot.geometry.kind === "marker")),
+      "palette geometry"
+    );
     const values = series(plot.seriesKey),
       custom = input.styles?.[plot.id];
     let pairedValues: NumericSeries | undefined;
@@ -117,6 +127,31 @@ export function compilePresentation(
         values.every((value, index) => (value === null) === (pairedValues![index] === null)),
         "unpaired range bar"
       );
+    }
+    let candleValues: CompiledPresentationPlot["candleValues"];
+    if (plot.geometry.kind === "candles") {
+      const { openSeriesKey, highSeriesKey, lowSeriesKey } = plot.geometry;
+      for (const key of [openSeriesKey, highSeriesKey, lowSeriesKey])
+        assert(hidden.has(key), "candle anchors must be hidden series");
+      const open = series(openSeriesKey),
+        high = series(highSeriesKey),
+        low = series(lowSeriesKey);
+      assert(
+        values.every((close, index) => {
+          const first = open[index]!,
+            top = high[index]!,
+            bottom = low[index]!;
+          return close === null
+            ? first === null && top === null && bottom === null
+            : first !== null &&
+                top !== null &&
+                bottom !== null &&
+                bottom <= Math.min(first, close) &&
+                Math.max(first, close) <= top;
+        }),
+        "candle range"
+      );
+      candleValues = Object.freeze({ open, high, low });
     }
     let colorIndices: NumericSeries | undefined;
     if (plot.color.kind === "indexed") {
@@ -161,6 +196,7 @@ export function compilePresentation(
       width,
       values,
       ...(pairedValues ? { pairedValues } : {}),
+      ...(candleValues ? { candleValues } : {}),
       ...(colorIndices ? { colorIndices } : {}),
       opacity: custom?.opacity ?? 1,
       lineStyle: custom?.lineStyle ?? "solid",

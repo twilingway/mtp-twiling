@@ -1,13 +1,24 @@
 import { anchoredStudies } from "./anchored.js";
+import { autoKeyLevelStudies } from "./auto-key-levels.js";
+import { autoSlopedStudies } from "./auto-sloped.js";
 import { averageStudies } from "./averages.js";
 import { bandStudies } from "./bands.js";
 import { bookerStudies } from "./booker.js";
+import { bookerPivotStudies } from "./booker-pivots.js";
+import { calendarAnalysisStudies } from "./calendar-analysis.js";
+import { correlationStudies } from "./correlation.js";
 import { externalStudies } from "./external.js";
+import { knoxvilleStudies } from "./knoxville.js";
 import { levelStudies } from "./levels.js";
+import { marketBreadthStudies } from "./market-breadth.js";
 import { momentumStudies } from "./momentum.js";
+import { netVolumeStudy } from "./net-volume.js";
+import { periodStudies } from "./period-studies.js";
+import { priceTargetStudies } from "./price-target.js";
 import { sessionStudies } from "./sessions.js";
 import { trendStudies } from "./trend.js";
 import { volumeStudies } from "./volume.js";
+import { volumeDeltaStudies } from "./volume-delta.js";
 import type {
   CatalogExpansionParameters,
   TechnicalBar,
@@ -18,15 +29,26 @@ import type {
 
 export const catalogExpansionStudies = [
   ...anchoredStudies,
+  ...autoKeyLevelStudies,
+  ...autoSlopedStudies,
   ...averageStudies,
   ...bandStudies,
   ...bookerStudies,
+  ...bookerPivotStudies,
+  ...calendarAnalysisStudies,
+  ...correlationStudies,
   ...externalStudies,
+  ...knoxvilleStudies,
   ...levelStudies,
+  ...marketBreadthStudies,
   ...momentumStudies,
+  netVolumeStudy,
+  ...periodStudies,
+  ...priceTargetStudies,
   ...sessionStudies,
   ...trendStudies,
-  ...volumeStudies
+  ...volumeStudies,
+  ...volumeDeltaStudies
 ];
 type CatalogStudy = (typeof catalogExpansionStudies)[number];
 type CatalogInstance = Extract<

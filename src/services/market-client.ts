@@ -294,6 +294,23 @@ export class MarketClient extends EventTarget {
   settleMutations(): Promise<void> {
     return this.mutations.run(async () => {});
   }
+  loadSpotTradeHistory(uid: string, range: HistoryRange, signal: AbortSignal) {
+    if (this.closed || signal.aborted) return Promise.resolve(null);
+    const row = this.values.find((item) => item.uid === uid);
+    return row ? this.publicMarket.loadSpotTradeHistory(row, range, signal) : Promise.resolve(null);
+  }
+  loadIntrabarVolume(
+    uid: string,
+    interval: TurnoverInterval,
+    range: HistoryRange,
+    signal: AbortSignal
+  ) {
+    if (this.closed || signal.aborted) return Promise.resolve(null);
+    const row = this.values.find((item) => item.uid === uid);
+    return row
+      ? this.publicMarket.loadIntrabarVolume(row, interval, range, signal)
+      : Promise.resolve(null);
+  }
   loadQuoteTurnover(
     uid: string,
     interval: TurnoverInterval,

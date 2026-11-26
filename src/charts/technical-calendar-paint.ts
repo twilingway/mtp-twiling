@@ -11,6 +11,7 @@ import type {
   OutputStyle,
   TechnicalIndicatorDefinition
 } from "../model/technical-indicators/types.js";
+import type { RenderedSlopedDecoration } from "./technical-sloped-paint.js";
 
 interface RegionStyle {
   color: string;
@@ -26,11 +27,13 @@ export type RenderedPriceDecoration = TechnicalPriceDecoration & RegionStyle;
 export function priceDecorationLayers(values: readonly RenderedPriceDecoration[]) {
   const regions: RenderedPriceRegion[] = [];
   const moon: RenderedMoonDecoration[] = [];
+  const sloped: RenderedSlopedDecoration[] = [];
   for (const value of values) {
-    if ("kind" in value) moon.push(value);
-    else regions.push(value);
+    if (!("kind" in value)) regions.push(value);
+    else if (value.kind === "candle-tint" || value.kind === "price-circle") moon.push(value);
+    else sloped.push(value);
   }
-  return { regions, moon };
+  return { regions, moon, sloped };
 }
 
 export function compileTechnicalPriceRegions(

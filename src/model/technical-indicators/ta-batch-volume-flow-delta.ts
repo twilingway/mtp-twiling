@@ -9,6 +9,8 @@ export interface IntrabarVolumePeriod {
   readonly endTime: number;
   /** Null means coverage is unknown. An empty array means complete coverage without trades. */
   readonly intrabars: readonly LowerVolumeBar[] | null;
+  /** Direction observed on immediately preceding lower candles, even after parent coverage failed. */
+  readonly seed?: IntrabarVolumeSeed;
 }
 
 export interface CumulativeVolumePeriod extends IntrabarVolumePeriod {
@@ -56,6 +58,14 @@ function classifyVolume(
       period.timestamp < previousEnd
     )
       throw new RangeError("Chart bar intervals must be ordered and distinct");
+    if (period.seed) {
+      assertSeries([period.seed.close]);
+      previousClose = period.seed.close;
+      direction = period.seed.direction;
+    } else if (previousEnd !== -Infinity && previousEnd !== period.timestamp) {
+      previousClose = null;
+      direction = null;
+    }
     previousEnd = period.endTime;
     if (period.intrabars === null) {
       previousClose = null;
@@ -134,6 +144,7 @@ export function cumulativeVolumeDelta(
 ): (VolumeDeltaBar | null)[] {
   let anchorTimestamp = -Infinity;
   let previousTime = -Infinity;
+  let previousEnd = -Infinity;
   let total: NumericValue = null;
   return volumeDelta(periods, seed).map((bar, index) => {
     const period = periods[index]!;
@@ -144,8 +155,9 @@ export function cumulativeVolumeDelta(
         throw new RangeError("Anchor periods must appear in chronological order");
       anchorTimestamp = period.anchorTimestamp;
       total = period.timestamp === anchorTimestamp ? 0 : null;
-    }
+    } else if (period.timestamp !== previousEnd) total = null;
     previousTime = period.timestamp;
+    previousEnd = period.endTime;
     if (total === null || bar === null) {
       total = null;
       return null;

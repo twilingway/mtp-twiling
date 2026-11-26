@@ -60,6 +60,7 @@ export function lightweightTechnical(
     candleCount = 0,
     projected = false,
     viewportFrame = 0;
+  let candleTail: { index: number; timestamp: number } | undefined;
   let events: ReturnType<typeof attachTechnicalPaneEvents> | undefined;
   const nativePanes = () => (typeof chart.panes === "function" ? chart.panes() : []);
   const referenceContext = lightweightReferenceContext(chart, () => primary?.());
@@ -160,6 +161,7 @@ export function lightweightTechnical(
     output.presentation?.precisionPolicy === "fixed-2" ||
     output.presentation?.geometry.kind === "cross" ||
     output.presentation?.geometry.kind === "range-bars" ||
+    output.presentation?.geometry.kind === "candles" ||
     output.presentation?.geometry.kind === "marker" ||
     (output.presentation?.geometry.kind === "line" &&
       output.presentation.geometry.gaps === "break");
@@ -241,7 +243,7 @@ export function lightweightTechnical(
     if (hasVisibleAverage(instances)) readViewport();
     const compiled = calculation.compile(instances, layout);
     projected = compiled.outputs.some((output) => output.timestamps.length > candleCount);
-    calendar.update(compiled.priceRegions);
+    calendar.update(compiled.priceRegions, candleTail);
     groups = compiled.groups;
     const lower = groups.filter((group) => group.key !== "price");
     const activePanes = new Set(lower.map((group) => group.key));
@@ -424,6 +426,9 @@ export function lightweightTechnical(
     setData(data: readonly Candle[]) {
       if (disposed || !alive()) return;
       candleCount = data.length;
+      const last = data.at(-1);
+      candleTail =
+        last === undefined ? undefined : { index: data.length - 1, timestamp: last.timestamp };
       calculation.setData(data);
       reconcile();
     },

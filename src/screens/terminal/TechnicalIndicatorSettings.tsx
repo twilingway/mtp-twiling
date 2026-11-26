@@ -4,6 +4,10 @@ import {
   technicalParameterLabel
 } from "../../i18n/messages-technical-settings.js";
 import { useTerminal } from "./context.js";
+import { CorrelationInstrumentSelect } from "./CorrelationInstrumentSelect.js";
+import { MarketBreadthFilePicker } from "./MarketBreadthFilePicker.js";
+import { useMarketBreadth } from "./MarketBreadthContext.js";
+import { isMarketBreadthStudy } from "../../model/technical-indicators/catalog-expansion/market-breadth.js";
 import { Modal } from "./Modal.js";
 import { useIndicatorMenuAction } from "./useIndicatorMenuAction.js";
 import { updateTechnicalIndicator } from "./technical-indicator-actions.js";
@@ -28,6 +32,8 @@ import {
 
 export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIndicatorInstance }) {
   const { controller, state } = useTerminal();
+  const breadth = useMarketBreadth();
+  const breadthStudy = isMarketBreadthStudy(instance.definitionId);
   const initial = useRef({ state, session: controller.sessionKey(), instance }).current;
   const locale = state.preferences.locale ?? "ru";
   const english = locale === "en";
@@ -151,8 +157,17 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
           <legend>{text("Параметры", "Inputs")}</legend>
           {definition.parameters.map((parameter) => (
             <label key={parameter.key}>
-              <span>{technicalParameterLabel(parameter.key, locale)}</span>
-              {parameter.type === "boolean" ? (
+              <span>
+                {parameter.key === "comparisonUid"
+                  ? text("Инструмент для сравнения", "Comparison instrument")
+                  : technicalParameterLabel(parameter.key, locale)}
+              </span>
+              {parameter.key === "comparisonUid" ? (
+                <CorrelationInstrumentSelect
+                  value={String(parameters[parameter.key])}
+                  onChange={(value) => setParameters({ ...parameters, [parameter.key]: value })}
+                />
+              ) : parameter.type === "boolean" ? (
                 <input
                   type="checkbox"
                   checked={parameters[parameter.key] === true}
@@ -224,6 +239,32 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
             </label>
           )}
         </fieldset>
+        {breadthStudy && breadth && (
+          <fieldset disabled={pending || !current}>
+            <legend>{text("Рынок для сравнения", "Comparison market")}</legend>
+            <MarketBreadthFilePicker
+              english={english}
+              data={breadth.input?.data ?? null}
+              onChange={breadth.setData}
+            />
+            {breadth.input && (
+              <label>
+                {text("Дата дневной свечи", "Daily candle date")}
+                <select
+                  value={breadth.input.dateBasis}
+                  onChange={(event) =>
+                    breadth.setDateBasis(
+                      event.target.value === "exchange-local" ? "exchange-local" : "utc-date"
+                    )
+                  }
+                >
+                  <option value="utc-date">{text("Дата UTC", "UTC date")}</option>
+                  <option value="exchange-local">{text("Дата биржи", "Exchange date")}</option>
+                </select>
+              </label>
+            )}
+          </fieldset>
+        )}
         {instance.definitionId === "lsma" && (
           <p>
             {text(

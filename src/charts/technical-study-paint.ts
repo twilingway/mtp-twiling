@@ -26,6 +26,11 @@ export function drawStudyMarker(
   const y = (point.y + distance) * verticalRatio;
   const dx = radius * horizontalRatio;
   const dy = radius * verticalRatio;
+  if (geometry.shape === "dash") {
+    const height = Math.max(1, geometry.size.value * verticalRatio);
+    context.fillRect(x - dx, y - height / 2, dx * 2, height);
+    return;
+  }
   context.beginPath();
   if (geometry.shape === "circle") context.ellipse(x, y, dx, dy, 0, 0, Math.PI * 2);
   else {
@@ -52,6 +57,30 @@ export function drawStudyRange(
   const width = Math.max(1, spacing * 0.7 * horizontalRatio);
   const top = Math.min(point.y, to) * verticalRatio;
   context.fillRect(point.x * horizontalRatio - width / 2, top, width, Math.max(1, height));
+}
+
+export function drawStudyCandle(
+  context: CanvasRenderingContext2D,
+  candle: { x: number; open: number; high: number; low: number; close: number },
+  spacing: number,
+  wickWidth: number,
+  horizontalRatio = 1,
+  verticalRatio = 1
+): void {
+  const x = candle.x * horizontalRatio;
+  const wick = Math.max(1, wickWidth * horizontalRatio);
+  const height = Math.abs(candle.high - candle.low) * verticalRatio;
+  if (height)
+    context.fillRect(x - wick / 2, Math.min(candle.high, candle.low) * verticalRatio, wick, height);
+  drawStudyRange(
+    context,
+    { x: candle.x, y: candle.open },
+    candle.close,
+    spacing,
+    true,
+    horizontalRatio,
+    verticalRatio
+  );
 }
 
 /** Split at a rendered intersection so a polygon never spans both directions. */

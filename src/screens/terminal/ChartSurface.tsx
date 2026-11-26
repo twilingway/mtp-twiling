@@ -16,6 +16,8 @@ import { drawingVisibleOnInterval } from "../../model/intervals/drawing-visibili
 import { technicalIndicatorGroups } from "../../model/technical-indicator-layout.js";
 import { useCameraInput } from "./camera-input.js";
 import { drawingRenderList } from "./drawing-settings-preview.js";
+const chartControls =
+  "[data-image-id],.indicator-legend,.technical-pane-legends,.calendar-analysis-overlays";
 
 export function visibleDrawings(state: TerminalState): Drawing[] {
   if (drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden) return [];
@@ -171,8 +173,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
   function down(event: ReactPointerEvent<HTMLDivElement>) {
     if (
       event.button !== 0 ||
-      (event.target instanceof Element &&
-        event.target.closest("[data-image-id],.indicator-legend,.technical-pane-legends"))
+      (event.target instanceof Element && event.target.closest(chartControls))
     )
       return;
     const chart = controller.chart;
@@ -395,11 +396,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
       }}
       onDoubleClickCapture={(event) => {
         if (cameraInput.action(event) === false) return;
-        if (
-          event.target instanceof Element &&
-          event.target.closest("[data-image-id],.indicator-legend,.technical-pane-legends")
-        )
-          return;
+        if (event.target instanceof Element && event.target.closest(chartControls)) return;
         const hit = find(pixel(event));
         if (hit) {
           event.preventDefault();
@@ -409,11 +406,7 @@ export function ChartGestures({ children }: { children: ReactNode }) {
         }
       }}
       onContextMenuCapture={(event) => {
-        if (
-          event.target instanceof Element &&
-          event.target.closest("[data-image-id],.indicator-legend,.technical-pane-legends")
-        )
-          return;
+        if (event.target instanceof Element && event.target.closest(chartControls)) return;
         event.preventDefault();
         event.stopPropagation();
         const hit = find(pixel(event));

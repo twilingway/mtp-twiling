@@ -165,7 +165,7 @@ function period(start, high, low, close, options = {}) {
 test("Booker pivot primitives use closed prior periods and an explicit future timestamp", () => {
   assert.deepEqual(BOOKER_INTRADAY_MINUTES, [60, 240, 480]);
   assert.deepEqual(BOOKER_MISSED_PERIODS, ["day", "week", "month"]);
-  assert.deepEqual(BOOKER_ZIV_PERIODS, [240, 480, "week", "month"]);
+  assert.deepEqual(BOOKER_ZIV_PERIODS, [240, "day", "week", "month"]);
   const before = period(0, 110, 90, 100);
   const current = period(60, 104, 89, 95, { closed: false });
   assert.deepEqual(classicPreviousPeriodPivots([before, current], 1), [

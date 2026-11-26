@@ -22,6 +22,9 @@ import { useTechnicalPaneMetrics } from "./use-technical-pane-metrics.js";
 import { SupplementalStudyStatusContext } from "./SupplementalStudyStatus.js";
 import { useOpenInterest } from "./use-open-interest.js";
 import { useQuoteTurnover } from "./use-quote-turnover.js";
+import { CalendarAnalysisTables } from "./CalendarAnalysisTables.js";
+import { useExtraStudyData } from "./use-extra-study-data.js";
+import { marketBreadthCoverage } from "../../model/technical-indicators/catalog-expansion/market-breadth.js";
 const Version = memo(function Version() {
   return <span id="app-version" hidden />;
 });
@@ -43,16 +46,54 @@ export function ChartPanel() {
     busy = available && (state.loading || state.importingBackup === true);
   const openInterest = useOpenInterest(controller, state, row);
   const quoteTurnover = useQuoteTurnover(controller, state, row);
+  const extra = useExtraStudyData(controller, state, row);
   const observations = openInterest.observations;
   const volumeStudies = quoteTurnover.volumeStudies;
+  const additional = extra.data;
   const supplemental = useMemo<TechnicalSupplementalInputs>(
     () => ({
+      ...additional,
       ...(observations ? { openInterest: observations } : {}),
-      ...(volumeStudies ? { volumeStudies } : {})
+      ...(volumeStudies || additional.volumeStudies
+        ? { volumeStudies: { ...volumeStudies, ...additional.volumeStudies } }
+        : {})
     }),
-    [observations, volumeStudies]
+    [observations, volumeStudies, additional]
   );
-  const studyStatus = { openInterest, quoteTurnover };
+  const breadthInput = additional.marketBreadth;
+  const coverage = useMemo(
+    () =>
+      p.timeframe === "1d" && breadthInput
+        ? marketBreadthCoverage(state.candles, breadthInput)
+        : undefined,
+    [breadthInput, p.timeframe, state.candles]
+  );
+  const breadthStatus = (metric: keyof NonNullable<typeof coverage>) =>
+    ({
+      status:
+        p.timeframe !== "1d"
+          ? "unsupported"
+          : !breadthInput
+            ? "needs-file"
+            : coverage?.[metric]
+              ? "ready"
+              : "empty",
+      ...(breadthInput && { currency: breadthInput.marketId })
+    }) as const;
+  const studyStatus = {
+    openInterest,
+    quoteTurnover,
+    priceTarget: extra.priceTarget,
+    intrabarVolume: extra.intrabarVolume,
+    netVolume: extra.netVolume,
+    priceLevel: extra.priceLevel,
+    correlation: extra.correlation,
+    marketBreadth: {
+      line: breadthStatus("line"),
+      ratio: breadthStatus("ratio"),
+      cvi: breadthStatus("cvi")
+    }
+  };
   return (
     <section
       id="chart-panel"
@@ -115,6 +156,11 @@ export function ChartPanel() {
       >
         <ChartGestures>
           <ChartCanvas supplemental={supplemental} drawingProjection={drawingProjection} />
+          <CalendarAnalysisTables
+            tables={extra.calendar.tables}
+            refresh={extra.calendar.refresh}
+            {...(p.locale ? { locale: p.locale } : {})}
+          />
           <ImageLayer />
           <DrawingAxisLabels drawingProjection={drawingProjection} />
           <CandleCountdown />

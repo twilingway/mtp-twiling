@@ -2,7 +2,9 @@ import { candleCalendarPeriod } from "../../candle-clock.js";
 import { NATIVE_TIMEFRAME_CONFIG } from "../../intervals/native-timeframes.js";
 import { getInterval, INTERVALS } from "../../intervals/registry.js";
 import type { IntervalId } from "../../intervals/registry.js";
+import type { SpotTradeHistory } from "../../market-trades.js";
 import { klingerOscillator } from "../ta-batch-volume-flow.js";
+import type { IntrabarVolumeHistory } from "../ta-batch-volume-intrabars.js";
 import { readQuoteTurnover, TURNOVER_DAY } from "../ta-batch-volume-flow-turnover.js";
 import type { QuoteTurnoverSeries } from "../ta-batch-volume-flow-turnover.js";
 import { relativeVolumeAtTime } from "../ta-batch-volume-flow-time.js";
@@ -37,6 +39,8 @@ const DAY_MS = 86_400_000;
 export type VolumeAnchorInterval = (typeof anchors)[number];
 
 export interface VolumeStudyData {
+  readonly intrabarVolume?: IntrabarVolumeHistory;
+  readonly netVolumeTrades?: SpotTradeHistory;
   /** Aligned to the current instrument and chart interval, with source-confirmed period coverage. */
   readonly relativeVolumePeriods?: Partial<
     Record<VolumeAnchorInterval, readonly RelativeVolumePeriod[]>

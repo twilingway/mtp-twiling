@@ -1,0 +1,97 @@
+.calendar-analysis-overlays {
+  position: absolute;
+  inset: 8px 68px 32px 8px;
+  z-index: 9;
+  pointer-events: none;
+}
+
+.calendar-analysis-position {
+  position: absolute;
+  display: grid;
+  gap: 5px;
+  max-width: min(96%, 690px);
+  max-height: 46%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  pointer-events: auto;
+}
+
+.calendar-analysis-position[data-position^="top"] {
+  top: 0;
+}
+.calendar-analysis-position[data-position^="bottom"] {
+  bottom: 0;
+}
+.calendar-analysis-position[data-position$="left"] {
+  left: 0;
+}
+.calendar-analysis-position[data-position$="right"] {
+  right: 0;
+}
+
+.calendar-table {
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--surface, var(--chart-background, #181818));
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.calendar-table summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.calendar-table-scroll {
+  max-height: min(200px, 24vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.calendar-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.calendar-table th,
+.calendar-table td {
+  padding: 4px 7px;
+  border-bottom: 1px solid var(--border);
+  text-align: right;
+  white-space: nowrap;
+}
+.calendar-table th:first-child {
+  text-align: left;
+}
+.calendar-table p {
+  margin: 4px 0;
+}
+.calendar-table-refresh {
+  margin-top: 5px;
+  font-size: 11px;
+}
+.calendar-row-note {
+  display: block;
+  white-space: normal;
+  font-weight: 400;
+}
+.calendar-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .calendar-analysis-overlays {
+    inset-inline-end: 48px;
+  }
+  .calendar-analysis-position {
+    max-width: min(100%, 460px);
+  }
+  .calendar-table-scroll {
+    max-height: 19vh;
+  }
+}

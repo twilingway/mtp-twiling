@@ -33,8 +33,16 @@ export interface TechnicalPaneMetric {
 
 export type TechnicalSupplementalInputs = Pick<
   TechnicalCalculationContext,
-  "openInterest" | "volumeStudies"
->;
+  | "openInterest"
+  | "volumeStudies"
+  | "correlationHistory"
+  | "priceLevelPeriods"
+  | "bookerPivotPeriods"
+  | "seasonalityHistory"
+  | "priceTarget"
+  | "autoKeyLevelTrades"
+  | "marketBreadth"
+> & { readonly instrumentUid?: string };
 
 export interface ChartAdapter {
   source?: { owner: string; viewKey: string; uid: string };

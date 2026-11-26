@@ -4,10 +4,9 @@ import {
   loadCatalog,
   loadHistory,
   loadQuotes,
-  searchCatalog,
   nativeInterval
 } from "./providers/bybit/index.js";
-import type { BybitCatalog, BybitCategory, BybitInstrument } from "./providers/bybit/types.js";
+import type { BybitCatalog, BybitCategory } from "./providers/bybit/types.js";
 import type { BybitStreamOptions } from "./providers/bybit/websocket.js";
 import type { BybitInterval } from "./providers/bybit/market.js";
 import {
@@ -17,13 +16,19 @@ import {
 import type { OpenInterestObservations } from "../model/technical-indicators/ta-batch-external.js";
 import type { TurnoverInterval } from "../model/technical-indicators/ta-batch-volume-flow-turnover.js";
 import { loadPublicQuoteTurnover } from "./market-turnover.js";
+import { loadPublicIntrabarVolume } from "./market-intrabar-volume.js";
+import { okxSpotTradeSource } from "./market-spot-trades.js";
 import { okxNativeInterval } from "./providers/okx/market.js";
-import type { OkxInstrument } from "./providers/okx/types.js";
 import {
+  knownBybitMarkets,
   marketTuple,
   okxCatalogInstrument,
+  okxMatches,
   okxRefs,
-  publicCatalogInstrument
+  publicCatalogInstrument,
+  publicSearchKey,
+  searchBybit,
+  supportedBybitInstrument
 } from "./market-public-mapping.js";
 import type { PublicQuote } from "./market-public-mapping.js";
 import { OkxMarket, PUBLIC_CATALOG_MAX_AGE_MS } from "./market-okx.js";
@@ -68,41 +73,6 @@ function candleSeries(row: MarketRow, timeframe: Timeframe): PublicSeries {
     throw new Error("Источник криптокотировок недоступен.");
   (ref.provider === "okx" ? okxNativeInterval : nativeInterval)(timeframe);
   return { uid: row.uid, ref, timeframe };
-}
-
-function supportedBybitInstrument(item: BybitInstrument): boolean {
-  return (
-    item.status === "Trading" &&
-    (item.ref.category === "spot" ||
-      (item.contractType === "LinearPerpetual" && item.settleCoin === "USDT"))
-  );
-}
-
-function knownBybitMarkets(catalog: BybitCatalog): Set<string> {
-  const categories = new Set(catalog.instruments.map((item) => item.ref.category));
-  if (!catalog.complete || !categories.has("spot") || !categories.has("linear"))
-    throw new Error("Полный каталог Bybit не подтверждён.");
-  return new Set(catalog.instruments.filter(supportedBybitInstrument).map(marketTuple));
-}
-
-function searchBybit(catalog: BybitCatalog, query: string, kind: InstrumentSearchKind) {
-  return searchCatalog(catalog, query, { cryptoOnly: false, limit: 300 })
-    .filter((item) => supportedBybitInstrument(item) && item.assetClass !== "unknown")
-    .map(publicCatalogInstrument)
-    .filter((item) => kind === "all" || item.kind === kind);
-}
-
-function searchKey(value: string): string {
-  return value
-    .normalize("NFKC")
-    .toUpperCase()
-    .replace(/[\s/_:-]+/g, "");
-}
-
-function okxMatches(item: OkxInstrument, query: string): boolean {
-  return [item.ref.symbol, item.baseCoin, item.quoteCoin].some((part) =>
-    searchKey(part).includes(query)
-  );
 }
 
 export class PublicMarket {
@@ -154,6 +124,28 @@ export class PublicMarket {
   private signal(signal?: AbortSignal): AbortSignal {
     return signal ? AbortSignal.any([signal, this.lifetime.signal]) : this.lifetime.signal;
   }
+  loadSpotTradeHistory(row: MarketRow, range: HistoryRange, signal: AbortSignal) {
+    const source = okxSpotTradeSource(row);
+    return source && !this.cachePaused
+      ? this.okx.spotTrades(source.ref, range, this.signal(signal))
+      : Promise.resolve(null);
+  }
+  loadIntrabarVolume(
+    row: MarketRow,
+    interval: TurnoverInterval,
+    range: HistoryRange,
+    signal: AbortSignal
+  ) {
+    if (this.cachePaused) return Promise.resolve(null);
+    return loadPublicIntrabarVolume(
+      row,
+      interval,
+      range,
+      this.signal(signal),
+      (ref, timeframe, part, active) => loadHistory(this.http, ref, timeframe, part, active),
+      (ref, timeframe, part, active) => this.okx.history(ref, timeframe, part, active)
+    );
+  }
   loadQuoteTurnover(
     row: MarketRow,
     interval: TurnoverInterval,
@@ -200,7 +192,7 @@ export class PublicMarket {
     kind: InstrumentSearchKind,
     signal?: AbortSignal
   ): Promise<CatalogInstrument[]> {
-    const needle = searchKey(query);
+    const needle = publicSearchKey(query);
     if (!needle || !["all", "crypto", "future", "tokenized-stock"].includes(kind)) return [];
     const active = this.signal(signal);
     let catalog: BybitCatalog;

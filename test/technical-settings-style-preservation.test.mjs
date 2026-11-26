@@ -54,6 +54,7 @@ function boundarySettings() {
     },
     "react/jsx-runtime": jsx,
     "screens/terminal/context.js": { useTerminal: () => ({ controller, state }) },
+    "screens/terminal/MarketBreadthContext.js": { useMarketBreadth: () => null },
     "screens/terminal/Modal.js": { Modal: () => null },
     "screens/terminal/useIndicatorMenuAction.js": {
       useIndicatorMenuAction: () => ({

@@ -364,9 +364,11 @@ test("legend collapse exposes an accessible compact count without toggling indic
       createContext: (defaultValue) => ({ defaultValue, Provider: Symbol("context-provider") }),
       useContext: (context) => context.defaultValue,
       memo: (component) => component,
-      useState: (value) => [value, () => {}],
+      useState: (value) => [typeof value === "function" ? value() : value, () => {}],
       useRef: (value) => ({ current: value }),
+      useCallback: (callback) => callback,
       useMemo: (compute) => compute(),
+      useEffectEvent: (callback) => callback,
       useEffect() {}
     },
     "react-dom": { createPortal: () => assert.fail("legend test must not open a list menu") },

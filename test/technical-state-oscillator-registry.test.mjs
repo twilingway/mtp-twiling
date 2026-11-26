@@ -43,7 +43,7 @@ test("append-only definitions preserve independent frozen42 Git contract exactly
     assert.equal(catalog.technicalDefinitionForCatalog(publicIds[i]), id);
   });
 });
-test("reviewed available TA includes price renderers and keeps unsupported items unavailable", () => {
+test("reviewed available TA includes price renderers and respects the catalog add guard", () => {
   for (const locale of ["ru", "en"]) {
     const entries = catalog.technicalCatalogEntries(locale);
     assert.equal(entries.length, 127);
@@ -59,7 +59,7 @@ test("reviewed available TA includes price renderers and keeps unsupported items
       assert.equal(catalog.technicalDefinitionForCatalog(id), definitionId);
       assert.equal(entries.find((e) => e.id === id).available, true);
     }
-    assert.equal(entries.find((e) => e.id === "STD;Advance%1Decline%1Line").available, false);
+    assert.equal(entries.find((e) => e.id === "STD;Advance%1Decline%1Line").available, true);
     assert.equal(
       catalog.technicalCatalogEntries(locale, "blocked").filter((e) => e.available).length,
       0

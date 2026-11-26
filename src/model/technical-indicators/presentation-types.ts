@@ -19,8 +19,14 @@ export type PlotGeometry =
   | { readonly kind: "columns"; readonly base: 0 }
   | { readonly kind: "range-bars"; readonly otherSeriesKey: string; readonly showEqual?: boolean }
   | {
+      readonly kind: "candles";
+      readonly openSeriesKey: string;
+      readonly highSeriesKey: string;
+      readonly lowSeriesKey: string;
+    }
+  | {
       readonly kind: "marker";
-      readonly shape: "triangle-up" | "triangle-down" | "circle";
+      readonly shape: "triangle-up" | "triangle-down" | "circle" | "dash";
       readonly placement: "above" | "below" | "center";
       readonly size: { readonly unit: "pine-relative"; readonly value: PlotSize };
     }
@@ -81,6 +87,11 @@ export interface CompiledPresentationPlot extends PresentationPlot {
   readonly precisionPolicy: PlotPrecisionPolicy;
   readonly values: NumericSeries;
   readonly pairedValues?: NumericSeries;
+  readonly candleValues?: {
+    readonly open: NumericSeries;
+    readonly high: NumericSeries;
+    readonly low: NumericSeries;
+  };
   readonly colorIndices?: NumericSeries;
   readonly opacity: number;
   readonly lineStyle: "solid" | "dashed" | "dotted";

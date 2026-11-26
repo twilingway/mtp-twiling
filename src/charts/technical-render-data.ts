@@ -2,6 +2,7 @@ import type { Candle } from "../model/types.js";
 import { technicalIndicatorGroups } from "../model/technical-indicator-layout.js";
 import type { TechnicalPanePreference } from "../model/technical-indicator-layout.js";
 import { calculateTechnicalIndicator } from "../model/technical-indicators/runtime.js";
+import { isVolumeDeltaStudy } from "../model/technical-indicators/catalog-expansion/volume-delta.js";
 import { getTechnicalIndicatorDefinition } from "../model/technical-indicators/definitions.js";
 import { isTechnicalIndicatorInstance } from "../model/technical-indicators/instances.js";
 import { compilePresentation } from "../model/technical-indicators/presentation.js";
@@ -50,6 +51,23 @@ export interface TechnicalRenderReference extends CompiledReferenceLevel {
   readonly order: number;
   readonly timestamps: readonly number[];
 }
+
+type SupplementalKey = keyof TechnicalSupplementalInputs;
+const auxiliaryStudyInputs: Partial<Record<string, readonly SupplementalKey[]>> = {
+  "correlation-coefficient": ["correlationHistory"],
+  "pivot-points-standard": ["priceLevelPeriods"],
+  "multi-time-period-charts": ["priceLevelPeriods"],
+  "booker-intraday-pivots": ["bookerPivotPeriods"],
+  "booker-missed-pivots": ["bookerPivotPeriods"],
+  "booker-ziv-ghost-pivots": ["bookerPivotPeriods"],
+  seasonality: ["seasonalityHistory"],
+  "price-target": ["priceTarget"],
+  "auto-key-levels": ["priceLevelPeriods", "autoKeyLevelTrades"],
+  "advance-decline-line": ["marketBreadth"],
+  "advance-decline-ratio": ["marketBreadth"],
+  "cumulative-volume-index": ["marketBreadth"]
+};
+const auxiliaryKeys = new Set(Object.values(auxiliaryStudyInputs).flatMap((keys) => keys ?? []));
 /** Per-adapter cache, keyed by the independent asynchronous and viewport inputs used by a study. */
 export class TechnicalRenderData {
   private bars: readonly Candle[] = [];
@@ -59,6 +77,8 @@ export class TechnicalRenderData {
   private supplemental: TechnicalSupplementalInputs = {};
   private openInterestRevision = 0;
   private volumeRevision = 0;
+  private intrabarRevision = 0;
+  private readonly supplementalRevisions = new Map<SupplementalKey, number>();
   constructor(context?: TechnicalCalculationContext) {
     this.context = context ? { ...context } : undefined;
   }
@@ -70,15 +90,56 @@ export class TechnicalRenderData {
     inputs: TechnicalSupplementalInputs,
     instrumentUid: string | null
   ): boolean {
-    const { openInterest, ...remaining } = inputs;
-    const scoped: TechnicalSupplementalInputs =
-      openInterest?.instrumentKey === instrumentUid ? inputs : remaining;
+    const { openInterest, volumeStudies } = inputs;
+    const {
+      correlationHistory,
+      priceLevelPeriods,
+      bookerPivotPeriods,
+      seasonalityHistory,
+      priceTarget,
+      autoKeyLevelTrades,
+      marketBreadth
+    } = inputs.instrumentUid === instrumentUid ? inputs : {};
+    const { turnover24Hours, intrabarVolume, relativeVolumePeriods, netVolumeTrades } =
+      volumeStudies ?? {};
+    const scoped: TechnicalSupplementalInputs = {
+      ...(openInterest?.instrumentKey === instrumentUid ? { openInterest } : {}),
+      ...(correlationHistory?.primaryUid === instrumentUid ? { correlationHistory } : {}),
+      ...(priceLevelPeriods ? { priceLevelPeriods } : {}),
+      ...(bookerPivotPeriods ? { bookerPivotPeriods } : {}),
+      ...(seasonalityHistory ? { seasonalityHistory } : {}),
+      ...(priceTarget?.forecast.instrumentKey === instrumentUid ? { priceTarget } : {}),
+      ...(autoKeyLevelTrades?.instrumentKey === instrumentUid ? { autoKeyLevelTrades } : {}),
+      ...(marketBreadth ? { marketBreadth } : {}),
+      ...(volumeStudies
+        ? {
+            volumeStudies: {
+              ...(relativeVolumePeriods ? { relativeVolumePeriods } : {}),
+              ...(turnover24Hours?.instrumentKey === instrumentUid ? { turnover24Hours } : {}),
+              ...(netVolumeTrades?.instrumentKey === instrumentUid ? { netVolumeTrades } : {}),
+              ...(intrabarVolume?.instrumentKey === instrumentUid ? { intrabarVolume } : {})
+            }
+          }
+        : {})
+    };
     const interestChanged = scoped.openInterest !== this.supplemental.openInterest;
-    const volumeChanged = inputs.volumeStudies !== this.supplemental.volumeStudies;
+    const previousVolume = this.supplemental.volumeStudies;
+    const volumeChanged =
+      scoped.volumeStudies?.turnover24Hours !== previousVolume?.turnover24Hours ||
+      scoped.volumeStudies?.relativeVolumePeriods !== previousVolume?.relativeVolumePeriods ||
+      scoped.volumeStudies?.netVolumeTrades !== previousVolume?.netVolumeTrades;
+    const intrabarChanged = scoped.volumeStudies?.intrabarVolume !== previousVolume?.intrabarVolume;
+    let supplementalChanged = false;
+    for (const key of auxiliaryKeys) {
+      if (scoped[key] === this.supplemental[key]) continue;
+      supplementalChanged = true;
+      this.supplementalRevisions.set(key, (this.supplementalRevisions.get(key) ?? 0) + 1);
+    }
     if (interestChanged) this.openInterestRevision++;
     if (volumeChanged) this.volumeRevision++;
+    if (intrabarChanged) this.intrabarRevision++;
     this.supplemental = scoped;
-    return interestChanged || volumeChanged;
+    return interestChanged || volumeChanged || intrabarChanged || supplementalChanged;
   }
   setVisibleBars(first: number, last: number): boolean {
     const from = this.bars[Math.max(0, Math.ceil(first))]?.timestamp;
@@ -109,9 +170,14 @@ export class TechnicalRenderData {
           instance.definitionId === "open-interest"
             ? this.openInterestRevision
             : instance.definitionId === "relative-volume-at-time" ||
-                instance.definitionId === "volume-24-hours"
+                instance.definitionId === "volume-24-hours" ||
+                instance.definitionId === "net-volume"
               ? this.volumeRevision
-              : null;
+              : isVolumeDeltaStudy(instance.definitionId)
+                ? this.intrabarRevision
+                : (auxiliaryStudyInputs[instance.definitionId]?.map(
+                    (key) => this.supplementalRevisions.get(key) ?? 0
+                  ) ?? null);
         const key = JSON.stringify([instance.definitionId, instance.params, range, externalKey]);
         seen.add(key);
         let result = this.cache.get(key);

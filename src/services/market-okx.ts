@@ -3,6 +3,7 @@ import type { HistoryRange, Timeframe } from "../model/types.js";
 import { loadOkxCatalog } from "./providers/okx/catalog.js";
 import { OkxHttp } from "./providers/okx/http.js";
 import { loadOkxHistory, loadOkxQuotes } from "./providers/okx/market.js";
+import { loadOkxSpotTradeHistory } from "./providers/okx/trade-history.js";
 import { OkxStream } from "./providers/okx/stream.js";
 import type { OkxInstrument } from "./providers/okx/types.js";
 
@@ -90,6 +91,10 @@ export class OkxMarket {
     signal: AbortSignal
   ) {
     return loadOkxHistory(this.http, ref, timeframe, range, signal);
+  }
+
+  spotTrades(ref: OkxProviderRef, range: HistoryRange, signal: AbortSignal) {
+    return loadOkxSpotTradeHistory(this.http, ref, range, signal);
   }
 
   close(): void {

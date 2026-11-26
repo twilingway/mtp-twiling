@@ -22,6 +22,7 @@ import { ThemeEffect } from "./screens/terminal/ThemeEffect.js";
 import { LocaleEffect } from "./screens/terminal/LocaleEffect.js";
 import { TerminalIndicatorLibrary } from "./screens/terminal/TerminalIndicatorLibrary.js";
 import { TechnicalIndicatorSettings } from "./screens/terminal/TechnicalIndicatorSettings.js";
+import { MarketBreadthProvider } from "./screens/terminal/MarketBreadthContext.js";
 function Terminal() {
   const { state } = useTerminal();
   const [chartCount, setChartCount] = useState<ChartLayoutCount>(1);
@@ -66,7 +67,9 @@ export function App() {
   const [controller] = useState(() => new TerminalController());
   return (
     <TerminalContext value={controller}>
-      <Terminal />
+      <MarketBreadthProvider>
+        <Terminal />
+      </MarketBreadthProvider>
     </TerminalContext>
   );
 }
