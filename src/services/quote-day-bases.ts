@@ -60,13 +60,18 @@ export class QuoteDayBases {
     Object.assign(row, dayChange(row.price, null));
   }
   update(row: MarketRow): void {
+    if (row.price === null || !Number.isFinite(row.price) || row.price <= 0) {
+      this.invalidate(row);
+      return;
+    }
     const day = quoteDay(row.time, this.now());
     const existing = row.uid ? this.bases.get(row.uid) : undefined;
+    const knownBase =
+      row.previousClose !== null && Number.isFinite(row.previousClose) && row.previousClose > 0;
     if (
       day &&
       row.previousCloseDay === day &&
-      (row.previousClose !== null ||
-        (existing?.day === day && (existing.retryAfter ?? 0) > this.now()))
+      (knownBase || (existing?.day === day && (existing.retryAfter ?? 0) > this.now()))
     ) {
       Object.assign(row, dayChange(row.price, row.previousClose));
       return;

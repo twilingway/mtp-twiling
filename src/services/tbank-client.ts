@@ -3,7 +3,7 @@ import { loadBankCatalog } from "./tbank-catalog.js";
 import { catalogInstrumentKind } from "../model/currency-search.js";
 import { MutationQueue } from "./mutation-queue.js";
 import { persistWatchlistMove, type WatchlistMove } from "./watchlist-order.js";
-import { quoteSnapshot } from "./quote-snapshot.js";
+import { applyLastPrice, applyQuoteSnapshot, quoteSnapshot } from "./quote-snapshot.js";
 import { QuoteDayBases, MISSING_DAY_BASE } from "./quote-day-bases.js";
 import { profileKey } from "./profile-key.js";
 import { selectedMarketRow } from "../model/selected-instrument.js";
@@ -178,8 +178,8 @@ export class TBankClient extends EventTarget {
     if (prices.status === "rejected") throw prices.reason;
     this.dayBases.clear();
     this.dayBases.seed(close.status === "fulfilled" ? close.value.closePrices : []);
-    for (const row of this.rows) this.dayBases.invalidate(row);
-    for (const price of list(prices.value.lastPrices)) this.applyPrice(price, false);
+    applyQuoteSnapshot(this.rows, cached?.rows ?? [], prices.value.lastPrices, this.serverNow());
+    for (const row of this.rows) this.dayBases.update(row);
     await this.dayBases.settled();
     this.updatedAt = new Date().toISOString();
     this.notify();
@@ -188,17 +188,8 @@ export class TBankClient extends EventTarget {
     return this.snapshot();
   }
   applyPrice(input: unknown, notify = true): void {
-    const price = object(input);
-    if (!price) return;
-    const row = this.rows.find(
-      (row) => row.uid === price.instrumentUid || (row.figi && row.figi === price.figi)
-    );
+    const row = applyLastPrice(this.rows, input, notify ? undefined : this.serverNow());
     if (!row) return;
-    const value = quotation(price.price);
-    if (value === null || value <= 0) return;
-    row.price = value;
-    row.time = text(price.time) ?? null;
-    row.availability = "available";
     this.dayBases.update(row);
     this.updatedAt = new Date().toISOString();
     if (notify) this.notify();

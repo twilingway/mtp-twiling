@@ -186,7 +186,7 @@ test("transient failure retries after 60s or reconnect without per-tick requests
   }
 });
 
-function fixture(initialRows, { closeError=false, prices, closes=[] }={}) {
+function fixture(initialRows, { closeError=false, prices, closes=[], cachedRows, candles }={}) {
   const requests=[];
   class Transport {
     closed=false;
@@ -201,12 +201,12 @@ function fixture(initialRows, { closeError=false, prices, closes=[] }={}) {
         if(closeError)throw new Error("close unavailable");
         return {closePrices:closes};
       }
-      if(method==="GetCandles")return {candles:[bar(24,55)]};
+      if(method==="GetCandles")return {candles:candles?.(body.instrumentId)??[bar(24,55)]};
       assert.fail(`unexpected request ${service}/${method}`);
     }
   }
   const cache={
-    loadMarket:async()=>undefined,
+    loadMarket:async()=>cachedRows ? {rows:cachedRows,at:now} : undefined,
     loadCatalog:async()=>({at:Date.now(),shares:[],futures:[],indicatives:[]}),
     loadWatchlist:async()=>initialRows,
     saveWatchlist:async()=>{},saveMarket:async()=>{},saveWatchlistSnapshot:async()=>{}
@@ -240,4 +240,86 @@ test("all 14 snapshot instruments share one date-aware policy and map closes by 
     assert.equal(current.previousCloseDay,"2026-11-25");
   }
   assert.equal(requests.filter(r=>r.method==="GetCandles").length,0);
+});
+
+test("partial and malformed snapshots preserve dated quotes, bases and zero changes", async () => {
+  const saved = (symbol, value) => ({
+    ...row(symbol),
+    price: value,
+    previousClose: 55,
+    previousCloseDay: "2026-11-25",
+    previousCloseSource: "evening"
+  });
+  const gazp = { ...saved("GAZP", 55), closeTime: close.eveningSessionPriceTime };
+  const initial = [
+    row("SBER"), gazp, saved("VTBR", 57),
+    saved("NVTK", 59), { ...row("YDEX"), price: null, time: null },
+    { ...row("LKOH"), price: 64, time: "2026-11-25T20:10:00Z" }
+  ];
+  const yandex = { ...saved("YDEX", 58), time: "2026-11-25T18:10:00Z" };
+  const cachedRows = [
+    yandex,
+    { ...gazp, previousClose: 54, previousCloseSource: null, closeTime: null },
+    saved("LKOH", 60)
+  ];
+  const prices = [
+    { instrumentUid: "SBER", price: q(57.085), time: tick },
+    { instrumentUid: "VTBR", price: q(0), time: tick },
+    { instrumentUid: "NVTK", price: q(63), time: "not-a-timestamp" },
+    { instrumentUid: "YDEX", price: q(60), time: "2026-11-24T20:10:00Z" }
+  ];
+  const closes = [{ ...close, instrumentUid: "SBER" }];
+  const { client, requests } = fixture(initial, { prices, closes, cachedRows });
+  await client.start();
+
+  assert.ok(Math.abs(client.rows[0].change - 2.085) < 1e-9);
+  assert.deepEqual(client.rows.slice(1).map(current => [current.symbol, current.price, current.change]), [
+    ["GAZP", 55, 0],
+    ["VTBR", 57, 2],
+    ["NVTK", 59, 4],
+    ["YDEX", 58, 3],
+    ["LKOH", 64, 9]
+  ]);
+  assert.equal(client.rows[3].time, tick);
+  assert.equal(client.rows[4].time, yandex.time);
+  assert.ok(client.rows.every(current => current.previousCloseDay === "2026-11-25"));
+  assert.equal(client.rows[1].previousCloseSource, "evening");
+  assert.equal(client.rows[1].closeTime, close.eveningSessionPriceTime);
+  assert.equal(client.rows[1].changePercent, 0);
+  assert.equal(requests.filter(request => request.method === "GetCandles").length, 0);
+  assert.deepEqual(
+    requests.filter(request => request.method === "GetLastPrices").map(request => request.body.instrumentId),
+    [["SBER_TQBR"], initial.map(({ uid }) => uid)]
+  );
+  assert.deepEqual(
+    requests.find(request => request.method === "GetClosePrices").body.instruments,
+    initial.map(({ uid }) => ({ instrumentId: uid }))
+  );
+});
+
+test("snapshot fallback loads a base for a priced omission and rebaselines only an actual new day", async () => {
+  const stale = {
+    ...row("VTBR"),
+    time: "2026-11-24T16:00:00Z",
+    previousClose: 40,
+    previousCloseDay: "2026-11-24"
+  };
+  const initial = [
+    stale, row("GAZP"), { ...row("NVTK"), previousClose: 0, previousCloseDay: "2026-11-25" },
+    { ...row("T"), time: "invalid", previousClose: 40, previousCloseDay: "2026-11-25" }
+  ];
+  const { client, requests } = fixture(initial, {
+    prices: [{ instrumentUid: "VTBR", price: q(57.085), time: tick }],
+    candles: (uid) => uid === "NVTK" ? [] : [bar(24,55)]
+  });
+  await client.start();
+
+  assert.deepEqual(client.rows.map(current => [current.symbol, current.previousClose]), [
+    ["VTBR", 55], ["GAZP", 55], ["NVTK", null], ["T", null]
+  ]);
+  assert.equal(client.rows[0].previousCloseDay, "2026-11-25");
+  assert.equal(client.rows[2].change, null);
+  assert.equal(client.rows[3].change, null);
+  assert.deepEqual(requests.filter(request => request.method === "GetCandles")
+    .map(request => request.body.instrumentId), ["VTBR", "GAZP", "NVTK"]);
 });
