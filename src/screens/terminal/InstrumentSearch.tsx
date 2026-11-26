@@ -1,4 +1,5 @@
 import { t, systemText } from "../../i18n/messages.js";
+import { providerLabel } from "./provider-label.js";
 import { useEffect, useState } from "react";
 import type { CatalogInstrument, InstrumentSearchKind, MarketRow } from "../../model/types.js";
 import { useTerminal } from "./context.js";
@@ -67,7 +68,7 @@ function kindLabel(item: CatalogInstrument): string {
 function metadata(item: CatalogInstrument): string {
   if (item.providerRef)
     return [
-      "Bybit",
+      providerLabel(item.providerRef),
       item.providerRef.category === "spot" ? "Spot" : "USDT perpetual",
       item.marketRegion,
       item.currency
@@ -280,7 +281,7 @@ export function InstrumentSearch() {
       </div>
       <small id="instrument-search-help">
         {t(
-          "Bybit · публичные котировки без ключа. Т‑Банк · личный ключ для российских инструментов. USDT-контракт и токенизированная акция не являются обычной акцией."
+          "Bybit и OKX · публичные котировки без ключа. Т‑Банк · личный ключ для российских инструментов. USDT-контракт и токенизированная акция не являются обычной акцией."
         )}
       </small>
     </Modal>

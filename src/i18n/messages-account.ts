@@ -6,12 +6,12 @@ export const accountMessages = {
   "Добро пожаловать в MTP TWILING": "Welcome to MTP TWILING",
   "Личный терминал для графиков, индикаторов и разметки.":
     "A personal workspace for charts, indicators and drawings.",
-  "Инструменты Т‑Банка и Bybit можно найти через поиск инструментов.":
-    "Find T-Bank and Bybit instruments using instrument search.",
-  "Личный терминал для графиков, индикаторов и разметки. Криптовалюты Bybit доступны без ключа. Для российских инструментов подключите свой ключ Т‑Банка.":
-    "A personal workspace for charts, indicators and drawings. Bybit crypto works without a key. Connect your own T-Bank key for Russian instruments.",
-  "Чтобы открыть Bybit, продолжите без подключения банка и найдите монету через поиск инструментов.":
-    "To open Bybit, continue without connecting a bank and find a coin in instrument search.",
+  "Инструменты Т‑Банка, Bybit и OKX можно найти через поиск.":
+    "Find T-Bank, Bybit and OKX instruments using instrument search.",
+  "Личный терминал для графиков, индикаторов и разметки. Криптовалюты Bybit и OKX доступны без ключа. Для российских инструментов подключите свой ключ Т‑Банка.":
+    "A personal workspace for charts, indicators and drawings. Bybit and OKX crypto works without a key. Connect your own T-Bank key for Russian instruments.",
+  "Для криптовалют продолжите без подключения банка и найдите монету через поиск инструментов.":
+    "For crypto, continue without connecting a bank and find a coin in instrument search.",
   "Подключите рыночные данные": "Connect market data",
   "Выпустите личный API-токен Т‑Инвестиций с правами только для чтения и вставьте его в настройках аккаунта. Приложение не совершает сделки.":
     "Create a personal read-only T-Invest API token and enter it in account settings. This app does not place trades.",

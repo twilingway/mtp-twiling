@@ -24,7 +24,11 @@ export function Toolbar() {
     p = state.preferences,
     row = selectedMarketRow(state.rows, p),
     ticker = row?.ticker || t("Инструмент"),
-    searchLabel = t("Найти инструмент");
+    searchLabel = t("Найти инструмент"),
+    shortIntervalUnavailable =
+      row?.providerRef?.provider === "okx"
+        ? "OKX: интервал пока не поддерживается"
+        : "Bybit: интервал пока не поддерживается";
   return (
     <header className="topbar">
       <a className="brand" href="./" aria-label="MTP TWILING" title="MTP TWILING">
@@ -56,8 +60,8 @@ export function Toolbar() {
             ...DERIVED_INTERVAL_UNAVAILABLE,
             ...(row?.providerRef
               ? {
-                  "2m": "Bybit: интервал пока не поддерживается",
-                  "10m": "Bybit: интервал пока не поддерживается"
+                  "2m": shortIntervalUnavailable,
+                  "10m": shortIntervalUnavailable
                 }
               : {})
           }}

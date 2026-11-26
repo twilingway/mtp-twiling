@@ -18,7 +18,7 @@ export function ApplicationInfo() {
             : state.authenticated
               ? t("Сохранённые котировки; подключаемся к Т-Банку…")
               : state.marketReady
-                ? t("Публичные данные Bybit · без ключа банка")
+                ? t("Публичные данные Bybit и OKX · без ключа банка")
                 : t("Открываем локальный профиль")}
       </p>
       <p>{systemText(state.historyHelp)}</p>

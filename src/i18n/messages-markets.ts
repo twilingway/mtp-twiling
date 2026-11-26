@@ -2,11 +2,11 @@ export const marketMessages = {
   "Переключаем локальный профиль. Аккаунт доступен.":
     "Switching the local profile. Account controls remain available.",
   "Выберите источник котировок": "Choose a market data source",
-  "Bybit доступен без ключа. Для российских инструментов подключите Т‑Банк.":
-    "Bybit works without a key. Connect T-Bank for Russian instruments.",
-  "Выберите инструмент Bybit или подключите Т‑Банк": "Choose a Bybit instrument or connect T-Bank",
+  "Bybit и OKX доступны без ключа. Для российских инструментов подключите Т‑Банк.":
+    "Bybit and OKX work without a key. Connect T-Bank for Russian instruments.",
+  "Выберите криптовалюту или подключите Т‑Банк": "Choose a cryptocurrency or connect T-Bank",
   "Аккаунт и источники": "Account and sources",
-  "Публичные данные Bybit · без ключа банка": "Public Bybit data · no bank key",
+  "Публичные данные Bybit и OKX · без ключа банка": "Public Bybit and OKX data · no bank key",
   "Открываем локальный профиль": "Opening the local profile",
   Криптовалюты: "Crypto",
   Криптовалюта: "Cryptocurrency",
@@ -15,17 +15,18 @@ export const marketMessages = {
   "Крипто · Спот": "Crypto · Spot",
   "Крипто · USDT perpetual": "Crypto · USDT perpetual",
   "Контракт на акцию/ETF": "Stock/ETF contract",
-  "Контракт · Bybit": "Contract · Bybit",
-  "Изменение за последние 24 часа · Bybit": "Change over the last 24 hours · Bybit",
-  "Bybit · последняя сделка · изменение за 24ч": "Bybit · last trade · 24h change",
+  Контракт: "Contract",
+  "Изменение за последние 24 часа": "Change over the last 24 hours",
+  "последняя сделка · изменение за 24ч": "last trade · 24h change",
   "Последние 24 часа": "Last 24 hours",
   "База изменения": "Change basis",
   "24ч": "24h",
   "Т-Банк подключён": "T-Bank connected",
   "Т-Банк не подключён": "T-Bank disconnected",
   "Bybit: интервал пока не поддерживается": "Bybit: interval is not supported yet",
-  "Bybit · публичные котировки без ключа. Т‑Банк · личный ключ для российских инструментов. USDT-контракт и токенизированная акция не являются обычной акцией.":
-    "Bybit · public quotes without a key. T-Bank · personal key for Russian instruments. USDT contracts and tokenized stocks are not ordinary shares.",
+  "OKX: интервал пока не поддерживается": "OKX: interval is not supported yet",
+  "Bybit и OKX · публичные котировки без ключа. Т‑Банк · личный ключ для российских инструментов. USDT-контракт и токенизированная акция не являются обычной акцией.":
+    "Bybit and OKX · public quotes without a key. T-Bank · personal key for Russian instruments. USDT contracts and tokenized stocks are not ordinary shares.",
   "Формат 2: обновите приложение на другом устройстве. Старые данные и синхронизация формата 1 сохраняются отдельно.":
     "Format 2: update the app on your other devices. Format 1 data and sync remain separate.",
   "В другом локальном профиле сохранены публичные инструменты. Существующую разметку этого профиля заменять не будем.":

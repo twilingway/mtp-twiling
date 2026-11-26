@@ -11,6 +11,7 @@ import { WatchlistFlagFilter } from "./WatchlistFlagFilter.js";
 import { InstrumentIcon } from "./WatchlistQuoteRow.js";
 import { InstrumentDetails } from "./InstrumentDetails.js";
 import { DetailsDivider } from "./DetailsDivider.js";
+import { providerLabel } from "./provider-label.js";
 export { InstrumentIcon } from "./WatchlistQuoteRow.js";
 type SortKey = "symbol" | "price" | "change" | "changePercent";
 export function Watchlist() {
@@ -19,6 +20,7 @@ export function Watchlist() {
     [sort, setSort] = useState<SortKey | null>(null),
     [direction, setDirection] = useState(-1);
   const selected = selectedMarketRow(state.rows, state.preferences);
+  const source = selected?.providerRef ? providerLabel(selected.providerRef) : null;
   const visible = state.rows.filter(
     (row) =>
       matchesWatchlistFlag(
@@ -105,7 +107,7 @@ export function Watchlist() {
                     ? t("Токенизированная акция")
                     : selected.assetClass === "crypto"
                       ? t("Криптовалюта")
-                      : t("Контракт · Bybit")
+                      : `${t("Контракт")} · ${source}`
                   : selected.type === "future"
                     ? t("Фьючерс")
                     : selected.type === "index"
@@ -123,13 +125,15 @@ export function Watchlist() {
             <p
               className={`detail-change ${signClass(selected.change)}`}
               id="detail-change"
-              title={t(
-                selected.comparisonBasis === "rolling-24h"
-                  ? "Изменение за последние 24 часа · Bybit"
-                  : selected.type === "future"
-                    ? "К предыдущему закрытию Т-Банка"
-                    : "К предыдущему дневному закрытию"
-              )}
+              title={
+                selected.comparisonBasis === "rolling-24h" && source
+                  ? `${t("Изменение за последние 24 часа")} · ${source}`
+                  : t(
+                      selected.type === "future"
+                        ? "К предыдущему закрытию Т-Банка"
+                        : "К предыдущему дневному закрытию"
+                    )
+              }
             >
               {selected.change == null || selected.changePercent == null
                 ? "—"
@@ -160,19 +164,19 @@ export function Watchlist() {
               </div>
               <div>
                 <span>{t("Источник")}</span>
-                <b>{selected.providerRef ? "Bybit" : t("Т‑Инвестиции")}</b>
+                <b>{source ?? t("Т‑Инвестиции")}</b>
               </div>
             </div>
             <p className="detail-note" id="detail-note">
-              {t(
-                selected.providerRef
-                  ? "Bybit · последняя сделка · изменение за 24ч"
-                  : selected.previousClose == null
-                    ? "Предыдущее закрытие недоступно"
-                    : selected.type === "future"
-                      ? "К предыдущему закрытию Т-Банка"
-                      : "К предыдущему дневному закрытию"
-              )}
+              {source
+                ? `${source} · ${t("последняя сделка · изменение за 24ч")}`
+                : t(
+                    selected.previousClose == null
+                      ? "Предыдущее закрытие недоступно"
+                      : selected.type === "future"
+                        ? "К предыдущему закрытию Т-Банка"
+                        : "К предыдущему дневному закрытию"
+                  )}
               {selected.note ? " · " + systemText(selected.note) : ""}
             </p>
             <InstrumentDetails row={selected} />
