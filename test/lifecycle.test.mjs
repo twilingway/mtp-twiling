@@ -162,10 +162,10 @@ test("latest asynchronous symbol selection wins and concurrent sidebar width doe
   let saves = 0;
   controller.saveView = () => (++saves === 1 ? old.promise : Promise.resolve());
   const olderSelection = controller.setPreferences({ symbol: "SBER" });
-  await controller.setPreferences({ symbol: "RTSI" });
+  const latestSelection = controller.setPreferences({ symbol: "RTSI" });
   await controller.setPreferences({ sidebarWidth: 380 });
   old.resolve();
-  await olderSelection;
+  await Promise.all([olderSelection, latestSelection]);
   assert.equal(controller.getSnapshot().preferences.symbol, "RTSI");
   assert.equal(controller.getSnapshot().preferences.sidebarWidth, 380);
   const delayed = deferred();
@@ -578,7 +578,7 @@ test("aborting PWA setup during registration removes listeners and prevents late
       return 1;
     },
     clearInterval: () => {}
-  });
+  }, { "generated/app-version.ts": { APP_VERSION: "source-only", BUILD_ID: "source-only" } });
   const { setupPwa } = modules.load("services/pwa.ts");
   const parent = new AbortController();
   const setup = setupPwa({

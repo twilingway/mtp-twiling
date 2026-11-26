@@ -1,8 +1,8 @@
 # Версия 0.3.22: TSI, KST и Fisher
 
-Ветка `feat/release-0322`, worktree `vps/artifacts/release-0322-worktree`. Source cut
-`50b5873778fa442fce3266c2f9882a59d231ab38`, build `6556aedb0c5b49bb`. Эта версия ещё не
-опубликована. Отдельная browser QA выполнена на собственном сервере5228.
+Ветка `feat/release-0322`, worktree `vps/artifacts/release-0322-worktree`. Финальный source cut
+`5d3e2e00699c1bfe5d8294c59ead27a343a17289`, build `59e00dca6d4d2d16`. Ниже локальная приёмка;
+exact-head CI, автоматический deploy и public PWA update подтверждаются отдельно после PR9.
 
 ## Вычисления и перенос
 
@@ -11,8 +11,8 @@
 value/signal, KST — value/signal, Fisher — value/trigger. Supertrend и SAR остаются math-only до
 правильного cross/linebr/fill rendering; DPO явно unresolved, не вычисляется по угаданному offset.
 
-Pure math49 сохранена неизменной. Независимый review регистрации2cb86e9 не нашёл blockers: 41
-focused test, whole-source compiler host, lint/format и spec46 PASS. Frozen42 witness
+Математический пакет49bfcf7 сохранён неизменным. Независимый review регистрации2cb86e9 не нашёл
+blockers: 41 focused test, whole-source compiler host, lint/format и spec46 PASS. Frozen42 witness
 `610fd4c860f6ccc49bc80c7f1f29651a5983d75ce2630ff565f5ed81823afc0a` независимо совпал с Git-базой.
 Математические limits, sparse policy и отсутствие Pine execution parity описаны в
 `TECHNICAL_TREND_STATE.md` и `TECHNICAL_STATE_OSCILLATOR_REGISTRATION.md`.
@@ -37,27 +37,53 @@ forward-fill. Источники/сессионные якоря MOEX/TV не у
 математический контракт, не доказательство provider или TradingView session parity. Документы:
 `DERIVED_INTERVAL_MATH.md` и `vps/artifacts/derived-interval-math-readonly-review.md`.
 
-## Проверки и browser gate
+## Исправления, выявленные при приёмке
 
-- Полный `pnpm check`:817/817; strict OpenSpec47/47.
+- Period/pane-only submit больше не материализует отсутствующие output styles. Sparse/legacy записи
+  сохраняются точно; только изменённый output получает полный явный стиль. Ручной цвет, совпавший с
+  default, остаётся ручным. Независимый review8138:25 focused tests и4 actual action probes PASS.
+  См. `TA_SETTINGS_STYLE_PRESERVATION.md`.
+- Быстрые независимые symbol/TF/engine intents объединяются перед commit, одинаковое поле получает
+  последнее значение. Сохранение старой камеры предшествует изменению preferences. Reload атомарно
+  устанавливает historyViewReady=false, поэтому выбор глубины не отменяет запуск новой истории во
+  время сохранения настроек. Network не удерживает очередь critical work.
+- Sticky owner/client/revision/import/depth guards сохраняются между ожиданиями. Отмена отдельного
+  depth intent не поглощает независимый valid forceReload intent. После carry перечитываются свежие
+  nonrouting preferences. Уже committed camera key не удаляется при позднем действии. Независимый
+  follow-up reviewfa996: исходные11 probes и7 дополнительных PASS; авторские19 routing, прежние8
+  depth и11 lifecycle PASS. См. `CONTROLLER_PREFERENCE_ROUTING.md`.
+
+## Финальные проверки и browser gate
+
+- Полный `pnpm check`:842/842; strict OpenSpec49/49.
 - Actual native renderer suite22/22: все45 definitions и отдельная Fisher1 empty-regression обоих
   adapters без camera reset/лишних primary writes.
-- Логи: `vps/artifacts/release-0322-integration-check.log` и
-  `vps/artifacts/release-0322-integration-spec.log`.
-- Fresh browser worker проверил реальные Bybit spot/perpetual, Canvas обоих engines, TSI31/7/11,
-  асимметричные KST периоды, Fisher17/1, JSON/layout/native gestures/camera и mobile375 RU/EN
-  dark/light. Source/build не редактирует; обычный Chrome/реальные ключи/Google OAuth исключены.
-- Артефакты browser QA: `vps/artifacts/release-0322-visual-qa`. Локальная приёмка PASS_WITH_LIMITS:
-  25 скриншотов просмотрены, JSON/reload сохраняют параметры, порядок, панели и их высоту. Google
-  OAuth, реальный банковский ключ и физические телефоны не проверялись.
-- При первом быстром выборе одна история появилась только после reload. Причина исторического
-  эпизода не установлена; начальные response/error listeners были подключены поздно. Два
-  дополнительных быстрых прогона в собственном профиле и контроль после готовности загрузили историю
-  без reload. Дневные запросы отменились, часовые вернули HTTP200. Попытка автоматизации выбрать
-  глубину во время загрузки остановилась на disabled select; это не ошибка загрузки данных. Через
-  промежуток loading=false при смене таймфрейма select остаётся недоступным по
-  historyViewReady=false. Эти наблюдения не доказывают отсутствие любой конкурентной ошибки;
-  отдельное source review проверяет границы маршрутизации до публикации.
+- Логи: `vps/artifacts/release-0322-final-integration-check.log` и
+  `vps/artifacts/release-0322-final-integration-spec.log`. Первый sandbox build завершился
+  spawnEPERM; тот же scoped check без изменения кода прошёл в разрешённой среде.
+- Fresh browser worker на финальном source/build: PASS_WITH_LIMITS, просмотрены24/24 screenshots.
+  Реальные Bybit Spot/Linear BTCUSDT, оба Canvas, быстрый startup/TF/engine/instrument switch без
+  recovery reload; depth365→5→365 сохраняет camera при неизменной области графика.
+- Actual settings UI сохраняет absent/sparse styles и manual default color; JSON/IndexedDB,
+  группировка/высота/порядок/collapse панелей, рисунок и reload проходят. Fisher1 пуст в обоих
+  engines,17 восстанавливается. Mobile375 RU/EN dark/light и checkbox16×16 проходят.
+- LW reload сохранил camera точно. KLine сохранил шаг8.8 и временной якорь; ширина plot913→940 из-за
+  native оси изменила rightOffsetBars33.5909→35.0682, то есть адаптацию на половину ширины. Exact
+  right-gap equality доказана для depth checks с одинаковой plot width.
+- Артефакты: `vps/artifacts/release-0322-fixed-visual-qa/{report,manifest,isolation-audit}.json`.
+  Ошибок приложения/Bybit нет, две deprecation warning. Own Chrome/server5230/9332 закрыты, порты
+  ECONNREFUSED; чужие процессы/обычный Chrome сохранены. Parent image delta0, worker24; это
+  structural audit, не измерение сетевых bytes.
 
-Автоматическая публикация и проверка live public обновления остаются отдельными этапами после
-локальной приёмки и exact-head CI. Общая цель активна; весь каталог127 ещё не реализован.
+Предыдущий source50b5873/build6556 имел25-image baseline gate в
+`vps/artifacts/release-0322-visual-qa`. При первом выборе история появилась после reload; причина
+этого исторического эпизода не установлена. Source regressions доказаны отдельно и не объявляются
+автоматически причиной того browser эпизода. Финальная fresh приёмка recovery reload не использует.
+
+Ограничения: desktop Chrome responsive emulation, физический touch/PWA install/реальный Google
+OAuth/банк/private profile не проверялись. GIS SDK loading не считается входом Google. Полный
+native45 matrix остаётся также в source tests; эта fresh browser matrix нацелена на routing/style
+исправления и не выдаётся за повтор всех формул или Pine execution parity.
+
+Автоматическая публикация и live public PWA update — отдельные gates после локальной приёмки и
+exact-head CI. Общая цель активна; весь каталог127 ещё не реализован.
