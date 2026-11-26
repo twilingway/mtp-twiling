@@ -1,6 +1,10 @@
 import { useRef } from "react";
 import { useTerminal } from "./context.js";
 import { technicalIndicatorDefinitions } from "../../model/technical-indicators/definitions.js";
+import {
+  technicalCalculationUnavailableReason,
+  calculationLimitMessage
+} from "../../model/technical-indicators/channel-average-runtime.js";
 import { technicalIndicatorGroups } from "../../model/technical-indicator-layout.js";
 import type { TechnicalIndicatorGroup } from "../../model/technical-indicator-layout.js";
 import type { TechnicalPaneMetric } from "../../charts/adapter.js";
@@ -87,6 +91,9 @@ function TechnicalRows({ group }: { group: TechnicalIndicatorGroup }) {
         const label = `${definition.shortTitle} ${Object.values(instance.params)
           .filter((item) => typeof item === "number")
           .join(", ")}`;
+        const limited =
+          technicalCalculationUnavailableReason(instance, state.candles?.length ?? 0) ===
+          "calculation-limit";
         return (
           <div
             key={instance.id}
@@ -139,6 +146,7 @@ function TechnicalRows({ group }: { group: TechnicalIndicatorGroup }) {
               }
             >
               {label}
+              {limited && <span role="status"> · {calculationLimitMessage(english)}</span>}
             </button>
             <span className="technical-row-actions">
               <button

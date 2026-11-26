@@ -6,4 +6,6 @@ export * from "./calculations.js";
 export * from "./data.js";
 export * from "./runtime.js";
 export * from "./trend-price-contract.js";
+export * from "./channel-average-contract.js";
+export { technicalCalculationUnavailableReason } from "./channel-average-runtime.js";
 export * from "./momentum-volume/index.js";

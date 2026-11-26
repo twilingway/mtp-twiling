@@ -9,6 +9,10 @@ import {
   technicalIndicatorDefinitions
 } from "../../model/technical-indicators/definitions.js";
 import { isTechnicalIndicatorInstance } from "../../model/technical-indicators/instances.js";
+import {
+  technicalCalculationUnavailableReason,
+  calculationLimitMessage
+} from "../../model/technical-indicators/channel-average-runtime.js";
 import type {
   OutputStyle,
   TechnicalIndicatorInstance
@@ -21,6 +25,8 @@ import {
 const labels: Readonly<Record<string, readonly [string, string]>> = {
   length: ["Период", "Length"],
   source: ["Источник", "Source"],
+  offset: ["Смещение", "Offset"],
+  sigma: ["Сигма", "Sigma"],
   atrLength: ["Период ATR", "ATR length"],
   factor: ["Множитель", "Factor"],
   start: ["Начальное ускорение", "Start"],
@@ -67,6 +73,21 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
   const [pane, setPane] = useState(technicalPaneKey(instance.pane));
   const [styles, setStyles] = useState<Record<string, OutputStyle> | undefined>(instance.styles);
   const [error, setError] = useState("");
+  const draft: unknown = {
+    ...instance,
+    params: Object.fromEntries(
+      definition.parameters.map((parameter) => [
+        parameter.key,
+        parameter.type === "source" || parameter.type === "choice"
+          ? parameters[parameter.key]
+          : Number(parameters[parameter.key])
+      ])
+    )
+  };
+  const limited =
+    isTechnicalIndicatorInstance(draft) &&
+    technicalCalculationUnavailableReason(draft, state.candles?.length ?? 0) ===
+      "calculation-limit";
   const { pending, run } = useIndicatorMenuAction(controller);
   const groups = technicalIndicatorGroups(state.preferences.technicalIndicators ?? []);
   const ownPane = `pane:${instance.id}`;
@@ -193,6 +214,15 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
             </select>
           </label>
         </fieldset>
+        {instance.definitionId === "lsma" && (
+          <p>
+            {text(
+              "Минимальный период LSMA здесь — 2. Результат при периоде 1 не подтверждён.",
+              "LSMA has a local minimum period of 2. The period 1 result is unverified."
+            )}
+          </p>
+        )}
+        {limited && <p role="status">{calculationLimitMessage(english)}</p>}
         <fieldset disabled={pending || !current}>
           <legend>{text("Стиль", "Style")}</legend>
           {definition.outputs.map((output) => {
@@ -212,7 +242,11 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
                     ? text("Восходящий тренд", "Up Trend")
                     : output.id === "downTrend"
                       ? text("Нисходящий тренд", "Down Trend")
-                      : output.title}
+                      : output.id === "longExit"
+                        ? text("Выход из длинной позиции", "Long Exit")
+                        : output.id === "shortExit"
+                          ? text("Выход из короткой позиции", "Short Exit")
+                          : output.title}
                 </label>
                 <label>
                   {text("Цвет", "Color")}
