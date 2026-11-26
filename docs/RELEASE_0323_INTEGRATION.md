@@ -1,46 +1,79 @@
-# 0.3.23: native TA, сохранение панелей и reader guard
+# 0.3.23: TA-индикаторы, сохранение панелей и проверка Drive
 
-Подготовка выпуска, не подтверждение публикации. Публичная/canonical версия пока0.3.22,
-main131e38e81fe8b10a53132806c3ccbac29f4d33d6/build59e00dca6d4d2d16.
+Это отчёт о проверке кандидата. Слияние, CI main, автоматическая публикация и обновление PWA
+подтверждаются отдельно по точному SHA и хешам публичных файлов.
 
 ## Изменения
 
-Добавлены SAR/Supertrend/ALMA/LSMA/Chandelier Exit:50 computed,51 technical entries с Volume, 55
-library с4 MTP scripts. Старые45/47 definitions, параметры, styles, history и numeric results
-сохранены независимыми Git-source witnesses. SAR рисуется крестиками, Supertrend — раздельными
-ветвями/заливками; все5 сохраняют native-price policy после переноса в отдельную панель. Excessive
-ALMA/LSMA work возвращает явный transient calculation-limit без усечения истории и изменения params.
+Добавлены Parabolic SAR, Supertrend, ALMA, LSMA и Chandelier Exit: 50 вычисляемых TA, 51 технический
+индикатор с объёмом и 55 записей библиотеки с четырьмя MTP-скриптами. SAR использует крестики,
+Supertrend — раздельные ветви и заливки. Все пять сохраняют native-price policy после переноса в
+отдельную панель. Старые определения, параметры, стили, требования истории и численные результаты
+проверены независимыми Git-source witnesses. При чрезмерной стоимости ALMA/LSMA возвращается явный
+transient calculation-limit без усечения истории или изменения параметров.
 
-Resize сохраняет порядок панелей и fresh untouched collapse/height/reorder предыдущих queued
-действий. Runtime context отделяет resized IDs от baseline order, persistent layout прежний. 30px
-collapsed strips не показывают ложные fallback tick labels; expanded meaningful ticks возвращаются.
+Изменение высоты панели сохраняет полный порядок и свежие параметры остальных панелей, включая
+сворачивание, высоту и предыдущее переупорядочивание в очереди. Runtime-контекст отделяет изменённые
+панели от исходного порядка; формат сохранений прежний.
 
-Drive guard проверяет same-head и standalone publish/resolve payload до принятия/публикации,
-останавливает unknown local association без default replacement. Пауза использует auth.suspend и
-сохраняет valid Google credential с исходным expiry. Проверка формата читает JSON, без image
-binaries. Поздняя гонка может оставить orphan blob: server CAS/zero-all-uploads не заявляются.
+В компактных панелях TA высотой до 30 CSS px скрыты статические числовые подписи и горизонтальная
+ценовая метка перекрестия. Линии и временная метка сохраняются. В основной и развёрнутой панелях
+метки восстанавливаются. Width hold сохраняет ширину графика при временном изменении native label
+policy; пользовательский режим курсора не включается обратно при восстановлении.
 
-## Проверенное и следующие gates
+Drive guard проверяет payload текущего снимка и родителей до принятия или публикации, в том числе
+при совпадающем head. Неподдерживаемая local association останавливает синхронизацию без замены на
+defaults. Пауза использует auth.suspend и сохраняет действующий credential до исходного expiry.
+Проверка формата читает JSON без image binaries. Поздняя гонка может оставить orphan blob: атомарный
+server CAS и отсутствие всех загрузок в любом сценарии не заявляются.
 
-- SAR/ST c14427f: independent9 groups +55 focused tests READY.
-- ALMA/LSMA/CE edd9668: math88/registration9/settings4; independent50 numeric/99 preflight/9 actual
-  submit probes, old47 witnesses и full-input costflow обоих adapters READY. Math780 blob IDs точны.
-- Pane fix16a8601: independent10 probes +19 repeated tests READY; root integrated94/94 PASS.
-- Compact axis13f3c27: actual isolated Chrome14 viewed/16 saved, both engines, dark/light,
-  expand/precision/camera. LW native rounding при разной высоте до0.000505 обратимо.
-- Reader guard8315/6651:73 новых и108 existing PASS; independent actual Auth+AES-vault7/7 PASS,
-  ciphertext сохраняется, handles aborted, expiry не продлевается, другой owner/generation сохранён.
-- Combined source50 до guard0d17cf1: полный check1026/1026, specs55/55, build2aed26fae5c28774 PASS.
-  Новый объединённый check/build, fresh product browser и public release/PWA gates ещё впереди.
+## Проверки исходников
 
-Final acceptance использует exact frozen source/build ID, оба native engines, native divider drag,
-library/settings/reload/import, real Bybit spot/linear, MTP/drawing/cursor layers и mobile375 RU/EN
-dark/light. Source probes и standalone native harness не заменяют эту проверку.
+- Финальный source/browser cut: `e78cb57f27a00ecf3ecf7aed0a69391e918f4d8d`; версия `0.3.23`, build
+  `4f05a9f589fb0222`.
+- `pnpm check`: 1112/1112, exit 0; `pnpm spec:validate`: 57/57, exit 0.
+- SAR/Supertrend: independent 9 групп и 55 focused tests.
+- ALMA/LSMA/CE: math 88, registration 9, settings 4; independent 50 numeric, 99 preflight и 9
+  actual-submit probes. Принятые math blobs сохранены; обе ветви SDK получают полную историю.
+- Pane capture/order: независимые 10 probes и 19 repeated tests; integrated 94/94.
+- Compact crosshair: 88 focused/baseline tests и 10 независимых групп, включая installed-native
+  label/axis sizing paths, по 2000 hover/leave cycles на движок, manual 30/31, stationary
+  expand/reorder/remove, Hidden mode, dispose и отсутствие дрейфа width.
+- Reader guard: 73 новых и 108 existing tests; independent actual Auth/AES-vault 7/7. Ciphertext и
+  исходный expiry сохраняются, handles отменяются, другой owner/generation не меняется.
+- Отдельный Git clone без alternates выполняет 11/11 исторических witnesses; ancestry содержит
+  оригинальные принятые math commits. Аудит source e78: 177 commits, 1963 blobs, совпадений с
+  секретами 0.
+
+## Проверка интерфейса
+
+Основной проход на source `ffc13bb07e8f4bd385691dc35b87e79cb58a9fd1`, build `62d28d73002305a0`: 33
+просмотренных PNG из 41 сохранённого. Реальные Bybit spot/linear REST и WebSocket, оба native
+движка, default/nondefault настройки пяти новых TA, крестики SAR, ветви и заливки Supertrend,
+сохранение прежних 11 TA и рисунков, native divider drag, engine/reload/import, слои MTP/сетки,
+RU/EN, dark/light и 375×667. Этот проход обнаружил ценовую метку в свёрнутой панели на обоих SDK.
+
+Окончательное исправление e78 прошло отдельный свежий visual gate: 29 PNG сохранены, 23 просмотрены.
+На обоих SDK компактные RSI/Fisher не показывают числовую метку; при одинаковых размерах camera,
+range, width, candle count/last и right gap совпали до/во время/после hover.
+Main/expanded/leave/remove восстанавливают метки, Arrow остаётся Hidden. Stationary expand/reorder и
+legacy volume проверены на KLine, light/mobile 375×667 — на обоих SDK. Ошибок страницы нет,
+собственные Chrome и сервер закрыты. Ручной UI resize зажимается на 44 px: граница 30/31
+подтверждена source/native тестами, а не UI drag. Полный исторический pre-launch hash сборки не
+сохранён; финальные 67 файлов совпали с хешами координатора, снятыми во время прохода. Clean e78 и
+build 4f05 проверены до/после; исходный профиль сохранён. Родительский контекст не получил новых
+tool images; сетевые байты не измерялись.
+
+При одинаковых размерах и данных hide/remove сохраняют диапазон и правый отступ. Изменение высоты на
+LW может менять native rounded bounds: в основном проходе при 333→391 px наблюдалась разница около
+0.23 px. Поэтому точное равенство численного диапазона при разной высоте не заявляется.
 
 ## Границы
 
-LSMA length1 остаётся unresolved: official wrapper30.0 подтверждён, но anonymous TradingView требует
-аккаунт для add study; numeric result не получен. Local min2 не выдаётся за Pine minimum. KC/DC пока
-math-only; KC boolean/choice registration выполняется отдельно. Все127 TA не реализованы. Новых
-instance2/envelope3/DB3 writers нет; G5 compatibility proposal отдельно. Real Google
-OAuth/Drive/two-device, установленное окно PWA и физический телефон не проверены этим source этапом.
+LSMA length 1 остаётся неподтверждённым execution oracle; local min 2 не выдаётся за Pine minimum.
+Все 127 названий каталога ещё не реализованы. Keltner source registration проверена отдельно и в
+этот выпуск не включена; Donchian требует поддержки смещённых plots. Новых writers instance 2,
+envelope 3 или DB 3 нет: G5 compatibility остаётся отдельным предложением.
+
+Реальные Google OAuth/Drive, синхронизация двух устройств, установленное окно PWA и физический
+телефон этим локальным проходом не подтверждаются. Загрузка GIS SDK не считается входом Google.

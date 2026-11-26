@@ -14,4 +14,6 @@
 
 ## Workflow follow-up
 
-- Fresh browser acceptance root после frozen source; release отдельно.
+- [x] Fresh browser acceptance на frozen e78/build4f05: оба SDK, compact hover и restore,
+      same-dimension camera/range/width/gap, Arrow, удаление и mobile; 23 PNG просмотрены. Native UI
+      minimum 44 px не выдаётся за manual 30/31 proof. Release/public PWA отдельно.
