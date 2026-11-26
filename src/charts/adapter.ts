@@ -16,6 +16,7 @@ import type { PriceMetadata } from "./price-format.js";
 import type { TechnicalIndicatorInstance } from "../model/technical-indicators/types.js";
 import type {
   TechnicalPaneLayout,
+  TechnicalPaneCaptureContext,
   TechnicalPanePreference
 } from "../model/technical-indicator-layout.js";
 
@@ -63,7 +64,8 @@ export interface ChartAdapter {
 export interface ChartOptions extends DisplayPreferences {
   technicalIndicators?: readonly TechnicalIndicatorInstance[];
   technicalPaneLayout?: readonly TechnicalPanePreference[];
-  onTechnicalPaneLayout?: ((layout: TechnicalPaneLayout) => void) | undefined;
+  onTechnicalPaneLayout?:
+    ((layout: TechnicalPaneLayout, capture: TechnicalPaneCaptureContext) => void) | undefined;
   onTechnicalPaneMetrics?: ((metrics: readonly TechnicalPaneMetric[]) => void) | undefined;
   onCameraIntent?: (() => void) | undefined;
   onCameraChange?: ((view: ChartView) => void) | undefined;

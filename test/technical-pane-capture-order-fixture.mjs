@@ -6,9 +6,11 @@ export const { createTechnicalIndicatorInstance: make } = load(
 );
 export const actions = load("screens/terminal/technical-indicator-actions.js");
 export const model = load("model/technical-indicator-layout.js");
-export const { capturedTechnicalLayout: capture, technicalPaneGeometry: geometry } = load(
-  "charts/technical-pane-geometry.js"
-);
+export const {
+  capturedTechnicalLayout: capture,
+  captureTechnicalPaneLayout: captureIntent,
+  technicalPaneGeometry: geometry
+} = load("charts/technical-pane-geometry.js");
 export const panes = (ids = ["size1", "size2", "size3", "size4"]) =>
   ids.map((id, order) => make("rsi", id, { order }));
 export const preferences = (ids, ratio = 0.18) =>

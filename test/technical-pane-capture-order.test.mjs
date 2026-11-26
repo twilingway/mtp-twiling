@@ -23,9 +23,11 @@ for (const engine of ["lightweight", "kline"])
       tasks = [],
       captured = [],
       f = nativeFixture(engine, [], {
-        onTechnicalPaneLayout(layout) {
+        onTechnicalPaneLayout(layout, context) {
           captured.push(structuredClone(layout));
-          tasks.push(actions.persistTechnicalPaneLayout(c, layout, () => true));
+          assert.deepEqual(context.resizedPaneIds, ["size2", "size3"]);
+          assert.deepEqual(context.baselineOrder, []);
+          tasks.push(actions.persistTechnicalPaneLayout(c, layout, () => true, context));
         }
       });
     t.after(() => f.adapter.destroy());
@@ -137,7 +139,10 @@ test("writer honors full captured order over old sparse order and filters remove
     c = controller(current, prior),
     captured = preferences(["size4", "removed", "size1", "size2", "size3"]);
   captured[0].heightRatio = 0.25;
-  await actions.persistTechnicalPaneLayout(c, captured, () => true);
+  await actions.persistTechnicalPaneLayout(c, captured, () => true, {
+    resizedPaneIds: order(captured),
+    baselineOrder: order(prior)
+  });
   const saved = c.getSnapshot().preferences.technicalPaneLayout;
   assert.deepEqual(order(saved), ["size4", "size1", "size2", "size3", "new"]);
   assert.equal(saved.at(-1).heightRatio, 0.31);

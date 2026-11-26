@@ -12,7 +12,7 @@ size2,size3,size1,size4.
 **Goals:** сохранить действительный native order всех lower pane IDs и resized ratios через
 capture/persist/reconcile обоих движков.
 
-**Non-Goals:** изменять default grouping sort, native adapters, drawing/camera/data, persistent
+**Non-Goals:** изменять default grouping sort, native rendering, drawing/camera/data, persistent
 schema или owner/import guards.
 
 ## Decisions
@@ -23,12 +23,16 @@ schema или owner/import guards.
    точно; для pane без override материализуется прежний geometry default0.18/collapsed false. Это
    необходимо текущему required ratio shape и не сохраняет viewport-normalized height нетронутой
    панели. Default константа общая для geometry и capture.
-3. Writer принимает порядок capture как authoritative для актуальных IDs. Прежние active IDs,
-   отсутствующие в snapshot, сохраняются следом в свежем persisted order; removed IDs не
-   восстанавливаются. Existing TA write serialization/valid callback/owner/import/session guards
-   остаются прежними.
-4. Capture не вызывается при программном resize/restore без completed separator gesture; zero-change
-   возвращает null. Event layer и native modules не редактируются.
+3. Runtime context содержит resizedPaneIds и baselineOrder отдельно от полного layout. Writer
+   применяет geometry только touched IDs и читает остальные fields из свежих prefs внутри очереди.
+   Actual-top order сохраняется, пока относительный порядок baseline saved IDs не изменён предыдущей
+   model reorder; тогда выигрывает fresh groups order. Добавленный collapse/height override при
+   sparse/empty baseline не является reorder. Removed IDs не восстанавливаются, новые active IDs
+   сохраняются. Legacy3arg calls являются partial geometry updates на fresh group order.
+4. Typed callback передаёт context вторым аргументом через оба native forwarders и lifecycle;
+   WeakMap/hidden array metadata не используются, runtime object не сохраняется в backup.
+5. Capture не вызывается при программном resize/restore без completed separator gesture; zero-change
+   возвращает null. Event layer не редактируется; native modules получают только forwarding hunks.
 
 ## Risks / Trade-offs
 

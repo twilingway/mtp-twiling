@@ -18,7 +18,7 @@ import type { ChartOptions, TechnicalPaneMetric } from "./adapter.js";
 import { TechnicalRenderData } from "./technical-render-data.js";
 import { technicalCalculationContext } from "./technical-calculation-context.js";
 import type { TechnicalRenderOutput } from "./technical-render-data.js";
-import { capturedTechnicalLayout } from "./technical-pane-geometry.js";
+import { captureTechnicalPaneLayout } from "./technical-pane-geometry.js";
 import { klinePaneGeometry } from "./kline-pane-geometry.js";
 import { attachTechnicalPaneEvents } from "./technical-pane-events.js";
 import { lineColor } from "../model/candle-palette.js";
@@ -198,11 +198,11 @@ export function klineTechnical(
       changed,
       capture(before, after) {
         if (disposed || !alive()) return;
-        const next = capturedTechnicalLayout(layout, before, after);
+        const next = captureTechnicalPaneLayout(layout, before, after);
         if (next) {
-          layout = next;
+          layout = next.layout;
           groups = calculation.compile(instances, layout).groups;
-          options.onTechnicalPaneLayout?.(next);
+          options.onTechnicalPaneLayout?.(next.layout, next.context);
         }
       }
     });

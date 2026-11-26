@@ -14,6 +14,8 @@ order при сохранении полного нового snapshot.
 - Shared writer сохраняет captured order с прежними owner/import/session guards и фильтрует
   удалённые IDs.
 - Общий regression проверяет callback→persist→reconcile для обоих engines.
+- Runtime context отделяет touched geometry от full order; свежие queued untouched prefs и
+  предыдущая явная pane reorder сохраняются.
 
 ## Capabilities
 
@@ -29,5 +31,6 @@ implementation bugfix, новый параллельный contract не вво�
 
 ## Impact
 
-Только shared capture и его persistence hunk, собственные tests/docs. Без native source edits, новых
-полей/миграции, controller guard changes, сборки, браузера, version и Google API.
+Shared capture/writer/runtime types, callback plumbing и минимальные native forwarding hunks,
+собственные tests/docs. Без новых persistent полей/миграции, controller guard changes, сборки,
+браузера, version и Google API.

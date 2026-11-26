@@ -1,7 +1,9 @@
 # Сохранение порядка TA panes после separator resize
 
 Source-only fix от `f74c33d968d7ca258def096bfc2d731bbdf74b5f`, отдельный worktree
-`artifacts/technical-pane-capture-order`. Frozen R worktree и native modules не изменялись.
+`artifacts/technical-pane-capture-order`. Первый order fix
+`d5c306040b45c606de3981b077c631fd67df444e` дополнен runtime intent follow-up после независимого
+queue review. Frozen R worktree не менялся.
 
 ## Наблюдение и доказательства
 
@@ -38,21 +40,56 @@ records.
 
 Только height delta>=1 меняет ratio. Нетронутые existing ratio/collapsed копируются точно; если
 override отсутствовал, сохраняется прежний renderer default0.18/collapsed false. Default константа
-теперь общая для geometry и capture. Required v1 ratio shape не меняется; viewport-normalized peers
-не превращаются в новые измеренные ratios. Changed pane ratio по-прежнему clamped0.05..0.8;
-collapsed сбрасывается только если resized pane выше31. Без изменений heights capture возвращает
-null. Максимум100 lower panes сохраняется без обрезания active IDs.
+теперь общая для geometry, capture и writer. Required v1 ratio shape не меняется;
+viewport-normalized peers не превращаются в новые измеренные ratios. Changed pane ratio по-прежнему
+clamped0.05..0.8; collapsed сбрасывается только если resized pane выше31. Без изменений heights
+capture возвращает null. Максимум100 lower panes сохраняется без обрезания active IDs.
 
-Shared `persistTechnicalPaneLayout` ставит принятые актуальные captured IDs первыми в их порядке,
-затем сохраняет остальные свежие active layout entries. Удалённые или перемещённые в другую pane IDs
-фильтруются по текущим instances; stale records не восстанавливаются. Serialization,
-owner/session/import/route guards и original valid callback не меняются. При изменении массива
-preferences во время ожидания storage прежний reference guard отменяет captured write. Поле order не
-добавлено: источником persisted order остаётся array order текущего v1 layout.
+Поле order не добавлено: источником persisted order остаётся array order текущего v1 layout.
 
-Production diff только в `src/charts/technical-pane-geometry.ts` и одном hunk
-`persistTechnicalPaneLayout` в `src/screens/terminal/technical-indicator-actions.ts`. Default
-grouping sort, `kline-technical.ts`, `lightweight-technical.ts`, event layer, controller routing,
+## Runtime intent и queued preferences
+
+Независимый review
+`artifacts/technical-pane-capture-order-review/{REPORT.md,probe.mjs,probe-results.json}` показал два
+P2 на d5: предыдущая queued операция сохраняла untouched collapse=true либо ratio0.37 до начала
+capture transform, после чего full old snapshot возвращал false/0.18. Проверка references после
+transform такой случай не отменяла. Old snapshot мог отменить и предыдущую явную pane reorder.
+
+Новый `captureTechnicalPaneLayout` возвращает явный объект:
+
+```ts
+{
+  layout: TechnicalPaneLayout; // полный actual-top order
+  context: {
+    resizedPaneIds: readonly string[]; // только изменённые heights
+    baselineOrder: readonly string[]; // saved IDs до capture
+  };
+}
+```
+
+Это runtime-only contract: `ChartOptions.onTechnicalPaneLayout(layout, context)` → оба native
+forwarders → actual `chart-lifecycle.ts` →
+`persistTechnicalPaneLayout(controller, layout, valid, context)`. Никаких WeakMap/hidden array
+properties, persistent metadata или DB migration. Старый `capturedTechnicalLayout` остаётся
+array-only measurement helper для существующих geometry readers.
+
+Writer внутри serialized transform берёт geometry только resized IDs из snapshot; untouched
+ratio/collapse берёт из fresh prefs, затем measurement/default0.18 для ещё не сохранённых IDs. Если
+относительный порядок общих baseline saved IDs изменён предыдущей model reorder, используется fresh
+group order; иначе сохраняется измеренный native order плюс новые active IDs в свежем порядке. Само
+добавление first override при collapse/height в empty/sparse layout не является reorder intent.
+Removed/moved IDs фильтруются по свежим instances; новые active entries сохраняются. Default
+grouping sort не меняется.
+
+Legacy3arg calls остаются explicit partial geometry patches на fresh full group order. Полный resize
+snapshot должен передавать context: без него все переданные records означают намеренные geometry
+updates. Production callback требует второй аргумент типами; tests проверяют реальную forwarding
+цепочку. Original serialization/owner/session/import/route/valid guards не меняются; изменение
+preferences после начала transform по-прежнему отменяет pending capture через reference guard.
+
+Production ownership follow-up: shared model runtime types/default constant, `adapter.ts`, geometry,
+actions и минимальные forwarding hunks в `kline-technical.ts`, `lightweight-technical.ts`,
+`chart-lifecycle.ts`. Native rendering/axis/geometry policy, event layer, controller routing,
 DB/JSON/Drive shape, numeric series, camera и кэш не меняются.
 
 ## Проверки
@@ -78,11 +115,18 @@ completeness.
 - Transient owner/import/session/valid cancellation и pending move/remove во время storage;
   subscriptions освобождаются.
 
-Прежние suites: technical-pane-layout7, technical-indicator-actions5, native-technical-renderers22,
-native-technical-geometry4, kline-technical-settle7 —45/45 PASS. С новым regression всего53 scoped
-tests. Whole-source TypeScript noEmit с двумя version strings только in-memory — PASS. Scoped
-ESLint/Prettier — PASS; strict OpenSpec51/51 — PASS. Frozen full SHA и clean WT status передаются
-отдельно после commit.
+Follow-up suite `technical-pane-capture-race.test.mjs` проверяет9 cases: оба независимых P2 на full
+baseline, collapse/height при partial/empty baseline, previous queued explicit reorder, new active
+pane и legacy partial API. `node test/technical-pane-capture-race.test.mjs --baseline-d5` читает
+только frozen writer через `git show` и даёт8 FAIL/1 PASS; current source9/9 PASS. Это различающий
+before/after probe, старый source не копируется в repository. Actual lifecycle suite2/2 PASS на
+kline/tradingview: context forwarding при queued collapse и retired-owner guard.
+
+Прежние suites layout7/actions5/native-renderers22/native-geometry4/KLine-settle7 и
+render-lifecycle1 —46/46 PASS; order8/race9/lifecycle2 —19/19 PASS. Всего65 scoped tests.
+Whole-source noEmit с in-memory version strings, scoped ESLint/Prettier, strict OpenSpec51/51 и
+diff-check — PASS. Frozen full SHA и clean WT status передаются отдельно после commit; portable
+shape не меняется.
 
 Это source regression и controlled adapter evidence, не новый actual-browser paint PASS. Повторить
 исходный drag→persist→sync в actual KLine и LW после root integration; исходный screenshot остаётся

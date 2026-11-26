@@ -1,11 +1,11 @@
 import type {
   TechnicalIndicatorGroup,
+  TechnicalPaneCapture,
   TechnicalPaneLayout,
   TechnicalPanePreference
 } from "../model/technical-indicator-layout.js";
 import type { TechnicalPaneMetric } from "./adapter.js";
-
-const defaultHeightRatio = 0.18;
+import { DEFAULT_TECHNICAL_PANE_HEIGHT_RATIO as defaultHeightRatio } from "../model/technical-indicator-layout.js";
 
 export function technicalMinimumCanvasHeight(
   lowerCount: number,
@@ -64,25 +64,39 @@ export function capturedTechnicalLayout(
   before: readonly TechnicalPaneMetric[],
   after: readonly TechnicalPaneMetric[]
 ): TechnicalPaneLayout | null {
+  return captureTechnicalPaneLayout(layout, before, after)?.layout ?? null;
+}
+
+/** Full measured order is distinct from the geometry edits that a resize actually intends. */
+export function captureTechnicalPaneLayout(
+  layout: readonly TechnicalPanePreference[],
+  before: readonly TechnicalPaneMetric[],
+  after: readonly TechnicalPaneMetric[]
+): TechnicalPaneCapture | null {
   const total = after.reduce((sum, item) => sum + item.height, 0);
   if (!Number.isFinite(total) || total <= 0) return null;
   const measured = after
     .filter((item) => item.key.startsWith("pane:"))
     .sort((a, b) => a.top - b.top);
   if (measured.length > 100) return null;
-  let resized = false;
+  const resizedPaneIds: string[] = [];
   const result = measured.map((item): TechnicalPanePreference => {
     const paneId = item.key.slice(5),
       saved = layout.find((entry) => entry.paneId === paneId);
     const old = before.find((entry) => entry.key === item.key);
     if (!old || Math.abs(item.height - old.height) < 1)
       return saved ? { ...saved } : { paneId, heightRatio: defaultHeightRatio, collapsed: false };
-    resized = true;
+    resizedPaneIds.push(paneId);
     return {
       paneId,
       heightRatio: Math.max(0.05, Math.min(0.8, item.height / total)),
       collapsed: saved?.collapsed === true && item.height <= 31
     };
   });
-  return resized ? result : null;
+  return resizedPaneIds.length
+    ? {
+        layout: result,
+        context: { resizedPaneIds, baselineOrder: layout.map((item) => item.paneId) }
+      }
+    : null;
 }
