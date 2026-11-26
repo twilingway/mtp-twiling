@@ -177,10 +177,13 @@ export function persistTechnicalPaneLayout(
         (preferences.technicalIndicators ?? []).map((item) => technicalPaneKey(item.pane))
       );
       const accepted = changed.filter((item) => existing.has(`pane:${item.paneId}`));
+      const captured = new Set(accepted.map((item) => item.paneId));
       return {
         technicalPaneLayout: [
-          ...layout.map((item) => accepted.find((next) => next.paneId === item.paneId) ?? item),
-          ...accepted.filter((item) => !layout.some((next) => next.paneId === item.paneId))
+          ...accepted,
+          ...layout.filter(
+            (item) => existing.has(`pane:${item.paneId}`) && !captured.has(item.paneId)
+          )
         ]
       };
     },

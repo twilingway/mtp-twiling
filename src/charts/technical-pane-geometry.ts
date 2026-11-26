@@ -5,6 +5,8 @@ import type {
 } from "../model/technical-indicator-layout.js";
 import type { TechnicalPaneMetric } from "./adapter.js";
 
+const defaultHeightRatio = 0.18;
+
 export function technicalMinimumCanvasHeight(
   lowerCount: number,
   legacyVolume = false,
@@ -27,7 +29,7 @@ export function technicalPaneGeometry(
     key: group.key,
     height: group.preference?.collapsed
       ? 30
-      : Math.max(30, total * (group.preference?.heightRatio ?? 0.18))
+      : Math.max(30, total * (group.preference?.heightRatio ?? defaultHeightRatio))
   }));
   const requested = targets.reduce((sum, item) => sum + item.height, 0);
   const reserveVolume = legacyVolume === null ? 0 : 30;
@@ -56,38 +58,31 @@ export function technicalPaneGeometry(
   ];
 }
 
-/** A user separator edit changes only panes whose actual height changed, not viewport-normalized peers. */
+/** Capture every measured pane's order, but change ratios only for genuinely resized panes. */
 export function capturedTechnicalLayout(
   layout: readonly TechnicalPanePreference[],
   before: readonly TechnicalPaneMetric[],
   after: readonly TechnicalPaneMetric[]
 ): TechnicalPaneLayout | null {
   const total = after.reduce((sum, item) => sum + item.height, 0);
-  if (total <= 0) return null;
-  const updates: TechnicalPanePreference[] = [];
-  for (const item of after) {
-    if (!item.key.startsWith("pane:")) continue;
-    const old = before.find((entry) => entry.key === item.key);
-    if (!old || Math.abs(item.height - old.height) < 1) continue;
+  if (!Number.isFinite(total) || total <= 0) return null;
+  const measured = after
+    .filter((item) => item.key.startsWith("pane:"))
+    .sort((a, b) => a.top - b.top);
+  if (measured.length > 100) return null;
+  let resized = false;
+  const result = measured.map((item): TechnicalPanePreference => {
     const paneId = item.key.slice(5),
       saved = layout.find((entry) => entry.paneId === paneId);
-    updates.push({
+    const old = before.find((entry) => entry.key === item.key);
+    if (!old || Math.abs(item.height - old.height) < 1)
+      return saved ? { ...saved } : { paneId, heightRatio: defaultHeightRatio, collapsed: false };
+    resized = true;
+    return {
       paneId,
       heightRatio: Math.max(0.05, Math.min(0.8, item.height / total)),
       collapsed: saved?.collapsed === true && item.height <= 31
-    });
-  }
-  if (!updates.length) return null;
-  const ids = new Set(updates.map((item) => item.paneId));
-  const result = layout.map(
-    (item) => updates.find((update) => update.paneId === item.paneId) ?? { ...item }
-  );
-  for (const item of updates)
-    if (!result.some((saved) => saved.paneId === item.paneId)) result.push(item);
-  // Bound explicit overrides to the instance contract; never persist render-only normalization.
-  while (result.length > 100) {
-    const index = result.findIndex((item) => !ids.has(item.paneId));
-    result.splice(index >= 0 ? index : 0, 1);
-  }
-  return result;
+    };
+  });
+  return resized ? result : null;
 }
