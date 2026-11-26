@@ -1,12 +1,13 @@
 import { t } from "../../i18n/messages.js";
 import { useState } from "react";
-import type { ChartSettings } from "../../model/types.js";
+import type { ChartEngine, ChartSettings } from "../../model/types.js";
 import { useTerminal } from "./context.js";
 import { INDICATOR_NAMES } from "./state.js";
 import { Modal } from "./Modal.js";
 import { TRADINGVIEW_CANDLE_STYLE } from "../../model/candle-palette.js";
 import { chartBackground, terminalTheme, withTheme } from "../../model/theme.js";
 import { TimeZonePicker } from "./ClockZoneControl.js";
+import { ChartEngineSelect } from "./ChartEngineSelect.js";
 import type { Locale } from "../../i18n/preferences.js";
 
 const CANDLE_PARTS = [
@@ -19,6 +20,7 @@ export function ChartSettingsDialog() {
     [settings, setSettings] = useState<ChartSettings>({ ...state.preferences.chartSettings });
   const [locale, setLocale] = useState<Locale>(state.preferences.locale ?? "ru");
   const [timeZone, setTimeZone] = useState(state.preferences.timeZone ?? "Europe/Moscow");
+  const [engine, setEngine] = useState<ChartEngine>();
   const update = (patch: ChartSettings) => setSettings((previous) => ({ ...previous, ...patch }));
   return (
     <Modal
@@ -30,12 +32,21 @@ export function ChartSettingsDialog() {
         id="chart-settings-form"
         onSubmit={(e) => {
           e.preventDefault();
+          const engineUpdate = engine && engine !== state.preferences.engine ? { engine } : {};
           void controller
-            .setPreferences({ locale, timeZone, chartSettings: settings })
+            .setPreferences({ ...engineUpdate, locale, timeZone, chartSettings: settings })
             .then(() => controller.setDialog(null));
         }}
       >
         <div className="display-preferences">
+          <label htmlFor="chart-settings-engine">
+            {t("Библиотека графика")}
+            <ChartEngineSelect
+              id="chart-settings-engine"
+              value={engine ?? state.preferences.engine}
+              onChange={setEngine}
+            />
+          </label>
           <label>
             {t("Язык")}
             <select
