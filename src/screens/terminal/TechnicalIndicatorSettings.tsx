@@ -60,21 +60,7 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
     Object.fromEntries(Object.entries(instance.params).map(([key, value]) => [key, String(value)]))
   );
   const [pane, setPane] = useState(technicalPaneKey(instance.pane));
-  const [styles, setStyles] = useState<Record<string, OutputStyle>>(() =>
-    Object.fromEntries(
-      definition.outputs.map((output) => [
-        output.id,
-        {
-          color: output.color,
-          width: 1,
-          visible: true,
-          opacity: 1,
-          lineStyle: "solid",
-          ...instance.styles?.[output.id]
-        }
-      ])
-    )
-  );
+  const [styles, setStyles] = useState<Record<string, OutputStyle> | undefined>(instance.styles);
   const [error, setError] = useState("");
   const { pending, run } = useIndicatorMenuAction(controller);
   const groups = technicalIndicatorGroups(state.preferences.technicalIndicators ?? []);
@@ -93,8 +79,16 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
     state.preferences.instrumentUid === initial.state.preferences.instrumentUid &&
     state.preferences.timeframe === initial.state.preferences.timeframe &&
     state.preferences.engine === initial.state.preferences.engine;
+  const displayStyle = (id: string, stored: typeof styles): OutputStyle => ({
+    color: definition.outputs.find((output) => output.id === id)!.color,
+    width: 1,
+    visible: true,
+    opacity: 1,
+    lineStyle: "solid",
+    ...stored?.[id]
+  });
   const style = (id: string, patch: Partial<OutputStyle>) =>
-    setStyles((previous) => ({ ...previous, [id]: { ...previous[id]!, ...patch } }));
+    setStyles((previous) => ({ ...previous, [id]: { ...displayStyle(id, previous), ...patch } }));
   return (
     <Modal
       id="technical-indicator-settings"
@@ -116,7 +110,7 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
               ])
             ),
             pane: pane === "price" ? { kind: "overlay" } : { kind: "pane", id: pane.slice(5) },
-            styles
+            ...(styles === undefined ? {} : { styles })
           };
           if (!current || !isTechnicalIndicatorInstance(candidate)) {
             setError(
@@ -197,7 +191,7 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
         <fieldset disabled={pending || !current}>
           <legend>{text("Стиль", "Style")}</legend>
           {definition.outputs.map((output) => {
-            const value = styles[output.id]!;
+            const value = displayStyle(output.id, styles);
             return (
               <div key={output.id} className="technical-output-style">
                 <label>
