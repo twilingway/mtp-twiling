@@ -1,6 +1,10 @@
 import type { CumulativeHistoryRequirement } from "./momentum-volume/metadata.js";
 import type { VolumeFlowHistoryRequirement, VolumeFlowId } from "./volume-flow/metadata.js";
 import type { VolumeAverage } from "./volume-flow/parameters.js";
+import type {
+  StateOscillatorId,
+  StateOscillatorHistoryRequirement
+} from "./state-oscillator-contract.js";
 
 export type NumericValue = number | null;
 export type NumericSeries = readonly NumericValue[];
@@ -40,7 +44,8 @@ export type TechnicalIndicatorId =
   | "adx"
   | "vortex"
   | "choppiness-index"
-  | VolumeFlowId;
+  | VolumeFlowId
+  | StateOscillatorId;
 export type PriceSource = "open" | "high" | "low" | "close" | "hl2" | "hlc3" | "ohlc4" | "volume";
 export interface TechnicalBar {
   readonly timestamp: number;
@@ -51,6 +56,19 @@ export interface TechnicalBar {
   readonly volume: NumericValue;
 }
 export interface TechnicalParameters {
+  tsi: { longLength: number; shortLength: number; signalLength: number };
+  kst: {
+    roc1Length: number;
+    roc2Length: number;
+    roc3Length: number;
+    roc4Length: number;
+    sma1Length: number;
+    sma2Length: number;
+    sma3Length: number;
+    sma4Length: number;
+    signalLength: number;
+  };
+  "fisher-transform": { length: number };
   cmf: { length: number };
   "chaikin-oscillator": { fastLength: number; slowLength: number };
   efi: { length: number };
@@ -174,6 +192,18 @@ export interface TechnicalIndicatorResult {
 export interface TechnicalCalculationContext {
   readonly historicalVolatilityPeriodsPerYear: number;
 }
+export type LegacyRecursiveHistoryRequirement = {
+  kind: "recursive";
+  lookbackBars: null;
+  seedBars: number;
+  seedPolicy:
+    | "first-non-null"
+    | "sma-of-first-length"
+    | "adjacent-change-wilder"
+    | "first-value-ema-chain"
+    | "true-range-wilder";
+  convergence: "full-input-dependent";
+};
 export type TechnicalHistoryRequirement =
   | {
       kind: "finite";
@@ -181,18 +211,8 @@ export type TechnicalHistoryRequirement =
       seedPolicy: "window";
       convergence: "exact-after-lookback";
     }
-  | {
-      kind: "recursive";
-      lookbackBars: null;
-      seedBars: number;
-      seedPolicy:
-        | "first-non-null"
-        | "sma-of-first-length"
-        | "adjacent-change-wilder"
-        | "first-value-ema-chain"
-        | "true-range-wilder";
-      convergence: "full-input-dependent";
-    }
+  | LegacyRecursiveHistoryRequirement
   /** Reviewed accumulation policy; never substitute an EMA/recursive seed. */
   | CumulativeHistoryRequirement
-  | VolumeFlowHistoryRequirement;
+  | VolumeFlowHistoryRequirement
+  | StateOscillatorHistoryRequirement;
