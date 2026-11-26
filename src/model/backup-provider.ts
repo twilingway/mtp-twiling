@@ -1,4 +1,10 @@
-import { isProviderRef, providerRefFromId, validProviderIdentity } from "./market-provider.js";
+import {
+  isProviderRef,
+  isReservedProviderId,
+  providerRefFromId,
+  providerRefFromViewKey,
+  validProviderIdentity
+} from "./market-provider.js";
 
 function object(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -22,18 +28,25 @@ export function validRowProvider(value: Record<string, unknown>): boolean {
 export function validBackupProviders(value: Record<string, unknown>): boolean {
   const schema = value.schemaVersion;
   if (schema !== 1 && schema !== 2) return false;
+  if (schema === 1 && value.requiredProviders !== undefined) return false;
   const visit = (item: unknown): boolean => {
-    if (typeof item === "string" && item.startsWith("bybit:"))
-      return schema === 2 && providerRefFromId(item) !== null;
     if (Array.isArray(item)) return item.every(visit);
     if (object(item)) {
       if (item.providerRef !== undefined && schema !== 2) return false;
       return Object.entries(item).every(([key, child]) => {
         // View keys add interval/engine/range suffixes; UID flag keys add an explicit prefix.
-        if (key.startsWith("uid:bybit:") && (schema !== 2 || !providerRefFromId(key.slice(4))))
+        const flagId = key.startsWith("uid:")
+          ? key.slice(4)
+          : key.startsWith("legacy:")
+            ? key.slice(7)
+            : null;
+        if (isReservedProviderId(flagId) && (schema !== 2 || !providerRefFromId(flagId)))
           return false;
-        if (key === "key" && typeof child === "string" && child.startsWith("bybit:"))
-          return schema === 2 && !!providerRefFromId(child.split(":").slice(0, -3).join(":"));
+        if (isReservedProviderId(child)) {
+          if (key === "key") return schema === 2 && !!providerRefFromViewKey(child);
+          if (key === "uid" || key === "symbol" || key === "instrumentUid")
+            return schema === 2 && providerRefFromId(child) !== null;
+        }
         return visit(child);
       });
     }

@@ -3,7 +3,8 @@ import { list } from "./types.js";
 const STORES = ["preferences", "drawings", "images", "history", "coverage", "vault"] as const;
 type Store = (typeof STORES)[number];
 export const db = await new Promise<IDBDatabase>((resolve, reject) => {
-  const request = indexedDB.open("twiling-personal-terminal", 2);
+  // A v2 client filters out unknown OKX rows when it rewrites the watchlist.
+  const request = indexedDB.open("twiling-personal-terminal", 3);
   request.onupgradeneeded = () => {
     for (const name of STORES) {
       const store = request.result.objectStoreNames.contains(name)

@@ -3,6 +3,7 @@ import { all } from "./storage-db.js";
 import { imageAsset, historyRecord } from "./types.js";
 import { mergeCandles, encodeCandles, decodeCandles } from "../model/history-codec.js";
 import { toBase64, fromBase64 } from "../model/backup-format.js";
+import { withRequiredProviders } from "../model/backup-export.js";
 import { providerRefFromId } from "../model/market-provider.js";
 import { physicalOwner, prepareProfileV2 } from "./storage-v2-migration.js";
 import type {
@@ -196,7 +197,7 @@ export async function createBackup(
           });
       }
     }
-  return { ...backup, schemaVersion: 2 };
+  return withRequiredProviders({ ...backup, schemaVersion: 2 });
 }
 export async function importBackup(
   owner: string,
