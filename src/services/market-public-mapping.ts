@@ -1,5 +1,16 @@
-import type { BybitInstrument, BybitQuote } from "./providers/bybit/types.js";
+import type { BybitInstrument } from "./providers/bybit/types.js";
+import type { OkxInstrument } from "./providers/okx/types.js";
+import { providerSeriesId } from "../model/market-provider.js";
 import type { CatalogInstrument, InstrumentKind, MarketRow } from "../model/types.js";
+
+export interface PublicQuote {
+  seriesId: string;
+  timestamp: number;
+  lastPrice: number | null;
+  previousPrice24h: number | null;
+  changePercent24h: number | null;
+}
+
 export function publicCatalogInstrument(item: BybitInstrument): CatalogInstrument {
   const kind: InstrumentKind =
     item.assetClass === "crypto"
@@ -35,6 +46,25 @@ export function publicCatalogInstrument(item: BybitInstrument): CatalogInstrumen
     ...(item.launchTime ? { firstTradeDate: new Date(item.launchTime).toISOString() } : {})
   };
 }
+export function okxCatalogInstrument(item: OkxInstrument): CatalogInstrument {
+  const spot = item.ref.category === "spot";
+  return {
+    uid: providerSeriesId(item.ref),
+    providerRef: item.ref,
+    ticker: item.ref.symbol,
+    name: `${item.baseCoin} · ${spot ? "спот" : "бессрочный USDT-контракт"}`,
+    kind: "crypto",
+    currency: item.quoteCoin,
+    exchange: "OKX",
+    assetClass: "crypto",
+    productKind: spot ? "spot" : "perpetual",
+    baseCoin: item.baseCoin,
+    quoteCoin: item.quoteCoin,
+    ...(item.settleCoin ? { settleCoin: item.settleCoin } : {}),
+    ...(item.tickSize !== null ? { nativePriceStep: item.tickSize } : {}),
+    ...(item.launchTime !== null ? { firstTradeDate: new Date(item.launchTime).toISOString() } : {})
+  };
+}
 export function publicMarketRow(item: CatalogInstrument): MarketRow {
   if (!item.providerRef || !item.uid) throw new Error("Публичный инструмент не имеет источника.");
   const increment = item.minPriceIncrement;
@@ -66,7 +96,7 @@ export function publicMarketRow(item: CatalogInstrument): MarketRow {
     availability: "pending"
   };
 }
-export function applyPublicQuote(row: MarketRow, quote: BybitQuote): void {
+export function applyPublicQuote(row: MarketRow, quote: PublicQuote): void {
   if (row.uid !== quote.seriesId || !row.providerRef) return;
   row.price = quote.lastPrice;
   row.previousClose = null;

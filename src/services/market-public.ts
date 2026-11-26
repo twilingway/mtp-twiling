@@ -7,12 +7,19 @@ import {
   searchCatalog,
   nativeInterval
 } from "./providers/bybit/index.js";
-import type { BybitCatalog, BybitCategory, BybitQuote } from "./providers/bybit/types.js";
+import type { BybitCatalog, BybitCategory, BybitInstrument } from "./providers/bybit/types.js";
 import type { BybitStreamOptions } from "./providers/bybit/websocket.js";
 import type { BybitInterval } from "./providers/bybit/market.js";
-import { publicCatalogInstrument } from "./market-public-mapping.js";
+import { okxNativeInterval } from "./providers/okx/market.js";
+import type { OkxInstrument } from "./providers/okx/types.js";
+import { okxCatalogInstrument, publicCatalogInstrument } from "./market-public-mapping.js";
+import type { PublicQuote } from "./market-public-mapping.js";
+import { OkxMarket, PUBLIC_CATALOG_MAX_AGE_MS } from "./market-okx.js";
+import type { OkxMarketOptions } from "./market-okx.js";
 import { TIMEFRAMES, mergeCandles, subtractRanges } from "../model/history-codec.js";
 import { shiftTimeframe } from "../model/intervals/calendar.js";
+import { providerSeriesId } from "../model/market-provider.js";
+import type { MarketProviderRef, OkxProviderRef } from "../model/market-provider.js";
 import type {
   Candle,
   CatalogInstrument,
@@ -28,20 +35,74 @@ export interface PublicMarketOptions {
     category: BybitCategory,
     options: BybitStreamOptions
   ) => Pick<BybitStream, "setSubscriptions" | "start" | "dispose">;
+  okx?: OkxMarketOptions;
   online?: () => boolean;
 }
+export type PublicMarketReconnect = Pick<MarketProviderRef, "provider" | "category">;
+
 interface Events {
-  quote(quote: BybitQuote): void;
+  quote(quote: PublicQuote): void;
   candle(event: CandleEvent): void;
   notice(message: string): void;
-  reconnect(category: BybitCategory): void;
+  reconnect(source: PublicMarketReconnect): void;
 }
+
+function supportedBybitInstrument(item: BybitInstrument): boolean {
+  return (
+    item.status === "Trading" &&
+    (item.ref.category === "spot" ||
+      (item.contractType === "LinearPerpetual" && item.settleCoin === "USDT"))
+  );
+}
+
+function marketTuple(item: BybitInstrument | OkxInstrument): string {
+  return JSON.stringify([
+    item.ref.category,
+    item.baseCoin.toUpperCase(),
+    item.quoteCoin.toUpperCase(),
+    item.settleCoin?.toUpperCase() ?? null
+  ]);
+}
+
+function knownBybitMarkets(catalog: BybitCatalog): Set<string> {
+  const categories = new Set(catalog.instruments.map((item) => item.ref.category));
+  if (!catalog.complete || !categories.has("spot") || !categories.has("linear"))
+    throw new Error("Полный каталог Bybit не подтверждён.");
+  return new Set(catalog.instruments.filter(supportedBybitInstrument).map(marketTuple));
+}
+
+function searchBybit(catalog: BybitCatalog, query: string, kind: InstrumentSearchKind) {
+  return searchCatalog(catalog, query, { cryptoOnly: false, limit: 300 })
+    .filter((item) => supportedBybitInstrument(item) && item.assetClass !== "unknown")
+    .map(publicCatalogInstrument)
+    .filter((item) => kind === "all" || item.kind === kind);
+}
+
+function searchKey(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toUpperCase()
+    .replace(/[\s/_:-]+/g, "");
+}
+
+function okxMatches(item: OkxInstrument, query: string): boolean {
+  return [item.ref.symbol, item.baseCoin, item.quoteCoin].some((part) =>
+    searchKey(part).includes(query)
+  );
+}
+
+function okxRefs(rows: readonly MarketRow[]): OkxProviderRef[] {
+  return rows.flatMap((row) => (row.providerRef?.provider === "okx" ? [row.providerRef] : []));
+}
+
 export class PublicMarket {
   cachePaused = false;
   private catalog: BybitCatalog | undefined;
+  private catalogReceivedAt: number | undefined;
   private catalogRequest: Promise<BybitCatalog> | undefined;
   private readonly lifetime = new AbortController();
   private readonly http: BybitHttp;
+  private readonly okx: OkxMarket;
   private readonly streams = new Map<
     BybitCategory,
     Pick<BybitStream, "setSubscriptions" | "start" | "dispose">
@@ -58,6 +119,22 @@ export class PublicMarket {
     private readonly options: PublicMarketOptions = {}
   ) {
     this.http = options.http ?? new BybitHttp();
+    this.okx = new OkxMarket(
+      this.lifetime.signal,
+      {
+        onQuote: (quote) => this.emitQuote(quote),
+        onCandles: (ref, timeframe, bars) => this.receiveCandles(ref, timeframe, bars),
+        onReconnect: () => {
+          const ref = this.selection?.row.providerRef;
+          if (ref?.provider === "okx" && !this.lifetime.signal.aborted && !this.cachePaused)
+            this.events.reconnect({ provider: "okx", category: ref.category });
+        },
+        onError: (error) => {
+          if (!this.lifetime.signal.aborted) this.events.notice(error.message);
+        }
+      },
+      options.okx
+    );
   }
   private signal(signal?: AbortSignal): AbortSignal {
     return signal ? AbortSignal.any([signal, this.lifetime.signal]) : this.lifetime.signal;
@@ -67,34 +144,62 @@ export class PublicMarket {
     kind: InstrumentSearchKind,
     signal?: AbortSignal
   ): Promise<CatalogInstrument[]> {
-    if (!["all", "crypto", "future", "tokenized-stock"].includes(kind)) return [];
+    const needle = searchKey(query);
+    if (!needle || !["all", "crypto", "future", "tokenized-stock"].includes(kind)) return [];
     const active = this.signal(signal);
-    active.throwIfAborted();
-    if (!this.catalog) {
-      this.catalogRequest ??= loadCatalog(this.http, this.lifetime.signal)
-        .then((value) => {
-          this.catalog = value;
-          return value;
-        })
-        .finally(() => {
-          this.catalogRequest = undefined;
-        });
-      await this.waitCatalog(this.catalogRequest, active);
+    let catalog: BybitCatalog;
+    try {
+      catalog = await this.bybitCatalog(active);
+    } catch (error) {
+      active.throwIfAborted();
+      const previous = this.catalog ? searchBybit(this.catalog, query, kind) : [];
+      if (!previous.length) throw error;
+      this.events.notice("Каталог Bybit не обновился. Показаны ранее найденные инструменты Bybit.");
+      return previous;
     }
     active.throwIfAborted();
-    if (!this.catalog) return [];
-    return searchCatalog(this.catalog, query, { cryptoOnly: false, limit: 300 })
-      .filter(
-        (item) =>
-          item.status === "Trading" &&
-          (item.ref.category === "spot" ||
-            (item.contractType === "LinearPerpetual" && item.settleCoin === "USDT"))
-      )
-      .filter((item) => item.assetClass !== "unknown")
-      .map(publicCatalogInstrument)
-      .filter((item) => kind === "all" || item.kind === kind);
+    const bybit = searchBybit(catalog, query, kind);
+    if (kind !== "all" && kind !== "crypto") return bybit;
+    try {
+      const known = knownBybitMarkets(catalog);
+      const okx = await this.waitCatalog(this.okx.catalog(), active);
+      return [
+        ...bybit,
+        ...okx
+          .filter((item) => okxMatches(item, needle) && !known.has(marketTuple(item)))
+          .map(okxCatalogInstrument)
+      ];
+    } catch (error) {
+      active.throwIfAborted();
+      if (!bybit.length) throw error;
+      this.events.notice(error instanceof Error ? error.message : "Каталог OKX недоступен.");
+      return bybit;
+    }
   }
-  private waitCatalog(request: Promise<BybitCatalog>, signal: AbortSignal): Promise<BybitCatalog> {
+
+  private bybitCatalog(signal: AbortSignal, refresh = false): Promise<BybitCatalog> {
+    signal.throwIfAborted();
+    if (this.catalogRequest) return this.waitCatalog(this.catalogRequest, signal);
+    if (
+      !refresh &&
+      this.catalog &&
+      this.catalogReceivedAt !== undefined &&
+      Date.now() - this.catalogReceivedAt < PUBLIC_CATALOG_MAX_AGE_MS
+    )
+      return Promise.resolve(this.catalog);
+    this.catalogRequest = loadCatalog(this.http, this.lifetime.signal)
+      .then((catalog) => {
+        this.catalog = catalog;
+        this.catalogReceivedAt = Date.now();
+        return catalog;
+      })
+      .finally(() => {
+        this.catalogRequest = undefined;
+      });
+    return this.waitCatalog(this.catalogRequest, signal);
+  }
+
+  private waitCatalog<T>(request: Promise<T>, signal: AbortSignal): Promise<T> {
     signal.throwIfAborted();
     return new Promise((resolve, reject) => {
       const abort = () => {
@@ -110,61 +215,65 @@ export class PublicMarket {
     });
   }
   async verify(instrument: CatalogInstrument, signal?: AbortSignal): Promise<CatalogInstrument> {
-    const values = await this.search(instrument.providerRef?.symbol ?? "", "all", signal);
-    const exact = values.find((item) => item.uid === instrument.uid);
+    const active = this.signal(signal),
+      ref = instrument.providerRef;
+    const catalog = await this.bybitCatalog(active, ref?.provider === "okx");
+    if (ref?.provider === "okx") {
+      const known = knownBybitMarkets(catalog);
+      const okx = await this.waitCatalog(this.okx.catalog(true), active);
+      const item = okx.find((value) => providerSeriesId(value.ref) === instrument.uid);
+      if (!item || instrument.uid !== providerSeriesId(ref))
+        throw new Error("Инструмент отсутствует в текущем каталоге OKX.");
+      if (known.has(marketTuple(item)))
+        throw new Error("Эта пара появилась на Bybit. Обновите поиск инструментов.");
+      return okxCatalogInstrument(item);
+    }
+    const exact = catalog.instruments.find(
+      (item) =>
+        supportedBybitInstrument(item) &&
+        item.assetClass !== "unknown" &&
+        item.seriesId === instrument.uid &&
+        item.ref.symbol === ref?.symbol &&
+        item.ref.category === ref.category
+    );
     if (!exact) throw new Error("Инструмент отсутствует в текущем полном каталоге Bybit.");
-    return exact;
+    return publicCatalogInstrument(exact);
   }
   sync(rows: readonly MarketRow[]): void {
     if (this.lifetime.signal.aborted) return;
     this.rows = rows;
+    const ref = this.selection?.row.providerRef;
+    this.okx.sync(
+      okxRefs(rows),
+      ref?.provider === "okx" && this.selection
+        ? { ref, timeframe: this.selection.timeframe }
+        : null
+    );
     for (const category of ["spot", "linear"] as const) {
       const symbols = rows.flatMap((row) =>
-        row.providerRef?.category === category ? [row.providerRef.symbol] : []
+        row.providerRef?.provider === "bybit" && row.providerRef.category === category
+          ? [row.providerRef.symbol]
+          : []
       );
       const selected =
-        this.selection?.row.providerRef?.category === category ? this.selection : null;
+        ref?.provider === "bybit" && ref.category === category ? this.selection : null;
       if (!symbols.length && !selected) {
         this.streams.get(category)?.dispose();
         this.streams.delete(category);
+        this.opened.delete(category);
         continue;
       }
       let stream = this.streams.get(category);
       if (!stream) {
         const opts: BybitStreamOptions = {
           onEvent: (event) => {
-            if (this.lifetime.signal.aborted || this.cachePaused) return;
-            if (event.kind === "quote") this.events.quote(event.quote);
-            if (event.kind === "candles") {
-              const current = this.selection;
-              if (
-                !current ||
-                current.row.providerRef?.category !== category ||
-                current.row.providerRef.symbol !== event.ref.symbol ||
-                current.timeframe !== event.interval
-              )
-                return;
-              for (const value of event.candles) {
-                const bar: Candle = {
-                  timestamp: value.timestamp,
-                  open: value.open,
-                  high: value.high,
-                  low: value.low,
-                  close: value.close,
-                  volume: value.baseVolume
-                };
-                this.events.candle({
-                  uid: current.row.uid!,
-                  interval: TIMEFRAMES[current.timeframe].stream,
-                  bar
-                });
-                this.queue(current.row.uid!, current.timeframe, bar);
-              }
-            }
+            if (event.kind === "quote") this.emitQuote(event.quote);
+            if (event.kind === "candles")
+              this.receiveCandles(event.ref, event.interval, event.candles);
           },
           onState: (state) => {
-            if (state === "open") {
-              if (this.opened.has(category)) this.events.reconnect(category);
+            if (state === "open" && !this.lifetime.signal.aborted) {
+              if (this.opened.has(category)) this.events.reconnect({ provider: "bybit", category });
               this.opened.add(category);
             }
           },
@@ -172,38 +281,31 @@ export class PublicMarket {
         };
         stream = this.options.stream?.(category, opts) ?? new BybitStream(category, opts);
         this.streams.set(category, stream);
-        stream.setSubscriptions({
-          tickers: symbols,
-          candles: selected
-            ? [
-                {
-                  symbol: selected.row.providerRef!.symbol,
-                  interval: selected.timeframe as BybitInterval
-                }
-              ]
+      }
+      stream.setSubscriptions({
+        tickers: symbols,
+        candles:
+          selected && ref
+            ? [{ symbol: ref.symbol, interval: selected.timeframe as BybitInterval }]
             : []
-        });
-      } else
-        stream.setSubscriptions({
-          tickers: symbols,
-          candles: selected
-            ? [
-                {
-                  symbol: selected.row.providerRef!.symbol,
-                  interval: selected.timeframe as BybitInterval
-                }
-              ]
-            : []
-        });
+      });
       stream.start(this.lifetime.signal);
     }
   }
   async snapshot(): Promise<void> {
+    await Promise.all([this.snapshotBybit(), this.okx.snapshot(okxRefs(this.rows))]);
+  }
+  private async snapshotBybit(): Promise<void> {
     for (const category of ["spot", "linear"] as const) {
-      if (!this.rows.some((row) => row.providerRef?.category === category)) continue;
+      if (
+        !this.rows.some(
+          (row) => row.providerRef?.provider === "bybit" && row.providerRef.category === category
+        )
+      )
+        continue;
       try {
         for (const quote of await loadQuotes(this.http, category, undefined, this.lifetime.signal))
-          if (!this.cachePaused) this.events.quote(quote);
+          this.emitQuote(quote);
       } catch (error) {
         if (!this.lifetime.signal.aborted)
           this.events.notice(error instanceof Error ? error.message : "Bybit недоступен");
@@ -212,7 +314,7 @@ export class PublicMarket {
   }
   select(row: MarketRow | null, timeframe: Timeframe): void {
     if (row?.providerRef) {
-      nativeInterval(timeframe);
+      (row.providerRef.provider === "okx" ? okxNativeInterval : nativeInterval)(timeframe);
       this.selection = { row, timeframe };
     } else this.selection = null;
     this.sync(this.rows);
@@ -223,8 +325,11 @@ export class PublicMarket {
     range: HistoryRange,
     options: CandleOptions = {}
   ): Promise<CandleResult> {
-    if (!row.providerRef || !row.uid) throw new Error("Источник Bybit недоступен.");
-    nativeInterval(timeframe);
+    const ref = row.providerRef;
+    if (!ref || !row.uid) throw new Error("Источник криптокотировок недоступен.");
+    const okx = ref.provider === "okx",
+      name = okx ? "OKX" : "Bybit";
+    (okx ? okxNativeInterval : nativeInterval)(timeframe);
     const signal = this.signal(options.signal);
     signal.throwIfAborted();
     let bars = await this.cache.loadHistory(this.owner(), row.uid, timeframe, range.from, range.to);
@@ -235,7 +340,7 @@ export class PublicMarket {
         ticker: row.ticker,
         timeframe,
         candles: bars,
-        source: "Bybit · IndexedDB · офлайн",
+        source: `${name} · IndexedDB · офлайн`,
         cached,
         requests: 0
       };
@@ -247,7 +352,10 @@ export class PublicMarket {
     const gaps = subtractRanges(range.from, closedTo, coverage);
     if (closedTo < range.to) gaps.push({ from: closedTo, to: range.to });
     for (const [index, part] of gaps.entries()) {
-      const rows = await loadHistory(this.http, row.providerRef, timeframe, part, signal);
+      const rows =
+        ref.provider === "okx"
+          ? await this.okx.history(ref, timeframe, part, signal)
+          : await loadHistory(this.http, ref, timeframe, part, signal);
       signal.throwIfAborted();
       const next = rows.map((value) => ({
         timestamp: value.timestamp,
@@ -273,19 +381,52 @@ export class PublicMarket {
       ticker: row.ticker,
       timeframe,
       candles: bars.filter((bar) => bar.timestamp >= range.from && bar.timestamp <= range.to),
-      source: "Bybit · напрямую · последняя сделка",
+      source: `${name} · напрямую · последняя сделка`,
       cached,
       requests: gaps.length,
       requestedRangeCovered: true
     };
   }
+
+  private emitQuote(quote: PublicQuote): void {
+    if (!this.lifetime.signal.aborted && !this.cachePaused) this.events.quote(quote);
+  }
+
+  private receiveCandles(
+    ref: MarketProviderRef,
+    timeframe: string,
+    bars: readonly (Omit<Candle, "volume"> & { baseVolume: number })[]
+  ): void {
+    const current = this.selection,
+      uid = providerSeriesId(ref);
+    if (
+      this.lifetime.signal.aborted ||
+      this.cachePaused ||
+      current?.row.uid !== uid ||
+      current.timeframe !== timeframe
+    )
+      return;
+    for (const value of bars) {
+      const bar: Candle = {
+        timestamp: value.timestamp,
+        open: value.open,
+        high: value.high,
+        low: value.low,
+        close: value.close,
+        volume: value.baseVolume
+      };
+      this.events.candle({ uid, interval: TIMEFRAMES[current.timeframe].stream, bar });
+      this.queue(uid, current.timeframe, bar);
+    }
+  }
+
   private queue(uid: string, timeframe: Timeframe, bar: Candle): void {
     const key = `${uid}:${timeframe}`,
       previous = this.live.get(key) ?? { uid, timeframe, bars: [] };
     previous.bars = mergeCandles(previous.bars, [bar]);
     this.live.set(key, previous);
     this.flushTimer ??= setTimeout(() => {
-      void this.flush().catch(() => this.events.notice("Не удалось сохранить свечи Bybit."));
+      void this.flush().catch(() => this.events.notice("Не удалось сохранить свечи криптобиржи."));
     }, 1500);
   }
   async flush(): Promise<void> {
@@ -299,6 +440,7 @@ export class PublicMarket {
   }
   async close(): Promise<void> {
     this.lifetime.abort();
+    this.okx.close();
     for (const stream of this.streams.values()) stream.dispose();
     this.streams.clear();
     await this.flush();

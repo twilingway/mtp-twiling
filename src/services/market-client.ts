@@ -68,7 +68,7 @@ export class MarketClient extends EventTarget {
         },
         candle: (event) => this.emit<CandleEvent>("candle", event),
         notice: (message) => this.emit("notice", message),
-        reconnect: (category) => this.emit("market-reconnect", category)
+        reconnect: (source) => this.emit("market-reconnect", source)
       },
       options
     );
