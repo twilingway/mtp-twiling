@@ -3,7 +3,8 @@ import {
   IndicatorSeries,
   LineType,
   PolygonType,
-  registerIndicator
+  registerIndicator,
+  registerYAxis
 } from "klinecharts";
 import type { Chart, IndicatorCreate, IndicatorFigureStylesCallbackData } from "klinecharts";
 import type { Candle } from "../model/types.js";
@@ -34,6 +35,19 @@ import type {
   KlineTechnicalContext as Context,
   KlineTechnicalRow as Row
 } from "./kline-technical-geometry.js";
+
+const COMPACT_AXIS = "PERSONAL_TA_COMPACT_AXIS";
+let compactAxisRegistered = false;
+function technicalAxis(): string {
+  if (!compactAxisRegistered) {
+    registerYAxis({
+      name: COMPACT_AXIS,
+      createTicks: ({ bounding, defaultTicks }) => (bounding.height <= 30 ? [] : defaultTicks)
+    });
+    compactAxisRegistered = true;
+  }
+  return COMPACT_AXIS;
+}
 
 interface Entry {
   name: string;
@@ -338,7 +352,12 @@ export function klineTechnical(
             {
               id: paneId,
               ...(!paneExists && group.key !== "price"
-                ? { height: 80, minHeight: 30, dragEnabled: true }
+                ? {
+                    height: 80,
+                    minHeight: 30,
+                    dragEnabled: true,
+                    axisOptions: { name: technicalAxis() }
+                  }
                 : {})
             },
             complete

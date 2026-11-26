@@ -21,6 +21,7 @@ import type { TechnicalRenderOutput } from "./technical-render-data.js";
 import { capturedTechnicalLayout, technicalPaneGeometry } from "./technical-pane-geometry.js";
 import { attachTechnicalPaneEvents } from "./technical-pane-events.js";
 import { lineColor } from "../model/candle-palette.js";
+import { chartPalette } from "../model/theme.js";
 import { presentationColor } from "../model/technical-indicators/presentation.js";
 import { LightweightTechnicalPrimitive } from "./lightweight-technical-primitives.js";
 
@@ -313,6 +314,10 @@ export function lightweightTechnical(
     lower.forEach((group, index) => {
       const pane = panes.get(group.key)!;
       if (pane.paneIndex() !== index + 1) pane.moveTo(index + 1);
+      // Keep a collapsed strip's range and width; it has no visible data scale to label.
+      const axis = pane.priceScale("right"),
+        color = group.preference?.collapsed ? "transparent" : chartPalette(options.settings).text;
+      if (axis.options().textColor !== color) axis.applyOptions({ textColor: color });
     });
     const allOwned = new Set([...owned.values()].map((entry) => entry.series));
     for (const group of groups) {

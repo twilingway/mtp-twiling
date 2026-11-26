@@ -28,7 +28,7 @@ export function nativeSdk() {
   });
   vm.runInContext(
     installed.replace(/^export \{[^\n]+\};$/m, "") +
-      "\nglobalThis.sdk={IndicatorStore,IndicatorImp,YAxisImp,IndicatorView,IndicatorTooltipView,IndicatorLastValueView,GridView,ChartStore,ChartImp,IndicatorSeries,DomPosition,LineType,PolygonType,registerFigure,registerIndicator,getIndicatorClass,getFigureClass,getSupportedIndicators,eachFigures};",
+      "\nglobalThis.sdk={IndicatorStore,IndicatorImp,YAxisImp,IndicatorView,IndicatorTooltipView,IndicatorLastValueView,GridView,ChartStore,ChartImp,IndicatorSeries,DomPosition,LineType,PolygonType,registerFigure,registerIndicator,registerYAxis,getYAxisClass,getIndicatorClass,getFigureClass,getSupportedIndicators,eachFigures};",
     context
   );
   return context.sdk;

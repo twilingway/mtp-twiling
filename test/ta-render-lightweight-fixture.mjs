@@ -92,12 +92,17 @@ export function fixture(initial) {
     nativeCalls = [];
   const coordinateHoles = new Set();
   const pane = () => {
+    const axisOptions = {};
     const p = {
       series: [],
       height: 200,
       paneIndex: () => panes.indexOf(p),
       getSeries: () => [...p.series],
       getHeight: () => p.height,
+      priceScale: () => ({
+        options: () => ({ ...axisOptions }),
+        applyOptions: (value) => Object.assign(axisOptions, value)
+      }),
       setStretchFactor(value) {
         p.height = value;
       },
@@ -225,7 +230,7 @@ export function fixture(initial) {
   });
   const adapter = load("charts/lightweight-technical.js").lightweightTechnical(
     chart,
-    { timeframe: "1d", container: { clientHeight: 428 } },
+    { timeframe: "1d", settings: {}, container: { clientHeight: 428 } },
     () => alive
   );
   return {
