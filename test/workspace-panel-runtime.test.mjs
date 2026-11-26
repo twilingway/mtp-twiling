@@ -165,6 +165,25 @@ test("both label palettes are saved by a secondary chart without changing siblin
   secondPanel.stop();
 });
 
+test("instrument search survives a watchlist fallback in the same secondary chart", async () => {
+  const f = fixtures();
+  const panel = f.create(2);
+  try {
+    panel.configure(f.first, f.state);
+    await immediate();
+    panel.setDialog("instruments");
+    f.state.rows = [f.second];
+    panel.configure(f.second, f.state);
+    assert.equal(panel.getSnapshot().dialog, "instruments");
+    assert.equal(panel.getSnapshot().preferences.instrumentUid, f.second.uid);
+    f.state.importingBackup = true;
+    panel.configure(f.second, f.state);
+    assert.equal(panel.getSnapshot().dialog, null);
+  } finally {
+    panel.stop();
+  }
+});
+
 test("timeframe, depth, engine and price style belong to one slot across reopen and owner changes", async () => {
   const f = fixtures();
   const panel = f.create(6);

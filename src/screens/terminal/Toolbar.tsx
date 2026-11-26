@@ -56,7 +56,7 @@ export function Toolbar({
           onClick={() =>
             state.ready ? controller.setDialog("instruments") : account.setDialog("account")
           }
-          title={searchLabel}
+          title={`${ticker} · ${searchLabel}`}
         >
           <b id="top-symbol">{ticker}</b>
         </button>

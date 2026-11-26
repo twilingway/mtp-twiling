@@ -4,9 +4,7 @@ import { drawingToolbarSettings, type DrawingTarget } from "../../model/drawing-
 import { useTerminal } from "./context.js";
 import { DrawingToolIcon, type DrawingIconName } from "./DrawingToolIcon.js";
 import { ChartMeasurementButton } from "./ChartMeasurement.js";
-import { ChartRangeZoomButton } from "./ChartRangeZoom.js";
-import { chartNavigationReady } from "./chart-navigation-state.js";
-import { userCameraAction } from "./controller-camera-sync.js";
+import { ChartRangeZoomButton, ChartZoomOutButton } from "./ChartRangeZoom.js";
 import {
   DrawingToolbarMenu,
   DrawingToolbarSplit,
@@ -34,7 +32,6 @@ const disabledReason = "Пока не реализовано";
 
 export function DrawingToolbar() {
   const { controller, state } = useTerminal();
-  const chart = controller.chart;
   const settings = drawingToolbarSettings(state.preferences.chartSettings);
   const showValuesOnHold = state.preferences.chartSettings.ohlcOnHold === true;
   const [menu, setMenu] = useState<OpenMenu | null>(null);
@@ -412,22 +409,7 @@ export function DrawingToolbar() {
       <span className="tool-divider" />
       <ChartMeasurementButton onChoose={closeMenu} />
       <ChartRangeZoomButton onChoose={closeMenu} />
-      <button
-        id="zoom-out"
-        type="button"
-        className="tool"
-        title={t("Уменьшить масштаб")}
-        aria-label={t("Уменьшить масштаб")}
-        disabled={!chartNavigationReady(state, chart) || !chart.zoom}
-        onClick={() => {
-          const current = controller.chart;
-          if (!chartNavigationReady(controller.getSnapshot(), current) || !current.zoom) return;
-          closeMenu();
-          userCameraAction(controller, current, () => current.zoom?.(-1));
-        }}
-      >
-        <DrawingToolIcon name="zoomOut" />
-      </button>
+      <ChartZoomOutButton onChoose={closeMenu} />
       <span className="tool-divider" />
       {utility(
         "magnet",

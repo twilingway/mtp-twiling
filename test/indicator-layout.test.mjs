@@ -379,6 +379,12 @@ test("legend collapse exposes an accessible compact count without toggling indic
     "screens/terminal/context.tsx": { useTerminal: () => ({ state, controller }) }
   });
   const Legend = load("screens/terminal/IndicatorLegend.tsx").IndicatorLegend;
+  const initial = Legend();
+  assert.equal(initial.props.children[0].props.hidden, true);
+  assert.equal(initial.props.children[1].props["aria-expanded"], false);
+  initial.props.children[1].props.onClick();
+  await new Promise(setImmediate);
+  assert.equal(state.preferences.chartSettings.legendCollapsed, false);
   const expanded = Legend(),
     button = expanded.props.children[1];
   assert.equal(button.props["aria-expanded"], true);

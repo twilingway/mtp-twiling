@@ -11,18 +11,40 @@
   font-size: 22px;
 }
 #instrument-dialog > header > button {
-  width: 36px;
-  height: 36px;
+  display: grid;
+  width: 44px;
+  height: 44px;
   flex-shrink: 0;
+  place-items: center;
+  padding: 0;
+  font-size: 26px;
+  line-height: 1;
 }
 #instrument-dialog .instrument-search-input {
+  position: relative;
   margin: 18px 0 12px;
 }
 #instrument-dialog .instrument-search-input input {
   width: 100%;
-  height: 42px;
+  height: 44px;
+  padding-inline-end: 46px;
   font-size: 16px;
   margin: 0;
+}
+#instrument-dialog .instrument-search-input input::-webkit-search-cancel-button {
+  appearance: none;
+}
+#instrument-dialog .instrument-search-clear {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  display: grid;
+  width: 44px;
+  place-items: center;
+  padding: 0;
+  color: var(--muted, #9598a1);
+  font-size: 24px;
+  line-height: 1;
 }
 .instrument-search-kinds {
   display: flex;
@@ -52,11 +74,17 @@
 }
 #instrument-dialog .instrument-result {
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  gap: 4px;
+  align-items: center;
+  padding: 0 4px 0 0;
+}
+#instrument-dialog .instrument-result-select {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
   gap: 12px;
   align-items: center;
   padding: 12px 8px;
-  width: 100%;
   min-height: 76px;
   text-align: left;
 }
@@ -115,11 +143,22 @@
   overflow-wrap: anywhere;
 }
 #instrument-dialog .instrument-result-action {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  padding: 0;
+  border-radius: 6px;
   color: var(--accent, #8aabff);
-  font-size: 13px;
-  white-space: nowrap;
+  font-size: 20px;
 }
-#instrument-dialog .instrument-result:disabled {
+#instrument-dialog .instrument-result-action span {
+  font-size: inherit;
+}
+#instrument-dialog .instrument-result-action[data-remove-instrument] {
+  color: var(--down, #f04454);
+}
+#instrument-dialog .instrument-result :is(button[aria-disabled="true"]) {
   opacity: 0.6;
 }
 #instrument-dialog button:focus-visible {
@@ -181,7 +220,7 @@
     min-height: 0;
     overflow: auto;
   }
-  #instrument-dialog .instrument-result {
+  #instrument-dialog .instrument-result-select {
     gap: 9px;
   }
   #instrument-dialog > small {

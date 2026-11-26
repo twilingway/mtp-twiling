@@ -1,6 +1,6 @@
 import { t, systemText } from "../../i18n/messages.js";
 import { providerLabel } from "./provider-label.js";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CatalogInstrument, InstrumentSearchKind, MarketRow } from "../../model/types.js";
 import { useTerminal } from "./context.js";
 import { Modal } from "./Modal.js";
@@ -8,6 +8,8 @@ import { intlLocale } from "../../i18n/preferences.js";
 import { providerAttributes } from "../../model/market-provider.js";
 import { orderedWatchlistRows } from "../../model/watchlist-sections.js";
 import { publishWorkspaceInstrument } from "./workspace-sync-controller.js";
+import { searchInstrumentUid, searchWatchlistRow } from "../../model/instrument-search-identity.js";
+import type { TerminalController } from "./controller.js";
 type Kind = InstrumentSearchKind;
 const KINDS: { kind: Kind; label: string }[] = [
   { kind: "all", label: "Все" },
@@ -95,7 +97,7 @@ function metadata(item: CatalogInstrument): string {
   return fields.join(" · ");
 }
 function instrumentKey(item: CatalogInstrument): string {
-  return item.uid ?? item.instrumentUid ?? item.figi ?? `${item.ticker}:${item.classCode ?? ""}`;
+  return searchInstrumentUid(item) ?? item.figi ?? `${item.ticker}:${item.classCode ?? ""}`;
 }
 function watchlistInstrument(row: MarketRow): CatalogInstrument {
   return {
@@ -113,7 +115,11 @@ function watchlistInstrument(row: MarketRow): CatalogInstrument {
     ...(row.expirationDate ? { expirationDate: row.expirationDate } : {})
   };
 }
-export function InstrumentSearch() {
+export function InstrumentSearch({
+  watchlistController
+}: {
+  watchlistController?: Pick<TerminalController, "addToWatchlist" | "removeInstrument">;
+}) {
   const { controller, state } = useTerminal(),
     [{ query, kind, revision }, setSearch] = useState<SearchRequest>({
       query: "",
@@ -126,7 +132,9 @@ export function InstrumentSearch() {
       items: [],
       error: ""
     }),
-    [adding, setAdding] = useState<string | null>(null);
+    [pending, setPending] = useState<string | null>(null);
+  const watchlist = watchlistController ?? controller;
+  const input = useRef<HTMLInputElement>(null);
   const cleanQuery = query.trim();
   const current = response.revision === revision && response.owner === state.owner;
   const busy = !!cleanQuery && !current;
@@ -158,6 +166,39 @@ export function InstrumentSearch() {
       abort.abort();
     };
   }, [controller, cleanQuery, kind, revision, state.owner]);
+  const changeQuery = (query: string) =>
+    setSearch((request) => ({ ...request, query, revision: request.revision + 1 }));
+  function run(key: string, action: () => Promise<unknown>, failure: string) {
+    if (pending !== null) return;
+    const { owner } = state;
+    setPending(key);
+    void action()
+      .catch((error: unknown) => {
+        if (controller.getSnapshot().owner === owner)
+          controller.notify(error instanceof Error ? error.message : t(failure));
+      })
+      .finally(() => setPending(null));
+  }
+  function select(item: CatalogInstrument, key: string, row?: MarketRow) {
+    const { owner } = state;
+    run(
+      key,
+      async () => {
+        if (window.matchMedia("(max-width: 800px)").matches) controller.panel.closeMobile();
+        if (row) {
+          const selection = controller.setPreferences({
+            symbol: row.symbol,
+            instrumentUid: row.uid
+          });
+          controller.setDialog(null);
+          await selection;
+        } else await controller.addInstrument(item);
+        if (controller.getSnapshot().owner === owner)
+          publishWorkspaceInstrument(controller, row?.uid ?? searchInstrumentUid(item));
+      },
+      "Не удалось добавить"
+    );
+  }
   return (
     <Modal
       id="instrument-dialog"
@@ -166,6 +207,7 @@ export function InstrumentSearch() {
     >
       <div className="instrument-search-input">
         <input
+          ref={input}
           id="instrument-query"
           type="search"
           aria-label={t("Тикер или название")}
@@ -176,15 +218,22 @@ export function InstrumentSearch() {
           autoCapitalize="off"
           spellCheck={false}
           value={query}
-          onChange={(event) => {
-            const query = event.currentTarget.value;
-            setSearch((request) => ({
-              ...request,
-              query,
-              revision: request.revision + 1
-            }));
-          }}
+          onChange={(event) => changeQuery(event.currentTarget.value)}
         />
+        {query && (
+          <button
+            type="button"
+            className="instrument-search-clear"
+            aria-label={t("Очистить поиск")}
+            title={t("Очистить поиск")}
+            onClick={() => {
+              changeQuery("");
+              input.current?.focus();
+            }}
+          >
+            ×
+          </button>
+        )}
       </div>
       <div
         id="instrument-kind"
@@ -224,65 +273,70 @@ export function InstrumentSearch() {
           </p>
         ) : (
           results.map((item, index) => {
-            const key = instrumentKey(item);
-            const row = cleanQuery ? undefined : displayed[index];
-            const added =
-              !!row ||
-              state.rows.some(
-                (row) => row.uid != null && row.uid === (item.uid ?? item.instrumentUid)
-              );
+            const key = `${instrumentKey(item)}:${index}`;
+            const row = cleanQuery ? searchWatchlistRow(state.rows, item) : displayed[index];
             const details = metadata(item);
+            const action = t(row ? "Удалить из списка котировок" : "Добавить в список котировок");
             return (
-              <button
-                key={`${key}:${index}`}
-                type="button"
-                className="instrument-result"
-                data-add-instrument={index}
-                disabled={adding != null}
-                onClick={() => {
-                  const owner = state.owner;
-                  setAdding(key);
-                  if (window.matchMedia("(max-width: 800px)").matches)
-                    controller.panel.closeMobile();
-                  const action = row
-                    ? controller.setPreferences({ symbol: row.symbol, instrumentUid: row.uid })
-                    : controller.addInstrument(item);
-                  if (row) controller.setDialog(null);
-                  void action
-                    .then(() => {
-                      if (controller.getSnapshot().owner === owner)
-                        publishWorkspaceInstrument(
-                          controller,
-                          row?.uid ?? item.uid ?? item.instrumentUid
-                        );
-                    })
-                    .catch((error: unknown) => {
-                      if (controller.getSnapshot().owner === owner)
-                        controller.notify(
-                          error instanceof Error ? error.message : t("Не удалось добавить")
-                        );
-                    })
-                    .finally(() => setAdding(null));
-                }}
-              >
-                <CatalogLogo item={item} />
-                <span className="instrument-result-copy">
-                  <span className="instrument-result-title">
-                    <strong>{item.ticker}</strong>
-                    <span className="instrument-kind-badge">{kindLabel(item)}</span>
+              <div key={key} className="instrument-result">
+                <button
+                  type="button"
+                  className="instrument-result-select"
+                  data-select-instrument={index}
+                  aria-disabled={pending !== null || undefined}
+                  onClick={() => select(item, key, row)}
+                >
+                  <CatalogLogo item={item} />
+                  <span className="instrument-result-copy">
+                    <span className="instrument-result-title">
+                      <strong>{item.ticker}</strong>
+                      <span className="instrument-kind-badge">{kindLabel(item)}</span>
+                    </span>
+                    <span className="instrument-result-name">{item.name}</span>
+                    {details && <small className="instrument-result-meta">{details}</small>}
                   </span>
-                  <span className="instrument-result-name">{item.name}</span>
-                  {details && <small className="instrument-result-meta">{details}</small>}
-                </span>
-                <span
+                </button>
+                <button
+                  type="button"
                   className="instrument-result-action"
-                  aria-label={
-                    adding === key ? t("Добавление") : added ? t("Открыть") : t("Добавить")
+                  data-add-instrument={row ? undefined : index}
+                  data-remove-instrument={row ? index : undefined}
+                  aria-label={`${action} · ${item.ticker} · ${item.name}`}
+                  title={action}
+                  aria-disabled={pending !== null || undefined}
+                  aria-busy={pending === key || undefined}
+                  onClick={() =>
+                    run(
+                      key,
+                      () =>
+                        row
+                          ? watchlist.removeInstrument({ uid: row.uid, symbol: row.symbol })
+                          : watchlist.addToWatchlist(item),
+                      row ? "Не удалось удалить инструмент." : "Не удалось добавить"
+                    )
                   }
                 >
-                  {adding === key ? "…" : added ? t("Открыть") : "＋"}
-                </span>
-              </button>
+                  {pending === key ? (
+                    "…"
+                  ) : row ? (
+                    <svg
+                      aria-hidden="true"
+                      width="18"
+                      height="18"
+                      viewBox="0 0 18 18"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M3 5h12M7 5V3h4v2m3 0-.8 10H4.8L4 5m3 3v4m4-4v4" />
+                    </svg>
+                  ) : (
+                    <span aria-hidden="true">+</span>
+                  )}
+                </button>
+              </div>
             );
           })
         )}

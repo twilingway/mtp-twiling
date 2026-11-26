@@ -6,6 +6,8 @@
 }
 
 .topbar .chart-symbol-controls .symbol-button {
+  flex: none;
+  inline-size: 88px;
   min-width: 0;
 }
 
@@ -62,6 +64,30 @@
   color: var(--accent);
 }
 
+@media (min-width: 801px) {
+  .topbar .timeframes:has(.interval-menu) {
+    flex: 0 0 226px;
+  }
+
+  .topbar .timeframes .interval-menu {
+    inline-size: 100%;
+  }
+
+  .topbar .interval-favorites {
+    flex: 1 1 auto;
+  }
+
+  .topbar .interval-favorite {
+    flex: 0 0 28px;
+    padding-inline: 3px;
+  }
+
+  .topbar .interval-menu-trigger {
+    inline-size: 52px;
+    margin-inline-start: auto;
+  }
+}
+
 @media (max-width: 800px) {
   .topbar .chart-symbol-controls {
     grid-row: 1;
@@ -72,5 +98,9 @@
     width: 32px;
     height: 34px;
     flex-basis: 32px;
+  }
+
+  .topbar .chart-symbol-controls .symbol-button {
+    inline-size: 44px;
   }
 }

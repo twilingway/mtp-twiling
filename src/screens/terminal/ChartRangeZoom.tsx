@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { t } from "../../i18n/messages.js";
 import { chartMeasurement } from "./chart-measurement-session.js";
 import {
   bindChartRangeZoom,
@@ -7,6 +8,8 @@ import {
   type ZoomRectangle
 } from "./chart-range-zoom-input.js";
 import { useTerminal } from "./context.js";
+import { chartNavigationReady } from "./chart-navigation-state.js";
+import { userCameraAction } from "./controller-camera-sync.js";
 import { DrawingToolIcon } from "./DrawingToolIcon.js";
 
 const labels = { ru: "Увеличить выбранную область", en: "Zoom to selection" };
@@ -35,6 +38,31 @@ export function ChartRangeZoomButton({ onChoose }: { onChoose?: () => void } = {
       }}
     >
       <DrawingToolIcon name="zoom" />
+    </button>
+  );
+}
+
+export function ChartZoomOutButton({ onChoose }: { onChoose: () => void }) {
+  const { controller, state } = useTerminal();
+  const chart = controller.chart;
+  const label = t("Уменьшить масштаб", state.preferences.locale);
+  return (
+    <button
+      id="zoom-out"
+      type="button"
+      className="tool"
+      title={label}
+      aria-label={label}
+      disabled={!chartNavigationReady(state, chart) || !chart.zoom}
+      onClick={() => {
+        const activeChart = controller.chart;
+        if (!chartNavigationReady(controller.getSnapshot(), activeChart) || !activeChart.zoom)
+          return;
+        onChoose();
+        userCameraAction(controller, activeChart, () => activeChart.zoom?.(-1));
+      }}
+    >
+      <DrawingToolIcon name="zoomOut" />
     </button>
   );
 }

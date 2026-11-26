@@ -6,7 +6,7 @@ import type { TechnicalSupplementalInputs } from "../../charts/adapter.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { precision } from "../../charts/adapter.js";
 import { useTerminal } from "./context.js";
-import { PERIOD_LABELS, number, signClass } from "./state.js";
+import { number, signClass } from "./state.js";
 import { InstrumentIcon } from "./Watchlist.js";
 import { ChartCanvas, ChartGestures } from "./ChartSurface.js";
 import { ChartDemonstration } from "./ChartDemonstration.js";
@@ -19,6 +19,7 @@ import { IndicatorLegend } from "./IndicatorLegend.js";
 import { ohlcCandleIndex, ohlcDisplayMode } from "../../model/ohlc-legend.js";
 import { OhlcLegend, OhlcLegendIcon } from "./OhlcLegend.js";
 import { ChartRangeControl } from "./intervals/ChartRangeControl.js";
+import { InlineTimeframeControl } from "./intervals/InlineTimeframeControl.js";
 import { ChartNavigation } from "./ChartNavigation.js";
 import { TechnicalIndicatorPanels } from "./TechnicalIndicatorPanels.js";
 import { useTechnicalPaneMetrics } from "./use-technical-pane-metrics.js";
@@ -173,9 +174,7 @@ export function ChartPanel({
                   ? `${providerLabel(row.providerRef)} · ${row.productKind === "spot" ? "Spot" : "USDT perpetual"}`
                   : "MOEX"}
             </span>
-            <span id={slot === 1 ? "chart-period" : undefined}>
-              {t(PERIOD_LABELS[p.timeframe])}
-            </span>
+            <InlineTimeframeControl slot={slot} provider={row?.providerRef?.provider} />
             <SelectedDrawingLock />
             {ohlcMode === "icon" && (
               <OhlcLegendIcon

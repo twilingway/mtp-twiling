@@ -205,7 +205,10 @@ export class WorkspacePanelController extends TerminalController {
         contextMenu: null,
         activeTool: null,
         preview: null,
-        dialog: null,
+        dialog:
+          state.dialog === "instruments" && importWritable(parent, state.owner)
+            ? state.dialog
+            : null,
         historyViewReady: true,
         loading: !!route,
         historyHelp: route ? "Загружаем историю…" : "Выберите инструмент"
@@ -229,7 +232,6 @@ export class WorkspacePanelController extends TerminalController {
     this.disconnect = () => route.market.removeEventListener(name, reconnect);
     void this.loadHistory();
   }
-
   private current(route: PanelRoute): boolean {
     const parent = this.parent.getSnapshot();
     return (
@@ -240,11 +242,9 @@ export class WorkspacePanelController extends TerminalController {
       parent.rows.some((row) => row.uid === route.row.uid && row.symbol === route.row.symbol)
     );
   }
-
   private canEdit(state: TerminalState): boolean {
     return !!this.route && this.current(this.route) && importWritable(state) && !state.backupBusy;
   }
-
   override setDialog: TerminalController["setDialog"] = (dialog, section) => {
     if (dialog === "account") this.parent.setDialog(dialog, section);
     else this.drawingSettings.setDialog(dialog, section);

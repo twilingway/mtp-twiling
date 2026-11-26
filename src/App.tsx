@@ -122,18 +122,20 @@ function Terminal() {
       </main>
       {state.dialog === "account" && <AccountDialog />}
       <TerminalContext value={editor}>
-        <ChartDialogs />
+        <ChartDialogs watchlistController={controller} />
       </TerminalContext>
       <UpdateBanner />
       <TerminalLifecycle chartEditor={editor} />
     </>
   );
 }
-function ChartDialogs() {
+function ChartDialogs({ watchlistController }: { watchlistController: TerminalController }) {
   const { state } = useTerminal();
   return (
     <>
-      {state.dialog === "instruments" && <InstrumentSearch />}
+      {state.dialog === "instruments" && (
+        <InstrumentSearch watchlistController={watchlistController} />
+      )}
       {state.dialog === "chart-settings" && <ChartSettingsDialog />}
       {state.dialog === "indicator-settings" && <IndicatorSettingsDialog />}
       {state.dialog === "indicator-library" && <TerminalIndicatorLibrary />}

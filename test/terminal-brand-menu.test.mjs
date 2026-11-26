@@ -56,6 +56,7 @@ function fixture() {
       })
     },
     "screens/terminal/ChartEngineSelect.js": { ChartEngineSelect: noop },
+    "screens/terminal/NativeChartTypeMenu.js": { NativeChartTypeMenu: noop },
     "screens/terminal/ChartLayoutPicker.js": { ChartLayoutPicker: noop },
     "screens/terminal/workspace-sync-controller.js": { publishWorkspaceTimeframe: noop },
     "screens/terminal/TerminalFullscreenControl.js": { TerminalFullscreenControl: noop },
