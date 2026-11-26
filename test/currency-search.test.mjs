@@ -401,7 +401,11 @@ test("actual search component exposes currency category and distinguishes MOEX a
     .slice(0, 2)
     .map((item) => ({ ...item, symbol: item.ticker, type: "currency" }));
   const load = sources({
-    react: { useState: (value) => [value, () => {}], useEffect: () => {} },
+    react: {
+      useState: (value) => [value, () => {}],
+      useEffect: () => {},
+      useRef: (current) => ({ current })
+    },
     "react/jsx-runtime": { jsx, jsxs: jsx },
     "screens/terminal/context.tsx": {
       useTerminal: () => ({ state: { owner: "one", rows, preferences: {} }, controller: {} })
@@ -410,16 +414,14 @@ test("actual search component exposes currency category and distinguishes MOEX a
     "i18n/messages.ts": { t: (value) => value, systemText: (value) => value },
     "i18n/preferences.ts": { intlLocale: () => "ru-RU" }
   });
-  const tree = load("screens/terminal/InstrumentSearch.tsx").InstrumentSearch();
+  const tree = load("screens/terminal/InstrumentSearch.tsx").InstrumentSearch({});
   const kinds = tree.props.children[1].props.children;
   assert.ok(kinds.some((item) => item.props.children === "Валюты"));
   const results = tree.props.children[2].props.children;
-  assert.equal(
-    results[0].props.children[1].props.children[0].props.children[1].props.children,
-    "Валюта"
-  );
-  assert.match(results[0].props.children[1].props.children[2].props.children, /CETS · MOEX/);
-  assert.match(results[1].props.children[1].props.children[2].props.children, /CNGDOTC · Дилер/);
+  const details = (index) => results[index].props.children[0].props.children[1].props.children;
+  assert.equal(details(0)[0].props.children[1].props.children, "Валюта");
+  assert.match(details(0)[2].props.children, /CETS · MOEX/);
+  assert.match(details(1)[2].props.children, /CNGDOTC · Дилер/);
   const english = sources()("i18n/messages-ui.ts").uiMessages;
   assert.equal(english["Валюты"], "Currencies");
   assert.equal(english["Валюта"], "Currency");
