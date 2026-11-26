@@ -8,6 +8,11 @@ import { TRADINGVIEW_CANDLE_STYLE } from "../../model/candle-palette.js";
 import { chartBackground, terminalTheme, withTheme } from "../../model/theme.js";
 import { TimeZonePicker } from "./ClockZoneControl.js";
 import { ChartEngineSelect } from "./ChartEngineSelect.js";
+import {
+  MAX_VOLUME_AVERAGE_PERIOD,
+  isVolumeAveragePeriod,
+  volumeAverageSettings
+} from "../../model/volume-average.js";
 import type { Locale } from "../../i18n/preferences.js";
 
 const CANDLE_PARTS = [
@@ -185,7 +190,10 @@ export function IndicatorSettingsDialog() {
       previous?.color ?? (key.startsWith("mtp") ? "#1e90ff" : key === "ma" ? "#ddad56" : "#7b8fff")
     ),
     [width, setWidth] = useState(previous?.width ?? 1),
-    [opacity, setOpacity] = useState(previous?.opacity ?? (key.startsWith("mtp") ? 0.65 : 1));
+    [opacity, setOpacity] = useState(previous?.opacity ?? (key.startsWith("mtp") ? 0.65 : 1)),
+    [volumeAverage, setVolumeAverage] = useState(() =>
+      volumeAverageSettings(state.preferences.chartSettings)
+    );
   return (
     <Modal
       id="indicator-settings-dialog"
@@ -195,17 +203,56 @@ export function IndicatorSettingsDialog() {
       <form
         onSubmit={(e) => {
           e.preventDefault();
+          if (key === "volume" && !isVolumeAveragePeriod(volumeAverage.period)) return;
           void controller
             .setChartSettings({
+              ...(key === "volume" ? { volumeAverage } : {}),
               indicatorOptions: {
                 ...state.preferences.chartSettings.indicatorOptions,
                 [key]: { color, width, opacity }
               }
             })
-            .then(() => controller.setDialog(null));
+            .then(() => {
+              if (controller.getSnapshot().dialog === "indicator-settings")
+                controller.setDialog(null);
+            })
+            .catch((error: unknown) =>
+              controller.notify(
+                error instanceof Error ? error.message : t("Не удалось сохранить настройки.")
+              )
+            );
         }}
       >
-        <p>{t("Источник: закрытие свечи (Close)")}</p>
+        {key === "volume" ? (
+          <>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                name="volume-average-enabled"
+                checked={volumeAverage.enabled}
+                onChange={(e) => setVolumeAverage({ ...volumeAverage, enabled: e.target.checked })}
+              />
+              {t("Средняя объёма (SMA)")}
+            </label>
+            <label>
+              {t("Период в свечах")}
+              <input
+                type="number"
+                name="volume-average-period"
+                min={1}
+                max={MAX_VOLUME_AVERAGE_PERIOD}
+                step={1}
+                required
+                value={Number.isFinite(volumeAverage.period) ? volumeAverage.period : ""}
+                onChange={(e) =>
+                  setVolumeAverage({ ...volumeAverage, period: e.target.valueAsNumber })
+                }
+              />
+            </label>
+          </>
+        ) : (
+          <p>{t("Источник: закрытие свечи (Close)")}</p>
+        )}
         <label>
           {t("Цвет линии")}
           <input

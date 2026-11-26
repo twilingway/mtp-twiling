@@ -1,6 +1,7 @@
 import * as storage from "../../services/storage-v2.js";
 import { loadChartView } from "../../services/chart-camera.js";
 import { activeMtpPeriods } from "../../model/mtp.js";
+import { volumeAverageWarmup } from "../../model/volume-average.js";
 import { mergeCandles, TIMEFRAMES } from "../../model/history-codec.js";
 import { olderHistoryStart } from "../../model/intervals/calendar.js";
 import type { Candle, ChartEngine, Timeframe } from "../../model/types.js";
@@ -122,7 +123,8 @@ export class TerminalHistory {
       0,
       ...activeMtpPeriods(p.indicators),
       p.indicators.ma ? 20 : 0,
-      p.indicators.ema ? 50 : 0
+      p.indicators.ema ? 50 : 0,
+      volumeAverageWarmup(p.chartSettings, p.indicators.volume)
     );
     this.source = {
       symbol: p.symbol,

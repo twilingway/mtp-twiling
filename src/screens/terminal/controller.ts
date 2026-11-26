@@ -6,6 +6,7 @@ import type { BackupExportOptions } from "../../model/backup-export.js";
 import type { WatchlistMove } from "../../services/watchlist-order.js";
 import { marketCalendar } from "../../services/market-calendar.js";
 import { toggleIndicatorFlags } from "../../model/indicator-flags.js";
+import { volumeAverageWarmup } from "../../model/volume-average.js";
 import { historyDepthTransition, saveControllerView } from "./controller-camera.js";
 import {
   PreferenceRouting,
@@ -366,7 +367,11 @@ export class TerminalController {
     };
     this.update({ preferences: { ...this.state.preferences, indicators, chartSettings } });
     await this.savePreferences();
-    if (key !== "volume" && this.session.matches(client) && owner === this.state.owner)
+    if (
+      (key !== "volume" || volumeAverageWarmup(chartSettings, indicators.volume) > 0) &&
+      this.session.matches(client) &&
+      owner === this.state.owner
+    )
       await this.loadHistory(true);
   };
   setChartSettings = async (patch: ChartSettings): Promise<void> => {
@@ -374,13 +379,25 @@ export class TerminalController {
       client = this.client;
     await this.saveView();
     if (!this.session.matches(client) || !importWritable(this.state, owner)) return;
+    const previous = this.state.preferences,
+      chartSettings = { ...previous.chartSettings, ...patch },
+      needsHistory =
+        volumeAverageWarmup(chartSettings, previous.indicators.volume) >
+        volumeAverageWarmup(previous.chartSettings, previous.indicators.volume);
     this.update({
       preferences: {
-        ...this.state.preferences,
-        chartSettings: { ...this.state.preferences.chartSettings, ...patch }
+        ...previous,
+        chartSettings
       }
     });
     await this.savePreferences();
+    if (
+      needsHistory &&
+      this.session.matches(client) &&
+      this.state.owner === owner &&
+      this.state.preferences.chartSettings === chartSettings
+    )
+      await this.loadHistory(true);
   };
   setDrawings = async (drawings: Drawing[]): Promise<void> => {
     await this.editing.change({ drawings });
