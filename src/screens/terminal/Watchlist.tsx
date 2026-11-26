@@ -6,6 +6,7 @@ import { precision } from "../../charts/adapter.js";
 import { useTerminal } from "./context.js";
 import { number, signClass, timeLabel } from "./state.js";
 import { WatchlistSectionsTable } from "./WatchlistSectionsTable.js";
+import { watchlistStartupNotice } from "./WatchlistStartupStatus.js";
 import { matchesWatchlistFlag } from "../../model/watchlist-flags.js";
 import { WatchlistFlagFilter } from "./WatchlistFlagFilter.js";
 import { InstrumentIcon } from "./WatchlistQuoteRow.js";
@@ -22,7 +23,8 @@ export function Watchlist({ chartEditor }: { chartEditor?: TerminalController } 
   const [query, setQuery] = useState(""),
     [sort, setSort] = useState<SortKey | null>(null),
     [direction, setDirection] = useState(-1);
-  const selected = selectedMarketRow(state.rows, chartState.preferences);
+  const startup = watchlistStartupNotice(state);
+  const selected = startup ? undefined : selectedMarketRow(state.rows, chartState.preferences);
   const source = selected?.providerRef ? providerLabel(selected.providerRef) : null;
   const visible = state.rows.filter(
     (row) =>
@@ -92,14 +94,16 @@ export function Watchlist({ chartEditor }: { chartEditor?: TerminalController } 
           chartEditor={editor}
           activeInstrument={selected ?? null}
         />
-        <div className="watchlist-meta">
-          <span id="quote-count">
-            {visible.length} {t("из")}
-            {state.rows.length} · {state.rows.filter((row) => row.price != null).length}{" "}
-            {t("с ценой")}
-          </span>
-          <span>{t("WebSocket · напрямую")}</span>
-        </div>
+        {!startup && (
+          <div className="watchlist-meta">
+            <span id="quote-count">
+              {visible.length} {t("из")}
+              {state.rows.length} · {state.rows.filter((row) => row.price != null).length}{" "}
+              {t("с ценой")}
+            </span>
+            <span>{t("WebSocket · напрямую")}</span>
+          </div>
+        )}
       </div>
       {selected && (
         <>

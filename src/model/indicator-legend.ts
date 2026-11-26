@@ -20,13 +20,10 @@ export function indicatorLegendKeys(
   settings: ChartSettings,
   flags: IndicatorFlags
 ): IndicatorKey[] {
-  return order.filter(
-    (key) =>
-      !settings.removedIndicators?.includes(key) &&
-      !(flags.mtpAll && ["mtp160", "mtp440", "mtp640"].includes(key)) &&
-      ((key.startsWith("mtp") && key !== "mtpAll") ||
-        key === "volume" ||
-        flags[key] ||
-        settings.indicatorOptions?.[key])
-  );
+  const hasSeparateMtp = !flags.mtpAll && (flags.mtp160 || flags.mtp440 || flags.mtp640);
+  return order.filter((key) => {
+    if (settings.removedIndicators?.includes(key)) return false;
+    if (key === "mtp160" || key === "mtp440" || key === "mtp640") return hasSeparateMtp;
+    return key === "volume" || flags[key] || settings.indicatorOptions?.[key];
+  });
 }

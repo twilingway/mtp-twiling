@@ -18,6 +18,7 @@ import { DrawingToolbarMenu } from "./DrawingToolbarMenu.js";
 import type { ToolbarMenuItem } from "./DrawingToolbarMenu.js";
 import { useIndicatorMenuAction } from "./useIndicatorMenuAction.js";
 import { useTechnicalPaneFocus } from "./use-technical-pane-focus.js";
+import { useTechnicalPaneActionReveal } from "./use-technical-pane-action-reveal.js";
 import {
   changeTechnicalPane,
   moveTechnicalIndicator,
@@ -67,8 +68,8 @@ function TechnicalPaneCommands({
   }, []);
   const english = state.preferences.locale === "en";
   const text = (ru: string, en: string) => (english ? en : ru);
-  const blocked =
-    pending || !!state.importingBackup || !!state.importRecoveryRequired || !!state.backupBusy;
+  const locked = !!(state.importingBackup || state.importRecoveryRequired || state.backupBusy);
+  const blocked = pending || locked;
   const { pane } = group;
   if (pane.kind !== "pane") return null;
   const collapsed = group.preference?.collapsed === true;
@@ -126,14 +127,21 @@ function TechnicalPaneCommands({
     )
   ];
   return (
-    <div className="technical-pane-actions" role="group" aria-label={menuLabel}>
+    <div
+      className="technical-pane-actions"
+      data-menu-open={(!blocked && anchor !== null) || undefined}
+      role="group"
+      aria-label={menuLabel}
+    >
       <button
         type="button"
-        disabled={blocked}
+        disabled={locked}
+        aria-disabled={pending || undefined}
         aria-label={collapseLabel}
         aria-expanded={focused || !collapsed}
         title={collapseLabel}
         onClick={() => {
+          if (blocked) return;
           if (focused) toggleFocus();
           void run(() => changeTechnicalPane(controller, pane.id, focused || !collapsed));
         }}
@@ -144,11 +152,14 @@ function TechnicalPaneCommands({
       </button>
       <button
         type="button"
-        disabled={blocked}
+        disabled={locked}
+        aria-disabled={pending || undefined}
         aria-label={focusLabel}
         title={focusLabel}
         aria-pressed={focused}
-        onClick={toggleFocus}
+        onClick={() => {
+          if (!blocked) toggleFocus();
+        }}
       >
         <svg viewBox="0 0 14 14" aria-hidden="true">
           <path
@@ -159,15 +170,18 @@ function TechnicalPaneCommands({
       <button
         ref={trigger}
         type="button"
-        disabled={blocked}
+        disabled={locked}
+        aria-disabled={pending || undefined}
         aria-label={menuLabel}
         aria-haspopup="menu"
         aria-expanded={anchor !== null}
         aria-controls={anchor ? menuId : undefined}
         title={menuLabel}
-        onClick={(event) => setAnchor(anchor ? null : event.currentTarget)}
+        onClick={(event) => {
+          if (!blocked) setAnchor(anchor ? null : event.currentTarget);
+        }}
         onKeyDown={(event) => {
-          if (event.key === "ArrowDown") {
+          if (!blocked && event.key === "ArrowDown") {
             event.preventDefault();
             setAnchor(event.currentTarget);
           }
@@ -385,6 +399,7 @@ export function TechnicalIndicatorPanels({ metrics }: { metrics: readonly Techni
     state.preferences.technicalIndicators ?? [],
     state.preferences.technicalPaneLayout
   ).filter((group) => group.pane.kind === "pane");
+  useTechnicalPaneActionReveal(legend, metrics, groups.length > 0);
   const scope = JSON.stringify([
     state.owner,
     state.chartRevision,

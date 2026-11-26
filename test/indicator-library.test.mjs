@@ -367,6 +367,7 @@ test("hiding combined MTP keeps a single legend row and never reveals its separa
   await f.controller.toggleIndicator("mtpAll");
   await changeMenuIndicator(f.controller, "mtpAll");
   const disabled = capture();
+  assert.deepEqual(disabled.keys, []);
   assert.equal(disabled.chartSettings.mtpAllHidden, undefined);
   for (const key of ["mtpAll", "mtp160", "mtp440", "mtp640"])
     assert.equal(disabled.indicators[key], false);
