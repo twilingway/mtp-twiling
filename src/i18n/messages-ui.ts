@@ -1,4 +1,5 @@
 export const uiMessages = {
+  "Установить приложение": "Install app",
   "Т‑Банк подключён": "T-Bank is connected",
   "Аккаунт Т‑Банка настроен": "T-Bank account is configured",
   "Котировки поступают по WebSocket": "Receiving quotes over WebSocket",

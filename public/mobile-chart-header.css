@@ -141,4 +141,19 @@
   .topbar :is(#engine, .top-spacer, .divider, .engine-label) {
     display: none;
   }
+
+  .topbar .install-actions {
+    grid-row: 2;
+    grid-column: 2 / -1;
+    justify-content: end;
+    margin-block-start: 4px;
+  }
+
+  .topbar .install-certificate-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 32px;
+    color: var(--accent);
+    font-size: 12px;
+  }
 }

@@ -519,9 +519,13 @@ function pwaElements() {
     textContent = "";
   }
   class Button extends Element {}
+  const install = new Button();
+  install.hidden = false;
   const nodes = new Map([
     ["app-version", new Element()],
     ["update-banner", new Element()],
+    ["install-actions", new Element()],
+    ["install-app", install],
     ["update-now", new Button()],
     ["update-later", new Button()]
   ]);
@@ -534,13 +538,17 @@ function pwaElements() {
   return { nodes, window, document, Element, Button };
 }
 
-test("browser shell offers updates after saving without advertising installation", async (t) => {
+test("browser shell advertises an installable web app", () => {
   const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
-  assert.doesNotMatch(html, /rel="manifest"|mobile-web-app-capable/);
-  assert.throws(
-    () => readFileSync(new URL("../public/manifest.webmanifest", import.meta.url)),
-    { code: "ENOENT" }
+  assert.match(html, /<link\b[^>]*\brel="manifest"[^>]*\bhref="\.\/manifest\.webmanifest"/);
+  const manifest = JSON.parse(
+    readFileSync(new URL("../public/manifest.webmanifest", import.meta.url), "utf8")
   );
+  assert.equal(manifest.display, "standalone");
+  assert.equal(manifest.start_url, "./");
+});
+
+test("browser shell offers updates after saving", async (t) => {
   const { nodes, window, document, Element, Button } = pwaElements();
   const serviceWorker = new TrackedTarget(),
     registration = new TrackedTarget(),
@@ -577,12 +585,6 @@ test("browser shell offers updates after saving without advertising installation
     }
   });
   t.after(dispose);
-  const prompt = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
-    prompt: () => calls.push("install"),
-    userChoice: Promise.resolve()
-  });
-  assert.equal(window.dispatchEvent(prompt), true);
-  window.dispatchEvent(new Event("appinstalled"));
   assert.deepEqual(calls, []);
   assert.deepEqual(notices, []);
   assert.equal(banner.hidden, false);
@@ -604,6 +606,83 @@ test("browser shell offers updates after saving without advertising installation
   serviceWorker.dispatchEvent(new Event("controllerchange"));
   serviceWorker.dispatchEvent(new Event("controllerchange"));
   assert.deepEqual(calls, ["save", "save", "ACTIVATE_UPDATE", "reload"]);
+});
+
+test("PWA installation consumes one prompt, shows a replacement and clears the actions on dispose", async (t) => {
+  const { nodes, window, document, Element, Button } = pwaElements();
+  const actions = nodes.get("install-actions"),
+    install = nodes.get("install-app"),
+    serviceWorker = new TrackedTarget(),
+    calls = [],
+    notices = [];
+  serviceWorker.register = async () => new TrackedTarget();
+  const { setupPwa } = sourceModules(
+    {
+      HTMLElement: Element,
+      HTMLButtonElement: Button,
+      window,
+      document,
+      navigator: { serviceWorker },
+      setInterval: () => 1,
+      clearInterval: () => {}
+    },
+    { "generated/app-version.ts": { APP_VERSION: "source-only", BUILD_ID: "source-only" } }
+  ).load("services/pwa.ts");
+  const dispose = await setupPwa({
+    notify: (notice) => notices.push(notice),
+    flush: async () => {}
+  });
+  t.after(dispose);
+  const capturePrompt = (name) => {
+    const choice = deferred();
+    const event = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+      prompt: () => calls.push(name),
+      userChoice: choice.promise
+    });
+    assert.equal(window.dispatchEvent(event), false);
+    return choice;
+  };
+  const click = () => install.dispatchEvent(new Event("click"));
+
+  assert.equal(actions.hidden, true);
+  const first = capturePrompt("first");
+  assert.equal(actions.hidden, false);
+  click();
+  click();
+  assert.equal(actions.hidden, true);
+  assert.equal(install.hidden, false);
+  assert.deepEqual(calls, ["first"]);
+  first.resolve({ outcome: "dismissed" });
+  await new Promise(setImmediate);
+  assert.equal(actions.hidden, true);
+  assert.deepEqual(notices, []);
+
+  const second = capturePrompt("second");
+  click();
+  const fresh = capturePrompt("fresh");
+  assert.equal(actions.hidden, true);
+  click();
+  assert.deepEqual(calls, ["first", "second"]);
+  second.resolve({ outcome: "dismissed" });
+  await new Promise(setImmediate);
+  assert.equal(actions.hidden, false);
+  click();
+  assert.deepEqual(calls, ["first", "second", "fresh"]);
+  window.dispatchEvent(new Event("appinstalled"));
+  fresh.resolve({ outcome: "accepted" });
+  await new Promise(setImmediate);
+  assert.equal(actions.hidden, true);
+  assert.deepEqual(notices, ["Приложение установлено."]);
+
+  capturePrompt("before disposal");
+  assert.equal(actions.hidden, false);
+  dispose();
+  assert.equal(actions.hidden, true);
+  assert.equal(window.listenerCount, 0);
+  click();
+  window.dispatchEvent(new Event("appinstalled"));
+  assert.deepEqual(calls, ["first", "second", "fresh"]);
+  assert.deepEqual(notices, ["Приложение установлено."]);
 });
 
 test("aborting PWA setup during registration removes listeners and prevents late checks", async () => {
@@ -665,7 +744,7 @@ test("aborting PWA setup during registration removes listeners and prevents late
     }
   });
   assert.equal(registerCalls, 1);
-  assert.equal(window.listenerCount, 0);
+  assert.equal(window.listenerCount, 2);
   assert.equal(nodes.get("update-now").listenerCount, 1);
   parent.abort();
   assert.equal(window.listenerCount, 0);
@@ -680,6 +759,7 @@ test("aborting PWA setup during registration removes listeners and prevents late
   assert.equal(serviceWorker.listenerCount, 0);
   assert.equal(registration.listenerCount, 0);
   window.dispatchEvent(new Event("online"));
+  window.dispatchEvent(new Event("appinstalled"));
   nodes.get("update-now").dispatchEvent(new Event("click"));
   serviceWorker.dispatchEvent(new Event("controllerchange"));
   await Promise.resolve();
