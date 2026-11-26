@@ -77,7 +77,7 @@ test("all127 public names are searchable in Russian and English with honest42-pl
     const entries = catalog.technicalCatalogEntries(locale);
     assert.equal(entries.length, 127);
     assert.equal(new Set(entries.map((entry) => entry.id)).size, 127);
-    assert.equal(entries.filter((entry) => entry.available).length, 43);
+    assert.equal(entries.filter((entry) => entry.available).length, 46);
     assert.ok(
       filterIndicatorLibrary(entries, "technicals", "RSI").some((entry) => entry.id === "STD;RSI")
     );
