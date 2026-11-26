@@ -62,6 +62,11 @@ storage-blocked без partial writes; после её закрытия upgrade 
 
 ## Обязательные проверки и решение
 
+Reader-side пункты1/2 реализованы отдельно для текущего клиента в `docs/DRIVE_READER_GUARD.md`:
+payload-only same-head/parent validation и сохранение unknown association. Follow-up6651 сохраняет
+valid Google credential при unsupported pause через auth.suspend. Это не исправляет уже выпущенные
+старые readers, не вводит новый writer и не заменяет согласование DB/rollback решения ниже.
+
 - Actual isolated IndexedDB old-open/live-tab→new-upgrade→old-reopen: нет partial writes или silent
   deletion; блокировка апгрейда видима. Открытые пользовательские профили не использовать.
 - Прогон обоих exact old readers против будущего writer/checkpoint: same/changed/unlinked heads,

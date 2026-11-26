@@ -28,7 +28,16 @@ login отложить. Ответы коротко по-русски. Реал�
 - Canonical main чистый и собран; server.mjs прежний, managed own5210/session24824 не
   перезапускался.
 
-### Следующая рабочая ветка — не опубликовано
+### Следующая рабочая ветка 0.3.23 — не опубликовано
+
+Актуальный срез описан в `docs/RELEASE_0323_INTEGRATION.md`:50 computed TA, исправление queued pane
+intent16a8601, reader guard8315/6651 с сохранением Google credential. Source50 без guard прошёл
+1026/1026, specs55/55, build2aed26fae5c28774. Guard отдельно73+108 tests и independent
+actualAuth/AES retest READY. Current root включает оба компонента; финальный combined check и
+product browser ещё нужны. Новых persistent formats/DB migrations нет. Ниже сохранён исторический
+этап47.
+
+### История подготовки до объединения50
 
 - `vps/artifacts/ta-render-integration`, исходный47-TA cut
   `6978bf1f638eab03f741d5e808a4c9a1f3323ebc`. Общий runtime compiler/bridge, LW primitives и native

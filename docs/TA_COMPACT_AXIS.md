@@ -16,3 +16,9 @@ unchanged numeric data, and the installed KLine axis inheritance. The targeted n
 memory. These method-level checks do not prove actual browser paint; the follow-up visual gate must
 inspect collapsed and expanded panes, both themes and native engines, including the absence of
 fallback text and preservation of the camera and main price scale.
+
+The bounded actual Chrome follow-up passed on frozen `f3a46cd`:14 images viewed,16 saved; report
+`vps/artifacts/ta-compact-axis-qa/REPORT.md`. Collapsed strips have no fallback ticks, meaningful
+expanded ticks return, and KLine native6/8 precision is retained. Time camera remains stable. LW
+autoscale has reversible endpoint rounding up to0.000505 across differing pane heights; expanded
+before/after endpoints return exactly. The later combined product acceptance remains separate.
