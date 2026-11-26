@@ -1,6 +1,12 @@
+.topbar {
+  padding-inline-start: 0;
+}
 .topbar .brand {
   flex-shrink: 0;
   min-width: 0;
+  /* Align with the rail content, which excludes its one-pixel separator. */
+  width: calc(var(--drawing-rail-width) - 1px);
+  justify-content: center;
 }
 .topbar .brand > img.brand-icon {
   display: block;

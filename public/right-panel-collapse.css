@@ -8,9 +8,11 @@
   grid-column: 1;
 }
 @media (max-width: 800px) {
+  :root {
+    --drawing-rail-width: 44px;
+  }
   .workspace,
   .workspace[data-right-panel-collapsed="true"] {
-    --drawing-rail-width: 44px;
     height: calc(100dvh - 88px);
     grid-template-columns: var(--drawing-rail-width) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) 44px;

@@ -1,6 +1,6 @@
 @media (max-width: 800px) {
   .topbar {
-    grid-template-columns: 26px minmax(0, 1fr) 32px 32px;
+    grid-template-columns: var(--drawing-rail-width) minmax(0, 1fr) 32px 32px;
   }
 
   .topbar #engine {
