@@ -171,6 +171,7 @@ test("catalog exhausts linear cursors, omits spot pagination and preserves TradF
     return response({
       category,
       list: [
+        linear(),
         linear({
           symbol: "AAPLUSDT",
           baseCoin: "AAPL",
@@ -224,6 +225,20 @@ test("catalog rejects cursor loops or later-page failure without returning parti
   });
   await assert.rejects(loadCatalog(http, controller.signal), { name: "AbortError" });
   assert.equal(calls.length, 1);
+});
+
+test("catalog rejects a cursor page with no new instruments", async () => {
+  for (const page of [[], [linear()]]) {
+    const { http, calls } = client((url) => {
+      const category = url.searchParams.get("category");
+      if (category === "spot") return response({ category, list: [spot()] });
+      return url.searchParams.has("cursor")
+        ? response({ category, list: page })
+        : response({ category, list: [linear()], nextPageCursor: "continue" });
+    });
+    await assert.rejects(loadCatalog(http), kind("pagination"));
+    assert.equal(calls.at(-1).url.searchParams.get("cursor"), "continue");
+  }
 });
 
 test("crypto eligibility fails closed for foreign/unknown/inactive product classes", () => {

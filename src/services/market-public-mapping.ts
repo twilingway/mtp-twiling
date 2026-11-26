@@ -96,8 +96,10 @@ export function publicMarketRow(item: CatalogInstrument): MarketRow {
     availability: "pending"
   };
 }
-export function applyPublicQuote(row: MarketRow, quote: PublicQuote): void {
-  if (row.uid !== quote.seriesId || !row.providerRef) return;
+export function applyPublicQuote(row: MarketRow, quote: PublicQuote): boolean {
+  if (row.uid !== quote.seriesId || !row.providerRef) return false;
+  if (row.providerRef.provider === "okx" && quote.timestamp < Date.parse(row.time ?? ""))
+    return false;
   row.price = quote.lastPrice;
   row.previousClose = null;
   delete row.previousCloseSource;
@@ -110,4 +112,5 @@ export function applyPublicQuote(row: MarketRow, quote: PublicQuote): void {
   row.comparisonBasis = "rolling-24h";
   row.time = new Date(quote.timestamp).toISOString();
   row.availability = quote.lastPrice === null ? "pending" : "available";
+  return true;
 }

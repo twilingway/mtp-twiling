@@ -61,8 +61,7 @@ export class MarketClient extends EventTarget {
       {
         quote: (quote) => {
           const row = this.values.find((row) => row.uid === quote.seriesId);
-          if (!row) return;
-          applyPublicQuote(row, quote);
+          if (!row || !applyPublicQuote(row, quote)) return;
           this.notify();
           this.scheduleSave();
         },

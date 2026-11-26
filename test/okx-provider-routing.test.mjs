@@ -34,7 +34,7 @@ function okxMarket(base, quote = "USDT", linear = false) {
   };
 }
 
-function fixture({ saved = [], holdOkxCatalog } = {}) {
+function fixture({ saved = [], holdOkxCatalog, nextBybitPage, serveOkxTickers } = {}) {
   const requests = [],
     writes = [],
     notices = [],
@@ -56,6 +56,7 @@ function fixture({ saved = [], holdOkxCatalog } = {}) {
       return okxCatalog[params.instType];
     }
     if (path.endsWith("/tickers")) {
+      if (serveOkxTickers) return serveOkxTickers(params.instType);
       return okxCatalog[params.instType].map(({ instId, instType }) => ({
         instId,
         instType,
@@ -74,8 +75,10 @@ function fixture({ saved = [], holdOkxCatalog } = {}) {
     requests.push({ provider: "bybit", path, params });
     if (path.endsWith("instruments-info")) {
       if (fault.bybit) throw new Error(fault.bybit);
-      const list = params.cursor ? [] : bybitCatalog[params.category];
-      return { time: start, result: { category: params.category, list } };
+      const list = params.cursor ? nextBybitPage : bybitCatalog[params.category];
+      const nextPageCursor =
+        params.category === "linear" && !params.cursor && nextBybitPage ? "continue" : "";
+      return { time: start, result: { category: params.category, list, nextPageCursor } };
     }
     assert.ok(path.endsWith("tickers"));
     return { time: start, result: { category: params.category, list: [] } };
@@ -193,6 +196,19 @@ test("never establishes OKX fallback from missing Bybit categories or failed Byb
   }
 });
 
+test("does not request OKX if a Bybit cursor page is empty or only repeats known markets", async () => {
+  for (const nextBybitPage of [[], [market("GLM", "USDT", true)]]) {
+    const f = fixture({ nextBybitPage });
+    try {
+      await assert.rejects(f.client.searchInstruments("GLM", "crypto"), { kind: "pagination" });
+      assert.ok(f.requests.some((request) => request.params?.cursor === "continue"));
+      assert.ok(!f.requests.some((request) => request.provider === "okx"));
+    } finally {
+      await f.client.close();
+    }
+  }
+});
+
 test("cancelling an OKX catalog search keeps the shared request usable by another search", async () => {
   let entered, release;
   const ready = new Promise((resolve) => {
@@ -221,6 +237,58 @@ test("cancelling an OKX catalog search keeps the shared request usable by anothe
       f.requests.filter((request) => request.path === "/api/v5/public/instruments").length,
       2
     );
+  } finally {
+    await f.client.close();
+  }
+});
+
+test("keeps a newer OKX stream price when REST arrives late and accepts a fresher REST price", async () => {
+  const ticker = (timestamp, price) => [
+    {
+      instType: "SPOT",
+      instId: "GLM-USDT",
+      ts: String(timestamp),
+      last: price,
+      open24h: "100"
+    }
+  ];
+  let reply;
+  const old = new Promise((resolve) => {
+    reply = resolve;
+  });
+  let requests = 0;
+  const f = fixture({
+    serveOkxTickers: () => (++requests === 1 ? old : ticker(start + 2_000, "150"))
+  });
+  await f.client.start();
+  try {
+    const row = f.row("GLM");
+    f.client.rows = [row];
+    let changes = 0;
+    f.client.addEventListener("state", () => {
+      changes++;
+    });
+    const pending = f.client.publicMarket.snapshot();
+    assert.equal(requests, 1);
+    const stream = f.streams.find((item) => item.provider === "okx");
+    stream.options.onQuote({
+      ref: row.providerRef,
+      seriesId: row.uid,
+      timestamp: start + 1_000,
+      lastPrice: 140,
+      previousPrice24h: 100,
+      changePercent24h: 40
+    });
+    reply(ticker(start, "110"));
+    await pending;
+    assert.equal(row.price, 140);
+    assert.equal(row.time, new Date(start + 1_000).toISOString());
+    assert.equal(changes, 1);
+
+    await f.client.publicMarket.snapshot();
+    assert.equal(row.price, 150);
+    assert.equal(row.time, new Date(start + 2_000).toISOString());
+    assert.equal(changes, 2);
   } finally {
     await f.client.close();
   }

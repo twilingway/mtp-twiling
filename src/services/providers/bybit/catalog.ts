@@ -109,6 +109,7 @@ export async function loadCatalog(http: BybitHttp, signal?: AbortSignal): Promis
       if (response.result.category !== category || !Array.isArray(response.result.list))
         throw new BybitError("protocol", "Bybit catalog category/list mismatch");
       observedAt = Math.max(observedAt, response.time);
+      const previousCount = instruments.size;
       for (const raw of response.result.list) {
         const item = normaliseInstrument(category, raw);
         instruments.set(item.seriesId, item);
@@ -118,6 +119,8 @@ export async function loadCatalog(http: BybitHttp, signal?: AbortSignal): Promis
         throw new BybitError("protocol", "Unexpected Bybit catalog cursor");
       if (next && seen.has(next))
         throw new BybitError("pagination", "Repeated Bybit catalog cursor");
+      if (cursor && instruments.size === previousCount)
+        throw new BybitError("pagination", "Bybit catalog cursor page added no new instruments");
       if (next) seen.add(next);
       cursor = next;
     } while (cursor);
