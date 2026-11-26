@@ -39,6 +39,9 @@ function load(relative) {
 }
 
 const { createOhlcLegend, formatOhlcValue } = load("model/ohlc-legend.ts");
+const { chartContrast } = load("model/theme.ts");
+const { DEFAULT_LAST_PRICE_COLOR, lastPriceStyle } = load("model/last-price-style.ts");
+const { drawingPriceLabelPosition, drawingPriceTargets } = load("model/drawing-price-labels.ts");
 const { OhlcLegend } = load("screens/terminal/OhlcLegend.tsx");
 const bar = (open, close) => ({
   timestamp: 1000,
@@ -50,15 +53,15 @@ const bar = (open, close) => ({
 });
 
 test("OHLC direction follows the preceding close, including gaps opposite to candle body", () => {
-  const rise = createOhlcLegend(bar(110, 105), 100, { upColor: "#123456" });
+  const rise = createOhlcLegend(bar(110, 105), 100, { upColor: "#6795c7" });
   assert.equal(rise.direction, "up");
-  assert.equal(rise.color, "#123456");
+  assert.equal(rise.color, "#6795c7");
   assert.equal(rise.change, 5);
   assert.equal(rise.percent, 5);
   assert.deepEqual(rise.values, { open: 110, high: 112, low: 103, close: 105 });
-  const fall = createOhlcLegend(bar(90, 95), 100, { downColor: "#654321" });
+  const fall = createOhlcLegend(bar(90, 95), 100, { downColor: "#b98452" });
   assert.equal(fall.direction, "down");
-  assert.equal(fall.color, "#654321");
+  assert.equal(fall.color, "#b98452");
   assert.equal(fall.change, -5);
   assert.equal(fall.percent, -5);
 });
@@ -109,13 +112,40 @@ test("neutral labels follow chart theme and background while configured directio
   const light = createOhlcLegend(undefined, undefined, { theme: "light" });
   assert.notEqual(dark.labelColor, light.labelColor);
   assert.equal(
-    createOhlcLegend(bar(1, 2), 1, { theme: "light", upColor: "#abcdef" }).color,
-    "#abcdef"
+    createOhlcLegend(bar(1, 2), 1, { theme: "light", upColor: "#123456" }).color,
+    "#123456"
   );
   assert.equal(
     createOhlcLegend(undefined, undefined, { theme: "dark", background: "#ffffff" }).labelColor,
     light.labelColor
   );
+});
+
+test("monochrome candles keep OHLC, last price and its label readable on both backgrounds", () => {
+  for (const background of ["#ffffff", "#000000", "#886688"]) {
+    for (const rising of [true, false]) {
+      const settings = { background, upColor: background, downColor: background };
+      const close = rising ? 2 : 0.5;
+      assert.ok(chartContrast(createOhlcLegend(bar(1, close), 1, settings).color, background) >= 4.5);
+      const last = lastPriceStyle(settings, rising);
+      assert.ok(chartContrast(last.color, background) >= 3);
+      assert.ok(chartContrast(last.text, last.color) >= 4.5);
+    }
+  }
+  for (const background of ["#ffffff", "#000000"]) {
+    assert.equal(lastPriceStyle({ background, lastPriceColor: DEFAULT_LAST_PRICE_COLOR }, false).color, DEFAULT_LAST_PRICE_COLOR);
+  }
+});
+
+test("drawing level targets preserve horizontal labels and avoid covering the live price", () => {
+  const points = [{ timestamp: 1000, value: 100 }, { timestamp: 2000, value: 90 }];
+  const horizontal = { name: "horizontalStraightLine", points: points.slice(0, 1) };
+  const sloped = { name: "rayLine", points };
+  assert.deepEqual(drawingPriceTargets([horizontal, sloped]).map(({ point, anchor }) => [point.value, anchor]), [[100, "always"]]);
+  assert.deepEqual(drawingPriceTargets([horizontal, sloped], sloped).map(({ point }) => point.value), [100, 100, 90]);
+  assert.equal(drawingPriceLabelPosition(110, 220, [110]), 94);
+  assert.equal(drawingPriceLabelPosition(10, 100, [10]), 26);
+  assert.equal(drawingPriceLabelPosition(-1, 100, []), null);
 });
 
 test("localized precision and signs are stable, including rounded zero and unavailable values", () => {
@@ -134,11 +164,11 @@ test("legend exposes four separate neutral labels and selected-bar change withou
       bar: bar(110, 105),
       previousClose: 100,
       digits: 2,
-      settings: { upColor: "#123456" }
+      settings: { upColor: "#6795c7" }
     })
   );
   assert.equal((markup.match(/class="ohlc-label"/g) ?? []).length, 4);
-  assert.match(markup, /--ohlc-value-color:#123456/);
+  assert.match(markup, /--ohlc-value-color:#6795c7/);
   assert.match(markup, /data-direction="up"/);
   assert.match(markup, /Изменение: \+5,00 \(\+5,00%\)/);
   assert.doesNotMatch(markup, /aria-live/);

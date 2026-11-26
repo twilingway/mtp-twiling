@@ -1,0 +1,213 @@
+.chart-workspace {
+  display: grid;
+  grid-column: 2;
+  grid-row: 1;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.chart-workspace > .chart-panel {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.chart-workspace[data-chart-count="2"],
+.chart-workspace[data-chart-count="3"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+}
+
+.chart-workspace[data-chart-count="3"] {
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.chart-workspace[data-chart-count="3"] > .chart-panel {
+  grid-row: 1 / span 2;
+}
+
+.chart-layout-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  min-height: 32px;
+  padding-inline: 6px 2px;
+  border: 1px solid var(--control-line);
+  border-radius: 6px;
+  background: var(--surface-input);
+}
+
+.chart-layout-control:hover,
+.chart-layout-control:focus-within {
+  background: var(--surface-hover);
+}
+
+.chart-layout-icon {
+  display: inline-block;
+  width: 14px;
+  height: 11px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  background: linear-gradient(currentColor, currentColor) center / 1px 100% no-repeat;
+  pointer-events: none;
+}
+
+.chart-layout-control select {
+  width: 35px;
+  min-height: 28px;
+  padding: 0 13px 0 2px;
+  border: 0;
+  background-color: transparent;
+  background-position: right 1px center;
+  color: inherit;
+  cursor: pointer;
+}
+
+.chart-layout-control select option {
+  color: var(--text);
+  background: var(--surface-input);
+}
+
+.auxiliary-chart {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--chart-background);
+}
+
+.auxiliary-chart-toolbar {
+  display: flex;
+  position: relative;
+  align-items: center;
+  flex: none;
+  gap: 7px;
+  padding: 4px 7px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.auxiliary-chart-toolbar label {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.auxiliary-chart-timeframe {
+  color: var(--muted);
+  white-space: nowrap;
+  font-size: 11px;
+}
+
+.auxiliary-chart-toolbar select {
+  min-width: 0;
+  width: 100%;
+  min-height: 26px;
+  padding: 2px 23px 2px 6px;
+  border: 1px solid var(--control-line);
+  border-radius: 5px;
+  background-color: var(--surface-input);
+  background-position: right 6px center;
+  color: inherit;
+  font-size: 12px;
+}
+
+.auxiliary-chart-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+}
+
+.auxiliary-chart-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.auxiliary-chart-empty,
+.auxiliary-chart-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  gap: 7px;
+  padding: 10px;
+  color: var(--text);
+  background: var(--surface);
+  text-align: center;
+}
+
+.auxiliary-chart-empty {
+  flex: 1;
+}
+
+.auxiliary-chart-status {
+  position: absolute;
+  inset: 0;
+}
+
+.auxiliary-chart-status[data-has-candles="true"] {
+  inset: 4px 62px auto 4px;
+  align-items: flex-start;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: start;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.auxiliary-chart-status button {
+  min-height: 24px;
+  border: 1px solid var(--control-line);
+  border-radius: 5px;
+  padding: 2px 8px;
+  color: inherit;
+  background: var(--surface-input);
+  cursor: pointer;
+}
+
+@media (max-width: 1050px) {
+  .chart-workspace[data-chart-count="2"],
+  .chart-workspace[data-chart-count="3"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-auto-rows: minmax(0, 1fr);
+  }
+
+  .chart-workspace[data-chart-count="3"] {
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+  }
+
+  .chart-workspace[data-chart-count="3"] > .chart-panel {
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 800px) {
+  .workspace[data-mobile-panel-open="true"] > .chart-workspace {
+    visibility: hidden;
+  }
+
+  .topbar .chart-layout-control {
+    grid-row: 2;
+    grid-column: 1;
+    justify-self: center;
+    gap: 2px;
+    padding-inline: 3px 0;
+  }
+
+  .topbar .chart-layout-control select {
+    width: 29px;
+  }
+
+  .chart-workspace[data-chart-count="3"] {
+    grid-template-rows: minmax(0, 1.35fr) repeat(2, minmax(0, 1fr));
+  }
+
+  .chart-workspace[data-chart-count="3"] .chart-heading .chart-price {
+    display: none;
+  }
+}

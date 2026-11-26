@@ -472,6 +472,7 @@ function formFixture(name = "segment") {
     node: () => node,
     style: () => node.props.children.props.children[3].props.children.props,
     coordinates: () => node.props.children.props.children[4].props.children.props,
+    lock: () => node.props.children.props.children[0].props.children[1].props,
     template: () => node.props.children.props.children[7].props.children[0].props,
     submit: () => node.props.children.props.onSubmit({ preventDefault() {} }),
     unmount: () => {
@@ -489,6 +490,13 @@ test("actual form handlers preview fields and templates; Cancel/Escape/close/unm
     f.style().change("lineOpacity", 0.4);
     f.render();
     assert.equal(c.getSnapshot().drawingSettingsPreview.drawing.settings.lineOpacity, 0.4);
+    assert.equal(f.coordinates().disabled, true);
+    f.coordinates().point(0, { value: 222 });
+    f.render();
+    assert.equal(c.getSnapshot().drawingSettingsPreview.drawing.points[0].value, 100);
+    f.lock().onClick();
+    f.render();
+    assert.equal(f.coordinates().disabled, false);
     f.coordinates().point(0, { value: 222 });
     f.render();
     assert.equal(c.getSnapshot().drawingSettingsPreview.drawing.points[0].value, 222);
@@ -519,6 +527,8 @@ test("actual form handlers preview fields and templates; Cancel/Escape/close/unm
   f.unmount();
   f.controller.dispose();
   const invalid = formFixture();
+  invalid.render();
+  invalid.lock().onClick();
   invalid.render();
   invalid.coordinates().point(0, { value: NaN });
   invalid.render();

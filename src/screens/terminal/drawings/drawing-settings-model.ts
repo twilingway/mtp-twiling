@@ -1,8 +1,13 @@
-import { drawingStyle, DEFAULT_FIB_LEVELS } from "../../../model/drawing-model.js";
+import {
+  drawingHasLineText,
+  drawingStyle,
+  DEFAULT_FIB_LEVELS
+} from "../../../model/drawing-model.js";
 import type { ResolvedDrawingStyle } from "../../../model/drawing-model.js";
 import type {
   Drawing,
   DrawingDraft,
+  DrawingTool,
   DrawingVisibility,
   DrawingSettings,
   FibLevelStyle
@@ -54,10 +59,20 @@ export function settingsCandidate(draft: SettingsDraft): Drawing | null {
   };
   return validSettingsDrawing(item) ? item : null;
 }
-export function initialSettings(value: { settings?: DrawingSettings }): DraftSettings {
+export function initialSettings(value: {
+  name?: DrawingTool;
+  settings?: DrawingSettings;
+}): DraftSettings {
   const settings = drawingStyle(value);
+  const legacyEmptyText =
+    value.name !== undefined &&
+    drawingHasLineText(value.name) &&
+    !settings.text &&
+    settings.textAlign === "center" &&
+    settings.textVertical === "center";
   return {
     ...settings,
+    ...(legacyEmptyText && { textAlign: "left", textVertical: "top" }),
     oneColor: settings.oneColor ?? false,
     levelStyles: structuredClone(
       settings.levelStyles ??

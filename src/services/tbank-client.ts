@@ -11,12 +11,12 @@ import { selectedMarketRow } from "../model/selected-instrument.js";
 import { isBankIdentity } from "../model/market-provider.js";
 import { assertBankRequest } from "./market-bank-cache.js";
 import { lastPriceSubscription } from "./market-subscriptions.js";
+import { BankCandleStream } from "./tbank-candle-stream.js";
 import { resolveWatchlist, quotation, normaliseCandles } from "../model/market-model.js";
 import { TIMEFRAMES, splitRanges, subtractRanges, mergeCandles } from "../model/history-codec.js";
 import { historyRequestWindow, shiftTimeframe } from "../model/intervals/calendar.js";
 import { nativeTimeframe } from "../model/intervals/native-timeframes.js";
 import type {
-  Candle,
   Catalog,
   CatalogInstrument,
   HistoryRange,
@@ -31,7 +31,6 @@ export { BankError } from "./tbank-transport.js";
 
 import type {
   Cache,
-  Subscription,
   BankState,
   BankSnapshot,
   CandleResult,
@@ -49,9 +48,8 @@ export class TBankClient extends EventTarget {
   authenticated = false;
   cachePaused = false;
   catalog: Catalog | undefined;
-  private candleSubscription: Subscription | null = null;
-  private liveBuffer = new Map<string, Subscription & { bars: Candle[] }>();
-  private flushTimer: ReturnType<typeof setTimeout> | undefined;
+  private readonly candleStream: BankCandleStream;
+  private socketOpened = false;
   private readonly transport: BankTransport;
   private readonly mutations = new MutationQueue();
   private readonly dayBases: QuoteDayBases;
@@ -61,6 +59,13 @@ export class TBankClient extends EventTarget {
     private readonly cache: Cache
   ) {
     super();
+    this.candleStream = new BankCandleStream(
+      (body) => this.send(body),
+      (...args) => this.cache.saveHistory(...args),
+      () => this.owner,
+      () => this.flush(),
+      () => this.emit("notice", "Не удалось сохранить новые свечи. Проверьте свободное место.")
+    );
     this.dayBases = new QuoteDayBases(
       this,
       () => this.serverNow(),
@@ -83,7 +88,9 @@ export class TBankClient extends EventTarget {
           this.notify();
         }
         this.send({ pingSettings: { pingDelayMs: 10000 } });
-        this.sendCandleSubscription("SUBSCRIPTION_ACTION_SUBSCRIBE");
+        this.candleStream.open();
+        if (this.socketOpened) this.emit("reconnect", undefined);
+        this.socketOpened = true;
       },
       data: (message) => this.receive(message),
       error: (message) => {
@@ -144,11 +151,7 @@ export class TBankClient extends EventTarget {
       watchlist !== undefined
         ? watchlist
         : resolveWatchlist(catalog.shares, catalog.futures, catalog.indicatives);
-    if (
-      this.candleSubscription &&
-      !this.rows.some((row) => row.uid === this.candleSubscription?.uid)
-    )
-      this.candleSubscription = null;
+    this.candleStream.keepRows(new Set(this.rows.flatMap((row) => (row.uid ? [row.uid] : []))));
     const catalogByUid = new Map(
       [
         ...catalog.shares,
@@ -301,10 +304,9 @@ export class TBankClient extends EventTarget {
       this.rows = rows;
       const unsubscribe =
         target.uid && !rows.some((row) => row.uid === target.uid) ? target.uid : null;
-      if (unsubscribe) this.send(lastPriceSubscription("unsubscribe", [unsubscribe]));
-      if (unsubscribe && this.candleSubscription?.uid === target.uid) {
-        this.sendCandleSubscription("SUBSCRIPTION_ACTION_UNSUBSCRIBE");
-        this.candleSubscription = null;
+      if (unsubscribe) {
+        this.send(lastPriceSubscription("unsubscribe", [unsubscribe]));
+        this.candleStream.remove(unsubscribe);
       }
       this.notify();
     });
@@ -333,12 +335,14 @@ export class TBankClient extends EventTarget {
       const bar = normaliseCandles([raw])[0],
         uid = text(raw.instrumentUid),
         interval = text(raw.interval);
-      if (bar && uid && interval) {
+      if (
+        bar &&
+        uid &&
+        interval &&
+        !this.cachePaused &&
+        this.candleStream.receive(uid, interval, bar)
+      )
         this.emit<CandleEvent>("candle", { uid, interval, bar });
-        const sub = this.candleSubscription;
-        if (sub && uid === sub.uid && interval === TIMEFRAMES[sub.timeframe].stream)
-          this.queueLiveBar(sub, bar);
-      }
     }
     const candles = object(data.subscribeCandlesResponse);
     if (
@@ -356,53 +360,17 @@ export class TBankClient extends EventTarget {
     assertBankRequest(data);
     this.transport.send(data);
   }
-  private sendCandleSubscription(action: string): void {
-    const sub = this.candleSubscription;
-    if (!sub) return;
-    this.send({
-      subscribeCandlesRequest: {
-        subscriptionAction: action,
-        instruments: [{ instrumentId: sub.uid, interval: TIMEFRAMES[sub.timeframe].stream }],
-        waitingClose: false
-      }
-    });
-  }
   subscribeCandles(uid: string, timeframe: Timeframe): void {
-    assertBankRequest({ uid });
-    nativeTimeframe(timeframe);
-    if (this.candleSubscription?.uid === uid && this.candleSubscription.timeframe === timeframe)
-      return;
-    this.sendCandleSubscription("SUBSCRIPTION_ACTION_UNSUBSCRIBE");
-    this.candleSubscription = { uid, timeframe };
-    this.sendCandleSubscription("SUBSCRIPTION_ACTION_SUBSCRIBE");
+    this.candleStream.select(uid, timeframe);
   }
   unsubscribeCandles(): void {
-    this.sendCandleSubscription("SUBSCRIPTION_ACTION_UNSUBSCRIBE");
-    this.candleSubscription = null;
+    this.candleStream.clearPrimary();
   }
-  private queueLiveBar(sub: Subscription, bar: Candle): void {
-    if (this.cachePaused) return;
-    const key = `${sub.uid}:${sub.timeframe}`,
-      previous = this.liveBuffer.get(key) ?? { ...sub, bars: [] };
-    previous.bars = mergeCandles(previous.bars, [bar]);
-    this.liveBuffer.set(key, previous);
-    if (!this.flushTimer)
-      this.flushTimer = setTimeout(() => {
-        void this.flush().catch(() =>
-          this.emit("notice", "Не удалось сохранить новые свечи. Проверьте свободное место.")
-        );
-      }, 1500);
+  retainCandle(uid: string, timeframe: Timeframe): () => void {
+    return this.candleStream.retain(uid, timeframe);
   }
   async flush(): Promise<void> {
-    clearTimeout(this.flushTimer);
-    this.flushTimer = undefined;
-    const blocks = [...this.liveBuffer.values()];
-    this.liveBuffer.clear();
-    await Promise.all(
-      blocks.map((block) =>
-        this.cache.saveHistory(this.owner, block.uid, block.timeframe, block.bars)
-      )
-    );
+    await this.candleStream.flush();
     if (this.rows.length && !this.mutations.active)
       await this.cache.saveMarket(this.owner, { rows: this.rows, at: Date.now() });
   }
@@ -410,8 +378,10 @@ export class TBankClient extends EventTarget {
     symbol: string,
     timeframe: Timeframe,
     range: HistoryRange,
-    { signal, onProgress, uid }: CandleOptions = {}
+    { signal, onProgress, uid }: CandleOptions = {},
+    select = true
   ): Promise<CandleResult> {
+    signal?.throwIfAborted();
     nativeTimeframe(timeframe);
     range = historyRequestWindow(range, timeframe);
     const row = selectedMarketRow(this.rows, { symbol, instrumentUid: uid });
@@ -426,6 +396,7 @@ export class TBankClient extends EventTarget {
       range.from,
       range.to
     );
+    signal?.throwIfAborted();
     if (!navigator.onLine)
       return {
         symbol,
@@ -437,6 +408,7 @@ export class TBankClient extends EventTarget {
         requests: 0
       };
     const coverage = await this.cache.loadCoverage(this.owner, row.uid, timeframe);
+    signal?.throwIfAborted();
     const closedTo = Math.min(range.to, shiftTimeframe(Date.now(), timeframe, -2));
     const gaps = subtractRanges(range.from, Math.max(range.from, closedTo), coverage);
     const recent = coverage.find(
@@ -465,10 +437,14 @@ export class TBankClient extends EventTarget {
         signal
       );
       const next = normaliseCandles(response.candles);
-      await this.cache.saveHistory(this.owner, row.uid, timeframe, next, {
-        ...part,
-        fetchedAt: Date.now()
-      });
+      signal?.throwIfAborted();
+      if (!this.cachePaused) {
+        await this.cache.saveHistory(this.owner, row.uid, timeframe, next, {
+          ...part,
+          fetchedAt: Date.now()
+        });
+        signal?.throwIfAborted();
+      }
       bars = mergeCandles(bars, next);
       onProgress?.({
         candles: bars,
@@ -478,7 +454,7 @@ export class TBankClient extends EventTarget {
       });
     }
     signal?.throwIfAborted();
-    this.subscribeCandles(row.uid, timeframe);
+    if (select) this.subscribeCandles(row.uid, timeframe);
     return {
       symbol,
       ticker: row.ticker,
@@ -491,7 +467,6 @@ export class TBankClient extends EventTarget {
   }
   close(): Promise<void> {
     this.transport.close();
-    clearTimeout(this.flushTimer);
     return this.flush();
   }
 }

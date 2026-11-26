@@ -16,10 +16,12 @@ import { okxCatalogInstrument, publicCatalogInstrument } from "./market-public-m
 import type { PublicQuote } from "./market-public-mapping.js";
 import { OkxMarket, PUBLIC_CATALOG_MAX_AGE_MS } from "./market-okx.js";
 import type { OkxMarketOptions } from "./market-okx.js";
+import { CandleLeases } from "./candle-leases.js";
 import { TIMEFRAMES, mergeCandles, subtractRanges } from "../model/history-codec.js";
 import { shiftTimeframe } from "../model/intervals/calendar.js";
 import { providerSeriesId } from "../model/market-provider.js";
 import type { MarketProviderRef, OkxProviderRef } from "../model/market-provider.js";
+import { isNativeIntervalId } from "../model/intervals/registry.js";
 import type {
   Candle,
   CatalogInstrument,
@@ -45,6 +47,15 @@ interface Events {
   candle(event: CandleEvent): void;
   notice(message: string): void;
   reconnect(source: PublicMarketReconnect): void;
+}
+type PublicSeries = { uid: string; ref: MarketProviderRef; timeframe: Timeframe };
+
+function candleSeries(row: MarketRow, timeframe: Timeframe): PublicSeries {
+  const ref = row.providerRef;
+  if (!ref || !row.uid || providerSeriesId(ref) !== row.uid)
+    throw new Error("Источник криптокотировок недоступен.");
+  (ref.provider === "okx" ? okxNativeInterval : nativeInterval)(timeframe);
+  return { uid: row.uid, ref, timeframe };
 }
 
 function supportedBybitInstrument(item: BybitInstrument): boolean {
@@ -109,7 +120,8 @@ export class PublicMarket {
   >();
   private readonly opened = new Set<BybitCategory>();
   private rows: readonly MarketRow[] = [];
-  private selection: { row: MarketRow; timeframe: Timeframe } | null = null;
+  private readonly candleLeases = new CandleLeases<PublicSeries>(() => this.sync(this.rows));
+  private rowIds = new Set<string>();
   private live = new Map<string, { uid: string; timeframe: Timeframe; bars: Candle[] }>();
   private flushTimer: ReturnType<typeof setTimeout> | undefined;
   constructor(
@@ -125,9 +137,13 @@ export class PublicMarket {
         onQuote: (quote) => this.emitQuote(quote),
         onCandles: (ref, timeframe, bars) => this.receiveCandles(ref, timeframe, bars),
         onReconnect: () => {
-          const ref = this.selection?.row.providerRef;
-          if (ref?.provider === "okx" && !this.lifetime.signal.aborted && !this.cachePaused)
-            this.events.reconnect({ provider: "okx", category: ref.category });
+          if (this.lifetime.signal.aborted || this.cachePaused) return;
+          const categories = new Set(
+            this.candleLeases.values.flatMap(({ ref, uid }) =>
+              ref.provider === "okx" && this.rowIds.has(uid) ? [ref.category] : []
+            )
+          );
+          for (const category of categories) this.events.reconnect({ provider: "okx", category });
         },
         onError: (error) => {
           if (!this.lifetime.signal.aborted) this.events.notice(error.message);
@@ -242,12 +258,11 @@ export class PublicMarket {
   sync(rows: readonly MarketRow[]): void {
     if (this.lifetime.signal.aborted) return;
     this.rows = rows;
-    const ref = this.selection?.row.providerRef;
+    this.rowIds = new Set(rows.flatMap((row) => (row.uid ? [row.uid] : [])));
+    const active = this.candleLeases.values.filter(({ uid }) => this.rowIds.has(uid));
     this.okx.sync(
       okxRefs(rows),
-      ref?.provider === "okx" && this.selection
-        ? { ref, timeframe: this.selection.timeframe }
-        : null
+      active.flatMap(({ ref, timeframe }) => (ref.provider === "okx" ? [{ ref, timeframe }] : []))
     );
     for (const category of ["spot", "linear"] as const) {
       const symbols = rows.flatMap((row) =>
@@ -255,9 +270,12 @@ export class PublicMarket {
           ? [row.providerRef.symbol]
           : []
       );
-      const selected =
-        ref?.provider === "bybit" && ref.category === category ? this.selection : null;
-      if (!symbols.length && !selected) {
+      const candles = active.flatMap(({ ref, timeframe }) =>
+        ref.provider === "bybit" && ref.category === category
+          ? [{ symbol: ref.symbol, interval: timeframe as BybitInterval }]
+          : []
+      );
+      if (!symbols.length && !candles.length) {
         this.streams.get(category)?.dispose();
         this.streams.delete(category);
         this.opened.delete(category);
@@ -284,10 +302,7 @@ export class PublicMarket {
       }
       stream.setSubscriptions({
         tickers: symbols,
-        candles:
-          selected && ref
-            ? [{ symbol: ref.symbol, interval: selected.timeframe as BybitInterval }]
-            : []
+        candles
       });
       stream.start(this.lifetime.signal);
     }
@@ -313,26 +328,25 @@ export class PublicMarket {
     }
   }
   select(row: MarketRow | null, timeframe: Timeframe): void {
-    if (row?.providerRef) {
-      (row.providerRef.provider === "okx" ? okxNativeInterval : nativeInterval)(timeframe);
-      this.selection = { row, timeframe };
-    } else this.selection = null;
-    this.sync(this.rows);
+    this.candleLeases.select(row?.providerRef ? candleSeries(row, timeframe) : null);
+  }
+  retainCandle(row: MarketRow, timeframe: Timeframe): () => void {
+    return this.candleLeases.retain(candleSeries(row, timeframe));
   }
   async candles(
     row: MarketRow,
     timeframe: Timeframe,
     range: HistoryRange,
-    options: CandleOptions = {}
+    options: CandleOptions = {},
+    select = true
   ): Promise<CandleResult> {
-    const ref = row.providerRef;
-    if (!ref || !row.uid) throw new Error("Источник криптокотировок недоступен.");
+    const { ref, uid } = candleSeries(row, timeframe);
     const okx = ref.provider === "okx",
       name = okx ? "OKX" : "Bybit";
-    (okx ? okxNativeInterval : nativeInterval)(timeframe);
     const signal = this.signal(options.signal);
     signal.throwIfAborted();
-    let bars = await this.cache.loadHistory(this.owner(), row.uid, timeframe, range.from, range.to);
+    let bars = await this.cache.loadHistory(this.owner(), uid, timeframe, range.from, range.to);
+    signal.throwIfAborted();
     const cached = bars.length > 0;
     if (!(this.options.online?.() ?? (typeof navigator === "undefined" || navigator.onLine)))
       return {
@@ -344,7 +358,8 @@ export class PublicMarket {
         cached,
         requests: 0
       };
-    const coverage = await this.cache.loadCoverage(this.owner(), row.uid, timeframe);
+    const coverage = await this.cache.loadCoverage(this.owner(), uid, timeframe);
+    signal.throwIfAborted();
     const closedTo = Math.max(
       range.from,
       Math.min(range.to, shiftTimeframe(Date.now(), timeframe, -2))
@@ -366,7 +381,7 @@ export class PublicMarket {
         volume: value.baseVolume
       }));
       if (!this.cachePaused)
-        await this.cache.saveHistory(this.owner(), row.uid, timeframe, next, {
+        await this.cache.saveHistory(this.owner(), uid, timeframe, next, {
           ...part,
           fetchedAt: Date.now()
         });
@@ -375,7 +390,7 @@ export class PublicMarket {
       options.onProgress?.({ candles: bars, cached, completed: index + 1, total: gaps.length });
     }
     signal.throwIfAborted();
-    this.select(row, timeframe);
+    if (select) this.select(row, timeframe);
     return {
       symbol: row.symbol,
       ticker: row.ticker,
@@ -397,13 +412,13 @@ export class PublicMarket {
     timeframe: string,
     bars: readonly (Omit<Candle, "volume"> & { baseVolume: number })[]
   ): void {
-    const current = this.selection,
-      uid = providerSeriesId(ref);
+    const uid = providerSeriesId(ref);
     if (
       this.lifetime.signal.aborted ||
       this.cachePaused ||
-      current?.row.uid !== uid ||
-      current.timeframe !== timeframe
+      !this.rowIds.has(uid) ||
+      !this.candleLeases.has(uid, timeframe) ||
+      !isNativeIntervalId(timeframe)
     )
       return;
     for (const value of bars) {
@@ -415,8 +430,15 @@ export class PublicMarket {
         close: value.close,
         volume: value.baseVolume
       };
-      this.events.candle({ uid, interval: TIMEFRAMES[current.timeframe].stream, bar });
-      this.queue(uid, current.timeframe, bar);
+      this.queue(uid, timeframe, bar);
+      this.events.candle({ uid, interval: TIMEFRAMES[timeframe].stream, bar });
+      if (
+        this.lifetime.signal.aborted ||
+        this.cachePaused ||
+        !this.rowIds.has(uid) ||
+        !this.candleLeases.has(uid, timeframe)
+      )
+        break;
     }
   }
 

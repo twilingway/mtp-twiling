@@ -66,14 +66,25 @@ export function chartPalette(settings: ChartSettings): Readonly<ChartPalette> {
   // Keep scales readable even when a custom background differs from the shell theme.
   const theme = luminance == null ? terminalTheme(settings) : luminance > 0.179 ? "light" : "dark",
     palette = THEME_PALETTES[theme];
-  const readable = (color: string) => {
-    const foreground = colorLuminance(color);
-    if (luminance == null || foreground == null) return color;
-    const contrast =
-      (Math.max(luminance, foreground) + 0.05) / (Math.min(luminance, foreground) + 0.05);
-    return contrast >= 4.5 ? color : luminance > 0.179 ? "#000000" : "#ffffff";
-  };
+  const readable = (color: string) => readableChartColor(color, background, 4.5);
   return { ...palette, background, text: readable(palette.text), muted: readable(palette.muted) };
+}
+
+export function chartContrast(foreground: string, background: string): number | null {
+  const a = colorLuminance(foreground),
+    b = colorLuminance(background);
+  return a === null || b === null ? null : (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+export function chartLabelText(background: string): string {
+  return (chartContrast("#ffffff", background) ?? 21) >= (chartContrast("#000000", background) ?? 1)
+    ? "#ffffff"
+    : "#000000";
+}
+
+export function readableChartColor(color: string, background: string, minimum: number): string {
+  const contrast = chartContrast(color, background);
+  return contrast === null || contrast >= minimum ? color : chartLabelText(background);
 }
 
 function colorLuminance(color: string): number | null {

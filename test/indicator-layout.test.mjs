@@ -9,7 +9,7 @@ import ts from "typescript";
 const root = fileURLToPath(new URL("../src/", import.meta.url));
 function sources(overrides = {}, globals = {}) {
   const cells = new Map(),
-    context = vm.createContext({ console, Date, Map, Math, Promise, queueMicrotask, ...globals });
+    context = vm.createContext({ console, Date, EventTarget, Map, Math, Promise, queueMicrotask, ...globals });
   function load(relative) {
     let filename = path.resolve(root, relative).replace(/\.js$/, ".ts");
     if (!existsSync(filename) && filename.endsWith(".ts")) filename = filename + "x";
@@ -359,7 +359,12 @@ test("legend collapse exposes an accessible compact count without toggling indic
     notify: (message) => assert.fail(message)
   };
   const load = sources({
-    react: { memo: (component) => component, useState: (value) => [value, () => {}], useEffect() {} },
+    react: {
+      memo: (component) => component,
+      useMemo: (factory) => factory(),
+      useState: (value) => [value, () => {}],
+      useEffect() {}
+    },
     "react-dom": { createPortal: () => assert.fail("legend test must not open a list menu") },
     "react/jsx-runtime": { jsx, jsxs: jsx },
     "services/storage-db.ts": {},

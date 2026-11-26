@@ -1,4 +1,7 @@
 export const drawingMessages = {
+  "Заблокировать объект": "Lock object",
+  "Разблокировать объект": "Unlock object",
+  "Цены объектов на шкале": "Drawing prices on the scale",
   "Включить уровень": "Enable level",
   "Значение уровня": "Level value",
   "Цвет уровня": "Level colour",
@@ -88,8 +91,12 @@ export const drawingMessages = {
   Снизу: "Bottom",
   Текст: "Text",
   "Текст рисунка": "Drawing text",
+  "Текст по горизонтали": "Horizontal text position",
+  "Текст по вертикали": "Vertical text position",
   "Размер шрифта": "Font size",
   Линия: "Line",
+  Контур: "Outline",
+  Заливка: "Fill",
   "Показывать на интервалах": "Show on intervals",
   "Применяется к таймфреймам: 1, 5, 15, 30 минут, 1 час, 1 день и 1 неделя.":
     "Applies to intervals: 1, 5, 15, 30 minutes, 1 hour, 1 day and 1 week.",
