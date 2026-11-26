@@ -415,7 +415,7 @@ test("terminal library exposes the searchable catalog and creates real TA instan
     ["mtpAll", "mtp160", "mtp440", "mtp640"]
   );
   assert.equal(dialog.props.entries.length, 131);
-  assert.equal(dialog.props.entries.filter((entry) => entry.available).length, 40);
+  assert.equal(dialog.props.entries.filter((entry) => entry.available).length, 47);
   assert.ok(
     dialog.props.entries.filter((entry) => !entry.available).every((entry) => entry.reason)
   );

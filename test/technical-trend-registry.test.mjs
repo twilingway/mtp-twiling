@@ -81,7 +81,7 @@ function series(actual, expected, tolerance = 2e-12) {
   });
 }
 
-test("35 definitions retain all original 29 defaults/order and unchanged legacy result shapes", () => {
+test("42 definitions retain all original29 defaults/order and unchanged legacy result shapes", () => {
   const legacy = {
     momentum: { length: 10, source: "close" },
     roc: { length: 9, source: "close" },
@@ -119,13 +119,13 @@ test("35 definitions retain all original 29 defaults/order and unchanged legacy 
     "ultimate-oscillator": { fastLength: 7, middleLength: 14, slowLength: 28 },
     trix: { length: 18 }
   };
-  assert.equal(core.technicalIndicatorDefinitions.length, 35);
+  assert.equal(core.technicalIndicatorDefinitions.length, 42);
   assert.deepEqual(
     core.technicalIndicatorDefinitions.slice(0, 29).map((item) => item.id),
     Object.keys(legacy)
   );
   assert.deepEqual(
-    core.technicalIndicatorDefinitions.slice(29).map((item) => item.id),
+    core.technicalIndicatorDefinitions.slice(29, 35).map((item) => item.id),
     ids
   );
   for (const [id, params] of Object.entries({ ...legacy, ...defaults })) {
@@ -154,7 +154,7 @@ test("35 definitions retain all original 29 defaults/order and unchanged legacy 
   for (const item of old) assert.deepEqual(item.params, legacy[item.definitionId]);
 });
 
-test("exact public IDs and existing English/Russian search aliases expose 36 TA entries", () => {
+test("exact public IDs and existing English/Russian search aliases expose43 TA entries", () => {
   const queries = {
     aroon: "Aroon",
     "aroon-oscillator": "Aroon osc",
@@ -166,7 +166,7 @@ test("exact public IDs and existing English/Russian search aliases expose 36 TA 
   for (const locale of ["ru", "en"]) {
     const entries = catalog.technicalCatalogEntries(locale);
     assert.equal(entries.length, 127);
-    assert.equal(entries.filter((item) => item.available).length, 36);
+    assert.equal(entries.filter((item) => item.available).length, 43);
     for (const [publicId, id] of Object.entries(publicIds)) {
       assert.equal(catalog.technicalDefinitionForCatalog(publicId), id);
       assert.equal(entries.find((item) => item.id === publicId).available, true);

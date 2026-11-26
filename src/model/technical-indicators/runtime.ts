@@ -3,6 +3,8 @@ import { assertTechnicalBars, priceSource } from "./data.js";
 import { getTechnicalIndicatorDefinition } from "./definitions.js";
 import { isTechnicalIndicatorInstance } from "./instances.js";
 import { assertLength, ema, sma } from "./primitives.js";
+import { isVolumeFlowInstance, calculateVolumeIndicator } from "./volume-runtime.js";
+import { volumeFlowMetadata } from "./volume-flow/metadata.js";
 import { wma, vwma, dema, tema, hma, smma, movingAverageMetadata } from "./averages/index.js";
 import {
   momentum,
@@ -45,6 +47,8 @@ import type {
 } from "./types.js";
 
 export function technicalIndicatorWarmup(instance: TechnicalIndicatorInstance): number | null {
+  if (isVolumeFlowInstance(instance))
+    return volumeFlowMetadata(instance.definitionId, instance.params).warmupBars;
   switch (instance.definitionId) {
     case "aroon":
     case "aroon-oscillator":
@@ -106,6 +110,8 @@ export function technicalIndicatorWarmup(instance: TechnicalIndicatorInstance): 
 export function technicalIndicatorHistoryRequirement(
   instance: TechnicalIndicatorInstance
 ): TechnicalHistoryRequirement {
+  if (isVolumeFlowInstance(instance))
+    return volumeFlowMetadata(instance.definitionId, instance.params).historyRequirement;
   const finite = (lookbackBars: number): TechnicalHistoryRequirement => ({
     kind: "finite",
     lookbackBars,
@@ -212,6 +218,7 @@ export function calculateTechnicalIndicator(
     );
   }
   assertTechnicalBars(bars);
+  if (isVolumeFlowInstance(instance)) return calculateVolumeIndicator(instance, bars);
   let series: Record<string, NumericSeries>, present: readonly boolean[];
   if (instance.definitionId === "atr") {
     series = { value: atr(bars, instance.params.length) };

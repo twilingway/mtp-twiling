@@ -37,7 +37,14 @@ const implemented: Readonly<Record<string, TechnicalIndicatorId>> = {
   "STD;DMI": "dmi",
   "STD;Average%1Directional%1Index": "adx",
   "STD;Vortex%1Indicator": "vortex",
-  "STD;Choppiness_Index": "choppiness-index"
+  "STD;Choppiness_Index": "choppiness-index",
+  "STD;Chaikin_Money_Flow": "cmf",
+  "STD;Chaikin_Oscillator": "chaikin-oscillator",
+  "STD;EFI": "efi",
+  "STD;EOM": "eom",
+  "STD;Volume%1Oscillator": "volume-oscillator",
+  "STD;Negative_Volume_Index": "nvi",
+  "STD;Positive_Volume_Index": "pvi"
 };
 
 export function technicalDefinitionForCatalog(id: string): TechnicalIndicatorId | undefined {

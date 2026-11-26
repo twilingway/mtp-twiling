@@ -1,6 +1,7 @@
 import { fromBase64, isRecord, toBase64, validateBackup } from "../../model/backup-format.js";
 import { isWatchlistFlags } from "../../model/watchlist-flags.js";
 import { validWatchlistSectionsField } from "../../model/watchlist-sections.js";
+import { isTechnicalIndicatorInstanceList } from "../../model/technical-indicators/instances.js";
 import type { Backup } from "../../model/types.js";
 import { DriveError } from "./types.js";
 import type { ContentReference, SnapshotManifest } from "./types.js";
@@ -49,7 +50,7 @@ const backupShape: Shape = {
       {
         ...scalars("schemaVersion id definitionId visible order"),
         params: scalars(
-          "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength diLength adxSmoothing"
+          "length source fastLength slowLength signalLength multiplier smoothK smoothD expansionLength contractionLength middleLength diLength adxSmoothing divisor emaLength oscillatorAverage signalAverage"
         ),
         pane: scalars("kind id"),
         styles: { $: scalars("color width visible opacity lineStyle") }
@@ -133,6 +134,13 @@ function project(value: unknown, shape: Shape): unknown {
 
 /** Deep allowlist; never serializes local owner, history, tokens or market quote fields. */
 export function sanitizeDriveBackup(value: unknown): Backup {
+  if (
+    isRecord(value) &&
+    isRecord(value.layout) &&
+    value.layout.technicalIndicators !== undefined &&
+    !isTechnicalIndicatorInstanceList(value.layout.technicalIndicators)
+  )
+    throw new DriveError("remote-invalid", "Некорректные технические индикаторы.");
   if (isRecord(value) && isRecord(value.layout) && !validWatchlistSectionsField(value.layout))
     throw new DriveError("remote-invalid", "Некорректные разделы списка инструментов.");
   const flagColors = ["red", "blue", "green", "yellow", "purple", "cyan", "pink"];

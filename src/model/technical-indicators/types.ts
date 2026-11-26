@@ -1,4 +1,6 @@
 import type { CumulativeHistoryRequirement } from "./momentum-volume/metadata.js";
+import type { VolumeFlowHistoryRequirement, VolumeFlowId } from "./volume-flow/metadata.js";
+import type { VolumeAverage } from "./volume-flow/parameters.js";
 
 export type NumericValue = number | null;
 export type NumericSeries = readonly NumericValue[];
@@ -37,7 +39,8 @@ export type TechnicalIndicatorId =
   | "dmi"
   | "adx"
   | "vortex"
-  | "choppiness-index";
+  | "choppiness-index"
+  | VolumeFlowId;
 export type PriceSource = "open" | "high" | "low" | "close" | "hl2" | "hlc3" | "ohlc4" | "volume";
 export interface TechnicalBar {
   readonly timestamp: number;
@@ -48,6 +51,19 @@ export interface TechnicalBar {
   readonly volume: NumericValue;
 }
 export interface TechnicalParameters {
+  cmf: { length: number };
+  "chaikin-oscillator": { fastLength: number; slowLength: number };
+  efi: { length: number };
+  eom: { length: number; divisor: number };
+  "volume-oscillator": {
+    fastLength: number;
+    slowLength: number;
+    signalLength: number;
+    oscillatorAverage: VolumeAverage;
+    signalAverage: VolumeAverage;
+  };
+  nvi: { emaLength: number };
+  pvi: { emaLength: number };
   aroon: { length: number };
   "aroon-oscillator": { length: number };
   dmi: { diLength: number; adxSmoothing: number };
@@ -112,7 +128,8 @@ export type TechnicalIndicatorInstance = {
 }[TechnicalIndicatorId];
 export type ParameterDefinition =
   | { key: string; type: "integer" | "number"; defaultValue: number; min: number; max: number }
-  | { key: string; type: "source"; defaultValue: PriceSource };
+  | { key: string; type: "source"; defaultValue: PriceSource }
+  | { key: string; type: "choice"; defaultValue: VolumeAverage; choices: readonly ["EMA", "SMA"] };
 export interface TechnicalOutputDefinition {
   id: string;
   title: string;
@@ -149,6 +166,8 @@ export interface TechnicalIndicatorResult {
   warmupBars: number | null;
   /** Present only when the parameters make every output mathematically undefined. */
   alwaysUndefined?: true;
+  /** New volume-flow indicators only; absent from legacy and available results. */
+  unavailableReason?: "volume-unavailable";
   historyRequirement: TechnicalHistoryRequirement;
 }
 /** Explicit current-timeframe context; never persisted in indicator instances or inferred from bars. */
@@ -175,4 +194,5 @@ export type TechnicalHistoryRequirement =
       convergence: "full-input-dependent";
     }
   /** Reviewed accumulation policy; never substitute an EMA/recursive seed. */
-  | CumulativeHistoryRequirement;
+  | CumulativeHistoryRequirement
+  | VolumeFlowHistoryRequirement;

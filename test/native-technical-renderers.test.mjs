@@ -93,6 +93,45 @@ test("LW pane metrics tolerate the model existing before its widget is created",
 });
 
 for (const engine of ["lightweight", "kline"]) {
+  test(`${engine}: unavailable volume stays empty and positive data restores all eleven volume outputs without resetting the camera`, () => {
+    const f = nativeFixture(engine),
+      { createTechnicalIndicatorInstance: create, calculateTechnicalIndicator: calculate } = api(f),
+      ids = ["cmf", "chaikin-oscillator", "efi", "eom", "volume-oscillator", "nvi", "pvi"],
+      instances = ids.map((id, order) => create(id, `volume-${id}`, { order })),
+      unavailable = bars.map((bar) => ({ ...bar, volume: 0 }));
+    f.adapter.setData(unavailable);
+    const camera = f.camera(),
+      writes = f.primaryWrites();
+    for (const instance of instances) {
+      const result = calculate(instance, unavailable);
+      assert.equal(result.unavailableReason, "volume-unavailable");
+      assert.ok(
+        Object.values(result.series).every((values) => values.every((value) => value === null))
+      );
+    }
+    assert.equal(outputs(f, instances, unavailable).length, 11);
+    f.adapter.updateTechnicalIndicators(instances, []);
+    f.ready();
+    assertValues(f, instances, unavailable);
+    assert.deepEqual(f.camera(), camera);
+    assert.equal(f.primaryWrites(), writes);
+    f.adapter.setData(bars);
+    const positiveWrites = f.primaryWrites();
+    f.adapter.updateTechnicalIndicators(instances, []);
+    f.ready();
+    for (const instance of instances) {
+      const result = calculate(instance, bars);
+      assert.equal(Object.hasOwn(result, "unavailableReason"), false);
+      assert.ok(
+        Object.values(result.series).every((values) => values.some((value) => value !== null))
+      );
+    }
+    assertValues(f, instances);
+    assert.equal(f.primaryWrites(), positiveWrites);
+    assert.deepEqual(f.camera(), camera);
+    f.adapter.destroy();
+  });
+
   test(`${engine}: undefined CHOP length one stays empty without zero substitution or camera reset`, () => {
     const f = nativeFixture(engine),
       { createTechnicalIndicatorInstance: create, calculateTechnicalIndicator: calculate } = api(f),
@@ -112,14 +151,14 @@ for (const engine of ["lightweight", "kline"]) {
     f.adapter.destroy();
   });
 
-  test(`${engine}: actual adapter renders all 35 common formulas, warmup and real timestamps`, () => {
+  test(`${engine}: actual adapter renders all 42 common formulas, warmup and real timestamps`, () => {
     const f = nativeFixture(engine),
       { createTechnicalIndicatorInstance: create, technicalIndicatorDefinitions: definitions } =
         api(f);
     const instances = definitions.map((definition, i) =>
       create(definition.id, `instance-${i}`, { order: i })
     );
-    assert.equal(instances.length, 35);
+    assert.equal(instances.length, 42);
     f.adapter.setData(bars);
     const writes = f.primaryWrites(),
       camera = f.camera();
@@ -156,7 +195,14 @@ for (const engine of ["lightweight", "kline"]) {
       "dmi",
       "adx",
       "vortex",
-      "choppiness-index"
+      "choppiness-index",
+      "cmf",
+      "chaikin-oscillator",
+      "efi",
+      "eom",
+      "volume-oscillator",
+      "nvi",
+      "pvi"
     ]);
     assert.deepEqual(
       f.adapter.technicalPaneMetrics().map((item) => item.key),

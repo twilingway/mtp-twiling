@@ -9,6 +9,39 @@ login отложить. Ответы коротко по-русски. Реал�
 
 ### Новейший статус — важнее исторических строк ниже
 
+- PR7 merged, canonical/public main0.3.20: `f69a6bdb65681d9724608cf84d73c0de5632dd2d`, build
+  `f6f831b361430895`. PR CI45728265644/run20 и exact main push CI45728693676/run21 success.
+  Full726/spec42, independent source review51 и visual34 captures PASS; mobile checkbox дефект
+  устранён.
+- Штатный автоматический timer выпустил .20 UTC00:32:15.587,12.439s wall/192.2MiB peak. Все67
+  canonical/native/public hashes и UTF-8 проверены verified Python TLS, соседи/лимиты/таймер
+  прежние. Evidence `deploy-release-readiness/auto-release-0320-proof.json` и journal рядом.
+  Canonical clean main собран, unchanged server.mjs не перезапускался: own session24824/5210.
+- Fresh public .19→.20 PWA worker работает только в своей копии закрытого
+  `public-0319-pwa-qa/profile`, новый `public-0320-pwa-qa/profile`, CDP9328. Native Update уже
+  принят, cache только f6; layout/UID/TA/2drawings/raw legacy сохранены. Source402files unchanged.
+  Реальные DMI/ADX/Aroon/VI добавлены к RSI/BBW; mobile fix/documents/finalcleanup ещё проверяются.
+  Не менять main на .21 до завершения его exact-public gate.
+- .21 source42: cut298101c/build670626838ab63513, check761/spec44, source registry review95+24 PASS,
+  native42/11 volume outputs PASS. Fresh browser28captures PASS: реальные spot/perpetual, обе
+  engines, все7/11outputs,4 PVO EMA/SMA choices, параметры/JSON/layout/native gestures/camera, 375px
+  RU/EN dark/light. Нулевой объём только source/native, без fake quotes. Own5227/9327 закрыты. После
+  приёмки merged main .20 как b966a68; production inputs неизменны. PR .21 пока не открыт.
+- `/root/trend_state_math` сдал math-only5:49bfcf77c9a5200f8bcaf6d70735bd167c500b5f,
+  `ta-trend-state-math`, clean. Supertrend/SAR/TSI/KST/Fisher,19tests; DPO unresolved. Независимое
+  review /root/ta_momentum_volume_math сверило official versions/hashes/recurrence, отчёт ещё
+  оформляется. Before registry нужны renderer gates SAR cross и Supertrend linebr/fill/hidden
+  bodyMiddle; существующий TA output contract пока line|histogram. Не объявлять все5 готовыми UI.
+- `/root/derived_interval_math` сдал source37366ddb7b0b7019185eb361dcdc026ecd3f7e21,
+  `derived-interval-math`,20tests, explicit sessions/anchor/windows/asOf/coverage/finality. Только
+  pure1m→4/6/7/8/9/45/180, без product enum/provider/cache/UI/schema. Независимое review
+  /root/deployment_recovery_review активно; не обещать MOEX/TradingView session parity.
+- Реальные Google OAuth/Drive/два устройства всё ещё не проверялись; GIS SDK load не является
+  входом. Общая цель активна, каталог127 не равен127 реализованным алгоритмам. Обычный Chrome,
+  реальные банковские ключи, чужие процессы и5190 не трогать.
+
+Ниже исторический статус до выпуска .20; актуальная сводка перечислена выше.
+
 - PR6 merged. Публичный и canonical main: `3be4cc44b7ae19b23cfd7b349c7ddada186a93a8`, версия 0.3.19,
   build `9d68e99e91dea44d`. PR CI run18 и main push CI45725499684/run19 PASS.
 - Штатный timer выпустил .19 UTC00:06:20.793; journal12.674s wall,192.2MiB peak. Все 67
