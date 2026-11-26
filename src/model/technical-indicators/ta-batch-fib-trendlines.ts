@@ -31,7 +31,8 @@ export function trendlineBreakout(
   from: PivotAnchor,
   through: PivotAnchor,
   side: "support" | "resistance",
-  closes = 3
+  closes = 3,
+  afterIndex = through.index
 ): TrendlineBreakout | null {
   assertLength(closes);
   assertTechnicalBars(bars);
@@ -43,13 +44,16 @@ export function trendlineBreakout(
     bars[from.index]?.timestamp !== from.timestamp ||
     bars[through.index]?.timestamp !== through.timestamp ||
     !Number.isFinite(from.value) ||
-    !Number.isFinite(through.value)
+    !Number.isFinite(through.value) ||
+    !Number.isSafeInteger(afterIndex) ||
+    afterIndex < through.index ||
+    afterIndex >= bars.length
   )
     throw new RangeError("Invalid trendline anchors");
 
   const slope = (through.value - from.value) / (through.index - from.index);
   let outside = 0;
-  for (let index = through.index + 1; index < bars.length; index++) {
+  for (let index = afterIndex + 1; index < bars.length; index++) {
     const bar = bars[index]!;
     const value = through.value + slope * (index - through.index);
     if (

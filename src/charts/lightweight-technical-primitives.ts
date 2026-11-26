@@ -10,9 +10,15 @@ import type {
   UTCTimestamp
 } from "lightweight-charts";
 import { presentationRuns } from "../model/technical-indicators/presentation-geometry.js";
+import { presentationColor } from "../model/technical-indicators/presentation.js";
 import { lineColor } from "../model/candle-palette.js";
 import type { TechnicalRenderFill, TechnicalRenderOutput } from "./technical-render-data.js";
-import { directionalFillRuns, drawStudyMarker, drawStudyRange } from "./technical-study-paint.js";
+import {
+  directionalFillRuns,
+  drawStudyCandle,
+  drawStudyMarker,
+  drawStudyRange
+} from "./technical-study-paint.js";
 import type { FillPoint } from "./technical-study-paint.js";
 
 type Target = Parameters<IPrimitivePaneRenderer["draw"]>[0];
@@ -58,17 +64,21 @@ export class LightweightTechnicalPrimitive implements ISeriesPrimitive<Time> {
   }
   autoscaleInfo() {
     const output = this.output;
+    const candle = output?.presentation?.candleValues;
     const paired = output?.presentation?.pairedValues;
-    if (!output?.style.visible || !paired) return null;
+    const lows = candle?.low ?? paired,
+      highs = candle?.high ?? paired;
+    if (!output?.style.visible || !lows || !highs) return null;
     const bounds = this.bounds(output.timestamps, 0);
     if (!bounds) return null;
     let minValue = Infinity,
       maxValue = -Infinity;
     for (let i = bounds.first; i <= bounds.last; i++) {
-      const value = paired[i];
-      if (value == null) continue;
-      minValue = Math.min(minValue, value);
-      maxValue = Math.max(maxValue, value);
+      const low = lows[i],
+        high = highs[i];
+      if (low == null || high == null) continue;
+      minValue = Math.min(minValue, low);
+      maxValue = Math.max(maxValue, high);
     }
     return Number.isFinite(minValue) ? { priceRange: { minValue, maxValue } } : null;
   }
@@ -193,16 +203,35 @@ export class LightweightTechnicalPrimitive implements ISeriesPrimitive<Time> {
                 ? [2 * hx, 4 * hx]
                 : []
           );
-          if (geometry.kind === "range-bars" || geometry.kind === "marker") {
-            ctx.fillStyle = ctx.strokeStyle;
+          if (
+            geometry.kind === "range-bars" ||
+            geometry.kind === "marker" ||
+            geometry.kind === "candles"
+          ) {
             const spacing =
-              geometry.kind === "range-bars" ? this.chart.timeScale().options().barSpacing : 0;
+              geometry.kind === "marker" ? 0 : this.chart.timeScale().options().barSpacing;
             for (let i = bounds.first; i <= bounds.last; i++) {
               const timestamp = output.timestamps[i]!;
               const p = this.point(timestamp, output.values[i]);
-              if (!p) continue;
+              const color = presentationColor(output.presentation, i);
+              if (!p || !color) continue;
+              ctx.fillStyle = lineColor(color, output.style.opacity);
               if (geometry.kind === "marker") drawStudyMarker(ctx, geometry, p, hx, vy);
-              else {
+              else if (geometry.kind === "candles") {
+                const candle = output.presentation.candleValues;
+                const open = this.point(timestamp, candle?.open[i]),
+                  high = this.point(timestamp, candle?.high[i]),
+                  low = this.point(timestamp, candle?.low[i]);
+                if (open && high && low)
+                  drawStudyCandle(
+                    ctx,
+                    { x: p.x, open: open.y, high: high.y, low: low.y, close: p.y },
+                    spacing,
+                    output.style.width,
+                    hx,
+                    vy
+                  );
+              } else {
                 const to = this.point(timestamp, output.presentation.pairedValues?.[i]);
                 if (to) drawStudyRange(ctx, p, to.y, spacing, geometry.showEqual ?? false, hx, vy);
               }

@@ -3,12 +3,13 @@ import type { NumericValue } from "./types.js";
 
 export const BOOKER_INTRADAY_MINUTES = [60, 240, 480] as const;
 export const BOOKER_MISSED_PERIODS = ["day", "week", "month"] as const;
-export const BOOKER_ZIV_PERIODS = [240, 480, "week", "month"] as const;
+export const BOOKER_ZIV_PERIODS = [240, "day", "week", "month"] as const;
 
 export interface BookerPivotPeriod {
   readonly start: number;
   readonly end: number;
   readonly closed: boolean;
+  readonly followsPrevious?: boolean;
   readonly high: NumericValue;
   readonly low: NumericValue;
   readonly close: NumericValue;
@@ -66,7 +67,7 @@ export function classicPreviousPeriodPivots(
   for (let index = Math.max(1, periods.length - lookback); index < periods.length; index++) {
     const previous = periods[index - 1]!;
     const { start, end } = periods[index]!;
-    if (!previous.closed) continue;
+    if (!previous.closed || periods[index]!.followsPrevious === false) continue;
     const value = classicCenter(previous);
     if (value !== null) result.push({ start, end, value });
   }
@@ -98,10 +99,13 @@ export function classicMissedPivots(
     const index = indices.get(level.start)!;
     let confirmed = periods[index]!.closed;
     for (let later = index; later < periods.length; later++) {
-      const { coverageComplete, observedRanges } = periods[later]!;
+      const { coverageComplete, followsPrevious, observedRanges } = periods[later]!;
       if (observedRanges.some(({ low, high }) => low <= level.value && level.value <= high))
         return { ...level, status: "touched" };
-      confirmed &&= coverageComplete && observedRanges.length > 0;
+      confirmed &&=
+        coverageComplete &&
+        observedRanges.length > 0 &&
+        (later === index || followsPrevious !== false);
     }
     return { ...level, status: confirmed ? "missed" : "unconfirmed" };
   });

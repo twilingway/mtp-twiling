@@ -3,6 +3,7 @@ import { tradingSessionRanges } from "../ta-batch-sessions-trading.js";
 import type { GapOptions } from "../ta-batch-sessions-gaps.js";
 import type { TradingSession, TradingSessionsContext } from "../ta-batch-sessions-trading.js";
 import type { TechnicalBar } from "../types.js";
+import type { TechnicalSlopedDecoration } from "./auto-sloped-geometry.js";
 
 export type CalendarRegionHistoryRequirement = {
   kind: "event-history";
@@ -47,7 +48,7 @@ export interface TechnicalPriceCircle {
 }
 
 export type TechnicalPriceDecoration =
-  TechnicalPriceRegion | TechnicalCandleTint | TechnicalPriceCircle;
+  TechnicalPriceRegion | TechnicalCandleTint | TechnicalPriceCircle | TechnicalSlopedDecoration;
 
 export function gapPriceRegions(
   bars: readonly TechnicalBar[],

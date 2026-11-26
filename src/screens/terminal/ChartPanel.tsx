@@ -21,6 +21,8 @@ import { useTechnicalPaneMetrics } from "./use-technical-pane-metrics.js";
 import { SupplementalStudyStatusContext } from "./SupplementalStudyStatus.js";
 import { useOpenInterest } from "./use-open-interest.js";
 import { useQuoteTurnover } from "./use-quote-turnover.js";
+import { CalendarAnalysisTables } from "./CalendarAnalysisTables.js";
+import { useExtraStudyData } from "./use-extra-study-data.js";
 const Version = memo(function Version() {
   return <span id="app-version" hidden />;
 });
@@ -41,16 +43,28 @@ export function ChartPanel() {
     busy = available && (state.loading || state.importingBackup === true);
   const openInterest = useOpenInterest(controller, state, row);
   const quoteTurnover = useQuoteTurnover(controller, state, row);
+  const extra = useExtraStudyData(controller, state, row);
   const observations = openInterest.observations;
   const volumeStudies = quoteTurnover.volumeStudies;
+  const additional = extra.data;
   const supplemental = useMemo<TechnicalSupplementalInputs>(
     () => ({
+      ...additional,
       ...(observations ? { openInterest: observations } : {}),
-      ...(volumeStudies ? { volumeStudies } : {})
+      ...(volumeStudies || additional.volumeStudies
+        ? { volumeStudies: { ...volumeStudies, ...additional.volumeStudies } }
+        : {})
     }),
-    [observations, volumeStudies]
+    [observations, volumeStudies, additional]
   );
-  const studyStatus = { openInterest, quoteTurnover };
+  const studyStatus = {
+    openInterest,
+    quoteTurnover,
+    priceTarget: extra.priceTarget,
+    intrabarVolume: extra.intrabarVolume,
+    netVolume: extra.netVolume,
+    priceLevel: extra.priceLevel
+  };
   return (
     <section
       id="chart-panel"
@@ -112,6 +126,11 @@ export function ChartPanel() {
       >
         <ChartGestures>
           <ChartCanvas supplemental={supplemental} />
+          <CalendarAnalysisTables
+            tables={extra.calendar.tables}
+            refresh={extra.calendar.refresh}
+            {...(p.locale ? { locale: p.locale } : {})}
+          />
           <ImageLayer />
           <DrawingAxisLabels />
           <CandleCountdown />

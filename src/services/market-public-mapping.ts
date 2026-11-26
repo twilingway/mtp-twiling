@@ -11,6 +11,19 @@ export interface PublicQuote {
   changePercent24h: number | null;
 }
 
+export function publicSearchKey(value: string): string {
+  return value
+    .normalize("NFKC")
+    .toUpperCase()
+    .replace(/[\s/_:-]+/g, "");
+}
+
+export function okxMatches(item: OkxInstrument, query: string): boolean {
+  return [item.ref.symbol, item.baseCoin, item.quoteCoin].some((part) =>
+    publicSearchKey(part).includes(query)
+  );
+}
+
 export function publicCatalogInstrument(item: BybitInstrument): CatalogInstrument {
   const kind: InstrumentKind =
     item.assetClass === "crypto"

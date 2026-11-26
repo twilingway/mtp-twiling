@@ -25,12 +25,46 @@ import type {
   AnchoredStudyHistory
 } from "./catalog-expansion/anchored-context.js";
 import type { AnchoredStudyParameters } from "./catalog-expansion/anchored.js";
+import type { AutoSlopedStudyParameters } from "./catalog-expansion/auto-sloped.js";
+import type {
+  AutoKeyLevelCalculationInputs,
+  AutoKeyLevelStudyParameters
+} from "./catalog-expansion/auto-key-levels.js";
 import type { AverageStudyParameters } from "./catalog-expansion/averages.js";
 import type { BandStudyParameters } from "./catalog-expansion/bands.js";
 import type { BookerStudyParameters } from "./catalog-expansion/booker.js";
+import type {
+  BookerPivotHistoryRequirement,
+  BookerPivotStudyParameters
+} from "./catalog-expansion/booker-pivots.js";
+import type { BookerPeriodData } from "./catalog-expansion/booker-periods.js";
+import type { CalendarAnalysisParameters } from "./catalog-expansion/calendar-analysis.js";
+import type { SeasonalityHistory } from "./catalog-expansion/calendar-analysis-data.js";
+import type {
+  CorrelationHistory,
+  CorrelationStudyParameters
+} from "./catalog-expansion/correlation.js";
 import type { ExternalStudyParameters } from "./catalog-expansion/external.js";
 import type { LevelStudyParameters } from "./catalog-expansion/levels.js";
+import type {
+  MarketBreadthCalculationInputs,
+  MarketBreadthHistoryRequirement
+} from "./catalog-expansion/market-breadth.js";
 import type { MomentumStudyParameters } from "./catalog-expansion/momentum.js";
+import type {
+  NetVolumeHistoryRequirement,
+  NetVolumeStudyParameters
+} from "./catalog-expansion/net-volume.js";
+import type {
+  PeriodStudyHistoryRequirement,
+  PeriodStudyParameters,
+  PriceLevelCalculationInputs
+} from "./catalog-expansion/period-studies.js";
+import type {
+  PriceTargetCalculationInputs,
+  PriceTargetHistoryRequirement,
+  PriceTargetStudyParameters
+} from "./catalog-expansion/price-target.js";
 import type { SessionStudyParameters } from "./catalog-expansion/sessions.js";
 import type {
   RankCorrelationWindowHistory,
@@ -42,6 +76,8 @@ import type {
   VolumeStudyParameters
 } from "./catalog-expansion/volume.js";
 import type { QuoteTurnoverHistoryRequirement } from "./ta-batch-volume-flow-turnover.js";
+import type { VolumeDeltaStudyParameters } from "./catalog-expansion/volume-delta.js";
+import type { IntrabarVolumeHistoryRequirement } from "./ta-batch-volume-intrabars.js";
 import type {
   TechnicalPriceDecoration,
   CalendarRegionHistoryRequirement
@@ -50,14 +86,23 @@ import type {
 export interface CatalogExpansionParameters
   extends
     AnchoredStudyParameters,
+    AutoKeyLevelStudyParameters,
+    AutoSlopedStudyParameters,
     AverageStudyParameters,
     BandStudyParameters,
     BookerStudyParameters,
+    BookerPivotStudyParameters,
+    CalendarAnalysisParameters,
+    CorrelationStudyParameters,
     ExternalStudyParameters,
     LevelStudyParameters,
     MomentumStudyParameters,
+    NetVolumeStudyParameters,
+    PeriodStudyParameters,
+    PriceTargetStudyParameters,
     SessionStudyParameters,
     TrendStudyParameters,
+    VolumeDeltaStudyParameters,
     VolumeStudyParameters {}
 
 export type NumericValue = number | null;
@@ -260,7 +305,13 @@ export interface TechnicalIndicatorResult {
   historyRequirement: TechnicalHistoryRequirement;
 }
 /** Explicit current-timeframe context; never persisted in indicator instances or inferred from bars. */
-export interface TechnicalCalculationContext extends AnchoredIndicatorContext {
+export interface TechnicalCalculationContext
+  extends
+    AnchoredIndicatorContext,
+    AutoKeyLevelCalculationInputs,
+    MarketBreadthCalculationInputs,
+    PriceLevelCalculationInputs,
+    PriceTargetCalculationInputs {
   readonly historicalVolatilityPeriodsPerYear: number;
   readonly chartInterval?: IntervalId;
   readonly exchangeTimeZone?: string;
@@ -268,6 +319,9 @@ export interface TechnicalCalculationContext extends AnchoredIndicatorContext {
   readonly lastBarClosed?: boolean;
   readonly volumeStudies?: VolumeStudyData;
   readonly openInterest?: OpenInterestObservations;
+  readonly correlationHistory?: CorrelationHistory;
+  readonly bookerPivotPeriods?: BookerPeriodData;
+  readonly seasonalityHistory?: SeasonalityHistory;
 }
 export type LegacyRecursiveHistoryRequirement = {
   kind: "recursive";
@@ -303,5 +357,11 @@ export type TechnicalHistoryRequirement =
   | RankCorrelationWindowHistory
   | AnchoredStudyHistory
   | CalendarRegionHistoryRequirement
+  | MarketBreadthHistoryRequirement
   | RelativeVolumeHistoryRequirement
-  | QuoteTurnoverHistoryRequirement;
+  | QuoteTurnoverHistoryRequirement
+  | IntrabarVolumeHistoryRequirement
+  | BookerPivotHistoryRequirement
+  | PeriodStudyHistoryRequirement
+  | PriceTargetHistoryRequirement
+  | NetVolumeHistoryRequirement;

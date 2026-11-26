@@ -4,6 +4,7 @@ import {
   technicalParameterLabel
 } from "../../i18n/messages-technical-settings.js";
 import { useTerminal } from "./context.js";
+import { CorrelationInstrumentSelect } from "./CorrelationInstrumentSelect.js";
 import { Modal } from "./Modal.js";
 import { useIndicatorMenuAction } from "./useIndicatorMenuAction.js";
 import { updateTechnicalIndicator } from "./technical-indicator-actions.js";
@@ -151,8 +152,17 @@ export function TechnicalIndicatorSettings({ instance }: { instance: TechnicalIn
           <legend>{text("Параметры", "Inputs")}</legend>
           {definition.parameters.map((parameter) => (
             <label key={parameter.key}>
-              <span>{technicalParameterLabel(parameter.key, locale)}</span>
-              {parameter.type === "boolean" ? (
+              <span>
+                {parameter.key === "comparisonUid"
+                  ? text("Инструмент для сравнения", "Comparison instrument")
+                  : technicalParameterLabel(parameter.key, locale)}
+              </span>
+              {parameter.key === "comparisonUid" ? (
+                <CorrelationInstrumentSelect
+                  value={String(parameters[parameter.key])}
+                  onChange={(value) => setParameters({ ...parameters, [parameter.key]: value })}
+                />
+              ) : parameter.type === "boolean" ? (
                 <input
                   type="checkbox"
                   checked={parameters[parameter.key] === true}

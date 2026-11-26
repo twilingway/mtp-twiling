@@ -32,14 +32,7 @@ test("volume catalog registers Klinger, RVAT and quote turnover, leaving unsuppo
     technicalCatalogEntries("en").map((entry) => [entry.id, entry.available])
   );
   for (const study of volumeStudies) assert.equal(entries.get(study.catalogId), true);
-  for (const catalogId of [
-    "STD;Net%1Volume",
-    "STD;Cumulative%1Volume%1Index",
-    "VolumeDelta@tv-basicstudies",
-    "CumulativeVolumeDelta@tv-basicstudies",
-    "STD;UP_DOWN_Volume"
-  ])
-    assert.equal(entries.get(catalogId), false);
+  assert.equal(entries.get("STD;Cumulative%1Volume%1Index"), false);
 });
 
 test("Klinger uses actual volumes, preserves missing observations, and plots both output lines", () => {

@@ -2,8 +2,10 @@ import { IndicatorSeries, registerIndicator } from "klinecharts";
 import type { Chart, IndicatorDrawParams } from "klinecharts";
 import { intlLocale } from "../i18n/preferences.js";
 import type { DisplayPreferences } from "../i18n/preferences.js";
+import { TIMEFRAMES } from "../model/history-codec.js";
+import { logicalForTime, timeForLogical } from "../model/intervals/projected-time.js";
 import { chartPalette } from "../model/theme.js";
-import type { ChartSettings } from "../model/types.js";
+import type { ChartSettings, Timeframe } from "../model/types.js";
 import {
   calendarRegionLabels,
   paintTechnicalPriceRegions,
@@ -15,13 +17,17 @@ import type {
   RenderedPriceRegion
 } from "./technical-calendar-paint.js";
 import { paintTechnicalMoon } from "./technical-moon-paint.js";
+import { paintTechnicalSloped, slopedViewportX } from "./technical-sloped-paint.js";
+import type { RenderedSlopedDecoration } from "./technical-sloped-paint.js";
 
 const paneId = "candle_pane";
 const registered = new Set<string>();
 
 interface RegionData {
   regions: readonly RenderedPriceRegion[];
+  sloped: readonly RenderedSlopedDecoration[];
   label: (data: RenderedPriceRegion["label"]) => string;
+  intervalMs?: number | null;
 }
 
 interface MoonData {
@@ -32,9 +38,13 @@ interface MoonData {
 
 function timeCoordinate(
   kLineDataList: IndicatorDrawParams["kLineDataList"],
-  xAxis: IndicatorDrawParams["xAxis"]
+  xAxis: IndicatorDrawParams["xAxis"],
+  intervalMs?: number | null
 ) {
   return (timestamp: number): number | null => {
+    const last = kLineDataList.at(-1);
+    if (last && timestamp > last.timestamp && intervalMs !== undefined)
+      return xAxis.convertToPixel(logicalForTime(kLineDataList, timestamp, intervalMs));
     let start = 0,
       end = kLineDataList.length;
     while (start < end) {
@@ -57,21 +67,36 @@ function drawRegions({
   yAxis
 }: IndicatorDrawParams) {
   const data = indicator.extendData as RegionData | undefined;
-  if (!data?.regions.length) return true;
+  if (!data || (!data.regions.length && !data.sloped?.length)) return true;
   const { timestamp: firstVisibleTime } =
     kLineDataList[Math.max(0, Math.floor(visibleRange.from) - 1)] ?? {};
-  const { timestamp: lastVisibleTime } =
-    kLineDataList[Math.min(kLineDataList.length - 1, Math.ceil(visibleRange.to) + 1)] ?? {};
+  const lastIndex = Math.ceil(visibleRange.realTo ?? visibleRange.to) + 1;
+  const lastVisibleTime =
+    data.intervalMs === undefined
+      ? kLineDataList[Math.min(kLineDataList.length - 1, lastIndex)]?.timestamp
+      : timeForLogical(kLineDataList, lastIndex, data.intervalMs);
+  const y = (value: number) => yAxis.convertToPixel(value);
   paintTechnicalPriceRegions(ctx, data.regions, {
     width: bounding.width,
     height: bounding.height,
     halfBar: barSpace.bar / 2,
     ...(firstVisibleTime !== undefined && { firstVisibleTime }),
-    ...(lastVisibleTime !== undefined && { lastVisibleTime }),
-    x: timeCoordinate(kLineDataList, xAxis),
-    y: (value) => yAxis.convertToPixel(value),
+    ...(lastVisibleTime != null && { lastVisibleTime }),
+    x: timeCoordinate(kLineDataList, xAxis, data.intervalMs),
+    y,
     label: data.label
   });
+  if (data.sloped?.length) {
+    const index = Math.floor(visibleRange.from);
+    const axis = slopedViewportX(bounding.width, index, xAxis.convertToPixel(index), barSpace.bar);
+    if (axis)
+      paintTechnicalSloped(ctx, data.sloped, {
+        width: bounding.width,
+        height: bounding.height,
+        ...axis,
+        y
+      });
+  }
   return true;
 }
 
@@ -152,10 +177,11 @@ function klineDecorationLayer<Data extends object>(
 
 export function klineCalendarRegions(
   chart: Chart,
-  options: DisplayPreferences & { settings?: ChartSettings },
+  options: DisplayPreferences & { settings?: ChartSettings; timeframe?: Timeframe },
   alive: () => boolean
 ) {
   const labels = calendarRegionLabels(options.locale);
+  const intervalMs = options.timeframe === undefined ? undefined : TIMEFRAMES[options.timeframe].ms;
   const regions = klineDecorationLayer<RegionData>(
     chart,
     "PERSONAL_TA_PRICE_REGIONS",
@@ -180,7 +206,16 @@ export function klineCalendarRegions(
   return {
     update(next: readonly RenderedPriceDecoration[] = []) {
       const layers = priceDecorationLayers(alive() ? next : []);
-      regions.update(layers.regions.length ? { regions: layers.regions, label } : null);
+      regions.update(
+        layers.regions.length || layers.sloped.length
+          ? {
+              regions: layers.regions,
+              sloped: layers.sloped,
+              label,
+              ...(intervalMs !== undefined && { intervalMs })
+            }
+          : null
+      );
       moon.update(
         layers.moon.length
           ? {

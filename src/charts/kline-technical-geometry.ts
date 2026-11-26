@@ -8,7 +8,12 @@ import type {
 import { presentationRuns } from "../model/technical-indicators/presentation-geometry.js";
 import { presentationColor } from "../model/technical-indicators/presentation.js";
 import { lineColor } from "../model/candle-palette.js";
-import { directionalFillRuns, drawStudyMarker, drawStudyRange } from "./technical-study-paint.js";
+import {
+  directionalFillRuns,
+  drawStudyCandle,
+  drawStudyMarker,
+  drawStudyRange
+} from "./technical-study-paint.js";
 import type { FillPoint } from "./technical-study-paint.js";
 
 export const klineTechnicalIndex = Symbol("technical-data-index");
@@ -46,18 +51,25 @@ export function klineColumnsBaseFigure(base: KlineColumnsBase) {
 const rangeAnchorType = "mtp-ta-range-anchor";
 let rangeAnchorRegistered = false;
 export function klineRangeAnchorFigures(outputs: readonly TechnicalRenderOutput[]) {
-  const anchors = outputs.flatMap((plot) =>
-    plot.style.visible && plot.presentation?.pairedValues
-      ? [{ plot, values: plot.presentation.pairedValues }]
-      : []
-  );
+  const anchors = outputs.flatMap((plot) => {
+    if (!plot.style.visible || !plot.presentation) return [];
+    const { pairedValues, candleValues } = plot.presentation;
+    return pairedValues
+      ? [{ key: plot.outputId, values: pairedValues }]
+      : candleValues
+        ? [
+            { key: `${plot.outputId}_low`, values: candleValues.low },
+            { key: `${plot.outputId}_high`, values: candleValues.high }
+          ]
+        : [];
+  });
   if (anchors.length && !rangeAnchorRegistered) {
     registerFigure({ name: rangeAnchorType, draw: () => {}, checkEventOn: () => false });
     rangeAnchorRegistered = true;
   }
   const keys = new Set(outputs.map((plot) => plot.outputId));
-  return anchors.map(({ plot, values }) => {
-    let key = `__mtpRangeAnchor_${plot.outputId}`;
+  return anchors.map(({ key: sourceKey, values }) => {
+    let key = `__mtpRangeAnchor_${sourceKey}`;
     while (keys.has(key)) key += "_";
     keys.add(key);
     return { key, type: rangeAnchorType, values };
@@ -155,13 +167,29 @@ function plot(params: Params, output: TechnicalRenderOutput): void {
   ctx.setLineDash(
     output.style.lineStyle === "dashed" ? [6, 4] : output.style.lineStyle === "dotted" ? [2, 3] : []
   );
-  if (geometry?.kind === "range-bars" || geometry?.kind === "marker") {
-    ctx.fillStyle = lineColor(output.style.color, output.style.opacity);
+  if (
+    geometry?.kind === "range-bars" ||
+    geometry?.kind === "marker" ||
+    geometry?.kind === "candles"
+  ) {
     for (let i = first; i <= last; i++) {
       const p = point(params, i, output.values[i]);
       if (!p) continue;
+      ctx.fillStyle = klineTechnicalColor(output, i);
       if (geometry.kind === "marker") drawStudyMarker(ctx, geometry, p);
-      else {
+      else if (geometry.kind === "candles") {
+        const candle = output.presentation?.candleValues;
+        const open = point(params, i, candle?.open[i]),
+          high = point(params, i, candle?.high[i]),
+          low = point(params, i, candle?.low[i]);
+        if (open && high && low)
+          drawStudyCandle(
+            ctx,
+            { x: p.x, open: open.y, high: high.y, low: low.y, close: p.y },
+            params.barSpace.bar,
+            output.style.width
+          );
+      } else {
         const to = point(params, i, output.presentation?.pairedValues?.[i]);
         if (to) drawStudyRange(ctx, p, to.y, params.barSpace.bar, geometry.showEqual ?? false);
       }
@@ -248,6 +276,7 @@ export function drawKlineTechnical(params: Params): boolean {
       output.presentation?.precisionPolicy === "fixed-2" ||
       output.presentation?.geometry.kind === "cross" ||
       output.presentation?.geometry.kind === "range-bars" ||
+      output.presentation?.geometry.kind === "candles" ||
       output.presentation?.geometry.kind === "marker" ||
       (output.presentation?.geometry.kind === "line" &&
         output.presentation.geometry.gaps === "break")

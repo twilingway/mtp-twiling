@@ -8,8 +8,10 @@ import type {
   UTCTimestamp
 } from "lightweight-charts";
 import type { DisplayPreferences } from "../i18n/preferences.js";
+import { TIMEFRAMES } from "../model/history-codec.js";
+import { logicalForTime } from "../model/intervals/projected-time.js";
 import { chartPalette } from "../model/theme.js";
-import type { ChartSettings } from "../model/types.js";
+import type { ChartSettings, Timeframe } from "../model/types.js";
 import {
   calendarRegionLabels,
   paintTechnicalPriceRegions,
@@ -17,41 +19,59 @@ import {
 } from "./technical-calendar-paint.js";
 import type { RenderedPriceDecoration } from "./technical-calendar-paint.js";
 import { paintTechnicalMoon } from "./technical-moon-paint.js";
+import { paintTechnicalSloped, slopedViewportX } from "./technical-sloped-paint.js";
 
 type Primary = ISeriesApi<"Candlestick"> | ISeriesApi<"Line">;
 
 export function lightweightCalendarRegions(
   chart: IChartApi,
-  options: DisplayPreferences & { settings?: ChartSettings },
+  options: DisplayPreferences & { settings?: ChartSettings; timeframe?: Timeframe },
   alive: () => boolean,
   primary?: () => Primary
 ) {
   const labels = calendarRegionLabels(options.locale);
+  const intervalMs = options.timeframe === undefined ? undefined : TIMEFRAMES[options.timeframe].ms;
   const markerOutline = chartPalette(options.settings ?? {}).text;
   let owner: Primary | undefined;
   let requestUpdate: (() => void) | undefined;
   let layers = priceDecorationLayers([]);
+  let tail: { index: number; timestamp: number } | undefined;
   const renderer: IPrimitivePaneRenderer = {
     draw: () => {},
     drawBackground(target) {
-      if (!owner || !alive() || !layers.regions.length) return;
+      if (!owner || !alive() || (!layers.regions.length && !layers.sloped.length)) return;
       const series = owner;
       const scale = chart.timeScale();
       const range = scale.getVisibleLogicalRange();
       if (!range) return;
-      const firstX = scale.logicalToCoordinate(range.from);
-      const nextX = scale.logicalToCoordinate((range.from + 1) as Logical);
+      // The installed SDK accepts integer series indices only, even with a fractional viewport.
+      const index = Math.floor(range.from);
+      const firstX = scale.logicalToCoordinate(index as Logical);
+      const nextX = scale.logicalToCoordinate((index + 1) as Logical);
       const halfBar = firstX !== null && nextX !== null ? Math.abs(nextX - firstX) / 2 : 0.5;
       const labelPrice = series.priceFormatter();
-      target.useMediaCoordinateSpace(({ context, mediaSize }) =>
+      const x = (timestamp: number) => {
+        const native = scale.timeToCoordinate(Math.floor(timestamp / 1000) as UTCTimestamp);
+        if (native !== null || !tail || timestamp <= tail.timestamp || intervalMs === undefined)
+          return native;
+        if (firstX === null) return null;
+        const projected = tail.index + logicalForTime([tail], timestamp, intervalMs);
+        return firstX + (projected - index) * (halfBar * 2);
+      };
+      target.useMediaCoordinateSpace(({ context, mediaSize }) => {
+        const y = (value: number) => series.priceToCoordinate(value);
         paintTechnicalPriceRegions(context, layers.regions, {
           ...mediaSize,
           halfBar,
-          x: (timestamp) => scale.timeToCoordinate(Math.floor(timestamp / 1000) as UTCTimestamp),
-          y: (value) => series.priceToCoordinate(value),
+          x,
+          y,
           label: (data) => labels(data, (value) => labelPrice.format(value))
-        })
-      );
+        });
+        if (layers.sloped.length) {
+          const axis = slopedViewportX(mediaSize.width, index, firstX, halfBar * 2);
+          if (axis) paintTechnicalSloped(context, layers.sloped, { ...mediaSize, ...axis, y });
+        }
+      });
     }
   };
   const moonRenderer: IPrimitivePaneRenderer = {
@@ -108,7 +128,11 @@ export function lightweightCalendarRegions(
     autoscaleInfo: () => null
   };
   return {
-    update(next: readonly RenderedPriceDecoration[] = []) {
+    update(
+      next: readonly RenderedPriceDecoration[] = [],
+      lastBar?: { index: number; timestamp: number }
+    ) {
+      tail = lastBar;
       layers = priceDecorationLayers(next);
       layers.moon = layers.moon.map((item) =>
         item.kind === "candle-tint"
@@ -130,6 +154,7 @@ export function lightweightCalendarRegions(
     dispose() {
       owner?.detachPrimitive(primitive);
       owner = undefined;
+      tail = undefined;
       layers = priceDecorationLayers([]);
     }
   };

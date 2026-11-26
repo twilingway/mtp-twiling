@@ -37,6 +37,8 @@ const DAY_MS = 86_400_000;
 export type VolumeAnchorInterval = (typeof anchors)[number];
 
 export interface VolumeStudyData {
+  readonly intrabarVolume?: import("../ta-batch-volume-intrabars.js").IntrabarVolumeHistory;
+  readonly netVolumeTrades?: import("../../market-trades.js").SpotTradeHistory;
   /** Aligned to the current instrument and chart interval, with source-confirmed period coverage. */
   readonly relativeVolumePeriods?: Partial<
     Record<VolumeAnchorInterval, readonly RelativeVolumePeriod[]>

@@ -2,6 +2,7 @@ import type { Candle } from "../model/types.js";
 import { technicalIndicatorGroups } from "../model/technical-indicator-layout.js";
 import type { TechnicalPanePreference } from "../model/technical-indicator-layout.js";
 import { calculateTechnicalIndicator } from "../model/technical-indicators/runtime.js";
+import { isVolumeDeltaStudy } from "../model/technical-indicators/catalog-expansion/volume-delta.js";
 import { getTechnicalIndicatorDefinition } from "../model/technical-indicators/definitions.js";
 import { isTechnicalIndicatorInstance } from "../model/technical-indicators/instances.js";
 import { compilePresentation } from "../model/technical-indicators/presentation.js";
@@ -50,6 +51,18 @@ export interface TechnicalRenderReference extends CompiledReferenceLevel {
   readonly order: number;
   readonly timestamps: readonly number[];
 }
+
+const auxiliaryStudyIds = new Set<string>([
+  "correlation-coefficient",
+  "pivot-points-standard",
+  "multi-time-period-charts",
+  "booker-intraday-pivots",
+  "booker-missed-pivots",
+  "booker-ziv-ghost-pivots",
+  "seasonality",
+  "price-target",
+  "auto-key-levels"
+]);
 /** Per-adapter cache, keyed by the independent asynchronous and viewport inputs used by a study. */
 export class TechnicalRenderData {
   private bars: readonly Candle[] = [];
@@ -59,6 +72,8 @@ export class TechnicalRenderData {
   private supplemental: TechnicalSupplementalInputs = {};
   private openInterestRevision = 0;
   private volumeRevision = 0;
+  private intrabarRevision = 0;
+  private supplementalRevision = 0;
   constructor(context?: TechnicalCalculationContext) {
     this.context = context ? { ...context } : undefined;
   }
@@ -70,15 +85,56 @@ export class TechnicalRenderData {
     inputs: TechnicalSupplementalInputs,
     instrumentUid: string | null
   ): boolean {
-    const { openInterest, ...remaining } = inputs;
-    const scoped: TechnicalSupplementalInputs =
-      openInterest?.instrumentKey === instrumentUid ? inputs : remaining;
+    const { openInterest, volumeStudies } = inputs;
+    const {
+      correlationHistory,
+      priceLevelPeriods,
+      bookerPivotPeriods,
+      seasonalityHistory,
+      priceTarget,
+      autoKeyLevelTrades
+    } = inputs.instrumentUid === instrumentUid ? inputs : {};
+    const { turnover24Hours, intrabarVolume, relativeVolumePeriods, netVolumeTrades } =
+      volumeStudies ?? {};
+    const scoped: TechnicalSupplementalInputs = {
+      ...(openInterest?.instrumentKey === instrumentUid ? { openInterest } : {}),
+      ...(correlationHistory?.primaryUid === instrumentUid ? { correlationHistory } : {}),
+      ...(priceLevelPeriods ? { priceLevelPeriods } : {}),
+      ...(bookerPivotPeriods ? { bookerPivotPeriods } : {}),
+      ...(seasonalityHistory ? { seasonalityHistory } : {}),
+      ...(priceTarget?.forecast.instrumentKey === instrumentUid ? { priceTarget } : {}),
+      ...(autoKeyLevelTrades?.instrumentKey === instrumentUid ? { autoKeyLevelTrades } : {}),
+      ...(volumeStudies
+        ? {
+            volumeStudies: {
+              ...(relativeVolumePeriods ? { relativeVolumePeriods } : {}),
+              ...(turnover24Hours?.instrumentKey === instrumentUid ? { turnover24Hours } : {}),
+              ...(netVolumeTrades?.instrumentKey === instrumentUid ? { netVolumeTrades } : {}),
+              ...(intrabarVolume?.instrumentKey === instrumentUid ? { intrabarVolume } : {})
+            }
+          }
+        : {})
+    };
     const interestChanged = scoped.openInterest !== this.supplemental.openInterest;
-    const volumeChanged = inputs.volumeStudies !== this.supplemental.volumeStudies;
+    const previousVolume = this.supplemental.volumeStudies;
+    const volumeChanged =
+      scoped.volumeStudies?.turnover24Hours !== previousVolume?.turnover24Hours ||
+      scoped.volumeStudies?.relativeVolumePeriods !== previousVolume?.relativeVolumePeriods ||
+      scoped.volumeStudies?.netVolumeTrades !== previousVolume?.netVolumeTrades;
+    const intrabarChanged = scoped.volumeStudies?.intrabarVolume !== previousVolume?.intrabarVolume;
+    const supplementalChanged =
+      scoped.correlationHistory !== this.supplemental.correlationHistory ||
+      scoped.priceLevelPeriods !== this.supplemental.priceLevelPeriods ||
+      scoped.bookerPivotPeriods !== this.supplemental.bookerPivotPeriods ||
+      scoped.seasonalityHistory !== this.supplemental.seasonalityHistory ||
+      scoped.priceTarget !== this.supplemental.priceTarget ||
+      scoped.autoKeyLevelTrades !== this.supplemental.autoKeyLevelTrades;
     if (interestChanged) this.openInterestRevision++;
     if (volumeChanged) this.volumeRevision++;
+    if (intrabarChanged) this.intrabarRevision++;
+    if (supplementalChanged) this.supplementalRevision++;
     this.supplemental = scoped;
-    return interestChanged || volumeChanged;
+    return interestChanged || volumeChanged || intrabarChanged || supplementalChanged;
   }
   setVisibleBars(first: number, last: number): boolean {
     const from = this.bars[Math.max(0, Math.ceil(first))]?.timestamp;
@@ -109,9 +165,14 @@ export class TechnicalRenderData {
           instance.definitionId === "open-interest"
             ? this.openInterestRevision
             : instance.definitionId === "relative-volume-at-time" ||
-                instance.definitionId === "volume-24-hours"
+                instance.definitionId === "volume-24-hours" ||
+                instance.definitionId === "net-volume"
               ? this.volumeRevision
-              : null;
+              : isVolumeDeltaStudy(instance.definitionId)
+                ? this.intrabarRevision
+                : auxiliaryStudyIds.has(instance.definitionId)
+                  ? this.supplementalRevision
+                  : null;
         const key = JSON.stringify([instance.definitionId, instance.params, range, externalKey]);
         seen.add(key);
         let result = this.cache.get(key);
