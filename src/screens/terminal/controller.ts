@@ -7,9 +7,14 @@ import type { WatchlistMove } from "../../services/watchlist-order.js";
 import { marketCalendar } from "../../services/market-calendar.js";
 import { toggleIndicatorFlags } from "../../model/indicator-flags.js";
 import { historyDepthTransition, saveControllerView } from "./controller-camera.js";
+import {
+  PreferenceRouting,
+  preferenceRoutingScope,
+  mergeRoutingPreferences
+} from "./controller-preference-routing.js";
 import type { TradingCalendarDay } from "../../model/candle-clock.js";
 import { resolveWatchlist } from "../../model/market-model.js";
-import { pinSelectedInstrument, selectedMarketRow } from "../../model/selected-instrument.js";
+import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { removeWatchlistInstrument, reorderCanonicalWatchlist } from "./controller-watchlist.js";
 import type {
   Backup,
@@ -72,7 +77,7 @@ export class TerminalController {
   chart: ChartAdapter | null = null;
   private readonly history: TerminalHistory;
   private readonly session: TerminalSession;
-  private selectionEpoch = 0;
+  private readonly preferenceRouting = new PreferenceRouting();
   readonly editing: TerminalEditing;
   readonly drawingSettings: ReturnType<typeof createDrawingPreview>;
   readonly tools: TerminalDrawingTools;
@@ -238,77 +243,107 @@ export class TerminalController {
     const routing =
       forceReload ||
       ["symbol", "instrumentUid", "timeframe", "rangeDays", "engine"].some((key) => key in patch);
-    const epoch = routing ? ++this.selectionEpoch : this.selectionEpoch;
+    if (routing) {
+      const scope = preferenceRoutingScope(this, () => !this.session.disposed, valid);
+      return this.preferenceRouting.enqueue(
+        patch,
+        forceReload,
+        scope,
+        this.applyRoutingPreferences
+      );
+    }
     const owner = this.state.owner,
       client = this.client;
-    const depth = historyDepthTransition(this, patch);
-    try {
-      await this.saveView();
-      await this.editing.flush();
-      if (
-        !this.session.matches(client) ||
-        !importWritable(this.state, owner) ||
-        (routing && epoch !== this.selectionEpoch) ||
-        !valid() ||
-        !depth.valid()
-      )
-        return;
-      const previous = this.state.preferences,
-        merged = {
-          ...previous,
-          ...patch
-        };
-      if ("symbol" in patch && !("instrumentUid" in patch)) delete merged.instrumentUid;
-      const next = routing ? pinSelectedInstrument(this.state.rows, merged) : merged;
-      const selected = selectedMarketRow(this.state.rows, next);
-      if (selected?.providerRef) next.providerRef = selected.providerRef;
-      else delete next.providerRef;
-      const reload =
-        next.symbol !== previous.symbol ||
-        next.instrumentUid !== previous.instrumentUid ||
-        next.timeframe !== previous.timeframe ||
-        next.rangeDays !== previous.rangeDays ||
-        next.engine !== previous.engine ||
-        forceReload;
-      if (
-        depth.active &&
-        !(await depth.carry(
-          next,
-          () =>
-            this.session.matches(client) &&
-            owner === this.state.owner &&
-            (!routing || epoch === this.selectionEpoch) &&
-            valid()
-        ))
-      )
-        return;
-      if (reload) this.resetHistory();
-      this.update({
-        preferences: next,
-        crosshairBar: null,
-        ...(reload
-          ? {
-              candles: [],
-              loading: false,
-              drawings: [],
-              images: [],
-              selectedObject: null,
-              activeTool: null,
-              preview: null
-            }
-          : {})
+    await this.saveView();
+    await this.editing.flush();
+    if (!this.session.matches(client) || !importWritable(this.state, owner) || !valid()) return;
+    const next = { ...this.state.preferences, ...patch },
+      selected = selectedMarketRow(this.state.rows, next);
+    if (selected?.providerRef) next.providerRef = selected.providerRef;
+    else delete next.providerRef;
+    this.update({ preferences: next, crosshairBar: null });
+    await this.savePreferences();
+  };
+  private applyRoutingPreferences = async (): Promise<void> => {
+    for (;;) {
+      const batch = this.preferenceRouting.batch((patch) => {
+        const candidate = historyDepthTransition(this, patch);
+        try {
+          return candidate.valid();
+        } finally {
+          candidate.dispose();
+        }
       });
-      await this.savePreferences();
-      if (
-        reload &&
-        marketAvailable(this.state) &&
-        epoch === this.selectionEpoch &&
-        this.session.matches(client) &&
-        owner === this.state.owner
-      )
-        await this.loadHistory();
-    } finally {
-      depth.dispose();
+      if (!batch) return;
+      const depth = historyDepthTransition(this, batch.patch);
+      const merge = () => mergeRoutingPreferences(this.state, batch.patch);
+      try {
+        await this.saveView();
+        await this.editing.flush();
+        if (!batch.current()) continue;
+        if (!depth.valid()) {
+          batch.finish();
+          return;
+        }
+        let next = merge();
+        if (depth.active && !(await depth.carry(next, batch.current))) {
+          if (!batch.current()) continue;
+          batch.finish();
+          return;
+        }
+        if (!batch.current()) continue;
+        if (!depth.valid()) {
+          batch.finish();
+          return;
+        }
+        next = merge();
+        const previous = this.state.preferences,
+          reload =
+            batch.forceReload ||
+            ["symbol", "instrumentUid", "timeframe", "rangeDays", "engine"].some(
+              (key) =>
+                next[key as keyof TerminalPreferences] !==
+                previous[key as keyof TerminalPreferences]
+            );
+        batch.accept();
+        const generation = reload ? this.preferenceRouting.commit() : 0;
+        if (reload) this.resetHistory();
+        this.update({
+          preferences: next,
+          crosshairBar: null,
+          ...(reload
+            ? {
+                candles: [],
+                loading: false,
+                historyViewReady: false,
+                drawings: [],
+                images: [],
+                selectedObject: null,
+                activeTool: null,
+                preview: null
+              }
+            : {})
+        });
+        if (!batch.ownersCurrent()) {
+          batch.finish();
+          return;
+        }
+        await this.savePreferences();
+        const loading =
+          reload &&
+          this.preferenceRouting.isCommitted(generation) &&
+          batch.ownersCurrent() &&
+          marketAvailable(this.state)
+            ? this.loadHistory()
+            : undefined;
+        batch.finish(loading);
+        return;
+      } catch (error) {
+        batch.fail(error);
+        return;
+      } finally {
+        depth.dispose();
+      }
     }
   };
   setTimeframe = async (timeframe: Timeframe): Promise<void> => {
