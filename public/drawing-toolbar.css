@@ -14,6 +14,10 @@
 }
 .drawing-toolbar {
   --drawing-arrow-width: 14px;
+  --drawing-tool-highlight: 30px;
+  --drawing-tool-highlight-height: 32px;
+  --drawing-arrow-highlight: 10px;
+  --drawing-arrow-offset: 2px;
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
@@ -38,7 +42,9 @@
   min-height: 36px;
 }
 .drawing-toolbar .tool,
-.drawing-tool-arrow {
+.drawing-toolbar .drawing-tool-arrow {
+  position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -47,6 +53,29 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
+}
+.drawing-toolbar :is(.tool, .drawing-tool-arrow)::before {
+  position: absolute;
+  z-index: -1;
+  top: 50%;
+  left: 50%;
+  width: var(--drawing-tool-highlight);
+  height: var(--drawing-tool-highlight-height);
+  box-sizing: border-box;
+  translate: -50% -50%;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  pointer-events: none;
+  content: "";
+}
+.drawing-toolbar .drawing-tool-main::before {
+  left: calc(50% + var(--drawing-arrow-width) / 2);
+}
+.drawing-toolbar .drawing-tool-arrow::before {
+  left: calc(50% + var(--drawing-arrow-offset));
+  width: var(--drawing-arrow-highlight);
+  height: 24px;
+  border-radius: 4px;
 }
 .drawing-toolbar > .tool > svg,
 .drawing-tool-split .drawing-tool-main > svg {
@@ -70,29 +99,45 @@
   border-radius: 4px 0 0 4px;
 }
 .drawing-tool-arrow {
-  position: static;
   flex: 0 0 var(--drawing-arrow-width);
   min-height: 36px;
   border-radius: 0 4px 4px 0;
 }
 .drawing-tool-arrow > .drawing-chevron {
-  width: 12px;
+  width: 10px;
   height: 12px;
-  flex-basis: 12px;
+  flex-basis: 10px;
+  translate: var(--drawing-arrow-offset) 0;
 }
-.drawing-toolbar .tool.active,
-.drawing-tool-split.active {
-  color: #2962ff;
-  background: #2962ff18;
+@media (hover: hover) {
+  .drawing-tool-split:not(:hover, :focus-within) .drawing-tool-arrow[aria-expanded="false"] svg {
+    opacity: 0.55;
+  }
+  .drawing-toolbar :is(.tool, .drawing-tool-arrow):hover:not(:disabled)::before {
+    background: var(--surface-hover);
+    border-color: var(--control-line);
+  }
+}
+.drawing-toolbar :is(.tool[aria-pressed="true"], .drawing-tool-arrow[aria-expanded="true"]) {
+  color: var(--accent);
+}
+.drawing-toolbar
+  :is(.tool[aria-pressed="true"], .drawing-tool-arrow[aria-expanded="true"])::before {
+  background: var(--accent-surface);
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--surface));
 }
 .drawing-tool-arrow[aria-expanded="true"] > .drawing-chevron {
   transform: rotate(90deg);
 }
-.drawing-toolbar button:hover:not(:disabled),
 .drawing-toolbar-popup button:hover:not([aria-disabled="true"]) {
   background: #2a2e39;
 }
-.drawing-toolbar button:focus-visible,
+.drawing-toolbar :is(.tool, .drawing-tool-arrow):focus-visible {
+  outline: none;
+}
+.drawing-toolbar :is(.tool, .drawing-tool-arrow):focus-visible::before {
+  box-shadow: 0 0 0 1px var(--accent);
+}
 .drawing-toolbar-popup button:focus-visible {
   outline: 2px solid #5685ff;
   outline-offset: -2px;
@@ -391,6 +436,9 @@
   }
   .drawing-toolbar {
     --drawing-arrow-width: 12px;
+    --drawing-tool-highlight: 26px;
+    --drawing-tool-highlight-height: 28px;
+    --drawing-arrow-highlight: 8px;
     padding: 5px 0;
     gap: 2px;
   }
