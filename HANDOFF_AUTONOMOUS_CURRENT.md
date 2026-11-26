@@ -9,6 +9,42 @@ login отложить. Ответы коротко по-русски. Реал�
 
 ### Новейший статус — важнее исторических строк ниже
 
+- PR6 merged. Публичный и canonical main: `3be4cc44b7ae19b23cfd7b349c7ddada186a93a8`, версия 0.3.19,
+  build `9d68e99e91dea44d`. PR CI run18 и main push CI45725499684/run19 PASS.
+- Штатный timer выпустил .19 UTC00:06:20.793; journal12.674s wall,192.2MiB peak. Все 67
+  canonical/native/public файлов побайтно совпали; UTF-8 MIME, лимиты192/240/Swap0 и соседи
+  сохранены. Proof `deploy-release-readiness/auto-release-0319-proof.json`, journal рядом. Деплой
+  вручную не запускался. Старый service MemoryPeak после timer no-op не является peak сборки.
+- Canonical clean main собран, собственный 5210 перезапущен в managed session24824; старый
+  session1404 остановлен. Local version и license txt UTF-8 проверены. Чужие процессы не трогать.
+- Public .18→.19 QA на копии собственного закрытого профиля проходит в `public-0319-pwa-qa`: обычный
+  Update, новый cache, public layout/UID/watchlist/2drawings и raw guest сохранены, оба
+  engines/Bybit spot/perp/RSI/BBW работают. Privacy/5licenses online/offline совпали, unknown404
+  остаётся404. Реальные Google OAuth/Drive и банк не использовались, но GIS SDK загружается при
+  account/export — не заявлять Google calls0. Final report/manifest: scoped
+  PASS_WITH_KNOWN_UI_DEFECT,25 captures/25 viewed, source449files unchanged; own Chrome закрыт. Root
+  проверил all67 через verified Python TLS; Node provenance warning из inherited
+  NODE_TLS_REJECT_UNAUTHORIZED не выдается за такую проверку. Chrome TLS bypass не ставился.
+- Унаследованный mobile TA settings checkbox defect подтверждён и на public .19. Fix7095365
+  проверяется в .20: checkbox16×16 вместо dialog input width100%/height42px; подписи не обрезаются.
+  Это известный предел .19, не скрывать его за общим PASS.
+- .20 integration сейчас `2f6cd5b`, production inputs идентичны frozen7095365, build
+  `f6f831b361430895`, full check726/726. Source review35:51 focused PASS. Worker в своём5225
+  заканчивает scoped CSS rerun; broad ef2 со всеми35 и native gestures PASS. Отдельный bounded
+  camera case подтвердил одинаковые last timestamp/count, barSpace/rightOffsetBars/anchor/gap;
+  прежний mixed run имел разную geometry. PR .20 ещё не открыт.
+- .21 отдельно: `vps/artifacts/release-0321-worktree`, head298101c, build `670626838ab63513`,
+  check761/761 и spec44/44 PASS.42 вычисления, native42+11volume outputs, positive-volume gate,
+  строгие EMA/SMA choices/JSON/Drive. Независимый registry c485150 review без blockers; fresh visual
+  worker начинает свой5227, не трогает5225/5210/public QA. Не публиковать раньше .20.
+- /root/trend_state_math возобновил math-only работу после public QA, ветка
+  feat/ta-trend-state-math. Checkpoint в
+  `ta-trend-state-math/openspec/changes/ta-trend-state/research-checkpoint.md`. DPO odd-length
+  conversion требует primary evidence, поэтому пока делаются остальные пять. Общая цель активна;
+  все127 TA не реализованы.
+
+Ниже исторический снимок до публикации .19; актуальные статусы перечислены выше.
+
 - PR5 merged, main `3a31c02aa86bd4fe3494b6fefe50fa35aeb81c71`: публичная и локальная0.3.18, build
   `62b7c12c8b73f573`. Main push CI45715266056/run14 PASS;622 tests/spec35.
 - Настоящий автоматический timer deploy: UTC22:46:30,12.811s wall,192.4MiB peak, лимиты192/240/Swap0
