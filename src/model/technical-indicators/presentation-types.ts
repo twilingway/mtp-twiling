@@ -1,10 +1,13 @@
 import type { NumericSeries, OutputStyle } from "./types.js";
 
 export type PlotSize = 1 | 2 | 3 | 4;
-export type PlotPrecisionPolicy = "legacy-fixed-6" | "native-price";
+export type PlotPrecisionPolicy = "legacy-fixed-6" | "native-price" | "fixed-2";
 export type PlotColorPolicy =
   | { readonly kind: "solid"; readonly color: string }
-  | { readonly kind: "palette"; readonly id: "macd-sign-change-v1" | "ao-change-v1" };
+  | {
+      readonly kind: "palette";
+      readonly id: "macd-sign-change-v1" | "ao-change-v1" | "bbp-sign-v1";
+    };
 export type PlotGeometry =
   | { readonly kind: "line"; readonly gaps: "legacy" | "break" }
   | { readonly kind: "columns"; readonly base: 0 }
@@ -26,6 +29,21 @@ export interface PresentationFill {
   readonly color: string;
   readonly opacity: number;
   readonly gaps: "break";
+  readonly extent?: "pane";
+}
+export interface PresentationReferenceLevel {
+  readonly id: string;
+  readonly title: string;
+  readonly value: number;
+  readonly color: string;
+  readonly opacity: number;
+  readonly width: PlotSize;
+  readonly lineStyle: "solid" | "dashed" | "dotted";
+}
+export interface CompiledReferenceLevel extends PresentationReferenceLevel {
+  readonly visible: boolean;
+  readonly scale: "include-when-visible";
+  readonly precisionPolicy: PlotPrecisionPolicy;
 }
 /** Runtime metadata only. This version is never an instance or backup schema version. */
 export interface PresentationDefinition {
@@ -35,6 +53,8 @@ export interface PresentationDefinition {
   readonly plots: readonly PresentationPlot[];
   readonly fills: readonly PresentationFill[];
   readonly hiddenSeries: readonly string[];
+  readonly constantSeries?: readonly { readonly seriesKey: string; readonly value: number }[];
+  readonly referenceLevels?: readonly PresentationReferenceLevel[];
 }
 export interface PresentationInput {
   readonly timestamps: readonly number[];
@@ -63,6 +83,7 @@ export interface CompiledPresentation {
   readonly timestamps: readonly number[];
   readonly plots: readonly CompiledPresentationPlot[];
   readonly fills: readonly CompiledPresentationFill[];
+  readonly referenceLevels?: readonly CompiledReferenceLevel[];
 }
 export interface IndexedRun {
   readonly first: number;

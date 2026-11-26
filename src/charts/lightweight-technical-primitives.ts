@@ -58,11 +58,11 @@ export class LightweightTechnicalPrimitive implements ISeriesPrimitive<Time> {
   autoscaleInfo(): null {
     return null;
   }
-  updatePlot(output: TechnicalRenderOutput): void {
+  updatePlot(output: TechnicalRenderOutput, project?: (value: number) => number | null): void {
     if (this.disposed) return;
     this.output = output;
     this.fill = undefined;
-    this.project = undefined;
+    this.project = project;
     this.request?.();
   }
   updateFill(fill: TechnicalRenderFill, project?: (value: number) => number | null): void {
@@ -180,13 +180,10 @@ export class LightweightTechnicalPrimitive implements ISeriesPrimitive<Time> {
               ctx.lineTo(p.x * hx, (p.y + radius) * vy);
               ctx.stroke();
             }
-          } else if (geometry.kind === "line" && geometry.gaps === "break") {
-            for (const run of presentationRuns(
-              output.values,
-              undefined,
-              bounds.first,
-              bounds.last
-            )) {
+          } else if (geometry.kind === "line") {
+            for (const run of geometry.gaps === "legacy"
+              ? [{ first: bounds.first, last: bounds.last }]
+              : presentationRuns(output.values, undefined, bounds.first, bounds.last)) {
               let previous: Point | undefined;
               const cap = (p: Point) => {
                 ctx.moveTo((p.x - output.style.width / 2) * hx, p.y * vy);
@@ -196,6 +193,7 @@ export class LightweightTechnicalPrimitive implements ISeriesPrimitive<Time> {
               for (let i = run.first; i <= run.last; i++) {
                 const p = this.point(output.timestamps[i]!, output.values[i]);
                 if (!p) {
+                  if (geometry.gaps === "legacy") continue;
                   previous = undefined;
                   continue;
                 }

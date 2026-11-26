@@ -1,6 +1,7 @@
 import { isRecord } from "../../model/backup-format.js";
 import { TOOL_NAMES } from "../../model/drawing-model.js";
 import { getTechnicalIndicatorDefinition } from "../../model/technical-indicators/definitions.js";
+import { technicalIndicatorStyleIds } from "../../model/technical-indicators/instances.js";
 import { sanitizeDriveBackup } from "./backup.js";
 import type { Backup } from "../../model/types.js";
 import { DriveError, type DriveInspection } from "./types.js";
@@ -75,10 +76,7 @@ export function assertReadableDrivePayload(value: unknown): Backup {
           instance.params,
           definition.parameters.map((parameter) => parameter.key)
         );
-        exact(
-          instance.styles,
-          definition.outputs.map((output) => output.id)
-        );
+        exact(instance.styles, technicalIndicatorStyleIds(definition));
       }
       exact(
         instance.pane,

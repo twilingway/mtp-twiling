@@ -1,3 +1,4 @@
+import { relativeRegisteredDefinitions } from "./relative-registration-definitions.js";
 import type {
   TechnicalIndicatorDefinition,
   TechnicalIndicatorId,
@@ -184,7 +185,8 @@ export const technicalIndicatorDefinitions: readonly TechnicalIndicatorDefinitio
   ...stateOscillatorDefinitions,
   ...trendPriceDefinitions,
   ...channelPriceDefinitions,
-  keltnerDefinition
+  keltnerDefinition,
+  ...relativeRegisteredDefinitions
 ]);
 
 /** A real catalog limitation, not a claimed OHLCV implementation. No 224 fake calculators. */

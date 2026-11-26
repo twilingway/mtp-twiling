@@ -299,6 +299,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       if (next.minMove === priceFormat.minMove && next.precision === priceFormat.precision) return;
       camera.programmatic(() => series.applyOptions({ priceFormat: lightweightPriceFormat(next) }));
       priceFormat = next;
+      technical.refreshNativeMetadata();
     },
     ...lightweightNavigation(
       chart,
@@ -436,7 +437,12 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     }
   };
   const live = camera.wrap(adapter);
-  const technical = lightweightTechnical(chart, options, () => !live.retired);
+  const technical = lightweightTechnical(
+    chart,
+    options,
+    () => !live.retired,
+    () => series
+  );
   technical.update(options.technicalIndicators ?? [], options.technicalPaneLayout);
   return live;
 }

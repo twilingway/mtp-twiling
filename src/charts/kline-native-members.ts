@@ -12,6 +12,7 @@ import {
   klineColumnsBase,
   klineColumnsBaseFigure
 } from "./kline-technical-geometry.js";
+import { klineReferenceFigures } from "./kline-technical-geometry.js";
 import type {
   KlineTechnicalContext as Context,
   KlineTechnicalRow as Row
@@ -58,7 +59,7 @@ const registered = new Set<string>();
 function family(slot: number, policy: PlotPrecisionPolicy, fill: boolean, active: boolean): string {
   if (slot >= 100) throw new RangeError("Too many native TA slots");
   const price = active && policy === "native-price";
-  const name = `PERSONAL_TA_${fill ? "FILL_" : ""}${active ? (price ? "PRICE_" : "") : "IDLE_"}${slot}`;
+  const name = `PERSONAL_TA_${fill ? "FILL_" : ""}${active ? (price ? "PRICE_" : policy === "fixed-2" ? "FIXED2_" : "") : "IDLE_"}${slot}`;
   if (!registered.has(name)) {
     registered.add(name);
     registerIndicator<Row>({
@@ -66,6 +67,7 @@ function family(slot: number, policy: PlotPrecisionPolicy, fill: boolean, active
       shortName: "",
       series: price ? IndicatorSeries.Price : IndicatorSeries.Normal,
       figures: [],
+      ...(active && policy === "fixed-2" ? { precision: 2 } : {}),
       calc: (_bars, indicator) => {
         const context = klineTechnicalContext(indicator);
         return active && !fill && context && !context.disposed ? context.rows : [];
@@ -83,12 +85,18 @@ function primary(plan: Plan, active: boolean, precision: number): IndicatorCreat
     shortName: "",
     ...(!active || policy !== "native-price" ? { precision } : {}),
     series:
-      active && (policy === "native-price" || plan.paneId === "candle_pane")
+      active && policy !== "fixed-2" && (policy === "native-price" || plan.paneId === "candle_pane")
         ? IndicatorSeries.Price
         : IndicatorSeries.Normal,
     zLevel: 10 + (outputs[0]?.order ?? 0),
     extendData: { context },
     figures: [
+      ...(active
+        ? klineReferenceFigures(context.references ?? [], outputs).map(({ key, type }) => ({
+            key,
+            type
+          }))
+        : []),
       ...(active && context.columnsBase ? [klineColumnsBaseFigure(context.columnsBase)] : []),
       ...visible.map((output) => ({
         key: output.outputId,
@@ -128,7 +136,9 @@ function primary(plan: Plan, active: boolean, precision: number): IndicatorCreat
         }))
     },
     // Data-free primary still paints declared reference levels through the existing domain.
-    visible: active ? visible.length > 0 : context.levels.length > 0
+    visible: active
+      ? visible.length > 0 || (context.references ?? []).some((level) => level.visible)
+      : context.levels.length > 0
   };
 }
 function companion(plan: Plan, active: boolean, precision: number): IndicatorCreate<Row> {
@@ -138,7 +148,9 @@ function companion(plan: Plan, active: boolean, precision: number): IndicatorCre
     figures: [],
     ...(!active || plan.policy !== "native-price" ? { precision } : {}),
     series:
-      active && (plan.policy === "native-price" || plan.paneId === "candle_pane")
+      active &&
+      plan.policy !== "fixed-2" &&
+      (plan.policy === "native-price" || plan.paneId === "candle_pane")
         ? IndicatorSeries.Price
         : IndicatorSeries.Normal,
     zLevel: -3 - (plan.outputs[0]?.order ?? 0),
@@ -170,6 +182,7 @@ export function klineNativeMembers(chart: Chart, alive: () => boolean, axisName:
       entry.plan.context.outputs = [];
       entry.plan.context.fills = [];
       entry.plan.context.columnsBase = null;
+      entry.plan.context.references = [];
     }
     if (entry.fillName) chart.removeIndicator(entry.plan.paneId, entry.fillName);
     chart.removeIndicator(entry.plan.paneId, entry.name);
@@ -278,7 +291,11 @@ export function klineNativeMembers(chart: Chart, alive: () => boolean, axisName:
           !domain ||
           (cached?.first === domain.first && cached.end === domain.end
             ? cached.value
-            : eligiblePublicPlots(plan.outputs, domain));
+            : eligiblePublicPlots(plan.outputs, domain) ||
+              (domain.end > domain.first &&
+                (plan.context.references ?? []).some(
+                  (level) => level.visible && level.timestamps.length > domain.first
+                )));
         if (domain) eligibility.set(plan, { first: domain.first, end: domain.end, value });
         active.set(plan, value);
       }
@@ -293,7 +310,12 @@ export function klineNativeMembers(chart: Chart, alive: () => boolean, axisName:
       for (const plan of plans) {
         if (!live() || epoch !== state.epoch) break;
         const eligible = active.get(plan) ?? true;
-        install(plan, eligible, eligible ? 6 : (precisions.get(plan.paneId) ?? 0), force);
+        install(
+          plan,
+          eligible,
+          eligible ? (plan.policy === "fixed-2" ? 2 : 6) : (precisions.get(plan.paneId) ?? 0),
+          force
+        );
       }
     } finally {
       writing = false;
@@ -365,6 +387,9 @@ export function klineNativeMembers(chart: Chart, alive: () => boolean, axisName:
         };
         context.outputs = outputs;
         context.fills = compiled.fills.filter((fill) => fill.instanceId === instance.id);
+        context.references = (compiled.references ?? []).filter(
+          (level) => level.instanceId === instance.id
+        );
         context.columnsBase = klineColumnsBase(outputs);
         context.rows = outputs[0]!.timestamps.map((_timestamp, index) => {
           const row = Object.assign(
@@ -374,6 +399,11 @@ export function klineNativeMembers(chart: Chart, alive: () => boolean, axisName:
             { [klineTechnicalIndex]: index }
           );
           const base = context.columnsBase;
+          for (const reference of klineReferenceFigures(context.references ?? [], outputs))
+            Object.defineProperty(row, reference.key, {
+              value: reference.level.value,
+              enumerable: false
+            });
           if (base && base.plots.some((output) => Number.isFinite(output.values[index])))
             Object.defineProperty(row, base.key, { value: base.value, enumerable: false });
           return row;

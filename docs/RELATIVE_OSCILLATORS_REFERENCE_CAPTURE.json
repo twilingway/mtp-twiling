@@ -1,0 +1,39 @@
+{
+  "payloads": [
+    {
+      "url": "https://www.tradingview.com/static/bundles/11967.f052e1615089996eccf6.js",
+      "sha256": "681492fc92bba4f2ec3dfb2435a2c6675a7f84df9a5fc41e3fd113eacdd9f2f8",
+      "bytes": 1407186,
+      "tls": "Python default CERT_REQUIRED/check_hostname; no proxy/insecure flags",
+      "fullPayloadSaved": false
+    },
+    {
+      "url": "https://www.tradingview.com/static/bundles/en.66605.a376644de8252d21909b.js",
+      "sha256": "dccdb351880727f7d4e3bae4bd901f7f93adf4ecdd8c12f7cbded978335e4414",
+      "bytes": 177335,
+      "tls": "Python default CERT_REQUIRED/check_hostname; no proxy/insecure flags",
+      "fullPayloadSaved": false
+    },
+    {
+      "url": "https://www.tradingview.com/static/bundles/en.41280.e2a0384c9e88f1dd1d95.js",
+      "sha256": "645adb78287f7291d882b2b3dedec0093b4c35ad822e14d68e9221cebf5d942d",
+      "bytes": 29228,
+      "tls": "Python default CERT_REQUIRED/check_hostname; no proxy/insecure flags",
+      "fullPayloadSaved": false
+    }
+  ],
+  "facts": {
+    "stochFormulaTranslationId": 91823,
+    "stochHighestLowestIgnoreNaTranslationId": 221157,
+    "swmaFixed4WeightsTranslationId": 98752,
+    "swmaNaPropagationTranslationId": 472349,
+    "stdevDefaultBiasedTrueTranslationId": 413143,
+    "stdevPopulationTranslationId": 322213,
+    "stdevSumEmaRmaKnownObservationNaTranslationId": 309834,
+    "emaFirstSourceSeedExamplePresent": true,
+    "rmaSmaSeedExamplePresent": true,
+    "stdevPopulationDivisorExamplePresent": true,
+    "highestStartupExplicitlyResolved": false,
+    "pineExecutionPerformed": false
+  }
+}

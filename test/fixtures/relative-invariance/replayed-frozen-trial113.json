@@ -1,0 +1,479 @@
+{
+  "trial": 113,
+  "options": {
+    "rsiLength": 6,
+    "stochasticLength": 2,
+    "smoothK": 3,
+    "smoothD": 2
+  },
+  "bars": [
+    {
+      "timestamp": -500,
+      "open": 6,
+      "high": null,
+      "low": 1,
+      "close": 5,
+      "volume": 6
+    },
+    {
+      "timestamp": 1473,
+      "open": null,
+      "high": 15,
+      "low": 7,
+      "close": 11,
+      "volume": 9
+    },
+    {
+      "timestamp": 3446,
+      "open": -19,
+      "high": -12,
+      "low": -20,
+      "close": -16,
+      "volume": 8
+    },
+    {
+      "timestamp": 5419,
+      "open": -12,
+      "high": -9,
+      "low": -17,
+      "close": -13,
+      "volume": 6
+    },
+    {
+      "timestamp": 7392,
+      "open": -10,
+      "high": -8,
+      "low": -16,
+      "close": -12,
+      "volume": 3
+    },
+    {
+      "timestamp": 9365,
+      "open": 10,
+      "high": 15,
+      "low": 7,
+      "close": 11,
+      "volume": 7
+    },
+    {
+      "timestamp": 11338,
+      "open": 6,
+      "high": 11,
+      "low": 3,
+      "close": 7,
+      "volume": 8
+    },
+    {
+      "timestamp": 13311,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 6
+    },
+    {
+      "timestamp": 15284,
+      "open": 19,
+      "high": 21,
+      "low": 13,
+      "close": 17,
+      "volume": 8
+    },
+    {
+      "timestamp": 17257,
+      "open": -20,
+      "high": -13,
+      "low": -21,
+      "close": -17,
+      "volume": 8
+    },
+    {
+      "timestamp": 19230,
+      "open": 2,
+      "high": 7,
+      "low": -1,
+      "close": 3,
+      "volume": null
+    },
+    {
+      "timestamp": 21203,
+      "open": 2,
+      "high": 7,
+      "low": -1,
+      "close": 3,
+      "volume": 5
+    },
+    {
+      "timestamp": 23176,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 9
+    },
+    {
+      "timestamp": 25149,
+      "open": 13,
+      "high": 17,
+      "low": 9,
+      "close": 13,
+      "volume": null
+    },
+    {
+      "timestamp": 27122,
+      "open": -4,
+      "high": -3,
+      "low": null,
+      "close": -7,
+      "volume": 2
+    },
+    {
+      "timestamp": 29095,
+      "open": -15,
+      "high": -8,
+      "low": -16,
+      "close": -12,
+      "volume": 2
+    },
+    {
+      "timestamp": 31068,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 7
+    },
+    {
+      "timestamp": 33041,
+      "open": -15,
+      "high": -12,
+      "low": -20,
+      "close": -16,
+      "volume": 2
+    },
+    {
+      "timestamp": 35014,
+      "open": -13,
+      "high": -11,
+      "low": -19,
+      "close": -15,
+      "volume": null
+    },
+    {
+      "timestamp": 36987,
+      "open": 10,
+      "high": 15,
+      "low": 7,
+      "close": 11,
+      "volume": 0
+    },
+    {
+      "timestamp": 38960,
+      "open": -1,
+      "high": 2,
+      "low": -6,
+      "close": -2,
+      "volume": null
+    },
+    {
+      "timestamp": 40933,
+      "open": 17,
+      "high": 22,
+      "low": null,
+      "close": 18,
+      "volume": 0
+    },
+    {
+      "timestamp": 42906,
+      "open": -7,
+      "high": -3,
+      "low": -11,
+      "close": -7,
+      "volume": 0
+    },
+    {
+      "timestamp": 44879,
+      "open": -11,
+      "high": -7,
+      "low": -15,
+      "close": -11,
+      "volume": 8
+    },
+    {
+      "timestamp": 46852,
+      "open": -12,
+      "high": -5,
+      "low": -13,
+      "close": -9,
+      "volume": 5
+    },
+    {
+      "timestamp": 48825,
+      "open": null,
+      "high": 16,
+      "low": 8,
+      "close": 12,
+      "volume": 0
+    },
+    {
+      "timestamp": 50798,
+      "open": 4,
+      "high": 5,
+      "low": -3,
+      "close": 1,
+      "volume": 7
+    },
+    {
+      "timestamp": 52771,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 4
+    },
+    {
+      "timestamp": 54744,
+      "open": 12,
+      "high": 19,
+      "low": 11,
+      "close": 15,
+      "volume": 2
+    },
+    {
+      "timestamp": 56717,
+      "open": -1,
+      "high": 6,
+      "low": -2,
+      "close": 2,
+      "volume": null
+    },
+    {
+      "timestamp": 58690,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 0
+    },
+    {
+      "timestamp": 60663,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 6
+    },
+    {
+      "timestamp": 62636,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": 1
+    },
+    {
+      "timestamp": 64609,
+      "open": null,
+      "high": null,
+      "low": null,
+      "close": null,
+      "volume": null
+    },
+    {
+      "timestamp": 66582,
+      "open": -11,
+      "high": -8,
+      "low": -16,
+      "close": -12,
+      "volume": null
+    },
+    {
+      "timestamp": 68555,
+      "open": -20,
+      "high": -16,
+      "low": -24,
+      "close": -20,
+      "volume": 0
+    },
+    {
+      "timestamp": 70528,
+      "open": -13,
+      "high": -6,
+      "low": -14,
+      "close": -10,
+      "volume": 2
+    },
+    {
+      "timestamp": 72501,
+      "open": -3,
+      "high": -2,
+      "low": -10,
+      "close": -6,
+      "volume": 3
+    }
+  ],
+  "actual": {
+    "k": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      66.66666666666666,
+      66.66666666666666,
+      66.66666666666667,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.33333333333333,
+      66.66666666666666,
+      66.66666666666666,
+      66.66666666666666,
+      33.333333333333336,
+      33.333333333333336,
+      33.33333333333333,
+      66.66666666666666,
+      66.66666666666666,
+      66.66666666666666,
+      66.66666666666666,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      0,
+      33.33333333333333,
+      66.66666666666666
+    ],
+    "d": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      66.66666666666666,
+      66.66666666666666,
+      50,
+      33.333333333333336,
+      33.333333333333336,
+      33.33333333333333,
+      49.99999999999999,
+      66.66666666666666,
+      66.66666666666666,
+      50,
+      33.333333333333336,
+      33.33333333333333,
+      49.99999999999999,
+      66.66666666666666,
+      66.66666666666666,
+      66.66666666666666,
+      50,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      16.666666666666668,
+      16.666666666666664,
+      49.99999999999999
+    ]
+  },
+  "expected": {
+    "k": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      66.66666666666667,
+      66.66666666666667,
+      66.66666666666667,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      66.66666666666667,
+      66.66666666666667,
+      66.66666666666667,
+      66.66666666666667,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      0,
+      33.333333333333336,
+      66.66666666666667
+    ],
+    "d": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      50,
+      66.66666666666667,
+      66.66666666666667,
+      50,
+      33.333333333333336,
+      33.333333333333336,
+      50,
+      66.66666666666667,
+      66.66666666666667,
+      66.66666666666667,
+      50,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      33.333333333333336,
+      16.666666666666668,
+      16.666666666666668,
+      50
+    ]
+  }
+}

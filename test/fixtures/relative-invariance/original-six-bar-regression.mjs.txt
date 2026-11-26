@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { loadRelativeSource } from "./relative-oscillators-math/test/helpers/relative-oscillator-source.mjs";
+const closes=Object.freeze([0,-4,-4,-3,-3,null]);
+const bars=Object.freeze(closes.map((close,timestamp)=>Object.freeze({timestamp,close,open:close,high:close===null?null:close+1,low:close===null?null:close-1,volume:1})));
+const actual=loadRelativeSource().stochasticRsi(bars,{rsiLength:3,stochasticLength:2,smoothK:1,smoothD:1});
+// Changes -4,0,+1 seed gain1/3/loss4/3 -> RSI20. A zero change gives2/9,8/9 -> RSI20.
+// The last missing change carries these states, so the last two RSI values equal20 exactly.
+// With stochasticLength2 the denominator is0: all raw/K/D values must remain null.
+console.log(JSON.stringify({sourceSHA:"a906f02d28bd2ea2eaed08d0f5892afcc3d14b78",closes,actual,expected:"all-null",pineExecution:false}));
+assert.deepEqual(actual,{k:Array(6).fill(null),d:Array(6).fill(null)},"Missing change must preserve the same RSI ratio after zero-change pin");

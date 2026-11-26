@@ -1,3 +1,8 @@
+import type {
+  RelativeRegisteredId,
+  RelativeRegisteredParameters,
+  RelativeRegisteredHistory
+} from "./relative-registration-contract.js";
 import type { CumulativeHistoryRequirement } from "./momentum-volume/metadata.js";
 import type { VolumeFlowHistoryRequirement, VolumeFlowId } from "./volume-flow/metadata.js";
 import type { VolumeAverage } from "./volume-flow/parameters.js";
@@ -56,7 +61,8 @@ export type TechnicalIndicatorId =
   | StateOscillatorId
   | TrendPriceId
   | ChannelPriceId
-  | "keltner-channels";
+  | "keltner-channels"
+  | RelativeRegisteredId;
 export type PriceSource = "open" | "high" | "low" | "close" | "hl2" | "hlc3" | "ohlc4" | "volume";
 export interface TechnicalBar {
   readonly timestamp: number;
@@ -66,7 +72,7 @@ export interface TechnicalBar {
   readonly close: NumericValue;
   readonly volume: NumericValue;
 }
-export interface TechnicalParameters extends ChannelPriceParameters {
+export interface TechnicalParameters extends ChannelPriceParameters, RelativeRegisteredParameters {
   "keltner-channels": KeltnerParameters;
   "parabolic-sar": { start: number; increment: number; maximum: number };
   supertrend: { atrLength: number; factor: number };
@@ -235,4 +241,5 @@ export type TechnicalHistoryRequirement =
   | StateOscillatorHistoryRequirement
   | TrendPriceHistoryRequirement
   | ChannelPriceHistoryRequirement
-  | KeltnerHistoryRequirement;
+  | KeltnerHistoryRequirement
+  | RelativeRegisteredHistory;

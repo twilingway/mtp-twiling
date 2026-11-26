@@ -1,4 +1,8 @@
 import {
+  isRelativeRegisteredInstance,
+  relativeRegisteredLimit
+} from "./relative-registration-runtime.js";
+import {
   alma,
   lsma,
   chandelierExit,
@@ -30,6 +34,7 @@ export function technicalCalculationUnavailableReason(
   instance: TechnicalIndicatorInstance,
   barCount: number
 ): "calculation-limit" | undefined {
+  if (isRelativeRegisteredInstance(instance)) return relativeRegisteredLimit(instance, barCount);
   if (instance.definitionId === "keltner-channels")
     return barCount > MAX_CHANNEL_AVERAGE_BARS ? "calculation-limit" : undefined;
   if (!isChannelPriceInstance(instance)) return undefined;

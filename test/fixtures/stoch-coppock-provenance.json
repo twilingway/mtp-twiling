@@ -1,0 +1,271 @@
+{
+    "immutableMathBlobs":  [
+                               {
+                                   "path":  "src/model/technical-indicators/averages/composed.ts",
+                                   "blob":  "77b43bedfa9a6a74dc285d4b09523eaab5e18437",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/averages/index.ts",
+                                   "blob":  "965dadbac3362f7760ddc3844a990586ce711917",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/averages/metadata.ts",
+                                   "blob":  "b231686816277717d90241a58b349787df350de7",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/averages/rolling-window.ts",
+                                   "blob":  "21b3ae23210ef7e7ef142930df1105c76a76ace5",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/averages/windows.ts",
+                                   "blob":  "c28d55b3e87dcdf34b71a4d441fbecebbadcae93",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/calculations.ts",
+                                   "blob":  "c0e264a3310cd79708061f0c9465d4682825cb5a",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/channel-average/averages.ts",
+                                   "blob":  "a4a17022850864ffb3aa0bd859d9395f0485822f",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/channel-average/channels.ts",
+                                   "blob":  "6349bc302da24890d568d2b355c58700a9261eaf",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/channel-average/filters.ts",
+                                   "blob":  "f1d0d35d5e14808029a3716ea8c32cb417870baa",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/channel-average/index.ts",
+                                   "blob":  "02a490d5bc1a89d3faf05f6b544632d90ea073b7",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/channel-average/inputs.ts",
+                                   "blob":  "2ff1866c77a1b4b527a172bb225fe59776e476f5",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/channel-average/metadata.ts",
+                                   "blob":  "2671da70a2cd157a751e77cc64874f003f2b9b1a",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/data.ts",
+                                   "blob":  "a7d92a9e4a7127b5e123ec371d67ec7da94b6d89",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/momentum-volume/index.ts",
+                                   "blob":  "e06b27f5467aa056ad985af193d98f56bf2764b7",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/momentum-volume/metadata.ts",
+                                   "blob":  "36d4938d87aa47fc38b30bcb76f6fd61fe705a38",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/momentum-volume/oscillators.ts",
+                                   "blob":  "a1c72eee1bfaf4285a59a518ef96030b12e8aaa5",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/momentum-volume/validation.ts",
+                                   "blob":  "2dc145e2871486502d62da4ccd07ed5994085d32",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/momentum-volume/volume.ts",
+                                   "blob":  "2433988dd0037ad61efad335116674c5f7c4dfcb",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/primitives.ts",
+                                   "blob":  "3d45d4787ccbd23ab120a313ee4dd27d2602b3ad",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/relative-oscillators/filters.ts",
+                                   "blob":  "517526a25672c88a77b46edca6bad6adea0cbb89",
+                                   "introducedByMathMerge":  true
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/relative-oscillators/index.ts",
+                                   "blob":  "4b52f2566b4493ffbd100adb5ac7a57a034132ae",
+                                   "introducedByMathMerge":  true
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/relative-oscillators/inputs.ts",
+                                   "blob":  "c215c370ff7f20a3465133a3bcec4228ac224cf8",
+                                   "introducedByMathMerge":  true
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/relative-oscillators/metadata.ts",
+                                   "blob":  "6d31ee4777b10d923361ff9860b3161e0eefdb7e",
+                                   "introducedByMathMerge":  true
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/relative-oscillators/numeric.ts",
+                                   "blob":  "1598099278eeab417009fa0fe8d80d28c9439770",
+                                   "introducedByMathMerge":  true
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/relative-oscillators/oscillators.ts",
+                                   "blob":  "c625814d7e1cdbbf56579bd52e32d2c1dfe27d7d",
+                                   "introducedByMathMerge":  true
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/relative-oscillators/volatility.ts",
+                                   "blob":  "aff55849614bb8135575031bbb0b257208e32623",
+                                   "introducedByMathMerge":  true
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/relative-oscillators/window.ts",
+                                   "blob":  "4146f80ee446ba40c2362605dc15d57b564352a9",
+                                   "introducedByMathMerge":  true
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-state/filters.ts",
+                                   "blob":  "01350e91ab97b7b42eb5c79acd935a0bf87c924d",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-state/fisher.ts",
+                                   "blob":  "94383b34d69870eb000028bd88eaa1372d40f1e7",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-state/index.ts",
+                                   "blob":  "6a660d9f3a409a245e070758676fe3d44a2898e4",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-state/inputs.ts",
+                                   "blob":  "6ae6fbbcd33a96bfd7f047334ee5c6b740d567d6",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-state/metadata.ts",
+                                   "blob":  "4977c5cdfded861ebeb02aa3d98a7c707ddad17f",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-state/oscillators.ts",
+                                   "blob":  "efcd30c8dd11b1ba66677cc8f9425aaae779928d",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-state/sar.ts",
+                                   "blob":  "87d584f232b7eb69a95555dd28792711a1446bd7",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-state/supertrend.ts",
+                                   "blob":  "0ee8ad09e1f8e19c89f59d2dff9fb34017ddec12",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-strength/aroon.ts",
+                                   "blob":  "fef2b78d5eea65aa28c06a27218eab6fc6055c22",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-strength/directional.ts",
+                                   "blob":  "f5227ef78e44d3f2be0ce7d0eb56416606f15ffd",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-strength/extrema.ts",
+                                   "blob":  "51685efdaece90041655fb951dde09467b744329",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-strength/index.ts",
+                                   "blob":  "6c6748f5d7ea137de9bea44dc87643782da4a7bd",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-strength/inputs.ts",
+                                   "blob":  "ef8ccec7d2c966e10826db5ee924522104fa4611",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-strength/metadata.ts",
+                                   "blob":  "49df317014b5571a3d976d30c71e4ab5adf22926",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/trend-strength/oscillators.ts",
+                                   "blob":  "e20a5e267ea3cc19905f966007c0dc37a6c88b80",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/volatility-momentum/index.ts",
+                                   "blob":  "887e75cfac945e3f896c1d70f5d4fd95e4b049fc",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/volatility-momentum/metadata.ts",
+                                   "blob":  "905c38aae77112e9c573c6adab6d123fc6ea260e",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/volatility-momentum/oscillators.ts",
+                                   "blob":  "60569305272c75d8f2ce4abd45d06811b55dd982",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/volatility-momentum/validation.ts",
+                                   "blob":  "a61fc2c4e487dc6be608cde7cedafd2bd2a9da0f",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/volatility-momentum/volatility.ts",
+                                   "blob":  "130607d2ce836df9b0f8370676451061a7801926",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/volatility-momentum/windows.ts",
+                                   "blob":  "885ccab81079794f3b73061cd37b558042455334",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/volume-flow/calculations.ts",
+                                   "blob":  "4a22de934bd8cb4e80509320598bd908a0c258eb",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/volume-flow/index.ts",
+                                   "blob":  "3140bbaf3a736cfb6b5983e41cb4aa8109b6c853",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/volume-flow/metadata.ts",
+                                   "blob":  "47838b59560d611f864bb81045e8a56ef61fd98a",
+                                   "introducedByMathMerge":  false
+                               },
+                               {
+                                   "path":  "src/model/technical-indicators/volume-flow/parameters.ts",
+                                   "blob":  "5f2ac38fc405343c1d8cd054b0daafdacd914ab8",
+                                   "introducedByMathMerge":  false
+                               }
+                           ],
+    "sourceCommit":  "2edd1364de75cc2db5f1d4d7c85aa510878e7919",
+    "historicalReceipt":  {
+                              "fileCount":  340,
+                              "changed":  0,
+                              "target":  "e08f4662399dfb634bc41d00909419213041af4b",
+                              "originalTestGitBlob":  "86bc6919116e78682386089dfeb5c90f92f64750"
+                          }
+}

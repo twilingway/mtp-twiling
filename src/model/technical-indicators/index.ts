@@ -10,3 +10,5 @@ export * from "./channel-average-contract.js";
 export * from "./keltner-contract.js";
 export { technicalCalculationUnavailableReason } from "./channel-average-runtime.js";
 export * from "./momentum-volume/index.js";
+
+export * from "./relative-registration-contract.js";
