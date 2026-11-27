@@ -19,7 +19,7 @@
 
 - [x] 3.1 Реализовать factory по согласованному общему host contract, сохранив независимое
       выключение; проверка: coordinator tests и standalone TypeScript с frozen интерфейсами.
-- [x] 3.2 Выполнить целевые тесты, TypeScript, lint и OpenSpec validation: 40/40 целевых тестов,
+- [x] 3.2 Выполнить целевые тесты, TypeScript, lint и OpenSpec validation: 44/44 целевых тестов,
       `tsc --noEmit`, scoped ESLint и strict OpenSpec 118/118; сборкой общего приложения управляет
       координатор.
 - [ ] 3.3 После регистрации приложения проверить настоящий OAuth, upload/download CORS и PWA

@@ -39,7 +39,8 @@ async function checkedBackup(context: YandexApplyContext, remote: YandexRemote):
 /** A durable intent plus an exact commit receipt prevents retry from importing twice. */
 export async function reconcileYandexApply(
   context: YandexApplyContext,
-  chooseLocal: boolean
+  chooseLocal: boolean,
+  retryRemoteId?: string
 ): Promise<boolean> {
   const { journal, clientId, accountId, guard, captured, actions } = context;
   const intent = await journal.applyIntent(clientId, accountId);
@@ -51,6 +52,18 @@ export async function reconcileYandexApply(
     return false;
   }
   if (intent.credentialGeneration !== context.generation) throw new YandexError("indeterminate");
+  const retireForReviewedRetry = async (): Promise<false> => {
+    guard.signal.throwIfAborted();
+    if (!guard.isCurrent() || context.host.scope("yandex-disk").revision !== captured.revision)
+      throw new YandexError("local-changed");
+    // Explicit direction supersedes the old outcome; it does not classify that outcome as no-commit.
+    await journal.archiveApplyIntent(clientId, intent, guard.signal);
+    await journal.clearApplyIntent(clientId, accountId, guard.signal);
+    actions.clearCommitted(intent.operationId);
+    return false;
+  };
+  if (retryRemoteId !== undefined && retryRemoteId !== intent.targetId)
+    return retireForReviewedRetry();
   const remote = context.remotes.find(({ revision }) => revision.revisionId === intent.targetId);
   if (
     !remote ||
@@ -68,6 +81,9 @@ export async function reconcileYandexApply(
     await journal.clearApplyIntent(clientId, accountId, guard.signal);
     actions.clearCommitted(intent.operationId);
     return true;
+  }
+  if (retryRemoteId === intent.targetId) {
+    return retireForReviewedRetry();
   }
   throw new YandexError("indeterminate");
 }
@@ -98,10 +114,24 @@ export async function applyYandexRemote(
   await journal.saveApplyIntent(clientId, intent, guard.signal);
   actions.applying();
   let committed: number | undefined;
-  await context.host.apply("yandex-disk", backup, captured.revision, guard, (revision) => {
-    committed = revision;
-    actions.committed(intent, revision);
-  });
+  try {
+    await context.host.apply("yandex-disk", backup, captured.revision, guard, (revision) => {
+      committed = revision;
+      actions.committed(intent, revision);
+    });
+    if (committed === undefined) throw new YandexError("local-changed");
+  } catch (error) {
+    // The host guarantees an immediate callback after native commit. No callback on a completed
+    // live attempt proves no commit; a crash/aborted identity never enters this cleanup path.
+    if (committed === undefined && !guard.signal.aborted && guard.isCurrent()) {
+      try {
+        await journal.clearApplyIntent(clientId, accountId, guard.signal);
+      } catch {
+        throw new YandexError("local-save");
+      }
+    }
+    throw error;
+  }
   if (
     committed === undefined ||
     guard.signal.aborted ||

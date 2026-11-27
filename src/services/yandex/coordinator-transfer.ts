@@ -80,18 +80,30 @@ export async function yandexTransfer(
     actions,
     decode: async (remote) => host.decode(await revisions.read(remote, valid), guard)
   };
-  if (await reconcileYandexApply(context, selection?.kind === "local")) return;
-  const apply = (selected: { remote: YandexRemote }) => applyYandexRemote(context, selected.remote);
-  if (selection?.kind === "remote") {
-    const selected = remotes.get(selection.id),
-      preview = actions.preview();
+  const selected = selection?.kind === "remote" ? remotes.get(selection.id) : undefined,
+    preview = actions.preview(),
+    freshRemote =
+      !!selected &&
+      preview.revision === captured.revision &&
+      sameHeads(preview.heads, inspected.heads);
+  try {
     if (
-      !selected ||
-      preview.revision !== captured.revision ||
-      !sameHeads(preview.heads, inspected.heads)
+      await reconcileYandexApply(
+        context,
+        selection?.kind === "local",
+        freshRemote ? selected.remote.revision.revisionId : undefined
+      )
     )
-      throw new YandexError("local-changed");
-    await apply(selected);
+      return;
+  } catch (error) {
+    if (error instanceof YandexError && error.code === "indeterminate" && !selection)
+      actions.conflict(captured, [...remotes.values()], inspected.heads);
+    throw error;
+  }
+  const apply = (remote: YandexRemote) => applyYandexRemote(context, remote);
+  if (selection?.kind === "remote") {
+    if (!selected || !freshRemote) throw new YandexError("local-changed");
+    await apply(selected.remote);
     return;
   }
   if (selection?.kind === "local") {
@@ -125,7 +137,7 @@ export async function yandexTransfer(
       pending.push(...(map.get(id)?.parents ?? []));
     }
     if (association.heads.every((id) => ancestors.has(id))) {
-      await apply(remotes.get(inspected.heads[0]!)!);
+      await apply(remotes.get(inspected.heads[0]!)!.remote);
       return;
     }
   }

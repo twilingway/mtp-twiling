@@ -104,6 +104,29 @@ async function fixture(enabled = true) {
     revision: () => revision
   };
 }
+async function seedRemote(f) {
+  const payload = new Blob([
+    JSON.stringify({
+      application: "personal-terminal",
+      schemaVersion: 2,
+      drawings: [],
+      images: [],
+      layout: { timeframe: "5m" }
+    })
+  ]);
+  const encoded = await encodeBundle(
+    { payload, images: [] },
+    {
+      revisionId: crypto.randomUUID(),
+      deviceId: crypto.randomUUID(),
+      parents: [],
+      createdAt: new Date().toISOString(),
+      digest: await payloadDigest(payload)
+    }
+  );
+  f.disk.files.set(revisionName(encoded.revision), encoded.body);
+  return encoded.revision;
+}
 test("disabled reload prepares local state without auth/network and ignores sync/choose", async () => {
   const f = await fixture(false);
   await f.coordinator.prepare();
@@ -462,4 +485,123 @@ test("reload after native commit can finalize a durable apply intent from canoni
   assert.equal(reloaded.getSnapshot().phase, "idle");
   assert.equal(await f.journal.applyIntent(config.clientId, f.disk.auth.accountId), undefined);
   reloaded.dispose();
+});
+test("known precommit quota failure retires its intent and a healthy remote retry commits exactly once", async () => {
+  const f = await fixture(),
+    remote = await seedRemote(f),
+    apply = f.host.apply;
+  let attempts = 0;
+  f.host.apply = async (...args) => {
+    if (++attempts === 1)
+      throw Object.assign(new Error("quota before native commit"), { code: "local-save" });
+    return apply(...args);
+  };
+  await f.coordinator.prepare();
+  await f.coordinator.sync();
+  await f.coordinator.choose({ kind: "remote", id: remote.revisionId });
+  assert.equal(f.coordinator.getSnapshot().error, "local-save");
+  assert.equal(f.applies(), 0);
+  assert.equal(await f.journal.applyIntent(config.clientId, f.disk.auth.accountId), undefined);
+  assert.equal(await f.journal.association(config.clientId, f.disk.auth.accountId), undefined);
+  await f.coordinator.choose({ kind: "remote", id: remote.revisionId });
+  assert.equal(attempts, 2);
+  assert.equal(f.applies(), 1);
+  assert.equal(f.coordinator.getSnapshot().choiceAction.state, "confirmed");
+  f.coordinator.dispose();
+});
+test("reload after a definitive precommit failure can repreview and retry remote without choosing local", async () => {
+  const f = await fixture(),
+    remote = await seedRemote(f),
+    apply = f.host.apply;
+  let attempts = 0;
+  f.host.apply = async (...args) => {
+    if (++attempts === 1) throw Object.assign(new Error("quota"), { code: "local-save" });
+    return apply(...args);
+  };
+  await f.coordinator.prepare();
+  await f.coordinator.sync();
+  await f.coordinator.choose({ kind: "remote", id: remote.revisionId });
+  f.coordinator.dispose();
+  const reloaded = f.make();
+  await reloaded.prepare();
+  await reloaded.sync();
+  assert.equal(reloaded.getSnapshot().phase, "conflict");
+  await reloaded.choose({ kind: "remote", id: remote.revisionId });
+  assert.equal(attempts, 2);
+  assert.equal(f.applies(), 1);
+  assert.equal(reloaded.getSnapshot().choiceAction.state, "confirmed");
+  reloaded.dispose();
+});
+test("an unknown crash intent stays indeterminate until a fresh guarded explicit remote decision", async () => {
+  const f = await fixture(),
+    remote = await seedRemote(f),
+    operationId = crypto.randomUUID();
+  await f.journal.saveApplyIntent(
+    config.clientId,
+    {
+      version: 1,
+      operationId,
+      accountId: f.disk.auth.accountId,
+      credentialGeneration: f.disk.auth.credentialGeneration,
+      targetId: remote.revisionId,
+      heads: [remote.revisionId],
+      digest: remote.digest
+    },
+    new AbortController().signal
+  );
+  await f.coordinator.prepare();
+  await f.coordinator.sync();
+  assert.equal(f.coordinator.getSnapshot().error, "indeterminate");
+  assert.ok(f.coordinator.getSnapshot().conflict);
+  assert.equal(f.applies(), 0);
+  assert.equal(
+    (await f.journal.applyIntent(config.clientId, f.disk.auth.accountId)).operationId,
+    operationId
+  );
+  f.edit();
+  f.coordinator.localIntent();
+  await f.coordinator.choose({ kind: "remote", id: remote.revisionId });
+  assert.equal(f.coordinator.getSnapshot().error, "local-changed");
+  assert.equal(f.applies(), 0);
+  assert.equal(
+    (await f.journal.applyIntent(config.clientId, f.disk.auth.accountId)).operationId,
+    operationId
+  );
+  await f.coordinator.sync();
+  assert.equal(f.coordinator.getSnapshot().error, "indeterminate");
+  await f.coordinator.choose({ kind: "remote", id: remote.revisionId });
+  assert.equal(f.applies(), 1);
+  assert.equal(f.coordinator.getSnapshot().choiceAction.state, "confirmed");
+  assert.ok(
+    [...f.backend.records.keys()].some((key) => key.endsWith(`unconfirmed-apply:${operationId}`))
+  );
+  assert.equal(await f.journal.applyIntent(config.clientId, f.disk.auth.accountId), undefined);
+  f.coordinator.dispose();
+});
+test("disable before a failed native attempt prevents late intent cleanup and permits fresh explicit recovery", async () => {
+  const f = await fixture(),
+    remote = await seedRemote(f),
+    apply = f.host.apply;
+  let attempts = 0;
+  f.host.apply = async (...args) => {
+    if (++attempts === 1) {
+      await f.coordinator.setEnabled(false);
+      throw Object.assign(new Error("cancelled before commit"), { code: "local-save" });
+    }
+    return apply(...args);
+  };
+  await f.coordinator.prepare();
+  await f.coordinator.sync();
+  await f.coordinator.choose({ kind: "remote", id: remote.revisionId });
+  assert.equal(f.coordinator.getSnapshot().phase, "disabled");
+  assert.equal(f.applies(), 0);
+  assert.ok(await f.journal.applyIntent(config.clientId, f.disk.auth.accountId));
+  await f.coordinator.setEnabled(true);
+  await f.coordinator.sync();
+  assert.equal(f.coordinator.getSnapshot().error, "indeterminate");
+  await f.coordinator.choose({ kind: "remote", id: remote.revisionId });
+  assert.equal(attempts, 2);
+  assert.equal(f.applies(), 1);
+  assert.equal(f.coordinator.getSnapshot().choiceAction.state, "confirmed");
+  f.coordinator.dispose();
 });
