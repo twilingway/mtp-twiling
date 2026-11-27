@@ -42,6 +42,7 @@ import {
 } from "./kline-selection-zoom.js";
 import { selectionZoomBounds } from "./selection-zoom.js";
 import { klineBarStyle, klineMainStyle } from "./kline-main-style.js";
+import { attachKlineAxisTouch } from "./kline-axis-touch.js";
 
 export function makeKline(options: ChartOptions): ChartAdapter {
   const camera = new UserCameraEvents(options);
@@ -118,6 +119,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     }
   });
   if (!chart) throw new Error("Не удалось создать KLineChart.");
+  const stopAxisTouch = attachKlineAxisTouch(container, chart);
   const axisLabels = klineAxisLabels(
     chart,
     lastPrice,
@@ -468,6 +470,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       paintFront();
     },
     destroy() {
+      stopAxisTouch();
       stopFrontProjection();
       axisLabels.dispose();
       technical?.dispose();

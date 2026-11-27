@@ -29,3 +29,25 @@ TouchEvent. Его ценовая шкала читает тот же vertTouchD
 - Порядок native touch и pointer событий зависит от браузера → нужны scoped gesture tests и
   последующая браузерная/телефонная проверка координатором.
 - Pointer cancellation не должен завершать рисунок → отмена очищает preview до записи.
+
+## KLine SDK evidence
+
+Проверен установленный KLine Charts 9.8.12, первичный исходник
+`node_modules/klinecharts/dist/index.esm.js` (только чтение):
+
+- `Event.touchStartEvent`, строка 12708, и `Event.touchMoveEvent`, строка 12760: Y_AXIS передаёт
+  события overlay, но не вызывает native масштабирование цены.
+- `Event.mouseDownEvent`, строка 12450, сохраняет исходный диапазон и pageY;
+  `Event.pressedMouseMoveEvent`, строка 12528, изменяет диапазон Y и вызывает `adjustPaneViewport`.
+- `SyntheticEvent._firesTouchEvents`, строка 12280: явно заданный
+  `sourceCapabilities.firesTouchEvents` имеет приоритет над фильтром совместимости 500 мс.
+
+Мост использует публичный `getDom("candle_pane", DomPosition.YAxis)` и отправляет новые
+синтетические mouse-события в native путь SDK. Только принадлежащий шкале single-touch подавляет
+прокрутку страницы; координата X остаётся в исходной полосе шкалы. Второй палец завершает мост и
+возвращает дальнейшие события SDK. Отмена, blur и dispose завершают native drag и удаляют
+обработчики. Пользовательские trusted-события не изменяются.
+
+`test/kline-axis-touch.test.mjs` исполняет методы установленного SDK: воспроизводит отсутствие
+масштабирования в touch пути, затем проверяет реальное изменение native диапазона через мост,
+координаты и флаги событий, фильтр совместимости, второй палец, отмену и очистку.

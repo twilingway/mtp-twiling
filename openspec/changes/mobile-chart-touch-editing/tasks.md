@@ -10,6 +10,8 @@
 - [x] 2.1 Удалить compact navigation pad, сохранить mouse controls; проверить scoped navigation
       test.
 - [x] 2.2 Отделить axis touch от workspace scroll; проверить workspace-touch tests.
+- [x] 2.3 Подключить KLine Y-axis touch к native mouse масштабированию с очисткой владения;
+      проверить `node --test --experimental-test-isolation=none test/kline-axis-touch.test.mjs`.
 
 ## 3. Проверки
 
