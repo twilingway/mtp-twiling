@@ -54,8 +54,17 @@ function environment() {
 
 test("real controller quote/candle events leave static component hooks idle and quotes live", async (t) => {
   const env = environment();
+  // AccountDialog's body/hooks are measured; its optional cloud children are not rendered here.
+  const unexpectedCloudUse = () => assert.fail("Quote profiler must not initialize optional cloud providers");
   const load = sourceModules({ react: React, "react/jsx-runtime": jsx, "react-dom": ReactDOM,
-    "services/storage.ts": {}, "services/storage-db.ts": {} });
+    "services/storage.ts": {}, "services/storage-db.ts": {},
+    "screens/terminal/controller-cloud-sync.ts": {
+      CLOUD_PROVIDERS: ["google-drive", "yandex-disk"],
+      terminalCloudSync: unexpectedCloudUse,
+      startTerminalCloudSync: unexpectedCloudUse
+    },
+    "screens/terminal/controller-drive.ts": { terminalGoogleRetention: unexpectedCloudUse }
+  });
   const { TerminalController } = load("screens/terminal/controller.js");
   const { TerminalContext, useTerminal } = load("screens/terminal/context.js");
   const { TIMEFRAMES } = load("model/history-codec.js");
