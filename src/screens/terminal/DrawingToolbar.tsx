@@ -5,6 +5,8 @@ import { useTerminal } from "./context.js";
 import { DrawingToolIcon, type DrawingIconName } from "./DrawingToolIcon.js";
 import { ChartMeasurementButton } from "./ChartMeasurement.js";
 import { ChartRangeZoomButton, ChartZoomOutButton } from "./ChartRangeZoom.js";
+import { useMobileLayout } from "./use-mobile-layout.js";
+import { magnetMenuSections } from "./drawing-toolbar-magnet-menu.js";
 import {
   DrawingToolbarMenu,
   DrawingToolbarSplit,
@@ -32,6 +34,7 @@ const disabledReason = "Пока не реализовано";
 
 export function DrawingToolbar() {
   const { controller, state } = useTerminal();
+  const mobile = useMobileLayout();
   const settings = drawingToolbarSettings(state.preferences.chartSettings);
   const showValuesOnHold = state.preferences.chartSettings.ohlcOnHold === true;
   const [menu, setMenu] = useState<OpenMenu | null>(null);
@@ -193,43 +196,12 @@ export function DrawingToolbar() {
     ];
   if (menu?.key === "magnet") {
     title = t("Магнит");
-    sections = [
-      {
-        title: null,
-        items: [
-          {
-            id: "weakMagnet",
-            label: t("Слабый магнит"),
-            icon: "magnet",
-            kind: "radio",
-            checked: settings.magnet === "weak",
-            action: () => run(() => controller.tools.setOptions({ magnet: "weak" }))
-          },
-          {
-            id: "strongMagnet",
-            label: t("Сильный магнит"),
-            icon: "strongMagnet",
-            kind: "radio",
-            checked: settings.magnet === "strong",
-            action: () => run(() => controller.tools.setOptions({ magnet: "strong" }))
-          }
-        ]
-      },
-      {
-        title: null,
-        items: [
-          {
-            id: "snapToIndicatorsSwitcher",
-            label: t("Прикрепить к индикаторам"),
-            kind: "checkbox",
-            checked: settings.snapIndicators,
-            disabled: settings.magnet === "off",
-            reason: t("Сначала включите магнит"),
-            action: () => run(() => controller.tools.toggleOption("snapIndicators"), false)
-          }
-        ]
-      }
-    ];
+    sections = magnetMenuSections(
+      settings,
+      mobile,
+      (magnet) => run(() => controller.tools.setOptions({ magnet })),
+      () => run(() => controller.tools.toggleOption("snapIndicators"), false)
+    );
   } else if (menu?.key === "lock") {
     title = t("Блокировка объектов");
     sections = [{ title: null, items: scopeRows("lock") }];
@@ -358,6 +330,7 @@ export function DrawingToolbar() {
       icon={icon}
       active={active}
       expanded={menu?.key === key}
+      mobileMenu={mobile && key === "magnet"}
       onChoose={() => {
         closeMenu();
         action();
@@ -401,6 +374,7 @@ export function DrawingToolbar() {
             active={active}
             disabled={!toolbarToolAvailable(last)}
             expanded={menu?.key === part.id}
+            mobileMenu={mobile}
             onChoose={() => choose(part, last)}
             onMenu={(anchor) => openMenu(part.id, anchor)}
           />
@@ -490,6 +464,7 @@ export function DrawingToolbar() {
           title={t(title)}
           anchor={menu.anchor}
           sections={sections}
+          mobile={mobile}
           onClose={closeMenu}
         />
       )}

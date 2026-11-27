@@ -352,6 +352,12 @@
   display: none !important;
 }
 @media (max-width: 800px) {
+  .drawing-tool-split[data-mobile-menu] {
+    --drawing-arrow-width: 0px;
+  }
+  .drawing-tool-split[data-mobile-menu] .drawing-tool-main {
+    border-radius: 4px;
+  }
   .drawing-toolbar {
     --drawing-arrow-width: 12px;
     --drawing-tool-highlight: 26px;
@@ -379,6 +385,104 @@
   .drawing-toolbar .rail-spacer {
     display: block;
   }
+}
+.drawing-tool-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 180;
+  display: flex;
+  align-items: flex-end;
+  background: #0009;
+  overscroll-behavior: none;
+}
+.drawing-tool-sheet {
+  box-sizing: border-box;
+  width: 100%;
+  max-height: calc(100% - 100px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  padding: 6px 0 calc(6px + env(safe-area-inset-bottom, 0px));
+  border-radius: 6px 6px 0 0;
+  background: #131313;
+  color: #dbdbdb;
+  font-size: 16px;
+  scrollbar-width: thin;
+}
+.drawing-tool-sheet .drawing-menu-section + .drawing-menu-section {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top-color: #333;
+}
+.drawing-tool-sheet .drawing-menu-section-title {
+  padding: 10px 16px;
+  color: #aaa;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.drawing-tool-sheet .drawing-menu-row {
+  min-height: 40px;
+  padding-right: 16px;
+}
+.drawing-tool-sheet .drawing-menu-row[data-selected] {
+  color: #131313;
+  background: #dbdbdb;
+}
+.drawing-tool-sheet .drawing-menu-action {
+  min-height: 40px;
+  gap: 12px;
+  padding: 0 12px 0 16px;
+}
+.drawing-tool-sheet .drawing-menu-icon,
+.drawing-tool-sheet .drawing-menu-icon svg {
+  width: 28px;
+  height: 28px;
+}
+.drawing-tool-sheet .drawing-menu-label {
+  padding: 6px 0;
+  line-height: 1.25;
+}
+.drawing-tool-sheet .drawing-menu-favorite {
+  flex: 0 0 24px;
+  padding: 0;
+  color: inherit;
+}
+.drawing-tool-sheet .drawing-menu-favorite svg {
+  width: 24px;
+  height: 24px;
+}
+.drawing-tool-sheet .drawing-menu-favorite.selected {
+  color: #ff9800;
+}
+.drawing-tool-sheet .drawing-menu-row[data-selected] .drawing-menu-favorite.selected {
+  color: #895100;
+}
+.drawing-tool-sheet button:focus-visible {
+  outline: 2px solid #5685ff;
+  outline-offset: -2px;
+}
+.drawing-sheet-checkbox {
+  display: flex;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+}
+.drawing-sheet-checkbox svg {
+  width: 16px;
+  height: 16px;
+}
+.drawing-sheet-back {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
 }
 @media (max-width: 600px) {
   .drawing-toolbar-popup {
