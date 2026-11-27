@@ -376,10 +376,112 @@ header.topbar {
   font-size: 24px;
 }
 @media (max-width: 800px) {
-  .topbar .toolbar-scroll .interval-menu-trigger {
-    height: 40px;
-    min-height: 40px;
+  :root {
+    --drawing-rail-width: 52px;
+    --mobile-toolbar-hit: 44px;
+    --mobile-avatar-inset: calc((var(--drawing-rail-width) - 1px - var(--mobile-toolbar-hit)) / 2);
+  }
+  header.topbar {
+    flex-basis: 46px;
+    height: 46px;
+    min-height: 46px;
+    max-height: 46px;
+  }
+  .topbar > .toolbar-scroll {
+    padding-inline-start: var(--mobile-avatar-inset);
+    scroll-padding-inline-start: calc(var(--drawing-rail-width) + 6px);
+  }
+  .topbar .toolbar-scroll .terminal-brand-menu {
+    flex-basis: var(--mobile-toolbar-hit);
+    width: var(--mobile-toolbar-hit);
+    inset-inline-start: var(--mobile-avatar-inset);
+    box-shadow: calc(0px - var(--mobile-avatar-inset)) 0 0 var(--surface, #131722);
+  }
+  .topbar .toolbar-scroll :is(.brand.account-button, .account-button .avatar) {
+    width: var(--mobile-toolbar-hit);
+    height: var(--mobile-toolbar-hit);
+    min-height: var(--mobile-toolbar-hit);
+    font-size: 20px;
+  }
+  .topbar .toolbar-scroll .chart-symbol-controls {
+    height: 42px;
+    border-radius: 22px;
+  }
+  .topbar .toolbar-scroll .chart-symbol-controls .symbol-button {
+    height: 38px;
+    min-height: 38px;
+    border-radius: 20px;
     font-size: 14px;
+  }
+  .topbar .toolbar-scroll .native-chart-type-trigger {
+    flex-basis: 38px;
+    width: 38px;
+    height: 38px;
+  }
+  .topbar .toolbar-scroll :is(.native-chart-type-trigger svg, .terminal-fullscreen-control svg) {
+    width: 22px;
+    height: 22px;
+  }
+  .topbar
+    .toolbar-scroll
+    :is(
+      .interval-favorite,
+      .interval-menu-trigger,
+      .indicator-control,
+      #indicators-button,
+      .indicator-quick-trigger,
+      .chart-layout-picker-trigger,
+      .terminal-fullscreen-control
+    ) {
+    height: var(--mobile-toolbar-hit);
+    min-height: var(--mobile-toolbar-hit);
+  }
+  .topbar .toolbar-scroll .interval-menu-trigger {
+    flex-basis: var(--mobile-toolbar-hit);
+    inline-size: var(--mobile-toolbar-hit);
+    min-width: var(--mobile-toolbar-hit);
+  }
+  .topbar .toolbar-scroll :is(.interval-favorite, #indicators-button) {
+    font-size: 14px;
+  }
+  .topbar .toolbar-scroll .indicator-control {
+    flex-basis: 154px;
+    width: 154px;
+    min-width: 154px;
+  }
+  .topbar .toolbar-scroll .indicator-quick-trigger {
+    flex-basis: 32px;
+    width: 32px;
+  }
+  .topbar .toolbar-scroll #indicators-button svg {
+    width: 24px;
+    height: 24px;
+  }
+  .topbar .toolbar-scroll .terminal-fullscreen-control {
+    width: var(--mobile-toolbar-hit);
+  }
+  .drawing-tools.drawing-toolbar {
+    --drawing-tool-highlight: 40px;
+    --drawing-tool-highlight-height: 40px;
+    min-height: 0;
+    padding-inline: 0;
+    overflow-y: auto;
+  }
+  .drawing-toolbar > .tool,
+  .drawing-toolbar .drawing-tool-split {
+    flex: 0 0 var(--mobile-toolbar-hit);
+    width: var(--mobile-toolbar-hit);
+    height: var(--mobile-toolbar-hit);
+    min-height: var(--mobile-toolbar-hit);
+  }
+  .drawing-toolbar :is(.drawing-tool-main, .drawing-tool-arrow) {
+    height: var(--mobile-toolbar-hit);
+    min-height: var(--mobile-toolbar-hit);
+  }
+  .drawing-toolbar > .tool > svg,
+  .drawing-toolbar .drawing-tool-main > svg {
+    width: 26px;
+    height: 26px;
   }
   .interval-menu-panel[data-mobile-sheet="true"]
     :is(.interval-menu-row, .interval-menu-choice, .interval-menu-category, .interval-menu-star) {
