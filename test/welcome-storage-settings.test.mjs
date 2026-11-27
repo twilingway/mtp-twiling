@@ -81,10 +81,18 @@ test("actual welcome/account components render English, official links and compa
   assert.ok(welcome.includes("welcome-do-not-show"));
   assert.equal(/[А-Яа-яЁё]/u.test(welcome), false);
   state = { ...state, dialog: "account" }; const account = render(AccountDialog);
-  assert.ok(account.includes('id="account-section-drive" hidden=""'));
+  assert.ok(account.includes('id="account-section-cloud" hidden=""'));
+  assert.ok(account.includes('aria-controls="account-section-cloud"'));
   assert.ok(account.includes('id="account-section-storage" hidden=""'));
   assert.ok(account.includes('id="account-section-transfer" hidden=""'));
-  assert.match(account, /Help(?: and getting started)?/); assert.ok(account.includes('id="google-drive-connect"'));
+  assert.match(account, /Help(?: and getting started)?/);
+  state = { ...state, initialAccountSection: "cloud" };
+  const cloud = render(AccountDialog);
+  assert.ok(cloud.includes('id="account-section-cloud"><'));
+  for (const provider of ["google-drive", "yandex-disk"]) {
+    assert.ok(cloud.includes(`data-provider="${provider}"`));
+    assert.ok(cloud.includes(`id="${provider}-enabled"`));
+  }
   // The existing license attribution uses a Cyrillic copyright letter in both locales.
   assert.equal(/[А-Яа-яЁё]/u.test(account.replace("Copyright (с) 2025 TradingView, Inc.", "")), false);
 
@@ -114,6 +122,7 @@ test("automatic welcome waits for startup and opens only for the settled guest",
   });
 
   for (const outcome of ["bank", "guest", "rejected"]) {
+    let cloudStarts = 0, cloudStops = 0;
     const startup = deferred(), effects = [], dialogs = [], notices = [], consumed = { current: false };
     const state = { ready: false, authenticated: false, profileTransition: false, dialog: null };
     const controller = {
@@ -138,7 +147,13 @@ test("automatic welcome waits for startup and opens only for the settled guest",
       "services/pwa.ts": { setupPwa: async () => () => {} },
       "services/storage-db.ts": { get: async () => undefined, put: async () => {} },
       "screens/terminal/context.tsx": { useTerminal: () => ({ controller, state }) },
-      "screens/terminal/controller-drive.ts": { startTerminalDrive: () => () => {} }
+      "screens/terminal/controller-cloud-sync.ts": {
+        startTerminalCloudSync: (target) => {
+          assert.equal(target, controller);
+          cloudStarts++;
+          return () => { cloudStops++; };
+        }
+      }
     });
     const { TerminalLifecycle } = modules("screens/terminal/TerminalLifecycle.tsx");
     const { WelcomeGate } = modules("screens/terminal/WelcomeDialog.tsx");
@@ -151,6 +166,7 @@ test("automatic welcome waits for startup and opens only for the settled guest",
     };
     assert.equal(gateProps().startupSettled, false);
     const cleanup = effects.pop()();
+    assert.equal(cloudStarts, 1);
     try {
       state.ready = true;
       runWelcomeEffect();
@@ -167,6 +183,7 @@ test("automatic welcome waits for startup and opens only for the settled guest",
       assert.deepEqual(notices, outcome === "rejected" ? ["Saved profile failed"] : []);
     } finally {
       cleanup();
+      assert.equal(cloudStops, 1);
     }
   }
 });

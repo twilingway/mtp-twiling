@@ -107,10 +107,13 @@ test("portable mutation barrier blocks edits/recovery but allows exports and log
   }
   controller.update({ backupBusy: true }); await controller.setPreferences({ locale: "en" });
   assert.equal(controller.getSnapshot().preferences.locale, "en");
+  const cloudSession = controller.cloudSessionKey();
   controller.update({ importingBackup: true }); const logout = controller.logout();
-  assert.equal(controller.getSnapshot().authenticated, false, "logout signals Google abort synchronously");
+  assert.equal(controller.cloudSessionKey(), cloudSession, "bank logout preserves the independent cloud session");
   await logout; assert.equal(reloads, 0); assert.equal(clients[0].closed, true);
-  assert.equal(controller.getSnapshot().owner, "public");
+  assert.equal(controller.getSnapshot().authenticated, false);
+  assert.equal(controller.cloudSessionKey(), cloudSession);
+  assert.equal(controller.getSnapshot().owner, "device");
   assert.equal(controller.getSnapshot().marketReady, true);
 });
 
@@ -337,10 +340,10 @@ function terminalFixture({ restore = async () => null, candles, importBackup, on
     importBackup: (...args) => importBackup(...args)
   };
   class BankBoundary extends EventTarget {
-    constructor(token, name) {
+    constructor(token, name, _cache, options = {}) {
       super();
       this.name = name;
-      this.owner = token ? `owner-${name}` : "public";
+      this.owner = options.owner ?? (token ? `owner-${name}` : "public");
       this.rows = token ? [sampleRow(name)] : [];
       this.authenticated = Boolean(token);
       this.closed = false;
@@ -392,6 +395,18 @@ function terminalFixture({ restore = async () => null, candles, importBackup, on
     },
     {
       "services/storage.ts": storage,
+      "services/workspace-identity.ts": {
+        DEVICE_OWNER: "device",
+        prepareDeviceWorkspace: async () => ({
+          owner: "device", primaryOwner: "public", cloudOwner: "device",
+          legacyOwners: ["public"], conflicts: []
+        })
+      },
+      "services/drive/device-slot-provider.ts": {
+        GoogleSlotProvider: class {
+          constructor() { assert.fail("optional cloud provider must not start in session tests"); }
+        }
+      },
       "services/chart-camera.ts": {
         loadChartView: async () => undefined,
         saveChartView: storage.saveView,
@@ -419,18 +434,18 @@ test("manual login wins over an older delayed remembered-session restore", async
   await enteredRestore.promise;
 
   await controller.login(`t.${"b".repeat(40)}`, "B", false);
-  assert.equal(controller.getSnapshot().owner, "owner-B");
+  assert.equal(controller.getSnapshot().owner, "device");
   assert.equal(controller.getSnapshot().ready, true);
 
   remembered.resolve({ token: `t.${"a".repeat(40)}`, owner: "owner-A", name: "A" });
   await bootstrap;
-  assert.equal(controller.getSnapshot().owner, "owner-B");
+  assert.equal(controller.getSnapshot().owner, "device");
   assert.equal(controller.getSnapshot().name, "B");
   assert.equal(clients.length, 1, "the stale restore must not activate another client");
   assert.equal(clients[0].name, "B");
   assert.equal(clients[0].closed, false);
   assert.equal(savedSessions.length, 1);
-  assert.equal(savedSessions[0].owner, "owner-B");
+  assert.equal(savedSessions[0].owner, "device");
 });
 
 test("an invalid backup leaves the current history request alive and able to finish", async (t) => {
@@ -489,7 +504,7 @@ test("an invalid backup leaves the current history request alive and able to fin
   assert.equal(controller.getSnapshot().loading, false);
   assert.equal(controller.getSnapshot().candles.length, 2);
   assert.equal(controller.getSnapshot().candles[1].timestamp, 1700086400000);
-  assert.equal(controller.getSnapshot().owner, "owner-B");
+  assert.equal(controller.getSnapshot().owner, "device");
 });
 
 class TrackedTarget extends EventTarget {

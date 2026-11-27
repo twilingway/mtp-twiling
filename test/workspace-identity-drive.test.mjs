@@ -226,6 +226,8 @@ test("terminal Drive bridge uses a stable cloud session in both API/Google order
   }
   const load = flowModules({
     "services/drive/coordinator.ts": { DriveCoordinator },
+    // This legacy bridge never constructs the optional v3 retention provider.
+    "services/drive/device-slot-provider.ts": { GoogleSlotProvider: class {} },
     "services/drive/auth.ts": { DriveAuth: class {} },
     "services/drive/sync.ts": { DriveSync: class {} },
     "services/drive/transport.ts": { DriveTransport: class {} },

@@ -383,7 +383,9 @@ test("automatic debounce coalesces edits and disabled automatic sync retains exp
 });
 
 test("quote changes do not dirty portable signatures; pixel replacements and UI settings do", () => {
-  const signature = sources({ "services/drive/local.ts": {} })("screens/terminal/controller-drive.ts").portableStateSignature;
+  const signature = sources({ "services/drive/local.ts": {},
+    "services/drive/device-slot-provider.ts": { GoogleSlotProvider: class {} }
+  })("screens/terminal/controller-drive.ts").portableStateSignature;
   const state = { preferences: backup().layout, rows: backup().watchlist, drawings: [], images: [] }, before = signature(state);
   assert.equal(signature({ ...state, rows: state.rows.map(row => ({ ...row, price: 99999, change: -5 })) }), before);
   assert.notEqual(signature({ ...state, preferences: { ...state.preferences, locale: "ru" } }), before);
@@ -578,6 +580,7 @@ test("one online event wakes automatic sync once and teardown removes that liste
     async sync() { syncs++; } suspend() { suspends++; }
   }
   const start = sources({ "services/drive/coordinator.ts": { DriveCoordinator: Coordinator }, "services/drive/local.ts": {},
+    "services/drive/device-slot-provider.ts": { GoogleSlotProvider: class {} },
     "screens/terminal/controller-camera-sync.ts": { cameraPending: () => false, flushCamera: async () => {}, subscribeCamera: () => () => {} }
   })("screens/terminal/controller-drive.ts").startTerminalDrive;
   const oldWindow = globalThis.window, oldDocument = globalThis.document;

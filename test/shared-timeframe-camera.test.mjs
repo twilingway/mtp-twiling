@@ -78,9 +78,12 @@ test("both engines carry live spacing and signed gap across every supported time
 
 function callbackFixture(hooks = {}, workspace = false) {
   const f = fixture(undefined, hooks);
+  const cloudSession = {};
   let view = full(camera(5, 5));
   let state = {
     owner: "owner", chartRevision: 0, authenticated: true, marketReady: true,
+    profileTransition: false, importingBackup: false, importRecoveryRequired: false,
+    workspaceMigrationIncomplete: false, loading: false, historyViewReady: true,
     preferences: { symbol: "GAZP", timeframe: "1d", engine: "tradingview", rangeDays: 365 },
     rows: [{ symbol: "GAZP", uid: "uid-GAZP" }]
   };
@@ -94,6 +97,7 @@ function callbackFixture(hooks = {}, workspace = false) {
     getSnapshot: () => state,
     subscribe: () => () => {},
     sessionKey: () => chart,
+    cloudSessionKey: () => cloudSession,
     notify: () => {}
   };
   const sync = f.load("screens/terminal/controller-camera-sync.ts");

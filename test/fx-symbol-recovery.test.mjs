@@ -93,7 +93,10 @@ function terminalFixture(t) {
     "services/storage.ts": { async savePreferences(owner, value) { saved.push({ owner, value }); }, async loadDrawings() { return []; }, async loadImages() { return []; } },
     "services/chart-camera.ts": { async loadChartView() {} },
     "services/drive/local.ts": { async loadDriveRecord() {}, async saveDriveRecord() {} },
-    "services/drive/coordinator.ts": { DriveCoordinator: class { constructor() { return drive; } } }
+    "services/drive/coordinator.ts": { DriveCoordinator: class { constructor() { return drive; } } },
+    "services/storage-db.ts": {
+      db: { transaction() { assert.fail("The controller fixture provides its own storage."); } }
+    }
   });
   const { TerminalController } = localLoad("screens/terminal/controller.ts");
   const { startTerminalDrive } = localLoad("screens/terminal/controller-drive.ts");
