@@ -5,6 +5,7 @@ import { diskFixture } from "./helpers/yandex-disk.mjs";
 const load = sourceLoader(),
   { YandexJournal } = load("services/yandex/journal.ts"),
   { YandexRevisions } = load("services/yandex/revisions.ts"),
+  { YandexTransport } = load("services/yandex/transport.ts"),
   { prepareDriveBackup, driveBackupDigest } = load("services/drive/backup.ts"),
   { encodeBundle, revisionName } = load("services/yandex/bundle.ts"),
   { decodeSlot } = load("services/yandex/slot-codec.ts");
@@ -12,8 +13,14 @@ async function fixture() {
   const backend = await localBackend(),
     journal = new YandexJournal(async () => backend),
     f = diskFixture();
-  const revisions = new YandexRevisions(f.transport, journal, f.auth, config.clientId);
-  return { ...f, backend, journal, revisions };
+  const transport = new YandexTransport(f.auth, {
+    fetch: f.fetcher,
+    sleep: async () => {},
+    // Storage failures use explicit fetch rejections; strict deadlines have separate transport tests.
+    timeoutMs: 5000
+  });
+  const revisions = new YandexRevisions(transport, journal, f.auth, config.clientId);
+  return { ...f, backend, journal, transport, revisions };
 }
 function backup(timeframe = "1h") {
   return {
@@ -147,6 +154,53 @@ test("a mode identity mismatch never replays, archives or deletes the pending up
 test("an unknown move result retains staged bytes and pending intent; exact readback retry is idempotent", async () => {
   const f = await fixture();
   await write(f, "1h");
+  const value = backup("2h"),
+    prepared = await prepareDriveBackup(value),
+    digest = await driveBackupDigest(value),
+    baseline = await f.revisions.inspect(() => true);
+  let lostResponses = 0;
+  f.hooks.before = async (url) => {
+    if (url.pathname.endsWith("/move")) {
+      lostResponses++;
+      throw new TypeError("MOVE response lost before its outcome was known");
+    }
+  };
+  await assert.rejects(
+    f.revisions.publish(prepared, digest, baseline.heads, () => true, true),
+    (error) => error.code === "indeterminate"
+  );
+  assert.ok(lostResponses > 0);
+  const pending = await f.journal.pending(config.clientId, f.auth.accountId),
+    stage = `stage_${pending.revision.revisionId}.mtp`,
+    staged = f.files.get(stage),
+    puts = f.puts();
+  assert.ok(staged);
+  assert.equal(
+    (await decodeSlot(staged)).envelope.current.revision.revisionId,
+    pending.revision.revisionId
+  );
+  assert.equal([...f.files.keys()].filter((name) => name.startsWith("slot_")).length, 1);
+  f.hooks.before = undefined;
+  const revision = await f.revisions.publish(prepared, digest, baseline.heads, () => true, true),
+    repeated = await f.revisions.publish(prepared, digest, baseline.heads, () => true, true);
+  assert.equal(revision.revisionId, pending.revision.revisionId);
+  assert.equal(repeated.revisionId, pending.revision.revisionId);
+  assert.equal(f.puts(), puts);
+  assert.equal(f.files.has(stage), false);
+  assert.equal(
+    (await f.journal.pending(config.clientId, f.auth.accountId)).revision.revisionId,
+    pending.revision.revisionId
+  );
+  await f.journal.clearPending(config.clientId, f.auth.accountId, f.auth.signal);
+  const inspected = await f.revisions.inspect(() => true);
+  assert.deepEqual(inspected.heads, [revision.revisionId]);
+  assert.equal(f.files.size, 2);
+  for (const body of f.files.values()) assert.ok((await decodeSlot(body)).current.size > 0);
+});
+
+test("a lost response after committed MOVE is reconciled by exact readback without another upload", async () => {
+  const f = await fixture();
+  await write(f, "1h");
   let once = true;
   f.hooks.afterMove = async (name) => {
     if (name.startsWith("slot_") && once) {
@@ -156,6 +210,8 @@ test("an unknown move result retains staged bytes and pending intent; exact read
     return new Response(null, { status: 201 });
   };
   const revision = await write(f, "2h");
+  assert.equal(once, false);
+  assert.equal(f.puts(), 2);
   const inspected = await f.revisions.inspect(() => true);
   assert.deepEqual(inspected.heads, [revision.revisionId]);
   assert.equal(f.files.size, 2);
