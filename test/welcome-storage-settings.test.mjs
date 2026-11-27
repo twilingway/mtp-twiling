@@ -75,23 +75,23 @@ test("actual welcome/account components render English, official links and compa
   const render = (component, props) => renderToStaticMarkup(React.createElement(TerminalContext, { value: controller }, React.createElement(component, props)));
   const welcome = render(WelcomeGate, { startupSettled: true });
   for (const link of ["https://developer.tbank.ru/invest/intro/intro/token", "https://www.tbank.ru/invest/settings/", "https://github.com/twilingway/mtp-twiling", "./privacy.html"]) assert.ok(welcome.includes(link));
-  assert.ok(welcome.includes("The terminal stores data in your browser."));
+  assert.ok(welcome.includes("Bank key: on this device."));
   assert.ok(welcome.includes("Clearing site data deletes local saves."));
-  assert.ok(welcome.includes("personal Google Drive"));
+  assert.ok(welcome.includes("Cloud sync is optional."));
   assert.ok(welcome.includes("welcome-do-not-show"));
   assert.equal(/[А-Яа-яЁё]/u.test(welcome), false);
   state = { ...state, dialog: "account" }; const account = render(AccountDialog);
   assert.ok(account.includes('id="account-section-drive" hidden=""'));
   assert.ok(account.includes('id="account-section-storage" hidden=""'));
   assert.ok(account.includes('id="account-section-transfer" hidden=""'));
-  assert.ok(account.includes('id="open-welcome"')); assert.ok(account.includes('id="google-drive-connect"'));
+  assert.match(account, /Help(?: and getting started)?/); assert.ok(account.includes('id="google-drive-connect"'));
   // The existing license attribution uses a Cyrillic copyright letter in both locales.
   assert.equal(/[А-Яа-яЁё]/u.test(account.replace("Copyright (с) 2025 TradingView, Inc.", "")), false);
 
   state = { ...state, dialog: "welcome", authenticated: true };
   for (const [locale, status, continueLabel] of [
-    ["en", "T-Bank is connected", "Continue"],
-    ["ru", "Т‑Банк подключён", "Продолжить"]
+    ["en", "T-Bank is connected", "Open charts"],
+    ["ru", "Т‑Банк подключён", "Открыть графики"]
   ]) {
     preferences.setDisplayPreferences({ locale });
     const help = render(WelcomeGate, { startupSettled: true });
