@@ -342,7 +342,7 @@ test("a durable native commit followed by UI restore failure does not reimport o
   assert.equal(h.applies(), 1);
 });
 
-test("binary browser probe uses identical upload media framing and enables only measured size after a 412", async () => {
+for (const imageBytes of [32, 1024 * 1024, 2 * 1024 * 1024]) test(`binary browser probe measures ${imageBytes} image bytes with identical framing and a 412`, async () => {
   const id = "synthetic-probe";
   let media;
   let seq = 1;
@@ -403,9 +403,67 @@ test("binary browser probe uses identical upload media framing and enables only 
     return new Response(media, { headers: { "Content-Length": String(media.size) } });
   };
   assert.equal(verifiedDeviceSlotUploadBytes(authorization), 0);
-  const result = await runDriveSlotBinaryProbe(authorization, fetcher, signal, 32);
+  const result = await runDriveSlotBinaryProbe(authorization, fetcher, signal, imageBytes);
   assert.equal(conditionalWrites, 2);
   assert.equal(result.loserStatus, 412);
   assert.equal(verifiedDeviceSlotUploadBytes(authorization), result.maxBytes);
   assert.equal(verifiedDeviceSlotUploadBytes({ ...authorization }), 0);
+  if (imageBytes >= 1024 * 1024) assert.equal(result.maxBytes, 2 * imageBytes + 1999);
+  else assert.ok(result.maxBytes <= 2 * imageBytes + 1999);
+});
+
+test("automatic capacity proof sees actual current plus previous bytes before pending and original replacement resumes once", async () => {
+  const mock = transport();
+  const peer = new DeviceSlotStore(mock.io, () => 1 << 20);
+  const first = await peerPublish(peer, await peer.inspect(scope, undefined, signal), "SBER", 180, deviceId);
+  let budget = 0, capacityCalls = 0, pendingCalls = 0;
+  const current = await version("GAZP");
+  const planned = plan(first, current, 181);
+  const previous = await version("SBER");
+  const expectedBytes = encodeDeviceSlotPackage(planned.envelope, current, previous).size;
+  const store = new DeviceSlotStore(mock.io, () => budget, async (bytes) => {
+    capacityCalls++;
+    assert.equal(pendingCalls, 0);
+    assert.equal(mock.patches(), 0);
+    assert.equal(bytes, expectedBytes);
+    budget = bytes;
+  });
+  const pinned = await store.inspect(scope, first.checkpoint, signal);
+  const after = await store.write(pinned, plan(pinned, current, 181), current, async () => { pendingCalls++; }, signal);
+  assert.equal(capacityCalls, 1);
+  assert.equal(pendingCalls, 1);
+  assert.equal(mock.patches(), 1);
+  assert.equal(after.files[0].envelope.current.revisionId, uid(181));
+  assert.equal(await previousSymbol(store, after), "SBER");
+});
+
+test("a head changing during automatic proof blocks before pending and preserves the peer write", async () => {
+  const mock = transport();
+  const peer = new DeviceSlotStore(mock.io, () => 1 << 20);
+  let budget = 0, pendingCalls = 0;
+  const store = new DeviceSlotStore(mock.io, () => budget, async () => {
+    const now = await peer.inspect(scope, undefined, signal);
+    await peerPublish(peer, now, "NVTK", 190, deviceB);
+    budget = 1 << 20;
+  });
+  const empty = await store.inspect(scope, undefined, signal);
+  const current = await version("SBER");
+  await assert.rejects(store.write(empty, plan(empty, current, 191), current, async () => { pendingCalls++; }, signal), { code: "conflict" });
+  assert.equal(pendingCalls, 0);
+  assert.equal(mock.files.size, 1);
+  assert.equal(mock.patches(), 0);
+});
+
+test("capacity cancellation cannot reserve or persist a user pending write", async () => {
+  const mock = transport();
+  const controller = new AbortController();
+  let pending = false, reserves = 0;
+  const io = { ...mock.io, reserve: async (...args) => { reserves++; return mock.io.reserve(...args); } };
+  const store = new DeviceSlotStore(io, () => 1 << 20, async () => { controller.abort(); });
+  const empty = await store.inspect(scope, undefined, controller.signal);
+  const current = await version("SBER");
+  await assert.rejects(store.write(empty, plan(empty, current, 192), current, async () => { pending = true; }, controller.signal), { name: "AbortError" });
+  assert.equal(pending, false);
+  assert.equal(reserves, 0);
+  assert.equal(mock.files.size, 0);
 });

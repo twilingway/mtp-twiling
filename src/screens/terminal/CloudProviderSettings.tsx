@@ -12,6 +12,7 @@ import { useTerminal } from "./context.js";
 import { shallowEqual } from "./snapshot-selector.js";
 import type { TerminalState } from "./state.js";
 import { cloudOperationTiming } from "./cloud-operation-clock.js";
+import type { GoogleStatus } from "../../services/drive/device-slot-provider.js";
 const phases: Record<CloudSyncStatus["phase"], string> = {
   disabled: "Синхронизация выключена",
   disconnected: "Облако не подключено",
@@ -96,11 +97,19 @@ export function CloudProviderSettings({
     provider.getSnapshot,
     provider.getSnapshot
   );
+  const googleChecking =
+    status.enabled &&
+    provider.id === "google-drive" &&
+    (status as GoogleStatus).writeCapability?.phase === "checking";
   const timing = cloudOperationTiming(provider);
   const [actionError, setActionError] = useState(false),
     [elapsed, setElapsed] = useState(0),
     [pendingActions, setPendingActions] = useState(0);
-  const busy = status.phase === "connecting" || status.phase === "syncing" || pendingActions > 0;
+  const busy =
+    googleChecking ||
+    status.phase === "connecting" ||
+    status.phase === "syncing" ||
+    pendingActions > 0;
   const blocked = !!(
     state.profileTransition ||
     state.backupBusy ||
@@ -150,7 +159,7 @@ export function CloudProviderSettings({
         {t("Включить синхронизацию")}
       </label>
       <p id={`${id}-status`} role="status">
-        {t(phases[visiblePhase])}
+        {t(googleChecking ? "Проверяем подключение…" : phases[visiblePhase])}
       </p>
       {!status.enabled && pendingActions > 0 && <p role="status">{t("Выполняем действие…")}</p>}
       {(status.credentialSaveError || actionError) && (
@@ -167,12 +176,25 @@ export function CloudProviderSettings({
           {status.preparing && <p role="status">{t("Готовим вход…")}</p>}
           {busy && (
             <div className="cloud-operation-progress" aria-live="polite">
-              <strong>{t(progress ? stages[progress.stage] : phases[status.phase])}</strong>
+              <strong>
+                {t(
+                  googleChecking
+                    ? "Проверяем подключение…"
+                    : progress
+                      ? stages[progress.stage]
+                      : phases[status.phase]
+                )}
+              </strong>
               <small>
                 {t("Прошло")}: {elapsed} {t("с")}
               </small>
-              {progress?.totalBytes !== undefined && progress.totalBytes > 0 && (
-                <progress value={progress.completedBytes ?? 0} max={progress.totalBytes} />
+              {googleChecking ? (
+                <progress aria-label={t("Проверяем подключение…")} />
+              ) : (
+                progress?.totalBytes !== undefined &&
+                progress.totalBytes > 0 && (
+                  <progress value={progress.completedBytes ?? 0} max={progress.totalBytes} />
+                )
               )}
             </div>
           )}
@@ -185,7 +207,7 @@ export function CloudProviderSettings({
             {t(
               status.pendingChanges
                 ? "Изменения ожидают синхронизации"
-                : status.lastSyncedAt && status.phase === "idle" && !status.error
+                : !googleChecking && status.lastSyncedAt && status.phase === "idle" && !status.error
                   ? "Операция подтверждена"
                   : status.lastSyncedAt
                     ? "Данные сохранены на устройстве. Ожидаем проверки облака."
@@ -255,7 +277,7 @@ export function CloudProviderSettings({
               {t(errors[status.error])}
             </p>
           )}
-          {status.choiceAction && (
+          {status.choiceAction && !googleChecking && (
             <p
               id={`${id}-choice-result`}
               role={status.choiceAction.state === "unconfirmed" ? "alert" : "status"}

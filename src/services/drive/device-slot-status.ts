@@ -11,11 +11,13 @@ import type { GoogleArchiveStatus } from "./device-slot-migration.js";
 import type { SlotSyncResult } from "./device-slot-sync.js";
 import type { DriveOperationTime, DriveProgress, DriveStage } from "./progress.js";
 import { DriveError } from "./types.js";
+import type { WriteCapabilityStatus } from "./write-capability.js";
 
 export interface GoogleStatus extends CloudSyncStatus {
   mode: "normal" | "test";
   migrationRequired?: boolean;
   uploadProbeBytes: number;
+  writeCapability?: WriteCapabilityStatus;
   driveProgress?: DriveProgress;
   lastOperation?: DriveOperationTime;
   previousVersions?: readonly { id: string; deviceId: string; size: number }[];
@@ -29,6 +31,7 @@ export type GoogleTransientStatusKey =
   | "archive"
   | "progress"
   | "driveProgress"
+  | "writeCapability"
   | "choiceAction"
   | "lastSyncedAt"
   | "previousVersions"
@@ -93,6 +96,12 @@ export function operationError(error: unknown): CloudErrorCode {
       return error.code;
   }
   return "local-save";
+}
+
+export function googleSlotChoiceFailure(
+  error: CloudErrorCode | undefined
+): NonNullable<GoogleStatus["choiceAction"]>["state"] {
+  return error === "indeterminate" ? "unconfirmed" : error === "conflict" ? "review" : "blocked";
 }
 
 export function deviceSlotOutcome(

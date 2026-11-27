@@ -612,7 +612,7 @@ test("disabling waits for an entered local effect but does not wait for a dispat
   await assert.rejects(fence.check(), { name: "AbortError" });
   assert.equal(stale, true);
 
-  for (const method of ["POST", "PATCH", "PUT"]) {
+  for (const method of ["POST", "PATCH", "PUT", "DELETE"]) {
     const enabled = await updateGoogleSlotTarget(disabled, { enabled: true }, access, signal);
     const next = googleSlotFence(
       enabled,
@@ -647,4 +647,48 @@ test("disabling waits for an entered local effect but does not wait for a dispat
     await assert.rejects(fetcher("https://example.test", { method }), { name: "AbortError" });
     assert.equal(requests, 1);
   }
+});
+
+for (const pointerless of [true, false]) test(`off-on lifecycle cannot revive a paused ${pointerless ? "pointerless" : "pointer"} job`, async () => {
+  const signal = new AbortController().signal;
+  let local = { generation: 3, enabled: true, explicitGoogleCredential: "same-credential" };
+  let active = { generation: 5, enabled: true, activeGoogleSlotOwner: "same-owner" };
+  const access = {
+    load: async (owner) => owner === GOOGLE_SLOT_ACTIVE_OWNER ? active : local,
+    save: async (owner, prior, patch) => {
+      const current = owner === GOOGLE_SLOT_ACTIVE_OWNER ? active : local;
+      assert.equal(prior.generation, current.generation);
+      const next = { ...current, ...patch, generation: current.generation + 1 };
+      if (owner === GOOGLE_SLOT_ACTIVE_OWNER) active = next; else local = next;
+      return next;
+    }
+  };
+  const target = { owner: "same-owner", record: local, pointer: pointerless ? undefined : active, enabled: true };
+  let stale = 0, writes = 0;
+  const old = googleSlotFence(target, access, signal, () => true, () => { stale++; });
+  await old.check();
+  const disabled = await updateGoogleSlotTarget(target, { enabled: false }, access, signal);
+  const enabled = await updateGoogleSlotTarget(disabled, { enabled: true }, access, signal);
+  assert.equal(enabled.enabled, true);
+  await assert.rejects(old.check(), { name: "AbortError" });
+  const send = old.guardFetch(async () => { writes++; return new Response(null, { status: 204 }); });
+  for (const method of ["POST", "PUT", "DELETE"]) await assert.rejects(send("https://example.test", { method }), { name: "AbortError" });
+  assert.equal(writes, 0);
+  assert.ok(stale > 0);
+});
+
+test("pointerless fence acknowledges only its own successful local CAS updates", async () => {
+  const signal = new AbortController().signal;
+  let record = { generation: 1, enabled: true };
+  const target = { owner: "device", record, pointer: undefined, enabled: true };
+  const fence = googleSlotFence(target, { load: async () => record }, signal, () => true, () => {});
+  await fence.check();
+  await fence.effect(() => {
+    const prior = record; record = { ...record, generation: record.generation + 1 };
+    fence.acknowledge(prior, record);
+  });
+  await fence.check();
+  record = { ...record, generation: record.generation + 1 };
+  await assert.rejects(fence.check(), { name: "AbortError" });
+  assert.throws(() => fence.acknowledge(target.record, record), { name: "AbortError" });
 });

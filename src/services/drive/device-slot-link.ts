@@ -46,18 +46,22 @@ export function googleSlotFence(
   onStale: (enabled: boolean) => void
 ) {
   const expected = target.pointer;
+  let generation = target.record.generation;
   const assertJob = () => {
     signal.throwIfAborted();
     if (!isCurrent()) throw new DOMException("Google sync operation ended.", "AbortError");
   };
   const check = async () => {
     assertJob();
-    if (!expected) return;
-    const actual = await access.load(GOOGLE_SLOT_ACTIVE_OWNER);
+    const actual = await access.load(expected ? GOOGLE_SLOT_ACTIVE_OWNER : target.owner);
     assertJob();
     if (
-      actual.generation !== expected.generation ||
-      actual.activeGoogleSlotOwner !== expected.activeGoogleSlotOwner ||
+      (expected &&
+        (actual.generation !== expected.generation ||
+          actual.activeGoogleSlotOwner !== expected.activeGoogleSlotOwner)) ||
+      (!expected &&
+        (actual.generation !== generation ||
+          actual.explicitGoogleCredential !== target.record.explicitGoogleCredential)) ||
       actual.enabled === false
     ) {
       onStale(actual.enabled !== false);
@@ -66,10 +70,6 @@ export function googleSlotFence(
     }
   };
   const effect = async <T>(action: () => T | Promise<T>): Promise<T> => {
-    if (!expected) {
-      assertJob();
-      return action();
-    }
     return pointerLock("shared", signal, async () => {
       await check();
       return action();
@@ -78,13 +78,20 @@ export function googleSlotFence(
   const guardFetch =
     (fetcher: typeof fetch): typeof fetch =>
     async (input, init) => {
-      if (!expected || !["POST", "PATCH", "PUT"].includes(init?.method ?? "GET"))
+      if (!["POST", "PATCH", "PUT", "DELETE"].includes(init?.method ?? "GET"))
         return fetcher(input, init);
       // The lock covers dispatch only. A later disable need not wait for Google to answer.
       const { response } = await effect(() => ({ response: fetcher(input, init) }));
       return response;
     };
-  return { check, effect, guardFetch };
+  const acknowledge = (prior: DeviceSlotRecord, next: DeviceSlotRecord) => {
+    assertJob();
+    if (expected) return;
+    if (prior.generation !== generation || next.generation !== prior.generation + 1)
+      throw new DOMException("Google record update is stale.", "AbortError");
+    generation = next.generation;
+  };
+  return { check, effect, guardFetch, acknowledge };
 }
 
 export const matchesGoogleSlotCredential = (
@@ -223,6 +230,8 @@ export async function updateGoogleSlotTarget(
     );
     return { ...target, pointer, enabled: pointer.enabled };
   }
-  const record = await access.save(target.owner, target.record, patch, signal);
+  const save = () => access.save(target.owner, target.record, patch, signal);
+  const record =
+    patch.enabled === undefined ? await save() : await pointerLock("exclusive", signal, save);
   return { ...target, record, enabled: target.pointer?.enabled ?? record.enabled };
 }

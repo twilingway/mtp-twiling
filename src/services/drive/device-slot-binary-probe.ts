@@ -19,6 +19,13 @@ import type { DriveAuthorization } from "./types.js";
 const budgets = new WeakMap<DriveAuthorization, number>();
 export const verifiedDeviceSlotUploadBytes = (authorization: DriveAuthorization) =>
   budgets.get(authorization) ?? 0;
+export const hydrateDeviceSlotUploadBytes = (authorization: DriveAuthorization, bytes: number) =>
+  budgets.set(authorization, bytes);
+
+export interface BinaryProbeLifecycle {
+  reserved(fileId: string, key: string): Promise<void>;
+  dispatch(fileId: string): Promise<void>;
+}
 
 async function syntheticVersion(variant: number, bytes: number, signal: AbortSignal) {
   const mimeType = "image/gif";
@@ -51,12 +58,13 @@ async function syntheticVersion(variant: number, bytes: number, signal: AbortSig
   );
 }
 
-/** Only an explicit DEV command may invoke this disposable-file test. */
+/** Shared binary proof; managed callers journal the owned file before create dispatch. */
 export async function runDriveSlotBinaryProbe(
   authorization: DriveAuthorization,
   fetcher: typeof fetch,
   signal: AbortSignal,
-  imageBytes = 1024 * 1024
+  imageBytes = 1024 * 1024,
+  lifecycle?: BinaryProbeLifecycle
 ) {
   if (!Number.isSafeInteger(imageBytes) || imageBytes < 1 || imageBytes > 2 * 1024 * 1024)
     throw new RangeError("Invalid Drive binary probe size");
@@ -97,6 +105,10 @@ export async function runDriveSlotBinaryProbe(
   const b = packet(await version(4, seed.current), seed);
   const io = new DeviceSlotHttp(authorization, fetcher, PROBE_NAMESPACE);
   const fileId = await io.reserve(scope);
+  await lifecycle?.reserved(fileId, key);
+  scope.throwIfAborted();
+  await lifecycle?.dispatch(fileId);
+  scope.throwIfAborted();
   await io.create(fileId, key, initial.body, scope);
   const before = await io.read(fileId, scope);
   const baseEtag = strongDeviceSlotTag(before.etag);

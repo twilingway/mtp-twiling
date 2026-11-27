@@ -1,4 +1,11 @@
 export const driveMessages = {
+  "Проверяем подключение…": "Checking connection…",
+  "Диагностика Google": "Google diagnostics",
+  "Проверка подключения не отправляет рабочее пространство.":
+    "The connection check does not send your workspace.",
+  "Повторить проверку подключения": "Check the connection again",
+  "Google Диск: удаление временных данных проверки будет повторено автоматически.":
+    "Google Drive: temporary connection-check data will be removed automatically on retry.",
   "Обновите приложение": "Update the app",
   "Старые версии": "Older versions",
   "Конфликт версий": "Version conflict",

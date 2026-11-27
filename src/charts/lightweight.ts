@@ -11,10 +11,9 @@ import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { chartPalette } from "../model/theme.js";
 import { lightweightAxisLabels } from "./lightweight-axis-labels.js";
 import { hasCalendarAxis } from "../model/intervals/axis-ticks.js";
-import { paintCalendarAxis, paintCalendarGrid } from "./lightweight-calendar-grid.js";
+import { lightweightCalendar } from "./lightweight-calendar.js";
 import { lightweightDateFormatters } from "../i18n/chart-formatters.js";
 import { intlLocale } from "../i18n/preferences.js";
-import { calendarAxisDisplay } from "../i18n/calendar-axis.js";
 import { lightweightNavigation } from "./lightweight-navigation.js";
 import { UserCameraEvents } from "./camera-events.js";
 import { lightweightLegacy } from "./lightweight-legacy.js";
@@ -46,7 +45,6 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
   let pendingPriceRange: { from: number; to: number } | undefined;
   const palette = chartPalette(settings);
   const dateFormatters = lightweightDateFormatters(timeframe, options);
-  const display = calendarAxisDisplay(timeframe, options);
   const formatTick = (time: Time, type: number) =>
     hasCalendarAxis(timeframe) ? "" : dateFormatters.tickMarkFormatter(time, type);
   const chart = createChart(container, {
@@ -98,6 +96,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     }
   });
   const stopTouchScroll = observeLightweightTouchScroll(container, chart);
+  const calendar = lightweightCalendar(chart, options, () => data);
   const main = lightweightMainSeries(chart, settings, priceFormat);
   const { series } = main;
   const axisLabels = lightweightAxisLabels(
@@ -150,24 +149,8 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
               const { context, horizontalPixelRatio: x, verticalPixelRatio: y, bitmapSize } = scope;
               context.save();
               context.scale(x, y);
-              const range = chart.timeScale().getVisibleLogicalRange();
-              if (
-                layer === "back" &&
-                settings.grid !== false &&
-                range &&
-                hasCalendarAxis(timeframe)
-              )
-                paintCalendarGrid(context, data, timeframe, {
-                  from: range.from,
-                  to: range.to,
-                  width: bitmapSize.width / x,
-                  height: bitmapSize.height / y,
-                  coordinate: (index) =>
-                    chart.timeScale().logicalToCoordinate(index as Logical) ?? NaN,
-                  color: palette.grid,
-                  pixelRatio: x,
-                  display
-                });
+              if (layer === "back")
+                calendar.paintGrid(context, bitmapSize.width / x, bitmapSize.height / y, x);
               options.paint(
                 context,
                 bitmapSize.width / x,
@@ -180,43 +163,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
           }
         })
       })),
-    timeAxisPaneViews: () =>
-      hasCalendarAxis(timeframe)
-        ? [
-            {
-              zOrder: () => "normal" as const,
-              renderer: () => ({
-                draw: (target) =>
-                  target.useBitmapCoordinateSpace((scope) => {
-                    const range = chart.timeScale().getVisibleLogicalRange();
-                    if (!range) return;
-                    const {
-                      context,
-                      horizontalPixelRatio: x,
-                      verticalPixelRatio: y,
-                      bitmapSize
-                    } = scope;
-                    context.save();
-                    context.scale(x, y);
-                    paintCalendarAxis(context, data, timeframe, {
-                      from: range.from,
-                      to: range.to,
-                      width: bitmapSize.width / x,
-                      height: bitmapSize.height / y,
-                      coordinate: (index) =>
-                        chart.timeScale().logicalToCoordinate(index as Logical) ?? NaN,
-                      color: palette.muted,
-                      fontSize: settings.scaleFontSize ?? 11,
-                      fontFamily:
-                        '-apple-system,BlinkMacSystemFont,"Trebuchet MS",Roboto,Ubuntu,sans-serif',
-                      display
-                    });
-                    context.restore();
-                  })
-              })
-            }
-          ]
-        : []
+    timeAxisPaneViews: calendar.timeAxisPaneViews
   };
   series.attachPrimitive(primitive);
   series.attachPrimitive(axisLabels.primitive);
@@ -331,6 +278,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     setData(next, fit) {
       if (live.retired) return;
       settingData = true;
+      calendar.invalidate();
       data = [...next];
       model.reset(data, activeMtpPeriods(indicators));
       main.setData(data);
@@ -360,6 +308,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       const historical = bar.timestamp < (data.at(-1)?.timestamp ?? bar.timestamp);
       if (index >= 0) data[index] = bar;
       else {
+        calendar.invalidate();
         data.push(bar);
         if (historical) data.sort((a, b) => a.timestamp - b.timestamp);
       }
@@ -479,6 +428,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     },
     redrawDrawings: () => updateDrawings(),
     destroy() {
+      calendar.dispose();
       main.dispose();
       stopTouchScroll();
       link.dispose();

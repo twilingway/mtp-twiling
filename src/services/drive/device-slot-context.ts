@@ -6,6 +6,8 @@ import { inspectLegacyDeviceSlotSources } from "./device-slot-migration.js";
 import { DeviceSlotStore } from "./device-slot-store.js";
 import type { SlotCapture, SlotSyncContext } from "./device-slot-sync.js";
 import type { DriveAuthorization } from "./types.js";
+import { DriveWriteCapability } from "./write-capability.js";
+import type { WriteCapabilityStatus } from "./write-capability.js";
 
 export const providerId = "google-drive";
 export const changed = () => new DOMException("Операция Google Диска устарела.", "AbortError");
@@ -41,6 +43,7 @@ interface ContextOptions extends Pick<SlotSyncContext, "capture" | "save" | "rep
   authorization: DriveAuthorization;
   fetcher: typeof fetch;
   fence: ReturnType<typeof googleSlotFence>;
+  capability: (status: WriteCapabilityStatus) => void;
 }
 
 /** One runtime job pins its authorization, portable revision, and guarded local writer. */
@@ -52,24 +55,46 @@ export function createDeviceSlotContext({
   fence,
   capture,
   save,
-  report
+  report,
+  capability
 }: ContextOptions): SlotSyncContext & { localChanged(): boolean } {
   let acceptedRevision = capture.revision;
   const checkIdentity = () => {
     if (!guard.isCurrent()) throw changed();
   };
+  const check = () => {
+    checkIdentity();
+    const latest = host.scope(providerId);
+    if (latest.blocked || latest.revision !== capture.revision) throw changed();
+  };
+  const manager = new DriveWriteCapability({
+    authorization,
+    fetcher: fence.guardFetch(fetcher),
+    signal: guard.signal,
+    check: async () => {
+      checkIdentity();
+      await fence.check();
+      checkIdentity();
+    },
+    publish: (status) => {
+      checkIdentity();
+      report?.("prepare-upload");
+      capability(status);
+    }
+  });
   return {
-    store: new DeviceSlotStore(new DeviceSlotHttp(authorization, fence.guardFetch(fetcher)), () =>
-      verifiedDeviceSlotUploadBytes(authorization)
+    store: new DeviceSlotStore(
+      new DeviceSlotHttp(authorization, fence.guardFetch(fetcher)),
+      () => verifiedDeviceSlotUploadBytes(authorization),
+      async (requiredBytes) => {
+        await manager.ensure(requiredBytes);
+        check();
+      }
     ),
     signal: guard.signal,
     capture,
     checkIdentity,
-    check() {
-      checkIdentity();
-      const latest = host.scope(providerId);
-      if (latest.blocked || latest.revision !== capture.revision) throw changed();
-    },
+    check,
     noteApplyRevision(revision) {
       acceptedRevision = revision;
     },
@@ -81,7 +106,11 @@ export function createDeviceSlotContext({
       fence.effect(() => host.apply(providerId, backup, revision, guard, onCommitted)),
     save: (prior, patch) => {
       checkIdentity();
-      return fence.effect(() => save(prior, patch));
+      return fence.effect(async () => {
+        const next = await save(prior, patch);
+        fence.acknowledge(prior, next);
+        return next;
+      });
     },
     report,
     localChanged: () => host.scope(providerId).revision !== acceptedRevision

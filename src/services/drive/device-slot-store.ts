@@ -114,7 +114,8 @@ export class DeviceSlotStore {
   private readonly genuine = new WeakMap<DeviceSlotInspection, ReadonlyMap<string, SlotLocation>>();
   constructor(
     private readonly io: SlotIo,
-    private readonly verifiedUploadBudget: () => number = () => 0
+    private readonly verifiedUploadBudget: () => number = () => 0,
+    private readonly ensureWriteCapacity?: (requiredBytes: number) => Promise<void>
   ) {}
 
   /** Inspect bounded headers without loading all image bodies from every client. */
@@ -203,8 +204,6 @@ export class DeviceSlotStore {
     signal: AbortSignal,
     report?: DriveReport
   ): Promise<DeviceSlotInspection> {
-    const max = this.verifiedUploadBudget();
-    if (max <= 0) throw new DeviceSlotCasError("probe");
     if (!this.genuine.has(snapshot)) throw invalid();
     const { workspaceId, legacyArchive } = snapshot;
     const envelope = parseDeviceSlotEnvelope(plan.envelope);
@@ -238,6 +237,20 @@ export class DeviceSlotStore {
     }
     report?.("prepare-upload");
     const bytes = encodeDeviceSlotPackage(envelope, current, previous);
+    if (this.ensureWriteCapacity) {
+      await this.ensureWriteCapacity(bytes.size);
+      signal.throwIfAborted();
+      const checked = await this.inspect(
+        { workspaceId, legacyArchive },
+        snapshot.checkpoint,
+        signal,
+        report
+      );
+      if (!checked || JSON.stringify(checked.checkpoint) !== JSON.stringify(snapshot.checkpoint))
+        throw conflict();
+    }
+    const max = this.verifiedUploadBudget();
+    if (max <= 0) throw new DeviceSlotCasError("probe");
     if (bytes.size > max)
       throw new DriveError("limit", "Размер версии превышает проверенный размер загрузки.");
     const pending = {
