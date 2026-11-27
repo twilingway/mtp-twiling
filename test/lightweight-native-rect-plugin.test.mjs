@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
@@ -15,6 +15,8 @@ import {
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const sdk = join(root, "node_modules", "lightweight-charts");
+// Resolve fixture imports alongside the actual SDK and its pnpm-linked dependencies.
+const sdkDist = await realpath(join(sdk, "dist"));
 const modes = {
   development: {
     renderer: "PaneRendererCandlesticks",
@@ -93,7 +95,7 @@ async function loadRenderer(source, names, minify) {
   const result = await build({
     stdin: {
       contents: `${source}\nexport { ${names.renderer} as TestRenderer, ${names.view} as TestView };`,
-      resolveDir: join(sdk, "dist"),
+      resolveDir: sdkDist,
       sourcefile: "pinned-sdk-renderer.mjs"
     },
     bundle: true,
