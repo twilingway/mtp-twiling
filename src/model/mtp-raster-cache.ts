@@ -159,6 +159,9 @@ export class MtpRasterCache {
     return { xScale, yScale, xOffset, yOffset };
   }
   private covers(frame: MtpRasterFrame, cached: Cached, matrix: Matrix): boolean {
+    const requiredFrom = Math.max(0, Math.floor(frame.from) - 1);
+    const requiredTo = Math.min(frame.model.data.length - 1, Math.ceil(frame.to) + 1);
+    if (requiredFrom < cached.indices[0]! || requiredTo > cached.indices[1]!) return false;
     let left = -matrix.xOffset / matrix.xScale;
     let right = (cached.width - matrix.xOffset) / matrix.xScale;
     let top = -matrix.yOffset / matrix.yScale;
@@ -170,15 +173,11 @@ export class MtpRasterCache {
     top = Math.max(top, cached.priceLowY);
     bottom = Math.min(bottom, cached.priceHighY);
     if (left > right || top > bottom) return true;
-    const requiredFrom = Math.max(0, Math.floor(frame.from) - 1);
-    const requiredTo = Math.min(frame.model.data.length - 1, Math.ceil(frame.to) + 1);
     return (
       left >= -cached.padX &&
       right <= cached.width + cached.padX &&
       top >= -cached.padY &&
-      bottom <= cached.height + cached.padY &&
-      (cached.fullHistory ||
-        (requiredFrom >= cached.indices[0]! && requiredTo <= cached.indices[1]!))
+      bottom <= cached.height + cached.padY
     );
   }
   draw(frame: MtpRasterFrame): boolean {
@@ -267,9 +266,13 @@ export class MtpRasterCache {
       }
       const previewScale =
         matrix.xScale >= 0.5 && matrix.xScale <= 2 && matrix.yScale >= 0.5 && matrix.yScale <= 2;
+      const covered = this.covers(frame, cached, matrix) && previewScale;
+      // A settled ordinary frame draws its exact native range, but keeps the padded capture
+      // available for the next gesture until coverage or data actually changes.
+      if (covered && cached.previewOnly && !changedData && (this.ready || !changedGeometry))
+        return false;
       if (
-        this.covers(frame, cached, matrix) &&
-        previewScale &&
+        covered &&
         ((!changedGeometry && !changedData) || (!this.ready && (!changedData || held)))
       ) {
         // Extra offscreen segments can affect wide stroke joins. Settled ordinary frames must
@@ -279,8 +282,6 @@ export class MtpRasterCache {
         return true;
       }
     }
-    const domain = model.extrema(0, model.data.length - 1);
-    if (!domain || !(domain.maxValue > domain.minValue) || model.data.length < 2) return false;
     // Padding captures offscreen price geometry at unchanged device resolution.
     const factor = Math.min(
       1.4,
@@ -288,16 +289,38 @@ export class MtpRasterCache {
       4096 / size.width,
       4096 / size.height
     );
-    const padPixelsX = Math.floor((size.width * (factor - 1)) / 2);
+    let padPixelsX = Math.floor((size.width * (factor - 1)) / 2);
     const padPixelsY = Math.floor((size.height * (factor - 1)) / 2);
+    const ordinary = nextX - firstX >= 1;
+    if (ordinary && end - start <= 3000) {
+      // Keep the existing Y reserve; use the remaining bounded surface for up to one X screen
+      // per side. Tall high-DPR panes receive less horizontal padding rather than more memory.
+      const rasterWidth = Math.min(
+        size.width * 3,
+        4096,
+        Math.floor((4 * 1024 * 1024) / (size.height + padPixelsY * 2))
+      );
+      padPixelsX = Math.max(0, Math.floor((rasterWidth - size.width) / 2));
+    }
     // Extend only unsampled ordinary-spacing paths: changing a dense sampling phase is unsafe.
     const extra =
-      nextX - firstX >= 1 ? Math.ceil(padPixelsX / horizontalRatio / (nextX - firstX)) : 0;
+      ordinary && end - start <= 3000
+        ? Math.min(
+            Math.ceil(padPixelsX / horizontalRatio / (nextX - firstX)),
+            Math.floor((3000 - (end - start)) / 2)
+          )
+        : 0;
     const captureStart = Math.max(0, start - extra),
       captureEnd = Math.min(model.data.length - 1, end + extra);
     const extend = extra > 0 && captureEnd - captureStart <= 3000;
     const indices = extend ? [captureStart, captureEnd] : [start, end];
     if (indices[1]! - indices[0]! < 2) return false;
+    // SMA warmup remains in the prefix; only bounds for actually captured geometry are needed.
+    // Dense sampling keeps its original whole-history domain and phase.
+    const domain = ordinary
+      ? model.extrema(indices[0]!, indices[1]!)
+      : model.extrema(0, model.data.length - 1);
+    if (!domain || !(domain.maxValue > domain.minValue) || model.data.length < 2) return false;
     // LW's public logicalToCoordinate accepts bar indices; fractional probes can return zero.
     indices.push(Math.floor((indices[0]! + indices[1]!) / 2));
     const prices = [domain.minValue, domain.maxValue, (domain.minValue + domain.maxValue) / 2];
