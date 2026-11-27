@@ -1,7 +1,9 @@
 #welcome-dialog {
   width: min(460px, calc(100vw - 24px));
   max-width: none;
-  height: auto;
+  /* Preserve the native dialog's content sizing when its inset is zero. */
+  height: fit-content;
+  min-height: 0;
   max-height: calc(100dvh - 24px);
   padding: 20px;
   overflow-y: auto;

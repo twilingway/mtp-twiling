@@ -330,7 +330,7 @@ export function DrawingToolbar() {
       icon={icon}
       active={active}
       expanded={menu?.key === key}
-      mobileMenu={mobile && key === "magnet"}
+      mobileMenu={mobile}
       onChoose={() => {
         closeMenu();
         action();
