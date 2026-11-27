@@ -16,6 +16,7 @@ import {
   loadStatic,
   parseOptions,
   requestFile,
+  sameOutputFiles,
   staticInputs
 } from "./dev-files.mjs";
 
@@ -142,6 +143,7 @@ export async function startDev({ port = 5210, projectRoot = root, outputDirector
     const devPlugin = (group) => ({
       name: `dev-${group}`,
       setup(build) {
+        let hadBuildError = false;
         build.onResolve({ filter: /generated\/app-version\.js$/ }, () => ({
           path: "version",
           namespace: "dev-version"
@@ -157,6 +159,7 @@ export async function startDev({ port = 5210, projectRoot = root, outputDirector
         build.onEnd(async (result) => {
           if (closed) return;
           if (result.errors.length) {
+            hadBuildError = true;
             broadcast(
               "build-error",
               "Build failed. See terminal; the last successful app remains available."
@@ -167,8 +170,19 @@ export async function startDev({ port = 5210, projectRoot = root, outputDirector
           for (const output of result.outputFiles ?? []) {
             const name = relative(outdir, output.path).replaceAll("\\", "/");
             files.set(name, Buffer.from(output.contents));
-            await mkdir(dirname(output.path), { recursive: true });
-            await writeFile(output.path, output.contents);
+          }
+          if (sameOutputFiles(groups.get(group), files)) {
+            if (hadBuildError) {
+              hadBuildError = false;
+              changed();
+            }
+            return;
+          }
+          hadBuildError = false;
+          for (const [name, contents] of files) {
+            const outputPath = join(outdir, name);
+            await mkdir(dirname(outputPath), { recursive: true });
+            await writeFile(outputPath, contents);
           }
           // Keep only this context's current outputs; repeated edits must not accumulate chunks.
           for (const name of groups.get(group)?.keys() ?? [])
@@ -216,8 +230,10 @@ export async function startDev({ port = 5210, projectRoot = root, outputDirector
         try {
           const signature = JSON.stringify([...(await staticInputs(publicDir))]);
           if (signature !== statics.signature && !closed) {
-            statics = await loadStatic(publicDir, outdir);
-            changed();
+            const next = await loadStatic(publicDir, outdir);
+            const outputChanged = !sameOutputFiles(statics.files, next.files);
+            statics = next;
+            if (outputChanged) changed();
           }
         } catch (error) {
           console.error("[dev] Static update failed:", error.message);

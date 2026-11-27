@@ -2,6 +2,13 @@ import { readFile, readdir, lstat, mkdir, writeFile } from "node:fs/promises";
 import { dirname, extname, join, relative } from "node:path";
 
 export const appPrefix = "/__dev/app/";
+
+export function sameOutputFiles(previous, next) {
+  if (!previous || previous.size !== next.size) return false;
+  for (const [name, contents] of next) if (!previous.get(name)?.equals(contents)) return false;
+  return true;
+}
+
 const staticExtensions = new Set([
   ".html",
   ".css",
