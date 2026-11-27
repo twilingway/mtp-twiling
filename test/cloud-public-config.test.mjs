@@ -55,12 +55,34 @@ test("invalid public identifiers and unregistered redirects are rejected before 
   );
 });
 
-test("default config matches each real callback, rejects stale ports and cross-origin overrides", () => {
+test("missing public Client ID leaves Yandex unconfigured without requiring a document", () => {
+  const previousDocument = globalThis.document,
+    previousId = globalThis.__MTP_YANDEX_CLIENT_ID__;
+  try {
+    delete globalThis.document;
+    delete globalThis.__MTP_YANDEX_CLIENT_ID__;
+    assert.equal(flowModules()("services/cloud-public-config.ts").yandexPublicConfig(), undefined);
+    for (const id of ["", " ", "invalid", clientId + "d"]) {
+      globalThis.__MTP_YANDEX_CLIENT_ID__ = id;
+      assert.equal(
+        flowModules()("services/cloud-public-config.ts").yandexPublicConfig(),
+        undefined
+      );
+    }
+  } finally {
+    if (previousDocument === undefined) delete globalThis.document;
+    else globalThis.document = previousDocument;
+    if (previousId === undefined) delete globalThis.__MTP_YANDEX_CLIENT_ID__;
+    else globalThis.__MTP_YANDEX_CLIENT_ID__ = previousId;
+  }
+});
+
+test("ENV config matches each real callback, rejects stale ports and cross-origin overrides", () => {
   const previousDocument = globalThis.document,
     previousId = globalThis.__MTP_YANDEX_CLIENT_ID__,
     previousRedirect = globalThis.__MTP_YANDEX_REDIRECT_URI__;
   try {
-    delete globalThis.__MTP_YANDEX_CLIENT_ID__;
+    globalThis.__MTP_YANDEX_CLIENT_ID__ = clientId;
     delete globalThis.__MTP_YANDEX_REDIRECT_URI__;
     for (const redirectUri of redirects) {
       globalThis.document = { baseURI: new URL("index.html", redirectUri).href };
