@@ -188,7 +188,11 @@ export async function routingFixture() {
       },
       "services/market-client.ts": { MarketClient: class {} },
       "screens/terminal/context.tsx": {
-        useTerminal: () => ({ controller, state: controller.getSnapshot() })
+        useTerminal: (select = (state) => state) => ({
+          controller,
+          state: select(controller.getSnapshot())
+        }),
+        useTerminalState: (target, select) => select(target.getSnapshot())
       },
       "screens/terminal/ClockZoneControl.tsx": { ClockZoneControl: () => null },
       "screens/terminal/TerminalIndicatorControls.tsx": { TerminalIndicatorControls: () => null },

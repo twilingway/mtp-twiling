@@ -5,11 +5,13 @@ import { Watchlist } from "./Watchlist.js";
 import { ObjectTree } from "./drawings/ObjectTree.js";
 import { PanelDivider } from "./PanelDivider.js";
 import { useMobileLayout } from "./use-mobile-layout.js";
+import { selectPanelState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 
 export function RightPanel({ chartEditor }: { chartEditor?: TerminalController } = {}) {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectPanelState, shallowEqual);
   const mobile = useMobileLayout();
-  const collapsed = !!state.preferences.rightPanelCollapsed || (mobile && !state.mobilePanelOpen);
+  const collapsed = !!state.rightPanelCollapsed || (mobile && !state.mobilePanelOpen);
   const select = (tab: "watchlist" | "objects") => {
     const owner = state.owner;
     void controller.panel.select(tab).catch((error: unknown) => {

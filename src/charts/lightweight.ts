@@ -113,6 +113,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     },
     {
       priceToCoordinate: (price) => series.priceToCoordinate(price),
+      priceScale: () => series.priceScale(),
       attachPrimitive: (primitive) => series.attachPrimitive(primitive),
       detachPrimitive: (primitive) => series.detachPrimitive(primitive)
     },

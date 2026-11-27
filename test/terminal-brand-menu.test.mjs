@@ -46,13 +46,14 @@ function fixture() {
     },
     "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: Symbol("fragment") },
     "screens/terminal/context.js": {
-      useTerminal: () => ({
+      useTerminalState: (target, select) => select(target.getSnapshot()),
+      useTerminal: (select = (state) => state) => ({
         controller,
-        state: {
+        state: select({
           ...accountState,
           preferences: { ...accountState.preferences, symbol: "BTCUSDT", instrumentUid: "btc" },
           rows: [{ symbol: "BTCUSDT", uid: "btc", ticker: "BTCUSDT" }]
-        }
+        })
       })
     },
     "screens/terminal/ChartEngineSelect.js": { ChartEngineSelect: noop },

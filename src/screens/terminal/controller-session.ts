@@ -15,6 +15,7 @@ import type { SessionBridge } from "./controller-bridge.js";
 import { publicGuestRecoveryCache } from "../../services/storage-guest-cache.js";
 import { guestRecoveryText } from "../../i18n/messages-guest-recovery.js";
 import { guestActivationFence } from "./controller-guest-activation.js";
+import { shareMarketRows } from "./market-state-sharing.js";
 const cancelled = () => new DOMException("Отключено", "AbortError");
 
 export class TerminalSession {
@@ -133,14 +134,7 @@ export class TerminalSession {
   }
   applyBankState(snapshot: MarketSnapshot, settleEmptyStartup = false): void {
     const state = this.bridge.getState(),
-      directions = new Map(state.pricesDirection),
-      before = new Map(state.rows.map((row) => [row.symbol, row.price]));
-    const rows = snapshot.rows.map((row) => {
-      const previous = before.get(row.symbol);
-      if (previous != null && row.price != null && previous !== row.price)
-        directions.set(row.symbol, row.price > previous ? "positive" : "negative");
-      return { ...row };
-    });
+      { rows, pricesDirection } = shareMarketRows(state, snapshot.rows);
     this.bridge.update({
       rows,
       ...(state.watchlistStartup === "error" ||
@@ -152,7 +146,7 @@ export class TerminalSession {
       authenticated: snapshot.authenticated,
       status: snapshot.status,
       error: snapshot.error ?? null,
-      pricesDirection: directions
+      pricesDirection
     });
   }
   private attach(client: MarketClient, lifecycle: number): void {

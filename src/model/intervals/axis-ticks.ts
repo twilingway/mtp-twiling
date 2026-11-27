@@ -72,7 +72,9 @@ export function calendarAxisTicks(
       (step) => step >= minimumMinutes
     ) ?? 1440;
   const candidates: { tick: CalendarAxisTick; priority: number }[] = [];
-  const parts = (timestamp: number) => {
+  const displayParts = options.display?.partsForData?.(data);
+  const parts = (timestamp: number, index?: number) => {
+    if (displayParts) return displayParts(timestamp, index);
     if (options.display) return options.display.parts(timestamp);
     const date = new Date(timestamp);
     return {
@@ -97,9 +99,9 @@ export function calendarAxisTicks(
       index === previousIndex + 1
         ? previousDate
         : index > 0
-          ? parts(domain.timestamp(index - 1)!)
+          ? parts(domain.timestamp(index - 1)!, index - 1)
           : null;
-    const date = parts(timestamp);
+    const date = parts(timestamp, index < data.length ? index : undefined);
     const year = !before || date.year !== before.year;
     const month = year || date.month !== before?.month;
     const day = month || date.day !== before?.day;

@@ -1,7 +1,8 @@
-import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { chartLayout } from "../../model/chart-workspace-layout.js";
 import { t } from "../../i18n/messages.js";
-import { useTerminal } from "./context.js";
+import { useTerminal, useTerminalState } from "./context.js";
+import { selectControlsState, selectToolbarState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { ChartEngineSelect } from "./ChartEngineSelect.js";
 import { NativeChartTypeMenu } from "./NativeChartTypeMenu.js";
 import { ChartLayoutPicker } from "./ChartLayoutPicker.js";
@@ -26,17 +27,16 @@ export function Toolbar({
   layout?: ChartLayoutPickerProps;
   accountController?: TerminalController;
 } = {}) {
-  const { controller, state } = useTerminal(),
+  const { controller, state } = useTerminal(selectToolbarState, shallowEqual),
     p = state.preferences,
-    row = selectedMarketRow(state.rows, p),
-    ticker = row?.ticker || t("Инструмент"),
+    ticker = state.selectedTicker || t("Инструмент"),
     searchLabel = t("Найти инструмент"),
     shortIntervalUnavailable =
-      row?.providerRef?.provider === "okx"
+      state.selectedProvider === "okx"
         ? "OKX: интервал пока не поддерживается"
         : "Bybit: интервал пока не поддерживается";
   const account = accountController ?? controller;
-  const accountState = account === controller ? state : account.getSnapshot();
+  const accountState = useTerminalState(account, selectControlsState, shallowEqual);
   return (
     <header className="topbar">
       <TerminalBrandMenu
@@ -68,7 +68,7 @@ export function Toolbar({
           favorites={p.favoriteIntervals ?? DEFAULT_INTERVAL_FAVORITES}
           availability={{
             ...DERIVED_INTERVAL_UNAVAILABLE,
-            ...(row?.providerRef
+            ...(state.selectedProvider
               ? {
                   "2m": shortIntervalUnavailable,
                   "10m": shortIntervalUnavailable

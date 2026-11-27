@@ -2,11 +2,18 @@ import { useEffect, useId, useRef, useState } from "react";
 import { t } from "../../i18n/messages.js";
 import { terminalTheme, withTheme } from "../../model/theme.js";
 import type { TerminalController } from "./controller.js";
-import type { TerminalPreferences, TerminalState } from "./state.js";
+import type { TerminalPreferences } from "./state.js";
+import type { TerminalControlsState } from "./terminal-state-selection.js";
 
 const brand = "MTP Twiling";
 
-function locked(state: TerminalState): boolean {
+interface BrandState {
+  profileTransition?: boolean | undefined;
+  backupBusy?: boolean | undefined;
+  importingBackup?: boolean | undefined;
+  importRecoveryRequired?: boolean | undefined;
+}
+function locked(state: BrandState): boolean {
   return !!(
     state.profileTransition ||
     state.backupBusy ||
@@ -21,7 +28,7 @@ export function TerminalBrandMenu({
   editor
 }: {
   account: TerminalController;
-  accountState: TerminalState;
+  accountState: TerminalControlsState;
   editor: TerminalController;
 }) {
   const id = useId();

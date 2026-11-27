@@ -138,6 +138,8 @@ export class MtpModel {
       end = Math.min(this.data.length - 1, Math.ceil(to) + 1);
     if (end < start) return;
     const step = Math.max(1, Math.ceil((end - start) / 3000));
+    // Every period shares the axis; keep null/nonfinite gaps and each period's sampling phase.
+    const xCoordinates = new Array<number | null | undefined>(end - start + 1);
     ctx.save();
     ctx.setLineDash([]);
     ctx.strokeStyle = "#1e90ff";
@@ -153,8 +155,10 @@ export class MtpModel {
       const first = Math.max(start, period - 1);
       for (let i = first; i <= end; i += step) {
         const value = this.sma(i, period);
-        const x = xFor(i),
-          y = yFor(value);
+        const offset = i - start;
+        let x = xCoordinates[offset];
+        if (x === undefined) xCoordinates[offset] = x = xFor(i);
+        const y = yFor(value);
         if (x == null || y == null || !Number.isFinite(x) || !Number.isFinite(y)) {
           begun = false;
           continue;
@@ -201,8 +205,49 @@ export interface MtpChart {
 }
 export interface MtpSeries {
   priceToCoordinate(price: number): number | null;
+  priceScale?(): { options(): { mode?: number } };
   attachPrimitive(primitive: MtpPrimitive): void;
   detachPrimitive(primitive: MtpPrimitive): void;
+}
+function lightweightPriceProjection(series: MtpSeries, model: MtpModel, from: number, to: number) {
+  const native = (price: number | null) =>
+    price === null ? null : series.priceToCoordinate(price);
+  const mode = series.priceScale?.().options().mode;
+  // SDK 5: Normal, Percentage and IndexedTo100 are affine in the original series price.
+  // Logarithmic and unknown modes must retain the SDK's native conversion.
+  if (mode !== 0 && mode !== 2 && mode !== 3) return native;
+  const domain = model.extrema(Math.floor(from) - 1, Math.ceil(to) + 1);
+  if (!domain) return native;
+  const low = domain.minValue,
+    high = domain.maxValue,
+    span = high - low;
+  if (
+    !Number.isFinite(span) ||
+    span <= Math.max(1, Math.abs(low), Math.abs(high)) * Number.EPSILON * 32
+  )
+    return native;
+  const middle = low + span / 2;
+  const lowY = native(low),
+    highY = native(high),
+    middleY = native(middle);
+  if (
+    lowY == null ||
+    highY == null ||
+    middleY == null ||
+    !Number.isFinite(lowY) ||
+    !Number.isFinite(highY) ||
+    !Number.isFinite(middleY)
+  )
+    return native;
+  const slope = (highY - lowY) / span;
+  if (!Number.isFinite(slope) || Math.abs(lowY + (middle - low) * slope - middleY) > 1e-7)
+    return native;
+  return (price: number | null) => {
+    if (price === null) return null;
+    if (!Number.isFinite(price)) return native(price);
+    const y = lowY + (price - low) * slope;
+    return Number.isFinite(y) ? y : native(price);
+  };
 }
 export function lightweightMtp(chart: MtpChart, series: MtpSeries, model: MtpModel) {
   let requestUpdate = () => {};
@@ -218,7 +263,8 @@ export function lightweightMtp(chart: MtpChart, series: MtpSeries, model: MtpMod
           renderer: () => ({
             draw() {},
             drawBackground(target) {
-              const range = chart.timeScale().getVisibleLogicalRange();
+              const timeScale = chart.timeScale();
+              const range = timeScale.getVisibleLogicalRange();
               if (!range) return;
               target.useBitmapCoordinateSpace(
                 ({ context, horizontalPixelRatio, verticalPixelRatio }) => {
@@ -228,8 +274,8 @@ export function lightweightMtp(chart: MtpChart, series: MtpSeries, model: MtpMod
                     context,
                     range.from,
                     range.to,
-                    (index) => chart.timeScale().logicalToCoordinate(index),
-                    (price) => (price === null ? null : series.priceToCoordinate(price))
+                    (index) => timeScale.logicalToCoordinate(index),
+                    lightweightPriceProjection(series, model, range.from, range.to)
                   );
                   context.restore();
                 }
