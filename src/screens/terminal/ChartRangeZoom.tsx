@@ -17,6 +17,7 @@ import {
 } from "./chart-navigation-state.js";
 import { userCameraAction } from "./controller-camera-sync.js";
 import { DrawingToolIcon } from "./DrawingToolIcon.js";
+import { chartAdapterReadySignal } from "./chart-adapter-ready.js";
 
 const labels = { ru: "Увеличить выбранную область", en: "Zoom to selection" };
 const selectRangeZoomButtonState = (state: TerminalState) => ({
@@ -55,6 +56,8 @@ export function ChartRangeZoomButton({ onChoose }: { onChoose?: () => void } = {
 
 export function ChartZoomOutButton({ onChoose }: { onChoose: () => void }) {
   const { controller, state } = useTerminal(selectChartNavigationState, shallowEqual);
+  const adapterReady = chartAdapterReadySignal(controller);
+  useSyncExternalStore(adapterReady.subscribe, adapterReady.getSnapshot, adapterReady.getSnapshot);
   const chart = controller.chart;
   // Adapter attachment and capabilities can change without a new store snapshot.
   const ready = chartNavigationSelectionReady(state, chart) && !!chart.zoom;

@@ -63,6 +63,12 @@ measure/zoom/zoom-out на 20 котировок либо 20 live-candle соб�
   проверяются на каждом render: асинхронный attach без нового snapshot не должен оставлять кнопку
   недоступной после следующего родительского render. Тест сохраняет identity snapshot, назначает
   chart и повторяет render; отдельно проверяется исчезновение zoom capability без обновления store.
+- Для первого асинхронного attach ZoomOut подписан на отдельный external store в WeakMap по
+  controller. Lifecycle публикует готовность после initial setView/setData, после первого появления
+  данных либо изменения persistView и при очистке принадлежащего ему adapter. Обычные live-candle
+  обновления сигнал не публикуют; chartRevision и portable state не изменяются. Тест настоящего
+  useChartCanvas проверяет attach без повторного render родителя, неизменный snapshot/revision,
+  отключение при cleanup, независимость controller и отсутствие уведомлений на 20 live ticks.
 - Watchlist, его таблица и фильтр сохраняют реальные rows/quotes и состояния импорта, исключая
   candles. Вложенные ApplicationInfo, BackupTransferSettings, DetailsDivider, внешний
   InstrumentDetails и TechnicalObjectTree также имеют самостоятельные селекторы. TechnicalRows
