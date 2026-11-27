@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore } from "react";
 import { t } from "../../i18n/messages.js";
+import { GoogleCompactionSettings } from "./GoogleCompactionSettings.js";
 import { terminalGoogleRetention } from "./controller-drive.js";
 import { useTerminal, useTerminalController } from "./context.js";
 import { shallowEqual } from "./snapshot-selector.js";
@@ -52,6 +53,7 @@ function RetentionDetails({ google }: { google: GoogleRetention }) {
           {t("Google Диск: удаление временных данных проверки будет повторено автоматически.")}
         </small>
       )}
+      <GoogleCompactionSettings google={google} status={status} blocked={blocked} />
       <details className="cloud-google-details" open={!!status.migrationRequired}>
         <summary>
           {t(
@@ -115,20 +117,6 @@ function RetentionDetails({ google }: { google: GoogleRetention }) {
         )}
         <details className="cloud-google-diagnostics">
           <summary>{t("Диагностика Google")}</summary>
-          <label>
-            {t("Режим синхронизации Google")}
-            <select
-              value={status.mode}
-              disabled={blocked}
-              onChange={(event) => {
-                const mode = event.target.value === "test" ? "test" : "normal";
-                run(() => google.setSlotMode(mode));
-              }}
-            >
-              <option value="normal">{t("Версии каждого устройства")}</option>
-              <option value="test">{t("Общий слот · тест")}</option>
-            </select>
-          </label>
           <p>{t("Проверка подключения не отправляет рабочее пространство.")}</p>
           <button
             type="button"

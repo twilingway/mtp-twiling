@@ -84,6 +84,7 @@ export function CloudProviderSettings({
     (status as GoogleStatus).writeCapability?.phase === "checking";
   const timing = cloudOperationTiming(provider);
   const [actionError, setActionError] = useState(false),
+    [clientModeError, setClientModeError] = useState(false),
     [comparisonError, setComparisonError] = useState(false),
     [elapsed, setElapsed] = useState(0),
     [pendingActions, setPendingActions] = useState(0);
@@ -134,6 +135,7 @@ export function CloudProviderSettings({
     status.choiceAction?.state === "running" ? status.choiceAction.selection : undefined;
   const visiblePhase = status.enabled ? status.phase : "disabled";
   const comparison = status.comparison ?? status.conflict;
+  const retention = status.retention;
   const migration = provider.id === "google-drive" && !!(status as GoogleStatus).migrationRequired;
   const compare = () => {
     if (!provider.inspect) return;
@@ -203,6 +205,65 @@ export function CloudProviderSettings({
               </dd>
             </div>
           </dl>
+          {retention?.phase === "pending" && (
+            <div className="cloud-retention-summary">
+              <p role="status">{t("Данные сохранены. Очистка старых версий ожидает повтора.")}</p>
+              {retention.keptFiles !== undefined && (
+                <small>
+                  {t("Сохранено файлов")} {retention.keptFiles.toLocaleString(intlLocale())}
+                </small>
+              )}
+              {retention.deletedFiles !== undefined && (
+                <small>
+                  {t("Удалено файлов")} {retention.deletedFiles.toLocaleString(intlLocale())}
+                </small>
+              )}
+            </div>
+          )}
+          {status.clientMode && provider.setClientMode && (
+            <div className="cloud-client-identity">
+              <label htmlFor={`${id}-client-mode`}>
+                {t("Клиент синхронизации")}
+                <select
+                  id={`${id}-client-mode`}
+                  value={status.clientMode}
+                  disabled={busy || blocked || !status.prepared}
+                  onChange={(event) => {
+                    const mode = event.target.value === "test" ? "test" : "normal";
+                    if (!provider.setClientMode) return;
+                    setClientModeError(false);
+                    setPendingActions((value) => value + 1);
+                    void provider
+                      .setClientMode(mode)
+                      .catch(() => setClientModeError(true))
+                      .finally(() => setPendingActions((value) => Math.max(0, value - 1)));
+                  }}
+                >
+                  <option value="normal">{t("Этот браузер")}</option>
+                  <option value="test">{t("Тестирование")}</option>
+                </select>
+              </label>
+              <p>
+                {t(
+                  status.clientMode === "test"
+                    ? "Тестовые сеансы в этом облаке используют один клиент."
+                    : "Сохранения этого браузера отделены от других устройств."
+                )}
+              </p>
+              <small>
+                {t(
+                  "Для инкогнито или временного сеанса выберите «Тестирование». Режим инкогнито не определяется автоматически."
+                )}
+              </small>
+              {clientModeError && (
+                <p role="alert">
+                  {t(
+                    "Не удалось изменить режим клиента. Завершите незавершённый обмен или повторите попытку."
+                  )}
+                </p>
+              )}
+            </div>
+          )}
           {!status.configured && <p role="status">{t("Нужна настройка OAuth приложения")}</p>}
           {status.preparing && <p role="status">{t("Готовим вход…")}</p>}
           {busy && (

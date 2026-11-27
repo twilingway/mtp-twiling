@@ -152,6 +152,12 @@ test("a changed second listing blocks inspection rather than granting cleanup or
     revisions = new YandexRevisions(f.transport, journal, f.auth, config.clientId);
   await revisions.publish(prepared, await sha256(prepared.payload), [], () => true);
   let lists = 0;
+  const inspectionStart = f.calls.length;
+  assert.ok(
+    f.calls
+      .filter(({ init }) => init.method === "DELETE")
+      .every(({ url }) => url.searchParams.get("path").split("/").at(-1).startsWith("probe_"))
+  );
   f.hooks.before = (url) => {
     if (url.searchParams.has("limit") && ++lists === 2) f.files.clear();
   };
@@ -160,7 +166,7 @@ test("a changed second listing blocks inspection rather than granting cleanup or
     (error) => error.code === "conflict"
   );
   assert.equal(
-    f.calls.some(({ init }) => init.method === "DELETE"),
+    f.calls.slice(inspectionStart).some(({ init }) => init.method === "DELETE"),
     false
   );
 });

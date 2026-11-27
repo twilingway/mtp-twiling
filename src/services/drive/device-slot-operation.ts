@@ -21,11 +21,17 @@ import type { GoogleStatus } from "./device-slot-status.js";
 import type { DriveAuthorization } from "./types.js";
 import { DriveWriteCapability } from "./write-capability.js";
 import type { WriteCapabilityStatus } from "./write-capability.js";
+import type { GoogleLegacyJob } from "./legacy-compaction-google.js";
 
 export type GoogleSlotOperation = (
   context: SlotSyncContext,
   record: DeviceSlotRecord
 ) => Promise<SlotSyncResult>;
+export interface GoogleSlotCompletion {
+  readonly authorization: DriveAuthorization;
+  readonly epoch: number;
+  readonly target: GoogleSlotTarget;
+}
 export interface GoogleSlotDependencies {
   auth: Pick<
     DriveAuth,
@@ -193,4 +199,41 @@ export async function runGoogleCapabilityDiagnostic(options: ProbeOptions, image
   if (!options.current()) throw changed();
   options.signal.throwIfAborted();
   return result;
+}
+
+export async function runGoogleProviderUploadProbe(
+  job: GoogleLegacyJob,
+  target: GoogleSlotTarget,
+  imageBytes: number | undefined,
+  fail: (error: unknown) => void,
+  success: () => void
+) {
+  try {
+    const result = await runGoogleCapabilityDiagnostic(
+      {
+        authorization: job.authorization,
+        target,
+        signal: job.signal,
+        load: job.dependencies.load,
+        fetcher: job.dependencies.fetch,
+        current: job.current,
+        reset: job.reset,
+        capability: (writeCapability) => {
+          if (job.current())
+            job.update({ writeCapability, uploadProbeBytes: writeCapability.verifiedBytes });
+        }
+      },
+      imageBytes
+    );
+    if (job.current()) {
+      success();
+      job.update({ uploadProbeBytes: result.maxBytes, phase: "idle" });
+    }
+    return result;
+  } catch (error) {
+    if (job.current()) fail(error);
+    throw error;
+  } finally {
+    job.finish();
+  }
 }

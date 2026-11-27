@@ -1,4 +1,4 @@
-import type { CloudSelection, CloudSyncProvider } from "../../model/cloud-sync.js";
+import type { CloudClientMode, CloudSelection, CloudSyncProvider } from "../../model/cloud-sync.js";
 import type { Backup } from "../../model/types.js";
 import { changed, providerId } from "./device-slot-context.js";
 import type { GoogleSlotHost, GoogleSlotScope } from "./device-slot-context.js";
@@ -12,22 +12,14 @@ import {
 import type { GoogleSlotTarget } from "./device-slot-link.js";
 import { LegacyDeviceSlotMigration } from "./device-slot-migration.js";
 import {
-  googleSlotReceiveReceipt,
   initialGoogleSlotStatus,
+  googleClientStatus,
   operationError,
   replacedGoogleAccountStatusKeys
 } from "./device-slot-status.js";
 import type { GoogleStatus, GoogleTransientStatusKey } from "./device-slot-status.js";
-import {
-  chooseDeviceSlotVersion,
-  restorePreviousDeviceSlotVersion,
-  synchronizeDeviceSlots
-} from "./device-slot-sync.js";
-import {
-  GoogleSlotPreviews,
-  inspectDeviceSlotVersions,
-  receiveGoogleSlotSelection
-} from "./device-slot-inspection.js";
+import { synchronizeDeviceSlots } from "./device-slot-sync.js";
+import { GoogleSlotPreviews, inspectDeviceSlotVersions } from "./device-slot-inspection.js";
 import type { SlotSyncResult } from "./device-slot-sync.js";
 import { finishDriveProgress } from "./progress.js";
 import { DriveError } from "./types.js";
@@ -41,10 +33,25 @@ import {
   guardedGoogleCapability,
   defaultGoogleSlotDependencies,
   googleCapabilityManager,
-  runGoogleCapabilityDiagnostic,
+  runGoogleProviderUploadProbe,
   sameGoogleSlotScope as sameScope
 } from "./device-slot-operation.js";
-import type { GoogleSlotOperation, GoogleSlotDependencies } from "./device-slot-operation.js";
+import type {
+  GoogleSlotOperation,
+  GoogleSlotDependencies,
+  GoogleSlotCompletion
+} from "./device-slot-operation.js";
+import {
+  compactGoogleLegacy,
+  inspectGoogleLegacyArchives,
+  downloadGoogleLegacyArchive,
+  probeGoogleLegacyDelete,
+  inspectGoogleLateLegacy,
+  runGoogleLegacyAction
+} from "./legacy-compaction-google.js";
+import type { GoogleLegacyJob } from "./legacy-compaction-google.js";
+import { createGoogleSlotProviderActions } from "./device-slot-provider-actions.js";
+import { takeGoogleLegacyJob } from "./legacy-compaction-provider-job.js";
 
 export class GoogleSlotProvider implements CloudSyncProvider {
   readonly id = providerId;
@@ -55,25 +62,37 @@ export class GoogleSlotProvider implements CloudSyncProvider {
   private authorization: DriveAuthorization | undefined;
   private readonly previews = new GoogleSlotPreviews();
   private readonly migration = new LegacyDeviceSlotMigration();
+  private readonly actions = createGoogleSlotProviderActions({
+    previews: this.previews,
+    migration: this.migration,
+    fetcher: (input, init) => this.dependencies.fetch(input, init),
+    state: () => this.state,
+    authorization: () => this.authorization,
+    run: (operation, selection) => this.run(operation, selection),
+    inspect: () => this.inspect(),
+    compact: (completion) => this.compactLegacyAutomatically(completion),
+    update: (patch) => this.update(patch),
+    omit: (...keys) => this.omit(...keys)
+  });
   private epoch = 0;
   private lifecycle = new AbortController();
   private timer: ReturnType<typeof setTimeout> | undefined;
   private operation: object | undefined;
   private disposed = false;
   private load: Promise<void> | undefined;
-
+  private localIntentRevision = 0;
   constructor(
     private readonly host: GoogleSlotHost,
     private readonly dependencies: GoogleSlotDependencies = defaultGoogleSlotDependencies()
   ) {}
-
   getSnapshot = (): GoogleStatus => this.state;
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   };
   private update(patch: Partial<GoogleStatus>) {
-    this.state = { ...this.state, ...patch };
+    const next = { ...this.state, ...patch };
+    this.state = { ...next, ...googleClientStatus(next.mode) };
     for (const listener of this.listeners) listener();
   }
   private reset(enabled = false) {
@@ -112,7 +131,6 @@ export class GoogleSlotProvider implements CloudSyncProvider {
       ...(code === "network" ? { pauseReason: "network" as const } : {})
     });
   }
-
   resume = (): void => this.profileChanged();
   profileChanged = (): void => {
     const next = this.host.scope(providerId);
@@ -132,8 +150,11 @@ export class GoogleSlotProvider implements CloudSyncProvider {
       if (!restored || !this.current(epoch)) return;
       const { target, enabled, authorization } = restored;
       this.target = target;
-      if (!enabled) return;
       const { automatic, mode, lastSyncedAt } = target.record;
+      if (!enabled) {
+        this.update({ mode, automatic });
+        return;
+      }
       this.update({
         enabled,
         automatic,
@@ -146,7 +167,6 @@ export class GoogleSlotProvider implements CloudSyncProvider {
       this.fail(error, epoch);
     }
   }
-
   private attach(authorization: DriveAuthorization, epoch: number) {
     this.authorization = authorization;
     this.migration.clear();
@@ -224,16 +244,13 @@ export class GoogleSlotProvider implements CloudSyncProvider {
     }, 1000);
   }
   localIntent = (): void => {
-    if (!this.state.enabled) return;
-    this.previews.clear();
-    this.omit("comparison");
-    this.update({ pendingChanges: true });
+    if (this.state.enabled) this.localIntentRevision++;
+    this.actions.localIntent();
   };
   localChanged = (): void => {
     this.localIntent();
     this.schedule();
   };
-
   prepare = async (): Promise<void> => {
     if (this.load) await this.load;
     if (!this.state.enabled || this.state.preparing || this.state.prepared) return;
@@ -279,7 +296,6 @@ export class GoogleSlotProvider implements CloudSyncProvider {
       this.fail(error, epoch);
     }
   };
-
   private async patchLocal(patch: Partial<DeviceSlotRecord>) {
     const scope = this.host.scope(providerId);
     const epoch = this.epoch;
@@ -311,9 +327,13 @@ export class GoogleSlotProvider implements CloudSyncProvider {
   };
   setSlotMode = async (mode: "normal" | "test") => {
     if (!this.state.enabled || this.operation || this.target?.record.pending) return;
+    if (mode === this.state.mode) return;
     await this.patchLocal({ mode });
-    this.update({ mode });
+    this.previews.clear();
+    this.omit("comparison", "conflict", "choiceAction", "compaction");
+    this.update({ mode, pendingChanges: true });
   };
+  setClientMode = (mode: CloudClientMode): Promise<void> => this.setSlotMode(mode);
   disconnect = async (): Promise<void> => {
     const disabling = this.setEnabled(false);
     const epoch = this.epoch;
@@ -326,110 +346,79 @@ export class GoogleSlotProvider implements CloudSyncProvider {
     this.reset();
     this.listeners.clear();
   };
-
+  private takeLegacyJob = (): GoogleLegacyJob | undefined =>
+    takeGoogleLegacyJob({
+      dependencies: this.dependencies,
+      signal: this.lifecycle.signal,
+      scope: () => this.host.scope(providerId),
+      authorization: () => this.authorization,
+      target: () => this.target,
+      state: () => this.state,
+      epoch: () => this.epoch,
+      current: (epoch) => this.current(epoch),
+      operation: () => this.operation,
+      claim: (job) => {
+        this.operation = job;
+      },
+      timer: () => this.timer,
+      clearTimer: () => {
+        clearTimeout(this.timer);
+        this.timer = undefined;
+      },
+      intentRevision: () => this.localIntentRevision,
+      reset: (enabled) => this.reset(enabled),
+      update: (patch) => this.update(patch),
+      schedule: () => this.schedule()
+    });
+  compactLegacy = async (): Promise<void> => {
+    await runGoogleLegacyAction(this.takeLegacyJob, compactGoogleLegacy);
+  };
+  private compactLegacyAutomatically = async (completed: GoogleSlotCompletion): Promise<void> => {
+    if (
+      completed.authorization !== this.authorization ||
+      completed.epoch !== this.epoch ||
+      completed.target !== this.target
+    )
+      return;
+    await runGoogleLegacyAction(this.takeLegacyJob, (job) => compactGoogleLegacy(job, false));
+  };
+  inspectLegacyArchives = async (): Promise<void> => {
+    await runGoogleLegacyAction(this.takeLegacyJob, inspectGoogleLegacyArchives);
+  };
+  downloadLegacyRawArchive = (id: string): Promise<Blob | undefined> =>
+    runGoogleLegacyAction(this.takeLegacyJob, (job) => downloadGoogleLegacyArchive(job, id));
+  runLegacyDeleteProbe = () => runGoogleLegacyAction(this.takeLegacyJob, probeGoogleLegacyDelete);
+  inspectLateLegacy = () => runGoogleLegacyAction(this.takeLegacyJob, inspectGoogleLateLegacy);
   runUploadProbe = async (imageBytes?: number) => {
-    const authorization = this.authorization;
-    const target = this.target;
-    if (!authorization || !target || !this.state.enabled || this.operation)
+    const job = this.takeLegacyJob();
+    if (!job || !this.target)
       throw new DriveError("not-ready", "Подключите Google Диск для пробы записи.");
-    const epoch = this.epoch;
-    const job = {};
-    this.operation = job;
-    const current = () => this.current(epoch) && authorization === this.authorization;
-    try {
-      const result = await runGoogleCapabilityDiagnostic(
-        {
-          authorization,
-          target,
-          signal: this.lifecycle.signal,
-          load: this.dependencies.load,
-          fetcher: this.dependencies.fetch,
-          current,
-          reset: (enabled) => this.reset(enabled),
-          capability: (writeCapability) =>
-            this.update({ writeCapability, uploadProbeBytes: writeCapability.verifiedBytes })
-        },
-        imageBytes
-      );
-      this.omit("error", "pauseReason");
-      this.update({ uploadProbeBytes: result.maxBytes, phase: "idle" });
-      return result;
-    } catch (error) {
-      this.fail(error, epoch);
-      throw error;
-    } finally {
-      if (this.operation === job) this.operation = undefined;
-    }
-  };
-
-  sync = async (): Promise<void> => this.run(synchronizeDeviceSlots);
-  inspect = async (): Promise<void> => this.run(inspectDeviceSlotVersions);
-  receive = async (id: string): Promise<void> => {
-    const preview = this.previews.comparison ?? this.previews.choice;
-    if (!preview) {
-      await this.inspect();
-      return;
-    }
-    await this.run(
-      receiveGoogleSlotSelection(preview, this.previews, id, (backup) => {
-        this.omit("comparison");
-        this.update(googleSlotReceiveReceipt(this.state, backup, id));
-      }),
-      { kind: "remote", id }
+    return runGoogleProviderUploadProbe(
+      job,
+      this.target,
+      imageBytes,
+      (error) => this.fail(error, this.epoch),
+      () => this.omit("error", "pauseReason")
     );
   };
-  choose = async (selection: CloudSelection): Promise<void> => {
-    if (this.state.migrationRequired) return this.migrateLegacy(selection);
-    const preview =
-      selection.kind === "local"
-        ? (this.previews.comparison ?? this.previews.choice)
-        : this.previews.choice;
-    if (!preview) {
-      await this.inspect();
-      this.update({ choiceAction: { selection, state: "review" } });
-      return;
-    }
-    await this.run(
-      (context, record) => chooseDeviceSlotVersion(context, record, preview, selection),
-      selection
-    );
+  sync = async (): Promise<void> => {
+    const completed = await this.run(synchronizeDeviceSlots);
+    if (completed) await this.compactLegacyAutomatically(completed);
   };
-
-  restorePrevious = async (revisionId: string): Promise<void> => {
-    if (!this.state.previousVersions?.some(({ id }) => id === revisionId)) return;
-    await this.run((context, record) =>
-      restorePreviousDeviceSlotVersion(context, record, revisionId)
-    );
+  inspect = async (): Promise<void> => {
+    await this.run(inspectDeviceSlotVersions);
   };
-
-  prepareLegacyArchive = async (): Promise<Blob | undefined> => {
-    const authorization = this.authorization;
-    if (!authorization || !this.state.migrationRequired) return;
-    let body: Blob | undefined;
-    await this.run(async (context, record) => {
-      body = await this.migration.prepare(context, record, authorization, this.dependencies.fetch);
-      return { state: "migration", record };
-    });
-    return body;
-  };
-
-  verifyLegacyArchive = async (file: Blob): Promise<void> => {
-    if (!this.migration.current || !this.state.migrationRequired) return;
-    await this.run(async (context, record) => {
-      await this.migration.verify(context, file);
-      return { state: "migration", record };
-    });
-  };
-
-  migrateLegacy = async (selection: CloudSelection): Promise<void> => {
-    if (!this.migration.current?.verified || !this.state.migrationRequired) return;
-    await this.run(
-      (context, record) => this.migration.migrate(context, record, selection),
-      selection
-    );
-  };
-
-  private async run(operation: GoogleSlotOperation, selection?: CloudSelection) {
+  receive = (id: string): Promise<void> => this.actions.receive(id);
+  choose = (selection: CloudSelection): Promise<void> => this.actions.choose(selection);
+  restorePrevious = (revisionId: string): Promise<void> => this.actions.restorePrevious(revisionId);
+  prepareLegacyArchive = (): Promise<Blob | undefined> => this.actions.prepareLegacyArchive();
+  verifyLegacyArchive = (file: Blob): Promise<void> => this.actions.verifyLegacyArchive(file);
+  migrateLegacy = (selection: CloudSelection): Promise<void> =>
+    this.actions.migrateLegacy(selection);
+  private async run(
+    operation: GoogleSlotOperation,
+    selection?: CloudSelection
+  ): Promise<GoogleSlotCompletion | undefined> {
     const authorization = this.authorization,
       scope = this.host.scope(providerId);
     if (!authorization || !this.state.enabled || this.operation || !scope.ready || scope.blocked)
@@ -453,6 +442,8 @@ export class GoogleSlotProvider implements CloudSyncProvider {
       this.authorization === authorization &&
       this.operation === job &&
       this.state.enabled;
+    let successful = false;
+    let finishedTarget: GoogleSlotTarget | undefined;
     await runGoogleSlotJob({
       host: this.host,
       scope,
@@ -463,8 +454,14 @@ export class GoogleSlotProvider implements CloudSyncProvider {
       operation,
       ...(selection ? { selection } : {}),
       reset: (enabled) => this.reset(enabled),
-      target: (target) => (this.target = target),
-      outcome: (result, local, localChanged) => this.publishOutcome(result, local, localChanged),
+      target: (target) => {
+        this.target = target;
+        finishedTarget = target;
+      },
+      outcome: (result, local, localChanged) => {
+        successful = result.state === "idle";
+        this.publishOutcome(result, local, localChanged);
+      },
       capability: guardedGoogleCapability(current, (patch) => this.update(patch)),
       update: (patch) => this.update(patch),
       fail: (error) => this.fail(error, epoch),
@@ -483,14 +480,15 @@ export class GoogleSlotProvider implements CloudSyncProvider {
           this.schedule();
       }
     });
+    return successful && finishedTarget
+      ? { authorization, epoch, target: finishedTarget }
+      : undefined;
   }
-
   private omit(...keys: GoogleTransientStatusKey[]) {
     const next = { ...this.state };
     for (const key of keys) delete next[key];
     this.state = next;
   }
-
   private publishOutcome(result: SlotSyncResult, local: Backup, changed: boolean) {
     const publication = this.previews.publish(result, this.state, this.migration, local, changed);
     this.omit(...publication.clear);

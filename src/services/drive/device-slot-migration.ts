@@ -5,27 +5,31 @@ import {
   verifyLegacyArchiveFile
 } from "./device-slot-archive.js";
 import type { ArchiveSource, LegacyArchive } from "./device-slot-archive.js";
+import { createLegacyArchiveOverlay } from "./legacy-archive-overlay.js";
+import type { LegacyArchiveInput } from "./legacy-archive-overlay.js";
 import type { DeviceSlotRecord } from "./device-slot-local.js";
 import { publishLegacyDeviceSlot } from "./device-slot-sync.js";
 import type { SlotSyncContext } from "./device-slot-sync.js";
 import { DriveSync } from "./sync.js";
 import { DriveTransport } from "./transport.js";
 import { DRIVE_NAMESPACE, DriveError, LEGACY_DRIVE_NAMESPACE } from "./types.js";
-import type { DriveAuthorization } from "./types.js";
+import type { DriveAuthorization, DriveStore } from "./types.js";
 
 export async function inspectLegacyDeviceSlotSources(
   authorization: DriveAuthorization,
-  fetcher: typeof fetch
+  fetcher: typeof fetch,
+  verifiedArchives: readonly LegacyArchiveInput[] = []
 ): Promise<ArchiveSource[]> {
-  return Promise.all(
-    ([DRIVE_NAMESPACE, LEGACY_DRIVE_NAMESPACE] as const).map(async (namespace) => {
-      const sync = new DriveSync(
-        new DriveTransport(authorization, { fetch: fetcher, namespace }),
-        namespace
-      );
-      return { namespace, sync, inspection: await sync.inspect() };
-    })
-  );
+  const sources: ArchiveSource[] = [];
+  // Verify archive containers sequentially: the two namespace readers must not double peak memory.
+  for (const namespace of [DRIVE_NAMESPACE, LEGACY_DRIVE_NAMESPACE] as const) {
+    let store: DriveStore = new DriveTransport(authorization, { fetch: fetcher, namespace });
+    if (verifiedArchives.length)
+      store = await createLegacyArchiveOverlay(store, namespace, verifiedArchives);
+    const sync = new DriveSync(store, namespace);
+    sources.push({ namespace, sync, inspection: await sync.inspect() });
+  }
+  return sources;
 }
 
 export interface GoogleArchiveStatus {
@@ -62,12 +66,13 @@ export class LegacyDeviceSlotMigration {
     context: SlotSyncContext,
     record: DeviceSlotRecord,
     auth: DriveAuthorization,
-    fetcher: typeof fetch
+    fetcher: typeof fetch,
+    verifiedArchives: readonly LegacyArchiveInput[] = []
   ): Promise<Blob> {
     if (record.scope || record.pending)
       throw new DriveError("conflict", "Google migration already started.");
     context.report("read-versions");
-    const sources = await inspectLegacyDeviceSlotSources(auth, fetcher);
+    const sources = await inspectLegacyDeviceSlotSources(auth, fetcher, verifiedArchives);
     context.check();
     const issued = await createLegacyArchive(
       sources,

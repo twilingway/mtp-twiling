@@ -1,5 +1,6 @@
 import type {
   CloudErrorCode,
+  CloudClientMode,
   CloudProgress,
   CloudRemoteChoice,
   CloudSyncStatus
@@ -12,6 +13,14 @@ import type { SlotPreview, SlotSyncResult } from "./device-slot-sync.js";
 import type { DriveOperationTime, DriveProgress, DriveStage } from "./progress.js";
 import { DriveError } from "./types.js";
 import type { WriteCapabilityStatus } from "./write-capability.js";
+import type { LegacyCompactionProgress, LegacyLateInspection } from "./legacy-compaction-types.js";
+import { cloudClientLabel, defaultCloudClientMode } from "../../model/cloud-client-identity.js";
+
+export const googleClientStatus = (mode: CloudClientMode) => ({
+  mode,
+  clientMode: mode,
+  clientLabel: cloudClientLabel(mode)
+});
 
 export interface GoogleStatus extends CloudSyncStatus {
   mode: "normal" | "test";
@@ -22,6 +31,12 @@ export interface GoogleStatus extends CloudSyncStatus {
   lastOperation?: DriveOperationTime;
   previousVersions?: readonly { id: string; deviceId: string; size: number }[];
   archive?: GoogleArchiveStatus;
+  compaction?: Omit<Partial<LegacyCompactionProgress>, "phase"> & {
+    phase: LegacyCompactionProgress["phase"] | "checking" | "paused";
+    error?: CloudErrorCode;
+  };
+  legacyArchives?: readonly { id: string; createdAt: string; bytes: number; fileCount?: number }[];
+  legacyLateChanges?: readonly LegacyLateInspection[];
 }
 
 export type GoogleTransientStatusKey =
@@ -36,6 +51,9 @@ export type GoogleTransientStatusKey =
   | "choiceAction"
   | "lastSyncedAt"
   | "previousVersions"
+  | "compaction"
+  | "legacyArchives"
+  | "legacyLateChanges"
   | "migrationRequired";
 
 export const replacedGoogleAccountStatusKeys = [
@@ -44,7 +62,10 @@ export const replacedGoogleAccountStatusKeys = [
   "choiceAction",
   "lastSyncedAt",
   "previousVersions",
-  "migrationRequired"
+  "migrationRequired",
+  "compaction",
+  "legacyArchives",
+  "legacyLateChanges"
 ] satisfies GoogleTransientStatusKey[];
 
 const stageNames: Record<DriveStage, CloudProgress["stage"]> = {
@@ -81,7 +102,12 @@ export const initialGoogleSlotStatus = (enabled = false): GoogleStatus => ({
   pendingChanges: false,
   authorizationStored: false,
   credentialSaveError: false,
-  mode: "normal",
+  ...googleClientStatus(
+    defaultCloudClientMode(
+      globalThis.location,
+      !!globalThis.document?.querySelector?.('script[type="module"][src="/__dev/client.js"]')
+    )
+  ),
   uploadProbeBytes: 0
 });
 

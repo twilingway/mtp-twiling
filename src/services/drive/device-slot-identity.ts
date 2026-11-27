@@ -3,6 +3,7 @@ import { get, put, transaction } from "../storage-db.js";
 import { uuidPattern } from "./backup.js";
 import { DEVICE_SLOT_TEST_DEVICE_ID } from "./device-slot-model.js";
 import { DriveError } from "./types.js";
+import { defaultCloudClientMode } from "../../model/cloud-client-identity.js";
 
 export { DEVICE_SLOT_TEST_DEVICE_ID };
 export type DriveSlotMode = "normal" | "test";
@@ -11,15 +12,11 @@ const DEVICE_KEY = "drive-device";
 
 export function defaultDriveSlotMode(
   address: Pick<Location, "pathname" | "search"> | undefined = globalThis.location,
-  devLoader = !!globalThis.document?.querySelector('script[type="module"][src="/__dev/client.js"]')
-): DriveSlotMode {
-  if (
-    devLoader ||
-    address?.pathname === "/__dev/app" ||
-    address?.pathname.startsWith("/__dev/app/")
+  devLoader = !!globalThis.document?.querySelector?.(
+    'script[type="module"][src="/__dev/client.js"]'
   )
-    return "test";
-  return new URLSearchParams(address?.search).get("sync-client") === "testing" ? "test" : "normal";
+): DriveSlotMode {
+  return defaultCloudClientMode(address, devLoader);
 }
 
 function modeKey(workspaceId: string): string {

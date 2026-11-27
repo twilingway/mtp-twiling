@@ -29,7 +29,8 @@ const create = (options = {}) => {
     automatic: false,
     mode: "normal",
     baseHeads: [],
-    enabled: options.enabled
+    enabled: options.enabled,
+    ...(options.pending ? { pending: options.pending } : {})
   };
   const calls = [];
   const signals = [];
@@ -93,6 +94,37 @@ test("a legacy inert record remains off and preference changes do not start Goog
   assert.equal(provider.getSnapshot().phase, "disabled");
   assert.equal(provider.getSnapshot().pendingChanges, false);
   provider.dispose();
+});
+
+test("Google shared client-mode alias preserves the saved choice, authorization and back-compatible mode field", async () => {
+  const f = create({ enabled: true });
+  try {
+    f.provider.resume();
+    await f.provider.prepare();
+    const calls = structuredClone(f.calls);
+    assert.equal(f.provider.getSnapshot().clientMode, "normal");
+    await f.provider.setClientMode("test");
+    assert.equal(f.provider.getSnapshot().clientMode, "test");
+    assert.equal(f.provider.getSnapshot().mode, "test");
+    assert.equal(f.provider.getSnapshot().clientLabel, "Тестирование");
+    assert.equal(f.state().mode, "test");
+    assert.deepEqual(f.calls, calls);
+    await f.provider.setSlotMode("normal");
+    assert.equal(f.provider.getSnapshot().clientMode, "normal");
+    assert.equal(f.provider.getSnapshot().clientLabel, "Этот браузер");
+    const blocked = create({ enabled: true, pending: { unknown: true } });
+    try {
+      blocked.provider.resume();
+      await blocked.provider.prepare();
+      await blocked.provider.setClientMode("test");
+      assert.equal(blocked.state().mode, "normal");
+      assert.deepEqual(blocked.state().pending, { unknown: true });
+    } finally {
+      blocked.provider.dispose();
+    }
+  } finally {
+    f.provider.dispose();
+  }
 });
 
 test("disposing a Google binding permits remount and stale uninstall cannot remove the new instance", () => {

@@ -3,7 +3,9 @@ export const YANDEX_ROOT = "app:/mtp-yandex-v1";
 export const YANDEX_CAPABILITIES = Object.freeze({
   replaceIfMatch: false,
   serverRevisionHistory: false,
-  automaticPhysicalCleanup: false
+  automaticPhysicalCleanup: false,
+  retentionRequiresSessionProof: true,
+  destinationExclusion: "probe-required" as const
 });
 export interface YandexPublicConfig {
   readonly clientId: string;

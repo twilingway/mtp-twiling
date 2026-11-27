@@ -97,9 +97,9 @@ async function fixture(enabled = true) {
     restore: () => restore,
     callbacks: () => callbacks,
     applies: () => applies,
-    edit: () => {
+    edit: (timeframe = "1h") => {
       revision++;
-      backup.layout.timeframe = "1h";
+      backup.layout.timeframe = timeframe;
     },
     revision: () => revision
   };
@@ -127,6 +127,129 @@ async function seedRemote(f) {
   f.disk.files.set(revisionName(encoded.revision), encoded.body);
   return encoded.revision;
 }
+test("client mode persists across reload, clears only previews and preserves OAuth and automatic preferences", async () => {
+  const f = await fixture();
+  try {
+    await f.coordinator.prepare();
+    await f.coordinator.inspect();
+    const before = f.coordinator.getSnapshot(),
+      restores = f.restore(),
+      callbacks = f.callbacks();
+    const signal = f.disk.auth.signal;
+    assert.ok(before.comparison);
+    const normal = await f.journal.deviceId();
+    await f.coordinator.setClientMode("test");
+    const after = f.coordinator.getSnapshot();
+    assert.equal(after.clientMode, "test");
+    assert.equal(after.clientLabel, "Тестирование");
+    assert.equal(after.comparison, undefined);
+    assert.equal(after.conflict, undefined);
+    assert.equal(after.automatic, before.automatic);
+    assert.equal(after.enabled, before.enabled);
+    assert.equal(after.connected, true);
+    assert.equal(f.restore(), restores);
+    assert.equal(f.callbacks(), callbacks);
+    assert.equal(signal.aborted, false);
+    assert.equal(f.disk.puts(), 0);
+    assert.equal(await f.journal.deviceId(), "00000000-0000-4000-8000-000000000001");
+    await f.coordinator.setAutomatic(true);
+    assert.equal((await f.journal.settings()).clientMode, "test");
+    await f.coordinator.setAutomatic(false);
+    const reopened = f.make();
+    try {
+      await reopened.prepare();
+      assert.equal(reopened.getSnapshot().clientMode, "test");
+      await reopened.setClientMode("normal");
+      assert.equal(await f.journal.deviceId(), normal);
+      assert.equal(reopened.getSnapshot().connected, true);
+    } finally {
+      reopened.dispose();
+    }
+  } finally {
+    f.coordinator.dispose();
+  }
+});
+
+test("a client mode change never discards a durable unresolved apply operation", async () => {
+  const f = await fixture();
+  try {
+    await f.coordinator.prepare();
+    const intent = {
+      version: 1,
+      operationId: crypto.randomUUID(),
+      accountId: f.disk.auth.accountId,
+      credentialGeneration: f.disk.auth.credentialGeneration,
+      targetId: crypto.randomUUID(),
+      heads: [],
+      digest: "a".repeat(64)
+    };
+    await f.journal.saveApplyIntent(config.clientId, intent, new AbortController().signal);
+    await assert.rejects(f.coordinator.setClientMode("test"), { code: "indeterminate" });
+    assert.equal(f.coordinator.getSnapshot().clientMode, "normal");
+    assert.equal((await f.journal.settings()).clientMode, "normal");
+    assert.deepEqual(await f.journal.applyIntent(config.clientId, f.disk.auth.accountId), intent);
+    assert.equal(f.disk.auth.signal.aborted, false);
+    assert.equal(f.disk.puts(), 0);
+  } finally {
+    f.coordinator.dispose();
+  }
+});
+test("failed client-mode persistence cannot be adopted by a later unrelated preference write", async () => {
+  const f = await fixture();
+  try {
+    await f.coordinator.prepare();
+    const save = f.journal.saveSettings.bind(f.journal);
+    f.journal.saveSettings = async () => {
+      throw new DOMException("synthetic full", "QuotaExceededError");
+    };
+    await assert.rejects(f.coordinator.setClientMode("test"), { code: "local-save" });
+    assert.equal(f.coordinator.getSnapshot().clientMode, "normal");
+    f.journal.saveSettings = save;
+    await f.coordinator.setAutomatic(true);
+    assert.equal((await f.journal.settings()).clientMode, "normal");
+    assert.equal(f.coordinator.getSnapshot().clientMode, "normal");
+    assert.equal(f.disk.auth.signal.aborted, false);
+    const saved = await f.journal.settings();
+    await f.journal.saveSettings({ ...saved, clientMode: "test" }, new AbortController().signal);
+    await f.coordinator.setAutomatic(false);
+    assert.equal(
+      (await f.journal.settings()).clientMode,
+      "test",
+      "an unrelated preference preserves another tab's explicit choice"
+    );
+    assert.equal(f.coordinator.getSnapshot().clientMode, "test");
+  } finally {
+    f.coordinator.dispose();
+  }
+});
+test("a different tab's client-mode choice fences an old comparison before any transfer", async () => {
+  const f = await fixture();
+  try {
+    await f.coordinator.prepare();
+    await f.coordinator.inspect();
+    assert.ok(f.coordinator.getSnapshot().comparison);
+    const settings = await f.journal.settings();
+    await f.journal.saveSettings({ ...settings, clientMode: "test" }, new AbortController().signal);
+    await f.coordinator.choose({ kind: "local" });
+    assert.equal(f.coordinator.getSnapshot().choiceAction.state, "review");
+    assert.equal(f.coordinator.getSnapshot().error, "local-changed");
+    assert.equal(f.disk.puts(), 0);
+    assert.equal(f.applies(), 0);
+    await f.coordinator.setClientMode("test");
+    assert.equal(f.coordinator.getSnapshot().clientMode, "test");
+    assert.equal(f.coordinator.getSnapshot().comparison, undefined);
+    assert.equal(f.disk.auth.signal.aborted, false);
+    await f.journal.saveSettings(
+      { ...settings, clientMode: "normal" },
+      new AbortController().signal
+    );
+    await f.coordinator.setAutomatic(true);
+    assert.equal((await f.journal.settings()).clientMode, "normal");
+    assert.equal(f.coordinator.getSnapshot().clientMode, "normal");
+  } finally {
+    f.coordinator.dispose();
+  }
+});
 test("disabled reload prepares local state without auth/network and ignores sync/choose", async () => {
   const f = await fixture(false);
   await f.coordinator.prepare();
@@ -1114,3 +1237,61 @@ for (const existing of [true, false]) {
     }
   });
 }
+
+test("verified cloud save stays confirmed when cleanup fails; only generic sync retries pruning", async () => {
+  const f = await fixture();
+  await f.coordinator.prepare();
+  await f.coordinator.inspect();
+  await f.coordinator.choose({ kind: "local" });
+  f.edit("1h");
+  f.coordinator.localIntent();
+  await f.coordinator.inspect();
+  await f.coordinator.choose({ kind: "local" });
+  const fetcher = f.disk.fetcher;
+  f.disk.fetcher = async (target, init) => {
+    const url = new URL(target),
+      name = url.searchParams.get("path")?.split("/").at(-1);
+    return init.method === "DELETE" && name?.startsWith("slot_")
+      ? new Response(null, { status: 503 })
+      : fetcher(target, init);
+  };
+  f.edit("5m");
+  f.coordinator.localIntent();
+  await f.coordinator.inspect();
+  await f.coordinator.choose({ kind: "local" });
+  let status = f.coordinator.getSnapshot();
+  assert.equal(status.choiceAction.state, "confirmed");
+  assert.equal(status.pendingChanges, false);
+  assert.equal(status.retention.phase, "pending");
+  assert.equal(status.retention.error, "network");
+  assert.equal(status.error, undefined);
+  assert.ok(status.lastSyncedAt);
+  assert.ok(await f.journal.association(config.clientId, f.disk.auth.accountId));
+  assert.equal(await f.journal.pending(config.clientId, f.disk.auth.accountId), undefined);
+  assert.equal([...f.disk.files.keys()].filter((name) => name.startsWith("slot_")).length, 3);
+  let calls = f.disk.calls.length;
+  await f.coordinator.inspect();
+  assert.equal(
+    f.disk.calls.slice(calls).some(({ init }) => init.method === "DELETE"),
+    false
+  );
+  const association = await f.journal.association(config.clientId, f.disk.auth.accountId);
+  const previous = f.coordinator
+    .getSnapshot()
+    .comparison.remotes.find(({ id }) => !association.heads.includes(id));
+  calls = f.disk.calls.length;
+  await f.coordinator.receive(previous.id);
+  assert.equal(
+    f.disk.calls.slice(calls).some(({ init }) => init.method === "DELETE"),
+    false
+  );
+  assert.equal(f.applies(), 1);
+  f.disk.fetcher = fetcher;
+  await f.coordinator.sync();
+  status = f.coordinator.getSnapshot();
+  assert.equal(status.retention.phase, "complete");
+  assert.equal(status.retention.keptFiles, 2);
+  assert.equal([...f.disk.files.keys()].filter((name) => name.startsWith("slot_")).length, 2);
+  assert.equal(f.disk.puts(), 3);
+  f.coordinator.dispose();
+});

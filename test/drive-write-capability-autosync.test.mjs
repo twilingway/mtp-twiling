@@ -82,9 +82,14 @@ function fixture(t) {
     save: async (_owner, prior, patch, signal) => { signal.throwIfAborted(); assert.equal(prior.generation, record.generation); saved.push(patch); record = { ...record, ...patch, generation: record.generation + 1 }; return record; },
     hasHistory: async () => false, fetch: fetcher, online: () => true
   });
+  // The idle receipt precedes the optional maintenance job. Track the whole public sync promise.
+  let currentSync;
+  const synchronize = provider.sync;
+  provider.sync = () => { currentSync = synchronize(); return currentSync; };
   t.after(() => { releaseProbe.resolve(); provider.dispose(); });
   const proofRecord = () => privateRows.get("private:google-write-capability:v1")?.value;
   return { provider, scope, calls, saved, files, proofRecord, createdProbe, releaseProbe,
+    async completeSync() { assert.ok(currentSync, "an automatic sync must already have started"); await currentSync; },
     edit() { local = backup("GAZP"); scope.revision++; provider.localChanged(); },
     userFiles: () => [...files.values()].filter((f) => f.appProperties.mtpNamespace === DEVICE_SLOT_NAMESPACE),
     async userBackup() { const file = [...files.values()].find((f) => f.appProperties.mtpNamespace === DEVICE_SLOT_NAMESPACE); return restoreDeviceSlotVersion((await decodeDeviceSlotPackage(file.body)).current); }
@@ -137,15 +142,15 @@ test("inspection preserves a preexisting automatic job and never creates an auto
   assert.equal(f.proofRecord(), undefined, "inspection itself must not probe");
   await Promise.race([f.createdProbe.promise, new Promise((_, reject) => setTimeout(() => reject(new Error("inspection cancelled the earlier automatic job")), 2500))]);
   f.releaseProbe.resolve();
-  await new Promise((resolve, reject) => {
-    const stop = f.provider.subscribe(() => {
-      if (f.provider.getSnapshot().phase === "idle" && !f.provider.getSnapshot().pendingChanges) { clearTimeout(timer); stop(); resolve(); }
-    });
-    const timer = setTimeout(() => { stop(); reject(new Error("automatic write did not finish")); }, 2500);
-  });
+  await f.completeSync();
   assert.equal(f.userFiles().length, 1);
+  const beforeInspection = f.calls.length;
+  const destructiveBefore = f.calls.filter((call) => call.method === "PUT" || call.method === "DELETE").length;
   await f.provider.inspect();
+  assert.ok(f.calls.slice(beforeInspection).every((call) => call.method === "GET"), "inspection itself is read-only");
   const requests = f.calls.length;
   await new Promise((resolve) => setTimeout(resolve, 1200));
   assert.equal(f.calls.length, requests, "inspection without a prior timer must not schedule sync");
+  assert.equal(f.calls.filter((call) => call.method === "PUT" || call.method === "DELETE").length,
+    destructiveBefore, "inspection must not cause a delayed PUT or DELETE");
 });

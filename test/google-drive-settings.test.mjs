@@ -24,6 +24,7 @@ function fixture(patch = {}, locale = "en", id = "google-drive") {
     authorizationStored: false,
     credentialSaveError: false,
     mode: "normal",
+    clientMode: "normal",
     uploadProbeBytes: 0,
     ...patch
   };
@@ -36,6 +37,10 @@ function fixture(patch = {}, locale = "en", id = "google-drive") {
       return () => listeners.delete(listener);
     },
     prepare: async () => {},
+    setClientMode: async (mode) => {
+      calls.push(["client-mode", mode]);
+      update({ clientMode: mode });
+    },
     runUploadProbe: async () => {
       calls.push(["probe"]);
     },
@@ -114,6 +119,26 @@ test("GoogleDriveSettings normal flow has no required probe or expanded diagnost
       /Check the connection again|Повторить проверку подключения|Перед отправкой нужно|Загрузка ещё не проверена|0 bytes/
     );
     assert.match(html, locale === "en" ? /Google diagnostics/ : /Диагностика Google/);
+    assert.deepEqual(f.calls, []);
+  }
+});
+test("both clouds expose one explicit client selector with private-session guidance and no duplicate Google control", () => {
+  for (const id of ["google-drive", "yandex-disk"]) {
+    const f = fixture({}, "en", id),
+      html = renderToStaticMarkup(
+        f.wrap(
+          React.createElement(
+            f.CloudProviderSettings,
+            { provider: f.google },
+            id === "google-drive" ? React.createElement(f.GoogleDriveSettings) : null
+          )
+        )
+      );
+    assert.equal((html.match(/<select /g) ?? []).length, 1);
+    assert.match(html, new RegExp(`id="${id}-client-mode"`));
+    assert.match(html, /This browser/);
+    assert.match(html, /Testing/);
+    assert.match(html, /Choose Testing for private browsing or a temporary session/);
     assert.deepEqual(f.calls, []);
   }
 });
@@ -204,6 +229,41 @@ function find(element, predicate) {
     if (result) return result;
   }
 }
+test("a client-selector failure is retryable without suggesting that sign-in was removed or changing cloud settings", async () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { event: undefined, HTMLIFrameElement: class {} };
+  const f = fixture();
+  let latest;
+  f.google.setClientMode = async () => {
+    throw new Error("synthetic full");
+  };
+  function Reader() {
+    latest = f.CloudProviderSettings({ provider: f.google });
+    return null;
+  }
+  const root = createRoot(nullContainer());
+  try {
+    flushSync(() => root.render(f.wrap(React.createElement(Reader))));
+    const control = () =>
+      find(latest, (element) => element.props.id === "google-drive-client-mode");
+    flushSync(() => control().props.onChange({ target: { value: "test" } }));
+    await new Promise(setImmediate);
+    const html = renderToStaticMarkup(latest);
+    assert.match(html, /Could not change client mode/);
+    assert.doesNotMatch(html, /Could not save or remove sign-in/);
+    assert.equal(control().props.value, "normal");
+    assert.equal(control().props.disabled, false);
+    assert.equal(f.google.getSnapshot().connected, true);
+    assert.equal(f.google.getSnapshot().enabled, true);
+    assert.equal(f.google.getSnapshot().automatic, false);
+    assert.deepEqual(f.calls, []);
+  } finally {
+    flushSync(() => root.unmount());
+    await new Promise(setImmediate);
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});
 
 test("GoogleDriveSettings checking is cancellable, independent and has zero quote/candle commits or automatic view probes", async (t) => {
   const previousWindow = globalThis.window;

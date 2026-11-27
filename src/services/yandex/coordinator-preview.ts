@@ -13,6 +13,20 @@ export function yandexVisibleChoices(inspected: {
 }): YandexPreviewRemote[] {
   const all = inspected.remotes.map(({ revision }) => revision),
     visible = new Set(inspected.heads);
+  const slots = inspected.remotes.filter((remote) => remote.slot);
+  const known = new Set(all.map(({ revisionId }) => revisionId));
+  if (slots.length || all.some(({ parents }) => parents.some((id) => !known.has(id)))) {
+    const legacy = inspected.remotes.filter((remote) => !remote.slot);
+    for (const remote of slots) visible.add(remote.revision.revisionId);
+    // Legacy bodies remain recoverable even when an old writer returns after migration/pruning.
+    for (const remote of legacy) visible.add(remote.revision.revisionId);
+    return inspected.remotes
+      .filter(({ revision }) => visible.has(revision.revisionId))
+      .map((remote) => ({
+        remote,
+        summary: { ...remote.revision.summary, date: remote.revision.createdAt }
+      }));
+  }
   for (const deviceId of new Set(all.map(({ deviceId }) => deviceId)))
     for (const revision of visibleDeviceVersions(all, deviceId)) visible.add(revision.revisionId);
   return [...visible].map((id) => {

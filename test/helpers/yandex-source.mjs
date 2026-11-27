@@ -47,6 +47,11 @@ export async function localBackend() {
       signal.throwIfAborted();
       records.set(id, structuredClone(value));
     },
+    readOrCreate: async (id, create, signal) => {
+      signal.throwIfAborted();
+      if (!records.has(id)) records.set(id, create());
+      return structuredClone(records.get(id));
+    },
     remove: async (id, signal, generation) => {
       signal?.throwIfAborted();
       if (!generation || records.get(id)?.generation === generation) records.delete(id);

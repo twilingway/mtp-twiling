@@ -54,6 +54,25 @@
 .cloud-last-confirmed {
   flex: 1 1 100%;
 }
+.cloud-client-identity {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--control-line);
+  border-radius: 8px;
+}
+.cloud-client-identity label {
+  display: grid;
+  gap: 6px;
+}
+.cloud-client-identity select {
+  width: 100%;
+  min-height: 44px;
+}
+.cloud-client-identity small {
+  color: var(--muted);
+  line-height: 1.5;
+}
 .cloud-last-confirmed time {
   font-size: 15px;
   font-variant-numeric: tabular-nums;

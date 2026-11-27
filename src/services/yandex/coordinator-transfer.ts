@@ -38,7 +38,7 @@ interface TransferActions extends YandexApplyActions {
     heads: readonly string[],
     review?: CloudSelection
   ): void;
-  unchanged(association: YandexAssociation): void;
+  unchanged(association: YandexAssociation, revision: number): Promise<void>;
   applying(): void;
 }
 export async function yandexTransfer(
@@ -147,7 +147,7 @@ export async function yandexTransfer(
   }
   if (association && sameHeads(association.heads, inspected.heads)) {
     if (captured.digest === association.digest) {
-      actions.unchanged(association);
+      await actions.unchanged(association, captured.revision);
       return;
     }
     for (const id of inspected.heads) {

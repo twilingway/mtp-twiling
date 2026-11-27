@@ -4,6 +4,8 @@ import type { YandexLocalStore } from "./local.js";
 import type { YandexAuthorization, YandexReference } from "./types.js";
 import { decodeBundle, MAX_BUNDLE_BYTES, revisionName } from "./bundle.js";
 import type { YandexRevision } from "./bundle.js";
+import type { CloudClientMode } from "../../model/cloud-sync.js";
+import { CLOUD_TEST_CLIENT_ID, defaultCloudClientMode } from "../../model/cloud-client-identity.js";
 
 export interface YandexAssociation {
   readonly version: 1;
@@ -33,6 +35,7 @@ export interface YandexApplyIntent {
 export interface YandexSettings {
   readonly enabled: boolean;
   readonly automatic: boolean;
+  readonly clientMode?: CloudClientMode;
 }
 export class YandexJournal {
   constructor(private readonly backend: () => Promise<YandexLocalStore> = yandexLocalStore) {}
@@ -43,19 +46,41 @@ export class YandexJournal {
   }
   async settings(): Promise<YandexSettings> {
     const value = object(await (await this.backend()).read("mtp:yandex:device:settings"));
-    return { enabled: value?.enabled === true, automatic: value?.automatic === true };
+    if (
+      value?.clientMode !== undefined &&
+      value.clientMode !== "normal" &&
+      value.clientMode !== "test"
+    )
+      throw new YandexError("local-save");
+    return {
+      enabled: value?.enabled === true,
+      automatic: value?.automatic === true,
+      clientMode:
+        value?.clientMode ??
+        defaultCloudClientMode(
+          globalThis.location,
+          !!globalThis.document?.querySelector?.('script[type="module"][src="/__dev/client.js"]')
+        )
+    };
   }
   async saveSettings(settings: YandexSettings, signal: AbortSignal): Promise<void> {
-    await (await this.backend()).write("mtp:yandex:device:settings", settings, signal);
+    const clientMode = settings.clientMode ?? (await this.settings()).clientMode;
+    if (clientMode !== "normal" && clientMode !== "test") throw new YandexError("local-save");
+    await (
+      await this.backend()
+    ).write("mtp:yandex:device:settings", { ...settings, clientMode }, signal);
   }
   async deviceId(): Promise<string> {
-    const backend = await this.backend(),
-      key = "mtp:yandex:device:device-id",
-      saved = await backend.read(key);
-    if (typeof saved === "string" && uuidPattern.test(saved)) return saved;
-    if (saved !== undefined) throw new YandexError("local-save");
-    const value = crypto.randomUUID();
-    await backend.write(key, value, new AbortController().signal);
+    if ((await this.settings()).clientMode === "test") return CLOUD_TEST_CLIENT_ID;
+    const value = await (
+      await this.backend()
+    ).readOrCreate(
+      "mtp:yandex:device:device-id",
+      () => crypto.randomUUID(),
+      new AbortController().signal
+    );
+    if (typeof value !== "string" || !uuidPattern.test(value) || value === CLOUD_TEST_CLIENT_ID)
+      throw new YandexError("local-save");
     return value;
   }
   async association(clientId: string, accountId: string): Promise<YandexAssociation | undefined> {

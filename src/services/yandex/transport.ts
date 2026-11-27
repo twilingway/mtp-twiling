@@ -1,8 +1,11 @@
 import { assertCurrent, object, sha256, YANDEX_ROOT, YandexError } from "./types.js";
 import type { YandexAuthorization, YandexFile, YandexReference } from "./types.js";
+import { moveYandexSlot, removeYandexSlot } from "./slot-transport.js";
+import type { SlotMutationAccess } from "./slot-transport.js";
 
 const API = "https://cloud-api.yandex.net/v1/disk/resources";
-const NAME = /^(?:[a-f\d-]{36}_[a-f\d-]{36}|probe_[a-f\d-]{36})\.mtp$/;
+const NAME =
+  /^(?:[a-f\d-]{36}_[a-f\d-]{36}|probe_[a-f\d-]{36}|(?:probe_slot_[a-f\d-]{36}_|slot_)[a-f\d-]{36}_[1-9]\d{0,9}|(?:probe_stage_[a-f\d-]{36}_|stage_)[a-f\d-]{36})\.mtp$/;
 const MD5 = /^[a-f\d]{32}$/;
 const MAX_FILES = 10000,
   MAX_LIST_BYTES = 4 * 1024 * 1024;
@@ -373,6 +376,28 @@ export class YandexTransport {
     )
       throw new YandexError("conflict");
     return item;
+  }
+  private slotAccess(): SlotMutationAccess {
+    return {
+      auth: this.auth,
+      request: (url, init, allowed, valid) => this.request(url, init, true, allowed, valid),
+      json: (response) => this.json(response),
+      metadata: (name) => this.metadata(name),
+      read: (file, limit) => this.read(file, limit),
+      sleep: this.sleep
+    };
+  }
+  moveImmutable(
+    from: string,
+    destination: string,
+    reference: YandexReference,
+    valid: () => boolean = () => true,
+    outcome?: (status: number) => void
+  ): Promise<YandexFile> {
+    return moveYandexSlot(this.slotAccess(), from, destination, reference, valid, outcome);
+  }
+  removeExact(file: YandexFile, valid: () => boolean = () => true): Promise<void> {
+    return removeYandexSlot(this.slotAccess(), file, valid);
   }
   /** Only explicit probe cleanup; regular synchronization never invokes physical deletion. */
   async removeProbe(item: YandexFile): Promise<void> {

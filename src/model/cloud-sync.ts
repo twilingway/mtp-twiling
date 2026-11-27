@@ -1,4 +1,5 @@
 export type CloudProviderId = "google-drive" | "yandex-disk";
+export type CloudClientMode = "normal" | "test";
 export type CloudErrorCode =
   | "configuration-required"
   | "auth-required"
@@ -46,6 +47,12 @@ export interface CloudProgress {
   completedBytes?: number;
   totalBytes?: number;
 }
+export interface CloudRetentionStatus {
+  phase: "pending" | "complete";
+  keptFiles?: number;
+  deletedFiles?: number;
+  error?: CloudErrorCode;
+}
 export interface CloudSyncStatus {
   provider: CloudProviderId;
   enabled: boolean;
@@ -58,6 +65,9 @@ export interface CloudSyncStatus {
   pendingChanges: boolean;
   authorizationStored: boolean;
   credentialSaveError: boolean;
+  clientMode?: CloudClientMode;
+  clientLabel?: string;
+  retention?: CloudRetentionStatus;
   lastSyncedAt?: string;
   error?: CloudErrorCode;
   pauseReason?: "offline" | "auth-required" | "network" | "configuration-required";
@@ -77,6 +87,7 @@ export interface CloudSyncProvider {
   localChanged(): void;
   setEnabled(enabled: boolean): Promise<void>;
   setAutomatic(automatic: boolean): Promise<void>;
+  setClientMode?(mode: CloudClientMode): Promise<void>;
   connectFromUserGesture(): Promise<void>;
   disconnect(): Promise<void>;
   sync(): Promise<void>;

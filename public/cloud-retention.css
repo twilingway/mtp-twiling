@@ -1,0 +1,111 @@
+.cloud-retention {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--control-line);
+}
+.cloud-retention :is(h4, p) {
+  margin: 0;
+}
+.cloud-retention h4 {
+  color: var(--text);
+  font-size: 15px;
+}
+.cloud-retention-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.cloud-retention-summary p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.cloud-retention-summary small {
+  color: var(--muted);
+}
+.cloud-retention button {
+  min-height: 44px;
+  white-space: normal;
+}
+.cloud-retention-compact {
+  justify-self: start;
+}
+.cloud-retention-progress {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--control-line);
+  border-radius: 8px;
+  background: var(--surface-input);
+}
+.cloud-retention-stage {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+}
+.cloud-retention-progress progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+.cloud-retention-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 0;
+}
+.cloud-retention-counts:empty {
+  display: none;
+}
+.cloud-retention-counts dt,
+.cloud-retention-note,
+.cloud-retention-archive-meta small {
+  color: var(--muted);
+}
+.cloud-retention-counts dd {
+  margin: 2px 0 0;
+  color: var(--text);
+  font-size: 21px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.cloud-retention-history summary {
+  min-height: 44px;
+  padding-block: 11px;
+  cursor: pointer;
+}
+.cloud-retention-history[open] > * + * {
+  margin-top: 8px;
+}
+.cloud-retention-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cloud-retention-archives {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cloud-retention-archives li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--control-line);
+  border-radius: 8px;
+}
+.cloud-retention-archive-meta {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.cloud-retention-archive-meta :is(time, strong) {
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+}
