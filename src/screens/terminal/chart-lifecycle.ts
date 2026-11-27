@@ -25,7 +25,7 @@ import { publishWorkspaceCrosshair } from "./workspace-sync-controller.js";
 import { persistTechnicalPaneLayout } from "./technical-indicator-actions.js";
 import type { TerminalPreferences } from "./state.js";
 import { drawingHandleRadius } from "./chart-drawing-touch.js";
-import { chartAdapterReadySignal } from "./chart-adapter-ready.js";
+import { observeChartAdapterReady } from "./chart-adapter-ready.js";
 
 function technicalInputs(preferences: TerminalPreferences) {
   const instances = preferences.technicalIndicators ?? [];
@@ -56,6 +56,7 @@ export function useChartCanvas(
     fittedWorkspaceHistory = useRef(false),
     dataFallback = useRef(false),
     adapterRef = useRef<ChartAdapter | null>(null),
+    adapterReadyRef = useRef<ReturnType<typeof observeChartAdapterReady> | null>(null),
     typeRange = useRef<{
       owner: string;
       revision: number;
@@ -115,6 +116,11 @@ export function useChartCanvas(
         selectedMarketRow(current.rows, current.preferences)?.uid === uid
       );
     };
+    const readiness = observeChartAdapterReady(
+      controller,
+      () => (dataRef.current.length ? owned : null),
+      () => matches() && owned !== null && controller.chart === owned
+    );
     const initialize = async () => {
       const snapshot = controller.getSnapshot(),
         instrument = selectedMarketRow(snapshot.rows, snapshot.preferences);
@@ -219,6 +225,7 @@ export function useChartCanvas(
         waitingForSlotAnchor = slot !== undefined && !viewAnchorCovered(view, candles);
       owned.persistView = ready && !showingFallback && !waitingForSlotAnchor;
       adapterRef.current = owned;
+      adapterReadyRef.current = readiness;
       controller.chart = owned;
       const currentPreferences = controller.getSnapshot().preferences;
       owned.setLastPriceLabelColors?.(lastPriceLabelColors(currentPreferences.chartSettings));
@@ -246,7 +253,7 @@ export function useChartCanvas(
         fittedWorkspaceHistory.current = !current.loading || !!view;
       }
       if (!ready || !candles.length || waitingForSlotAnchor) pendingSavedView.current = view;
-      if (matches() && controller.chart === owned) chartAdapterReadySignal(controller).publish();
+      readiness.check();
     };
     void initialize().catch((error: unknown) => {
       if (matches())
@@ -291,8 +298,9 @@ export function useChartCanvas(
       owned?.destroy();
       if (owned && controller.chart === owned) {
         controller.chart = null;
-        chartAdapterReadySignal(controller).publish();
       }
+      readiness.stop();
+      if (adapterReadyRef.current === readiness) adapterReadyRef.current = null;
       adapterRef.current = null;
       dataRef.current = [];
       dataFallback.current = false;
@@ -331,7 +339,7 @@ export function useChartCanvas(
     const previousPersistView = adapter?.persistView;
     const publishReadiness = () => {
       if (adapter && controller.chart === adapter && previousPersistView !== adapter.persistView)
-        chartAdapterReadySignal(controller).publish();
+        adapterReadyRef.current?.check();
     };
     if (adapter)
       adapter.persistView =
@@ -373,8 +381,7 @@ export function useChartCanvas(
     dataRef.current = next;
     dataFallback.current = fallback;
     if (!waitingForSlotAnchor) pendingSavedView.current = undefined;
-    if (!previous.length && controller.chart === adapter)
-      chartAdapterReadySignal(controller).publish();
+    if (!previous.length && controller.chart === adapter) adapterReadyRef.current?.check();
     else publishReadiness();
   }, [
     controller,
