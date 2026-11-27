@@ -187,7 +187,7 @@ export function ContextMenu() {
       ref={ref}
       className={`chart-context-menu ${x + 490 > window.innerWidth ? "submenu-left" : ""}`}
       role="menu"
-      style={{ left: x, top: y }}
+      style={{ left: x, top: y, ...(mobile && { maxHeight: `calc(100dvh - ${y + 6}px)` }) }}
       onContextMenu={(event) => event.preventDefault()}
     >
       {drawing && (

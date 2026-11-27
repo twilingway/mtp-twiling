@@ -41,6 +41,68 @@ const load = (name, imports = {}, globals = {}) => {
 };
 const helpers = load("mobile-object-widget.ts");
 
+function renderContextMenu({ width, height, mobile, kind = "drawing" }) {
+  const state = {
+    selectedObject: "selected",
+    contextMenu: { x: 128, y: 226, target: { kind, id: "selected" } },
+    drawings: kind === "drawing" ? [{ id: "selected", name: "segment", points: [] }] : [],
+    images: kind === "image" ? [{ id: "selected", name: "Photo", width: 100 }] : []
+  };
+  const { ContextMenu } = load(
+    "ContextMenu.tsx",
+    {
+      react: {
+        useCallback: (fn) => fn,
+        useEffect: () => {},
+        useRef: (current) => ({ current }),
+        useState: (initial) => [initial === false ? true : initial, () => {}]
+      },
+      "react/jsx-runtime": {
+        jsx: (type, props) => ({ type, props }),
+        jsxs: (type, props) => ({ type, props }),
+        Fragment: "fragment"
+      },
+      "../../../i18n/messages.js": { t: (value) => value },
+      "../../../model/drawing-model.js": { TOOL_NAMES: { segment: "Line" } },
+      "../../../model/indicator-legend.js": {},
+      "../state.js": {},
+      "../context.js": { useTerminal: () => ({ state, controller: {} }) },
+      "./controls/ChevronIcon.js": { ChevronIcon: "chevron" },
+      "./MobileObjectWidget.js": { useMobileObjectWidget: () => mobile },
+      "./mobile-object-widget.js": helpers
+    },
+    { window: { innerWidth: width, innerHeight: height } }
+  );
+  return ContextMenu();
+}
+
+test("expanded mobile context menus retain a six pixel lower margin on phone viewports", () => {
+  for (const [width, height] of [
+    [392, 783],
+    [320, 568]
+  ]) {
+    for (const kind of ["drawing", "image"]) {
+      const menu = renderContextMenu({ width, height, mobile: true, kind });
+      const { top, maxHeight } = menu.props.style;
+      assert.equal(maxHeight, `calc(100dvh - ${top + 6}px)`);
+      // The reported 566px expanded menu must scroll instead of crossing the bottom edge.
+      const effectiveHeight = Math.min(566, height - top - 6);
+      assert.ok(top + effectiveHeight <= height - 6);
+      assert.ok(effectiveHeight > 40);
+    }
+  }
+});
+
+test("desktop context menu positioning and height remain unchanged", () => {
+  assert.deepEqual(
+    plain(renderContextMenu({ width: 1440, height: 900, mobile: false }).props.style),
+    {
+      left: 128,
+      top: 226
+    }
+  );
+});
+
 test("widget clamps all edges on 392x783 and 320x568 without losing drag coordinates", () => {
   for (const [width, height] of [
     [392, 783],
