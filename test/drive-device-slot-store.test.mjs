@@ -289,6 +289,38 @@ test("explicit choice verifies a preview through a fresh store and commits only 
   assert.deepEqual(h.accepted, [42]);
 });
 
+test("first local publication requires an explicit empty-account choice and refreshes legacy discovery", async () => {
+  const mock = transport();
+  const store = new DeviceSlotStore(mock.io, () => 1 << 20);
+  const h = await syncHarness(store, undefined, "SBER");
+  Object.assign(h.record(), {
+    scope: undefined,
+    digest: undefined,
+    explicitGoogleCredential: uid(172)
+  });
+  let hasLegacy = false;
+  h.context.legacyAvailable = async () => hasLegacy;
+  const initial = await synchronizeDeviceSlots(h.context, h.record());
+  assert.equal(initial.state, "choice");
+  assert.deepEqual(initial.preview.conflict.remotes, []);
+  assert.equal(mock.files.size, 0);
+  hasLegacy = true;
+  await assert.rejects(
+    chooseDeviceSlotVersion(h.context, h.record(), initial.preview, {
+      kind: "local"
+    }),
+    { code: "conflict" }
+  );
+  assert.equal(mock.files.size, 0);
+  hasLegacy = false;
+  const result = await chooseDeviceSlotVersion(h.context, h.record(), initial.preview, {
+    kind: "local"
+  });
+  assert.equal(result.state, "idle");
+  assert.equal(mock.files.size, 1);
+  assert.equal(h.applies(), 0);
+});
+
 test("a durable native commit followed by UI restore failure does not reimport on retry", async () => {
   const mock = transport();
   const store = new DeviceSlotStore(mock.io, () => 1 << 20);

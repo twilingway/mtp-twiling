@@ -24,6 +24,7 @@ import { hasDriveHistory } from "./local.js";
 import { advanceDriveProgress, beginDriveProgress, finishDriveProgress } from "./progress.js";
 import { DriveError } from "./types.js";
 import type { DriveAuthorization } from "./types.js";
+import { googleSlotStorageOwner } from "./workspace-binding.js";
 export type { GoogleStatus } from "./device-slot-status.js";
 
 export type { GoogleSlotHost } from "./device-slot-context.js";
@@ -46,6 +47,14 @@ const sameScope = (a: GoogleSlotScope | undefined, b: GoogleSlotScope) =>
   a?.cloudOwner === b.cloudOwner &&
   a?.session === b.session &&
   a?.associationConflict === b.associationConflict;
+const matchesCredential = (
+  scope: GoogleSlotScope,
+  record: DeviceSlotRecord,
+  authorization: DriveAuthorization
+) =>
+  !scope.associationConflict ||
+  (!!record.explicitGoogleCredential &&
+    record.explicitGoogleCredential === authorization.credentialId);
 
 export class GoogleSlotProvider implements CloudSyncProvider {
   readonly id = providerId;
@@ -129,20 +138,24 @@ export class GoogleSlotProvider implements CloudSyncProvider {
     }
     this.reset();
     this.scope = next;
-    if (next.ready && !next.associationConflict) this.load = this.restore(next, this.epoch);
+    if (next.ready) this.load = this.restore(next, this.epoch);
   };
   private async restore(scope: GoogleSlotScope, epoch: number) {
     try {
-      const record = await this.dependencies.load(scope.cloudOwner);
+      const owner = googleSlotStorageOwner(scope);
+      const record = await this.dependencies.load(owner);
       if (!this.current(epoch)) return;
       this.record = record;
       if (record.enabled === false) return;
-      const authorization = await this.dependencies.auth.restore(scope.cloudOwner);
+      const authorization =
+        !scope.associationConflict || record.explicitGoogleCredential
+          ? await this.dependencies.auth.restore(owner)
+          : undefined;
       if (!this.current(epoch)) return;
       const enabled =
         record.enabled === true ||
-        !!authorization ||
-        (await this.dependencies.hasHistory(scope.cloudOwner));
+        (!scope.associationConflict &&
+          (!!authorization || (await this.dependencies.hasHistory(owner))));
       if (!this.current(epoch) || !enabled) return;
       this.update({
         enabled,
@@ -151,7 +164,8 @@ export class GoogleSlotProvider implements CloudSyncProvider {
         phase: "disconnected",
         ...(record.lastSyncedAt ? { lastSyncedAt: record.lastSyncedAt } : {})
       });
-      if (authorization) this.attach(authorization, epoch);
+      if (authorization && matchesCredential(scope, record, authorization))
+        this.attach(authorization, epoch);
     } catch (error) {
       this.fail(error, epoch);
     }
@@ -237,15 +251,22 @@ export class GoogleSlotProvider implements CloudSyncProvider {
       !this.state.prepared ||
       this.operation ||
       !scope.ready ||
-      scope.associationConflict ||
       this.state.phase === "connecting"
     )
       return;
     const epoch = this.epoch;
     this.update({ phase: "connecting" });
     try {
-      const authorization = await this.dependencies.auth.connectFromUserGesture(scope.cloudOwner);
-      if (this.current(epoch)) this.attach(authorization, epoch);
+      const authorization = await this.dependencies.auth.connectFromUserGesture(
+        googleSlotStorageOwner(scope)
+      );
+      if (!this.current(epoch) || authorization.signal.aborted) return;
+      if (scope.associationConflict) {
+        if (!authorization.credentialId)
+          throw new DriveError("auth-required", "Нужен повторный вход в Google.");
+        await this.patchLocal({ explicitGoogleCredential: authorization.credentialId });
+      }
+      if (this.current(epoch) && !authorization.signal.aborted) this.attach(authorization, epoch);
     } catch (error) {
       this.fail(error, epoch);
     }
@@ -254,16 +275,11 @@ export class GoogleSlotProvider implements CloudSyncProvider {
   private async patchLocal(patch: Partial<DeviceSlotRecord>) {
     const scope = this.host.scope(providerId);
     const epoch = this.epoch;
-    if (!scope.ready || scope.associationConflict)
-      throw new DriveError("busy", "Рабочее пространство недоступно.");
-    const record = await this.dependencies.load(scope.cloudOwner);
+    if (!scope.ready) throw new DriveError("busy", "Рабочее пространство недоступно.");
+    const owner = googleSlotStorageOwner(scope);
+    const record = await this.dependencies.load(owner);
     if (!sameScope(scope, this.host.scope(providerId)) || epoch !== this.epoch) throw changed();
-    const saved = await this.dependencies.save(
-      scope.cloudOwner,
-      record,
-      patch,
-      this.lifecycle.signal
-    );
+    const saved = await this.dependencies.save(owner, record, patch, this.lifecycle.signal);
     if (!this.current(epoch)) throw changed();
     this.record = saved;
     return saved;
@@ -292,7 +308,7 @@ export class GoogleSlotProvider implements CloudSyncProvider {
     const epoch = this.epoch;
     await disabling;
     if (this.current(epoch) && !this.state.enabled && sameScope(scope, this.host.scope(providerId)))
-      await this.dependencies.auth.forgetOwner(scope.cloudOwner);
+      await this.dependencies.auth.forgetOwner(googleSlotStorageOwner(scope));
   };
   dispose = (): void => {
     this.disposed = true;
@@ -377,14 +393,7 @@ export class GoogleSlotProvider implements CloudSyncProvider {
   private async run(operation: Operation, selection?: CloudSelection) {
     const authorization = this.authorization,
       scope = this.host.scope(providerId);
-    if (
-      !authorization ||
-      !this.state.enabled ||
-      this.operation ||
-      !scope.ready ||
-      scope.blocked ||
-      scope.associationConflict
-    )
+    if (!authorization || !this.state.enabled || this.operation || !scope.ready || scope.blocked)
       return;
     if (!this.dependencies.online()) {
       this.update({ pendingChanges: true, pauseReason: "offline" });
@@ -411,9 +420,19 @@ export class GoogleSlotProvider implements CloudSyncProvider {
       ...(selection ? { choiceAction: { selection, state: "running" as const } } : {})
     });
     try {
+      const owner = googleSlotStorageOwner(scope);
+      const record = await this.dependencies.load(owner);
+      checkIdentity();
+      if (record.enabled === false) {
+        this.reset();
+        return;
+      }
+      if (!matchesCredential(scope, record, authorization)) {
+        this.dependencies.auth.suspend();
+        return;
+      }
       const captured = await this.host.capture(providerId, { signal, isCurrent: current });
       checkIdentity();
-      const record = await this.dependencies.load(scope.cloudOwner);
       const context = createDeviceSlotContext({
         host: this.host,
         capture: captured,
@@ -421,7 +440,7 @@ export class GoogleSlotProvider implements CloudSyncProvider {
         authorization,
         fetcher: this.dependencies.fetch,
         save: async (prior, patch) => {
-          const next = await this.dependencies.save(scope.cloudOwner, prior, patch, signal);
+          const next = await this.dependencies.save(owner, prior, patch, signal);
           if (current()) this.record = next;
           return next;
         },

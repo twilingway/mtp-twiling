@@ -267,6 +267,7 @@ export async function synchronizeDeviceSlots(
   const sameHeads = same(record.baseHeads, snapshot.heads);
   const localSame = context.capture.digest === record.digest;
   if (
+    (record.explicitGoogleCredential && !record.scope) ||
     snapshot.heads.length > 1 ||
     (snapshot.heads.length && !sameHeads && (!record.scope || !localSame))
   ) {
@@ -319,6 +320,7 @@ export async function chooseDeviceSlotVersion(
     throw changed();
   const snapshot = await assertPinned(context, preview.snapshot);
   if (selection.kind === "local") {
+    if (!snapshot.heads.length && (await context.legacyAvailable())) throw changed();
     const version = await prepareDeviceSlotVersion(context.capture.prepared, context.signal);
     const written = await publish(
       context,
@@ -326,7 +328,7 @@ export async function chooseDeviceSlotVersion(
       snapshot,
       version,
       context.capture.digest,
-      "local"
+      snapshot.heads.length ? "local" : undefined
     );
     return finishPublish(context, written, context.capture.digest);
   }

@@ -20,6 +20,7 @@ export interface DeviceSlotRecord {
   readonly schemaVersion: 3;
   readonly generation: number;
   readonly enabled?: boolean | undefined;
+  readonly explicitGoogleCredential?: string | undefined;
   readonly automatic: boolean;
   readonly mode: DriveSlotMode;
   readonly scope?: DeviceSlotScope | undefined;
@@ -98,6 +99,9 @@ function parse(value: unknown, fallback: DriveSlotMode): DeviceSlotRecord {
     Number(record.generation) < 0 ||
     typeof record.automatic !== "boolean" ||
     (record.enabled !== undefined && typeof record.enabled !== "boolean") ||
+    (record.explicitGoogleCredential !== undefined &&
+      (typeof record.explicitGoogleCredential !== "string" ||
+        !uuidPattern.test(record.explicitGoogleCredential))) ||
     (record.mode !== "normal" && record.mode !== "test") ||
     !Array.isArray(record.baseHeads) ||
     record.baseHeads.length > 256 ||
@@ -122,6 +126,7 @@ function parse(value: unknown, fallback: DriveSlotMode): DeviceSlotRecord {
     schemaVersion: 3,
     generation: Number(record.generation),
     enabled: record.enabled,
+    explicitGoogleCredential: record.explicitGoogleCredential,
     automatic: record.automatic,
     mode: record.mode,
     scope,
