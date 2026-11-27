@@ -1,0 +1,79 @@
+.mobile-object-widget {
+  position: fixed;
+  z-index: 155;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  width: max-content;
+  max-width: calc(100vw - 12px);
+  gap: 1px;
+  padding: 3px;
+  border: 1px solid var(--control-line, #434651);
+  border-radius: 7px;
+  color: var(--text, #d1d4dc);
+  background: var(--surface-raised, #1e222d);
+  box-shadow: 0 4px 18px #0006;
+}
+.mobile-object-widget button,
+.mobile-object-widget select,
+.mobile-object-color {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.mobile-object-widget select {
+  width: 44px;
+  padding: 0 2px;
+  color: inherit;
+  background: var(--surface-input, #181c26);
+}
+.mobile-object-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  font-size: 24px !important;
+}
+.mobile-object-handle:active {
+  cursor: grabbing;
+}
+.mobile-object-color {
+  position: relative;
+  width: 40px;
+  overflow: hidden;
+  font-size: 19px;
+}
+.mobile-object-color span {
+  pointer-events: none;
+  z-index: 1;
+  align-self: flex-start;
+  line-height: 29px;
+}
+.mobile-object-color input {
+  position: absolute;
+  inset: 0;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  padding: 27px 5px 3px;
+  border: 0;
+  background: transparent;
+}
+.mobile-object-color:focus-within {
+  outline: 2px solid #7ca4ff;
+  outline-offset: -2px;
+}
+@media (max-width: 650px), (pointer: coarse) {
+  .chart-context-menu {
+    max-height: calc(100dvh - 12px);
+    overflow-y: auto;
+  }
+  .chart-context-menu button {
+    min-height: 40px;
+  }
+}
