@@ -3,6 +3,10 @@ import type { ChartLayoutId } from "../../model/chart-workspace-layout.js";
 import { isRecord } from "../../model/backup-format.js";
 import { DEFAULT_WORKSPACE_SYNC_FLAGS } from "./workspace-sync.js";
 import type { WorkspaceSyncFlags } from "./workspace-sync.js";
+import {
+  readWorkspaceLocal,
+  writeWorkspaceLocal
+} from "../../services/workspace-identity-local.js";
 
 export interface WorkspacePresentation {
   layoutId: ChartLayoutId;
@@ -14,7 +18,7 @@ const storageKey = (owner: string) => `mtp:workspace-presentation:${encodeURICom
 export function loadWorkspacePresentation(owner: string): WorkspacePresentation {
   let saved: unknown;
   try {
-    saved = JSON.parse(localStorage.getItem(storageKey(owner)) ?? "null");
+    saved = JSON.parse(readWorkspaceLocal(storageKey(owner)) ?? "null");
   } catch {
     // An inaccessible or damaged preference falls back to a single chart.
   }
@@ -30,7 +34,7 @@ export function loadWorkspacePresentation(owner: string): WorkspacePresentation 
 
 export function saveWorkspacePresentation(owner: string, value: WorkspacePresentation): void {
   try {
-    localStorage.setItem(storageKey(owner), JSON.stringify(value));
+    writeWorkspaceLocal(storageKey(owner), JSON.stringify(value));
   } catch {
     // The selected layout remains usable during this session.
   }

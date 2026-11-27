@@ -12,18 +12,20 @@ import { DEFAULT_CHART_SETTINGS, DEFAULT_INDICATORS } from "./state.js";
 import type { TerminalPreferences } from "./state.js";
 import { defaultPreferences, errorText } from "./controller-bridge.js";
 import type { SessionBridge } from "./controller-bridge.js";
-import { publicGuestRecoveryCache } from "../../services/storage-guest-cache.js";
-import { guestRecoveryText } from "../../i18n/messages-guest-recovery.js";
-import { guestActivationFence } from "./controller-guest-activation.js";
+import { DEVICE_OWNER, prepareDeviceWorkspace } from "../../services/workspace-identity.js";
+import type { DeviceWorkspaceBinding } from "../../services/workspace-identity.js";
 import { shareMarketRows } from "./market-state-sharing.js";
 const cancelled = () => new DOMException("Отключено", "AbortError");
 
 export class TerminalSession {
   client: MarketClient | null = null;
   disposed = false;
+  readonly cloudSession = {};
+  workspaceBinding: DeviceWorkspaceBinding | undefined;
   private lifecycle = 0;
   private activation = 0;
   private transitionAbort: AbortController | undefined;
+  private readonly transitionPauses = new WeakMap<MarketClient, boolean>();
   private liveFrame: number | null = null;
   private reconnectClient: MarketClient | null = null;
   private sessionWrites: Promise<void> = Promise.resolve();
@@ -37,7 +39,7 @@ export class TerminalSession {
     );
   }
   matches(client: MarketClient | null): boolean {
-    return !this.disposed && client === this.client;
+    return !this.disposed && !this.bridge.getState().profileTransition && client === this.client;
   }
   async prepareProfile(
     owner: string,
@@ -46,24 +48,33 @@ export class TerminalSession {
     valid: () => boolean = () => !this.disposed
   ): Promise<void> {
     if (!valid() || (!force && this.bridge.getState().owner === owner)) return;
-    await storage.prepareProfileV2(owner, valid);
-    await storage.migrateLegacy(owner, name);
+    const preferences = await this.readProfilePreferences(owner, name, valid);
     if (!valid()) return;
+    this.bridge.resetHistory();
+    this.bridge.update({ owner, name, preferences });
+  }
+  private async readProfilePreferences(
+    owner: string,
+    name: string,
+    valid: () => boolean
+  ): Promise<TerminalPreferences> {
+    await storage.prepareProfileV2(owner, valid);
+    if (owner !== DEVICE_OWNER) await storage.migrateLegacy(owner, name);
+    if (!valid()) throw cancelled();
     const saved = await storage.loadPreferences(owner),
       defaults = defaultPreferences();
-    if (!valid()) return;
-    const preferences: TerminalPreferences = {
+    if (!valid()) throw cancelled();
+    return {
       ...defaults,
       ...saved,
       ...displayPreferences(saved),
       indicators: { ...DEFAULT_INDICATORS, ...saved.indicators },
       chartSettings: { ...DEFAULT_CHART_SETTINGS, ...migrateCandlePalette(saved.chartSettings) }
     };
-    this.bridge.resetHistory();
-    this.bridge.update({ owner, name, preferences });
   }
   async start(): Promise<void> {
     this.disposed = false;
+    if (!this.client) this.bridge.update({ watchlistStartup: "loading" });
     const lifecycle = ++this.lifecycle;
     let activation = this.activation;
     window.addEventListener("online", this.onOnline);
@@ -72,7 +83,7 @@ export class TerminalSession {
       const session = await storage.restoreSession();
       if (!this.current(lifecycle, activation)) return;
       activation++;
-      await this.activate(null, "", lifecycle, storage.PUBLIC_OWNER, Boolean(session));
+      await this.activate(null, "", lifecycle, session?.owner, Boolean(session));
       if (!this.current(lifecycle, activation)) return;
       this.bridge.update({ ready: true });
       if (!session || !this.current(lifecycle, activation)) return;
@@ -93,14 +104,28 @@ export class TerminalSession {
       this.bridge.update({ watchlistStartup: "error" });
   }
   private onOnline = (): void => {
-    const client = this.client;
-    if (!client || this.disposed || this.reconnectClient === client) return;
+    const client = this.client,
+      state = this.bridge.getState();
+    if (
+      !client ||
+      this.disposed ||
+      this.reconnectClient === client ||
+      state.profileTransition ||
+      state.importingBackup ||
+      state.importRecoveryRequired
+    )
+      return;
     const lifecycle = this.lifecycle;
     this.reconnectClient = client;
     void client
       .start()
       .then((snapshot) => {
-        if (this.current(lifecycle, undefined, client)) {
+        if (
+          this.matches(client) &&
+          this.current(lifecycle, undefined, client) &&
+          !this.bridge.getState().importingBackup &&
+          !this.bridge.getState().importRecoveryRequired
+        ) {
           this.applyBankState(snapshot);
           if (!this.bridge.getState().candles.length) return this.bridge.loadHistory();
         }
@@ -215,61 +240,59 @@ export class TerminalSession {
     this.transitionAbort = transition;
     const activation = ++this.activation,
       previous = this.client,
-      sourceOwner = storage.PUBLIC_OWNER,
-      previousPaused = previous?.cachePaused ?? false;
-    let guestRecoveryFailed = false,
-      guestRecoveryQuota = false;
-    const cache =
-      token === null ? publicGuestRecoveryCache(storage, () => guestRecoveryQuota) : storage;
-    const candidate = new MarketClient(token, name, cache, owner ? { owner } : {});
-    const recoveryFence = guestActivationFence(
-      this.bridge,
-      () => candidate.owner,
-      () => this.current(lifecycle, activation),
-      transition,
-      token === null
-    );
-    const attempt = recoveryFence.valid;
+      previousPaused = previous
+        ? (this.transitionPauses.get(previous) ?? previous.cachePaused)
+        : false;
+    if (previous) this.transitionPauses.set(previous, previousPaused);
+    let candidate: MarketClient | undefined;
+    const attempt = () => this.current(lifecycle, activation) && !transition.signal.aborted;
+    const cameraViews = this.bridge.captureCameraViews?.();
     this.bridge.update({ profileTransition: true });
+    this.bridge.resetHistory();
+    this.cancelLiveFrame();
     try {
+      await cameraViews;
+      await this.bridge.settleTransfers?.();
       await previous?.settleMutations?.();
       await this.bridge.flush();
       if (!attempt()) throw cancelled();
       if (previous) previous.cachePaused = true;
-      const target = await candidate.prepareOwner();
+      const preferredOwner = previous ? this.bridge.getState().owner : owner;
+      const binding = await prepareDeviceWorkspace({
+        ...(preferredOwner === undefined ? {} : { preferredOwner }),
+        valid: attempt,
+        signal: transition.signal
+      });
       if (!attempt()) throw cancelled();
-      await storage.prepareProfileV2(target, attempt, transition.signal);
-      if (token === null && target === storage.PUBLIC_OWNER && recoveryFence.canAdopt) {
-        const recovery = await storage.adoptLegacyGuestWorkspace(attempt, transition.signal);
-        guestRecoveryQuota = recovery === "quota-failed";
-        guestRecoveryFailed =
-          guestRecoveryQuota || recovery === "failed" || recovery === "source-invalid";
-      }
-      const transfer = await storage.copyPublicProfile(
-        sourceOwner,
-        target,
-        attempt,
-        false,
-        transition.signal
-      );
-      if (!attempt()) throw cancelled();
+      candidate = new MarketClient(token, name, storage, { owner: binding.owner });
+      const target = binding.owner;
       await candidate.start();
       if (!attempt()) throw cancelled();
-      await previous?.close();
+      const recoveringImport = !!this.bridge.getState().importRecoveryRequired;
+      const preferences =
+        this.bridge.getState().owner === target && !recoveringImport
+          ? this.bridge.getState().preferences
+          : await this.readProfilePreferences(target, name, attempt);
       if (!attempt()) throw cancelled();
-      recoveryFence.beforeProfileCommit();
+      await previous
+        ?.close()
+        .catch(() => this.bridge.notify("Не удалось завершить старое подключение котировок."));
+      if (!attempt()) throw cancelled();
       this.bridge.resetHistory();
       this.cancelLiveFrame();
       this.client = candidate;
+      this.workspaceBinding = binding;
       this.reconnectClient = null;
       this.attach(candidate, lifecycle);
       const valid = () => attempt() && this.current(lifecycle, activation, candidate);
-      await this.prepareProfile(target, name, false, valid);
-      if (!valid()) throw cancelled();
       this.bridge.update({
+        owner: target,
+        preferences,
         name,
-        profileTransition: false,
-        pendingPublicSource: transfer.conflict ? sourceOwner : null
+        loading: false,
+        workspaceMigrationIncomplete: false,
+        ...(recoveringImport ? { importRecoveryRequired: false, historyViewReady: false } : {}),
+        pendingPublicSource: null
       });
       if (!valid()) throw cancelled();
       this.applyBankState(candidate.snapshot(), !deferEmptyWatchlist);
@@ -285,40 +308,36 @@ export class TerminalSession {
           }
         });
       }
-      recoveryFence.afterProfileCommit();
-      await this.bridge.loadHistory();
+      this.bridge.update({ profileTransition: false });
+      await this.bridge.loadHistory(true);
       if (!valid()) throw cancelled();
-      if (
-        guestRecoveryFailed &&
-        recoveryFence.warningAllowed() &&
-        target === storage.PUBLIC_OWNER &&
-        !this.bridge.getState().importingBackup
-      )
-        this.bridge.notify(guestRecoveryText("autoFailed"));
       return candidate;
     } catch (error) {
-      if (candidate !== this.client) {
-        if (
-          token === null &&
-          (transition.signal.aborted ||
-            ((error instanceof DOMException || error instanceof Error) &&
-              error.name === "AbortError"))
-        )
-          candidate.cachePaused = true;
+      if (candidate && candidate !== this.client) {
+        candidate.cachePaused = true;
         await candidate.close();
       }
+      if (attempt() && !this.client)
+        this.bridge.update({ workspaceMigrationIncomplete: true, ready: false });
+      else if (attempt() && candidate === this.client)
+        this.bridge.update({ importRecoveryRequired: true, historyViewReady: false });
       if (attempt()) this.failWatchlistStartup();
       throw error;
     } finally {
-      recoveryFence.dispose();
-      if (previous && !previous.closed) previous.cachePaused = previousPaused;
-      if (attempt()) this.bridge.update({ profileTransition: false });
+      if (attempt()) {
+        if (previous && !previous.closed) previous.cachePaused = previousPaused;
+        if (previous) this.transitionPauses.delete(previous);
+        this.bridge.update({ profileTransition: false, loading: false });
+      }
     }
   }
   async login(token: string, name: string, remember: boolean): Promise<void> {
     const clean = token.trim().replaceAll("\\_", "_");
     if (!/^t\.[A-Za-z0-9_-]{40,200}$/.test(clean))
       throw new Error("Введите корректный read-only токен.");
+    // A committed migration is adopted before API validation can fail.
+    if (this.bridge.getState().owner !== DEVICE_OWNER)
+      await this.activate(null, "", this.lifecycle, this.bridge.getState().owner);
     const client = await this.activate(clean, name.trim());
     const operation = this.sessionWrites.then(async () => {
       if (!this.matches(client)) throw cancelled();
@@ -329,7 +348,6 @@ export class TerminalSession {
     if (this.matches(client)) this.bridge.update({ dialog: null, ready: true });
   }
   async logout(): Promise<void> {
-    this.bridge.update({ authenticated: false, profileTransition: true });
     const client = this.client,
       lifecycle = this.lifecycle,
       activation = this.activation;
@@ -338,7 +356,7 @@ export class TerminalSession {
     if (!this.current(lifecycle, activation)) return;
     await storage.clearSession(client?.owner);
     if (!this.current(lifecycle, activation)) return;
-    await this.activate(null, "", lifecycle, storage.PUBLIC_OWNER);
+    await this.activate(null, "", lifecycle);
   }
   async mergePublicProfile(): Promise<void> {
     const state = this.bridge.getState(),
@@ -348,7 +366,8 @@ export class TerminalSession {
     if (!source || !client || state.profileTransition || state.importingBackup || state.backupBusy)
       return;
     const valid = () =>
-      this.matches(client) &&
+      !this.disposed &&
+      client === this.client &&
       this.bridge.getState().owner === owner &&
       !this.bridge.getState().importingBackup;
     this.bridge.update({ profileTransition: true });

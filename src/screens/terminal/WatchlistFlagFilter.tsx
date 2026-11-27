@@ -1,3 +1,5 @@
+import { selectWatchlistState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { KeyboardEvent } from "react";
@@ -13,7 +15,7 @@ import { persistWatchlistFlagChange } from "./watchlist-flag-preferences.js";
 import { FlagIcon } from "./WatchlistFlag.js";
 
 export function WatchlistFlagFilter() {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectWatchlistState, shallowEqual);
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const [opened, setOpened] = useState<{ owner: string; left: number; top: number } | null>(null);

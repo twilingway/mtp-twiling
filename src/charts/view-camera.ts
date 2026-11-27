@@ -18,9 +18,20 @@ export function isChartCamera(value: unknown): value is ChartCamera {
 export function chooseChartView(
   symbol: string,
   saved: ChartView | undefined,
-  shared: { symbol: string; camera: ChartCamera } | undefined
+  shared: { symbol: string; timeframe?: string; camera: ChartCamera } | undefined,
+  timeframe?: string
 ): ChartView | undefined {
-  if (shared && shared.symbol !== symbol) return { camera: shared.camera };
+  if (
+    shared &&
+    (shared.symbol !== symbol ||
+      (shared.timeframe !== undefined &&
+        timeframe !== undefined &&
+        (shared.timeframe !== timeframe ||
+          (saved?.camera !== undefined &&
+            (saved.camera.barSpace !== shared.camera.barSpace ||
+              saved.camera.rightOffsetBars !== shared.camera.rightOffsetBars)))))
+  )
+    return { camera: { ...shared.camera } };
   return saved ?? (shared ? { camera: shared.camera } : undefined);
 }
 

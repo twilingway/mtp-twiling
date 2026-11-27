@@ -48,6 +48,7 @@ import { marketAvailable } from "./market-readiness.js";
 import { nativeInterval } from "../../services/providers/bybit/market.js";
 import { flushWorkspaceAnnotations } from "./workspace-annotations.js";
 import { ChartSettingsCommands, mergeChartPreferences } from "./controller-chart-settings.js";
+import { captureWorkspaceCameraViews, flushCamera } from "./controller-camera-sync.js";
 import type { ContextMenu, TerminalDialog, TerminalPreferences, TerminalState } from "./state.js";
 
 export class TerminalController {
@@ -120,7 +121,9 @@ export class TerminalController {
       mutateCandles: (candles: Candle[]) => {
         this.state = { ...this.state, candles };
       },
-      flush: () => this.flush()
+      flush: () => this.flush(),
+      captureCameraViews: () => captureWorkspaceCameraViews(this),
+      settleTransfers: () => this.backups.settle()
     });
     this.backups = new TerminalBackups({
       ...bridge,
@@ -139,6 +142,8 @@ export class TerminalController {
   }
   getSnapshot = (): TerminalState => this.state;
   sessionKey = (): MarketClient | null => this.client;
+  cloudSessionKey = (): object => this.session.cloudSession;
+  workspaceBinding = () => this.session.workspaceBinding;
   marketNow = (): number => this.client?.serverNow?.() ?? Date.now();
   subscribe = (listener: () => void): (() => void) => {
     this.listeners.add(listener);
@@ -150,8 +155,7 @@ export class TerminalController {
     const ownerChanged = patch.owner !== undefined && patch.owner !== this.state.owner;
     if (patch.preferences)
       patch = { ...patch, objectPanel: patch.preferences.rightPanelTab === "objects" };
-    if (ownerChanged || (patch.authenticated === false && this.state.authenticated))
-      this.editing.reset();
+    if (ownerChanged) this.editing.reset();
     else if (
       patch.preferences &&
       (patch.preferences.symbol !== this.state.preferences.symbol ||
@@ -194,7 +198,9 @@ export class TerminalController {
     const client = this.client;
     await this.editing.flush();
     await flushWorkspaceAnnotations(this.state.owner);
+    await flushCamera(this);
     if (options.captureView !== false) await this.saveView();
+    if (client && !this.state.importRecoveryRequired) await this.savePreferences();
     await client?.flush();
     await storage.flush();
   };

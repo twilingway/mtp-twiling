@@ -1,3 +1,5 @@
+import { selectWatchlistState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { DragEvent, MouseEvent } from "react";
 import { createPortal } from "react-dom";
@@ -49,7 +51,7 @@ export function WatchlistSectionsTable({
   chartEditor?: TerminalController;
   activeInstrument?: MarketRow | null;
 }) {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectWatchlistState, shallowEqual);
   const startup = watchlistStartupNotice(state);
   const editor = chartEditor ?? controller;
   const rowMenuId = useId();
@@ -405,7 +407,20 @@ export function WatchlistSectionsTable({
         </tbody>
       </table>
       {startup ? (
-        <WatchlistStartupStatus phase={startup} locale={state.preferences.locale} />
+        <WatchlistStartupStatus
+          phase={startup}
+          locale={state.preferences.locale}
+          migrationIncomplete={!!state.workspaceMigrationIncomplete}
+          onRetry={() => {
+            void controller
+              .start()
+              .catch(() =>
+                controller.notify(
+                  "Не удалось открыть рабочее пространство. Сохранённые данные не изменены."
+                )
+              );
+          }}
+        />
       ) : !groups.some((group) => group.rows.length) && !sections.length ? (
         <p id="empty-search">
           {state.rows.length

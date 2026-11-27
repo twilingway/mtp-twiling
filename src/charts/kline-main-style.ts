@@ -2,20 +2,22 @@ import { CandleType } from "klinecharts";
 import type { CandleStyle, DeepPartial } from "klinecharts";
 import { NATIVE_CHART_LINE, resolveNativeChartType } from "../model/native-chart-type.js";
 import type { ChartSettings } from "../model/types.js";
+import { barColors } from "../model/bar-palette.js";
 
 export function klineMainStyle(settings: ChartSettings): DeepPartial<CandleStyle> {
   const type = resolveNativeChartType(settings),
     color = NATIVE_CHART_LINE;
   if (type === "candles") return { type: CandleType.CandleSolid };
-  if (type === "bars")
+  if (type === "bars") {
+    const colors = barColors(settings);
     return {
       type: CandleType.Ohlc,
       bar: {
-        upColor: settings.upColor ?? "#53b987",
-        downColor: settings.downColor ?? "#eb4d5c",
-        noChangeColor: settings.upColor ?? "#53b987"
+        ...colors,
+        noChangeColor: colors.upColor
       }
     };
+  }
   return {
     type: CandleType.Area,
     area: {
@@ -32,5 +34,29 @@ export function klineMainStyle(settings: ChartSettings): DeepPartial<CandleStyle
               { offset: 1, color: color.top }
             ]
     }
+  };
+}
+
+export function klineBarStyle(
+  settings: ChartSettings,
+  overrides: DeepPartial<CandleStyle["bar"]> = {}
+): DeepPartial<CandleStyle["bar"]> {
+  return {
+    noChangeColor: settings.bodyVisible === false ? "transparent" : (settings.upColor ?? "#53b987"),
+    noChangeBorderColor:
+      settings.borderVisible === false ? "transparent" : (settings.borderUpColor ?? "#53b987"),
+    noChangeWickColor:
+      settings.wickVisible === false ? "transparent" : (settings.wickUpColor ?? "#336854"),
+    upColor: settings.bodyVisible === false ? "transparent" : (settings.upColor ?? "#53b987"),
+    downColor: settings.bodyVisible === false ? "transparent" : (settings.downColor ?? "#eb4d5c"),
+    upBorderColor:
+      settings.borderVisible === false ? "transparent" : (settings.borderUpColor ?? "#53b987"),
+    downBorderColor:
+      settings.borderVisible === false ? "transparent" : (settings.borderDownColor ?? "#eb4d5c"),
+    upWickColor:
+      settings.wickVisible === false ? "transparent" : (settings.wickUpColor ?? "#336854"),
+    downWickColor:
+      settings.wickVisible === false ? "transparent" : (settings.wickDownColor ?? "#7f323f"),
+    ...overrides
   };
 }

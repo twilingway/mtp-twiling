@@ -277,7 +277,8 @@ export function paintDrawings(
   project: DrawingProjector,
   width: number,
   height: number,
-  selected: string | null
+  selected: string | null,
+  handleRadius = 5
 ) {
   ctx.save();
   ctx.beginPath();
@@ -434,7 +435,7 @@ export function paintDrawings(
         ctx.strokeStyle = "#2962ff";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+        ctx.arc(p.x, p.y, handleRadius, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       }
@@ -450,7 +451,8 @@ export function hitDrawing(
   point: PixelPoint,
   project: DrawingProjector,
   width: number,
-  height: number
+  height: number,
+  handleRadius = 10
 ): { id: string; handle: number } | null {
   for (const layer of ["front", "back"] as const) {
     for (let index = items.length - 1; index >= 0; index--) {
@@ -459,7 +461,7 @@ export function hitDrawing(
       const geometry = drawingGeometry(drawing, project, width, height);
       if (!geometry) continue;
       const handle = geometry.points.findIndex(
-        (p) => Math.hypot(p.x - point.x, p.y - point.y) < 10
+        (p) => Math.hypot(p.x - point.x, p.y - point.y) < handleRadius
       );
       if (handle >= 0) return { id: drawing.id, handle };
       if (geometry.lines.some(([a, b]) => segmentDistance(point, a, b) < 7))

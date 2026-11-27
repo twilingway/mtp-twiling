@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { DrawingToolIcon, type DrawingIconName } from "./DrawingToolIcon.js";
 import { ChevronIcon } from "./drawings/controls/ChevronIcon.js";
+import { DrawingToolSheet } from "./DrawingToolSheet.js";
 
 export interface ToolbarMenuItem {
   id: string;
@@ -22,12 +23,13 @@ export interface ToolbarMenuSection {
   title: string | null;
   items: ToolbarMenuItem[];
 }
-interface Props {
+export interface DrawingToolbarMenuProps {
   id: string;
   title: string;
   anchor: HTMLElement;
   sections: ToolbarMenuSection[];
   onClose: (restoreFocus?: boolean) => void;
+  mobile?: boolean;
 }
 
 interface SplitProps {
@@ -39,6 +41,7 @@ interface SplitProps {
   active: boolean;
   disabled?: boolean;
   expanded: boolean;
+  mobileMenu?: boolean;
   onChoose: () => void;
   onMenu: (anchor: HTMLElement) => void;
 }
@@ -51,12 +54,21 @@ export function DrawingToolbarSplit({
   active,
   disabled,
   expanded,
+  mobileMenu = false,
   onChoose,
   onMenu
 }: SplitProps) {
-  const tooltip = disabled ? t(label) + t(" — Пока не реализовано") : t(label);
+  const tooltip = mobileMenu
+    ? t(menuLabel)
+    : disabled
+      ? t(label) + t(" — Пока не реализовано")
+      : t(label);
   return (
-    <div className={`drawing-tool-split ${active ? "active" : ""}`} data-tool-group={id}>
+    <div
+      className={`drawing-tool-split ${active ? "active" : ""}`}
+      data-tool-group={id}
+      data-mobile-menu={mobileMenu || undefined}
+    >
       <button
         type="button"
         className="tool drawing-tool-main"
@@ -64,8 +76,11 @@ export function DrawingToolbarSplit({
         title={tooltip}
         aria-label={tooltip}
         aria-pressed={active}
-        disabled={disabled}
-        onClick={onChoose}
+        aria-haspopup={mobileMenu ? "dialog" : undefined}
+        aria-expanded={mobileMenu ? expanded : undefined}
+        aria-controls={mobileMenu && expanded ? "drawing-toolbar-menu" : undefined}
+        disabled={disabled && !mobileMenu}
+        onClick={(event) => (mobileMenu ? onMenu(event.currentTarget) : onChoose())}
         onKeyDown={(event) => {
           if (event.key === "ArrowRight") {
             event.preventDefault();
@@ -75,29 +90,41 @@ export function DrawingToolbarSplit({
       >
         <DrawingToolIcon name={icon} />
       </button>
-      <button
-        type="button"
-        className="drawing-tool-arrow"
-        aria-label={t(menuLabel) + t(": открыть меню")}
-        aria-haspopup="menu"
-        aria-expanded={expanded}
-        aria-controls={expanded ? "drawing-toolbar-menu" : undefined}
-        onClick={(event) => onMenu(event.currentTarget)}
-        onKeyDown={(event) => {
-          if (["ArrowRight", "ArrowDown"].includes(event.key)) {
-            event.preventDefault();
-            event.stopPropagation();
-            onMenu(event.currentTarget);
-          }
-        }}
-      >
-        <ChevronIcon direction="right" />
-      </button>
+      {!mobileMenu && (
+        <button
+          type="button"
+          className="drawing-tool-arrow"
+          aria-label={t(menuLabel) + t(": открыть меню")}
+          aria-haspopup="menu"
+          aria-expanded={expanded}
+          aria-controls={expanded ? "drawing-toolbar-menu" : undefined}
+          onClick={(event) => onMenu(event.currentTarget)}
+          onKeyDown={(event) => {
+            if (["ArrowRight", "ArrowDown"].includes(event.key)) {
+              event.preventDefault();
+              event.stopPropagation();
+              onMenu(event.currentTarget);
+            }
+          }}
+        >
+          <ChevronIcon direction="right" />
+        </button>
+      )}
     </div>
   );
 }
 
-export function DrawingToolbarMenu({ id, title, anchor, sections, onClose }: Props) {
+export function DrawingToolbarMenu(props: DrawingToolbarMenuProps) {
+  return props.mobile ? <DrawingToolSheet {...props} /> : <DesktopDrawingToolbarMenu {...props} />;
+}
+
+function DesktopDrawingToolbarMenu({
+  id,
+  title,
+  anchor,
+  sections,
+  onClose
+}: DrawingToolbarMenuProps) {
   const root = useRef<HTMLDivElement>(null);
   const [path, setPath] = useState<ToolbarMenuItem[]>([]);
   const [focusId, setFocusId] = useState<string | null>(null);

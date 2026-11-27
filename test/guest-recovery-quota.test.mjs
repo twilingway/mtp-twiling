@@ -4,7 +4,7 @@ import vm from "node:vm";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { createGuestFixture } from "./helpers/guest-recovery-database.mjs";
-const target = "profile-v2:public",
+const target = "profile-v2:device",
   layout = {
     engine: "kline",
     rangeDays: 180,
@@ -17,19 +17,27 @@ function deferred() {
   });
   return { promise, resolve };
 }
-async function sessionFixture(wrapper = true) {
+const legacyRecords = (f) =>
+  structuredClone(
+    Object.fromEntries(
+      Object.entries(f.database.stores).map(([name, records]) => [name, [...records]])
+    )
+  );
+function assertLegacyRecords(f, before) {
+  for (const [name, records] of Object.entries(before))
+    for (const [id, value] of records)
+      assert.deepEqual(f.database.stores[name].get(id), value, `${name}/${id}`);
+}
+async function sessionFixture() {
   const f = await createGuestFixture();
   await f.storage.savePreferences("guest", layout);
   f.database.stores.preferences.set("v2-profile-ready:public", {
     id: "v2-profile-ready:public",
-    owner: target,
+    owner: "profile-v2:public",
     value: true
   });
   f.storage.restoreSession = async () => undefined;
-  f.storage.migrateLegacy = async () => {};
   f.storage.saveSession = async () => {};
-  if (!wrapper)
-    f.load("services/storage-guest-cache.ts").publicGuestRecoveryCache = (cache) => cache;
   const { TerminalSession } = f.load("screens/terminal/controller-session.ts"),
     { defaultPreferences } = f.load("screens/terminal/controller-bridge.ts"),
     notices = [],
@@ -65,31 +73,18 @@ async function sessionFixture(wrapper = true) {
   return { ...f, session, notices, bridge, state: () => state };
 }
 
-test("regression: caught guest quota blocks ordinary empty public bootstrap; the narrow wrapper keeps it usable and permits later bank activation when bank persistence works", async () => {
-  const unwrapped = await sessionFixture(false);
-  unwrapped.database.hooks.beforeWriteComplete = (_tx, _store, _kind, record) => {
-    if (record?.owner === target) throw new DOMException("full", "QuotaExceededError");
-  };
-  await assert.rejects(unwrapped.session.start(), { name: "QuotaExceededError" });
-  unwrapped.session.dispose();
+test("canonical migration quota preserves guest rows, drawings and preferences, blocks empty startup and permits a durable retry before bank activation", async () => {
   const f = await sessionFixture();
+  const rows = [{ uid: "saved", symbol: "ONE", name: "Saved", price: null, previousClose: null }],
+    drawings = [
+      { id: "line", name: "horizontalStraightLine", points: [{ timestamp: 1, value: 10 }] }
+    ];
+  await f.storage.saveWatchlistSnapshot("guest", rows);
+  await f.storage.saveDrawings("guest", "ONE", drawings);
+  const before = legacyRecords(f);
   f.database.hooks.beforeWriteComplete = (_tx, _store, _kind, record) => {
     if (record?.owner === target) throw new DOMException("full", "QuotaExceededError");
   };
-  await f.session.start();
-  assert.equal(f.state().owner, "public");
-  assert.equal(f.state().marketReady, true);
-  assert.equal(f.state().authenticated, false);
-  assert.equal(f.notices.length, 1);
-  assert.match(f.notices[0], /не сохранён/);
-  assert.equal(f.database.stores.preferences.has("guest-public-adoption:v1"), false);
-  assert.equal(f.database.stores.preferences.has(`layout:${target}`), false);
-  assert.deepEqual(f.database.stores.preferences.get("layout:guest").value, layout);
-  await f.session.client.flush();
-  const backup = await f
-    .load("services/storage-guest-recovery.ts")
-    .createLegacyGuestBackup({ includeHistory: false });
-  assert.deepEqual(backup.layout, layout);
   class Bank extends EventTarget {
     rows = [];
     authenticated = true;
@@ -103,13 +98,45 @@ test("regression: caught guest quota blocks ordinary empty public bootstrap; the
     async close() {}
   }
   f.load("services/tbank-client.ts").TBankClient = Bank;
-  f.load("services/profile-key.ts").profileKey = async () => "bank-A";
   try {
+    await assert.rejects(f.session.start(), {
+      name: "WorkspaceMigrationError",
+      code: "storage-failed"
+    });
+    assert.equal(f.session.client, null);
+    assert.equal(f.state().ready, false);
+    assert.equal(f.state().workspaceMigrationIncomplete, true);
+    assert.equal(f.state().watchlistStartup, "error");
+    assert.equal(f.database.stores.preferences.has("device-workspace-migration:v1"), false);
+    assert.equal(f.database.stores.preferences.has(`layout:${target}`), false);
+    assertLegacyRecords(f, before);
+    delete f.database.hooks.beforeWriteComplete;
+    await f.session.start();
+    assert.equal(f.state().owner, "device");
+    assert.equal(f.state().ready, true);
+    assert.equal(f.state().workspaceMigrationIncomplete, false);
+    assert.equal(f.state().marketReady, true);
+    assert.equal(f.state().authenticated, false);
+    assert.deepEqual(
+      f.state().rows.map((row) => row.uid),
+      ["saved"]
+    );
+    assert.equal(f.state().preferences.engine, "kline");
+    assert.equal(f.state().preferences.rangeDays, 180);
+    assert.deepEqual(await f.storage.loadDrawings(target, "ONE"), drawings);
+    assertLegacyRecords(f, before);
     await f.session.login(`t.${"x".repeat(40)}`, "Test", false);
-    assert.equal(f.state().owner, "bank-A");
+    assert.equal(f.state().owner, "device");
     assert.equal(f.state().authenticated, true);
-    assert.equal(f.state().preferences.engine, "tradingview");
-    assert.equal(f.state().preferences.rangeDays, 365);
+    assert.equal(f.state().preferences.engine, "kline");
+    assert.equal(f.state().preferences.rangeDays, 180);
+    assert.deepEqual(
+      f.state().rows.map((row) => row.uid),
+      ["saved"]
+    );
+    assert.deepEqual(await f.storage.loadDrawings(target, "ONE"), drawings);
+    assertLegacyRecords(f, before);
+    assert.deepEqual(f.notices, []);
   } finally {
     f.session.dispose();
   }
@@ -161,21 +188,37 @@ test("quota classifier accepts DOMException independently of Error inheritance",
   assert.equal(context.exports.isGuestQuotaError(new DOMException("abort", "AbortError")), false);
 });
 
-test("corrupt guest does not block public startup; abort during adoption neither continues activation nor emits a late recovery warning", async () => {
+test("corrupt guest blocks empty canonical startup with intact recovery data; corrected source can retry, and cancellation never commits staged migration", async () => {
   const f = await sessionFixture();
   f.database.stores.preferences.get("layout:guest").value = { rangeDays: -1 };
+  const corrupt = legacyRecords(f);
   try {
+    await assert.rejects(f.session.start(), {
+      name: "WorkspaceMigrationError",
+      code: "source-invalid"
+    });
+    assert.equal(f.session.client, null);
+    assert.equal(f.state().ready, false);
+    assert.equal(f.state().workspaceMigrationIncomplete, true);
+    assert.equal(f.database.stores.preferences.has("device-workspace-migration:v1"), false);
+    assertLegacyRecords(f, corrupt);
+    // Explicit recovery repairs the source; startup itself must never overwrite it.
+    await f.storage.savePreferences("guest", layout);
     await f.session.start();
-    assert.equal(f.state().owner, "public");
-    assert.equal(f.notices.length, 1);
+    assert.equal(f.state().owner, "device");
+    assert.equal(f.state().ready, true);
+    assert.equal(f.state().workspaceMigrationIncomplete, false);
+    assert.equal(f.state().preferences.rangeDays, 180);
+    assert.deepEqual(f.notices, []);
   } finally {
     f.session.dispose();
   }
   const other = await sessionFixture(),
     entered = deferred(),
-    release = deferred();
-  other.database.hooks.beforeWriteComplete = async (tx) => {
-    if (tx.names.length === 5) {
+    release = deferred(),
+    before = legacyRecords(other);
+  other.database.hooks.beforeWriteComplete = async (_tx, _store, _kind, record) => {
+    if (record?.id === "device-workspace-migration:v1") {
       entered.resolve();
       await release.promise;
     }
@@ -190,22 +233,23 @@ test("corrupt guest does not block public startup; abort during adoption neither
   assert.equal(other.database.stores.preferences.has("guest-public-adoption:v1"), false);
   assert.equal(other.database.stores.preferences.has(`layout:${target}`), false);
   assert.equal(other.database.stores.preferences.has(`market:${target}`), false);
+  assert.equal(other.database.stores.preferences.has("device-workspace-migration:v1"), false);
+  assertLegacyRecords(other, before);
 });
 
-test("public activation observes import bounces during adoption or history await and emits no stale recovery warning", async () => {
+test("migration blocks portable mutations, cancellation aborts staged writes and history-stage import flags never emit a stale recovery warning", async () => {
   for (const phase of ["adoption", "history"]) {
     const f = await sessionFixture(),
       entered = deferred(),
       release = deferred();
     if (phase === "adoption")
-      f.database.hooks.beforeWriteComplete = async (tx) => {
-        if (tx.names.length === 5) {
+      f.database.hooks.beforeWriteComplete = async (_tx, _store, _kind, record) => {
+        if (record?.id === "device-workspace-migration:v1") {
           entered.resolve();
           await release.promise;
         }
       };
     else {
-      f.database.stores.preferences.get("layout:guest").value = { rangeDays: -1 };
       f.bridge.loadHistory = async () => {
         entered.resolve();
         await release.promise;
@@ -213,13 +257,20 @@ test("public activation observes import bounces during adoption or history await
     }
     const starting = f.session.start();
     await entered.promise;
-    f.bridge.update({ importingBackup: true });
-    f.bridge.update({ importingBackup: false });
+    if (phase === "adoption") {
+      const { importWritable } = f.load("screens/terminal/controller-transfer-guard.ts");
+      assert.equal(f.state().profileTransition, true);
+      assert.equal(importWritable(f.state()), false);
+      f.session.dispose();
+    } else {
+      f.bridge.update({ importingBackup: true });
+      f.bridge.update({ importingBackup: false });
+    }
     release.resolve();
     if (phase === "adoption") await assert.rejects(starting, { name: "AbortError" });
     else {
       await starting;
-      assert.equal(f.state().owner, "public");
+      assert.equal(f.state().owner, "device");
       assert.equal(f.session.client.closed, false);
     }
     assert.equal(f.notices.length, 0, phase);
@@ -228,13 +279,13 @@ test("public activation observes import bounces during adoption or history await
   }
 });
 
-test("own owner/revision commit and ordinary instrument choice during public history await keep the valid client installed", async () => {
+test("canonical owner/revision commit and ordinary instrument choice during history await keep the valid client installed", async () => {
   const own = await sessionFixture();
   own.bridge.resetHistory = () =>
     own.bridge.update({ chartRevision: (own.state().chartRevision ?? 0) + 1 });
   try {
     await own.session.start();
-    assert.equal(own.state().owner, "public");
+    assert.equal(own.state().owner, "device");
     assert.equal(own.state().preferences.engine, "kline");
     assert.ok(own.state().chartRevision > 0);
     assert.equal(own.session.client.closed, false);
@@ -244,7 +295,6 @@ test("own owner/revision commit and ordinary instrument choice during public his
   const f = await sessionFixture(),
     entered = deferred(),
     release = deferred();
-  f.database.stores.preferences.get("layout:guest").value = { rangeDays: -1 };
   f.bridge.loadHistory = async () => {
     entered.resolve();
     await release.promise;

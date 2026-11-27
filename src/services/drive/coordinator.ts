@@ -15,6 +15,7 @@ import type { DriveReport } from "./progress.js";
 import { LegacyDriveMigration } from "./legacy.js";
 import { acceptDriveRecord } from "./accept.js";
 import { applyDriveBackup } from "./apply.js";
+import { matchesDriveWorkspace, suspendedDriveStatus } from "./workspace-binding.js";
 import type {
   DriveBridge,
   DriveChoiceAction,
@@ -29,6 +30,8 @@ export class DriveCoordinator {
   private status: DriveStatus = initialDriveStatus();
   private readonly listeners = new Set<() => void>();
   private owner = "";
+  private cloudOwner = "";
+  private transition = false;
   private session: unknown;
   private authenticated = false;
   private restoredEpoch: number | undefined;
@@ -56,7 +59,10 @@ export class DriveCoordinator {
               remote: this.remote
             }
           : undefined,
-      valid: (context) => this.current(context.epoch) && context.revision === this.revision,
+      valid: (context) =>
+        this.current(context.epoch) &&
+        !this.bridge.profile().transition &&
+        context.revision === this.revision,
       reader: (authorization) => dependencies.legacySync?.(authorization),
       busy: () => this.busy,
       setBusy: (value, context) => {
@@ -98,7 +104,12 @@ export class DriveCoordinator {
   }
   profileChanged(): void {
     const profile = this.bridge.profile();
-    const changed = profile.owner !== this.owner || profile.session !== this.session;
+    if (profile.transition && !this.transition) {
+      this.revision++;
+      this.resumeDue = this.status.connected && this.status.automatic;
+    }
+    this.transition = !!profile.transition;
+    const changed = !matchesDriveWorkspace(profile, this.owner, this.cloudOwner, this.session);
     if (!changed && profile.authenticated === this.authenticated) {
       if (this.resumeDue && !profile.blocked) {
         this.resumeDue = false;
@@ -106,23 +117,22 @@ export class DriveCoordinator {
       }
       return;
     }
-    if (!profile.authenticated && this.authenticated) this.disconnect();
-    else this.suspend();
+    this.suspend();
     this.owner = profile.owner;
+    this.cloudOwner = profile.cloudOwner ?? profile.owner;
     this.session = profile.session;
     this.authenticated = profile.authenticated;
     this.record = undefined;
     this.status = initialDriveStatus(this.status.prepared);
     this.listeners.forEach((listener) => listener());
-    if (profile.authenticated) void this.restoreProfile(this.epoch);
+    if (profile.authenticated && !profile.associationConflict) void this.restoreProfile(this.epoch);
   }
   private profileCurrent(epoch: number): boolean {
     const profile = this.bridge.profile();
     return (
       epoch === this.epoch &&
       profile.authenticated &&
-      profile.owner === this.owner &&
-      profile.session === this.session
+      matchesDriveWorkspace(profile, this.owner, this.cloudOwner, this.session)
     );
   }
   private async restoreProfile(epoch: number): Promise<void> {
@@ -130,7 +140,7 @@ export class DriveCoordinator {
     this.restoredEpoch = epoch;
     await restoreReadableDriveProfile(
       this.dependencies,
-      this.owner,
+      this.cloudOwner,
       () => this.profileCurrent(epoch),
       (record) => {
         this.record = record;
@@ -143,7 +153,11 @@ export class DriveCoordinator {
   }
   resume(): void {
     this.profileChanged();
-    if (this.bridge.profile().authenticated && !this.authorization)
+    if (
+      this.bridge.profile().authenticated &&
+      !this.bridge.profile().associationConflict &&
+      !this.authorization
+    )
       void this.restoreProfile(this.epoch);
   }
   localChanged(): void {
@@ -152,7 +166,7 @@ export class DriveCoordinator {
       this.update({ pendingChanges: true });
       if (this.record) {
         this.record = { ...this.record, pendingChanges: true };
-        void this.dependencies.save(this.owner, this.record).catch(() => {});
+        void this.dependencies.save(this.cloudOwner, this.record).catch(() => {});
       }
       this.schedule();
     }
@@ -175,15 +189,17 @@ export class DriveCoordinator {
     const profile = this.bridge.profile();
     if (
       !profile.authenticated ||
+      profile.blocked ||
       !this.status.prepared ||
       this.busy ||
       this.status.phase === "connecting"
     )
       return;
     this.owner = profile.owner;
+    this.cloudOwner = profile.cloudOwner ?? profile.owner;
     this.session = profile.session;
     const epoch = ++this.epoch,
-      pending = this.dependencies.auth.connectFromUserGesture(profile.owner);
+      pending = this.dependencies.auth.connectFromUserGesture(this.cloudOwner);
     this.update({
       phase: "connecting",
       error: undefined,
@@ -211,8 +227,7 @@ export class DriveCoordinator {
       "abort",
       () => {
         if (epoch !== this.epoch) return;
-        this.remote = undefined;
-        this.authorization = undefined;
+        this.remote = this.authorization = undefined;
         this.preview = undefined;
         clearTimeout(this.debounce);
         this.update({
@@ -228,7 +243,7 @@ export class DriveCoordinator {
       },
       { once: true }
     );
-    const record = this.record ?? (await this.dependencies.load(this.owner));
+    const record = this.record ?? (await this.dependencies.load(this.cloudOwner));
     if (!this.current(epoch)) return;
     this.record = record;
     this.remote = this.dependencies.sync(authorization);
@@ -251,27 +266,11 @@ export class DriveCoordinator {
     this.legacy.reset();
     this.epoch++;
     clearTimeout(this.debounce);
-    this.authorization = undefined;
-    this.remote = undefined;
-    this.preview = undefined;
-    this.busy = false;
+    this.authorization = this.remote = this.preview = undefined;
+    this.busy = this.resumeDue = false;
     this.applyingEpoch = undefined;
-    this.resumeDue = false;
     this.dependencies.auth.suspend();
-    this.update({
-      phase: "disconnected",
-      connected: false,
-      connectedThisSession: undefined,
-      automaticBlockedByFormat: undefined,
-      conflict: undefined,
-      choiceAction: undefined,
-      error: undefined,
-      authorizationStored: false,
-      credentialSaveError: false,
-      pauseReason: undefined,
-      legacyAvailable: false,
-      lastOperation: undefined
-    });
+    this.update(suspendedDriveStatus());
   };
   disconnect = (): void => {
     this.suspend();
@@ -284,7 +283,10 @@ export class DriveCoordinator {
     return this.profileCurrent(epoch) && !!this.authorization && !this.authorization.signal.aborted;
   }
   private check(epoch: number, revision?: number): void {
-    if (!this.current(epoch) || (revision !== undefined && revision !== this.revision))
+    if (
+      !this.current(epoch) ||
+      (revision !== undefined && (revision !== this.revision || this.bridge.profile().transition))
+    )
       throw cancelled();
   }
   private fail(error: unknown): void {
@@ -309,7 +311,7 @@ export class DriveCoordinator {
     this.update({ automatic });
     if (this.record) {
       this.record = { ...this.record, automatic };
-      await this.dependencies.save(this.owner, this.record);
+      await this.dependencies.save(this.cloudOwner, this.record);
     }
     if (automatic) this.schedule();
     else clearTimeout(this.debounce);
@@ -460,7 +462,8 @@ export class DriveCoordinator {
     if (!signal) throw cancelled();
     const digest = await applyDriveBackup(backup, this.bridge, signal, {
       check: () => this.check(epoch, revision),
-      current: () => this.current(epoch) && revision === this.revision,
+      current: () =>
+        this.current(epoch) && !this.bridge.profile().transition && revision === this.revision,
       applying: (active) => {
         if (active) this.applyingEpoch = epoch;
         else if (this.applyingEpoch === epoch) this.applyingEpoch = undefined;
@@ -479,7 +482,7 @@ export class DriveCoordinator {
     const lastSyncedAt = await acceptDriveRecord(this.record, heads, digest, revision, {
       check: () => this.check(epoch),
       revision: () => this.revision,
-      save: (record) => this.dependencies.save(this.owner, record),
+      save: (record) => this.dependencies.save(this.cloudOwner, record),
       assign: (record) => {
         this.record = record;
       }

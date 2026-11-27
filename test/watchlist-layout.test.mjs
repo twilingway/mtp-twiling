@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import ts from "typescript";
+import { createGuestFixture } from "./helpers/guest-recovery-database.mjs";
 
 const sourceRoot = fileURLToPath(new URL("../src/", import.meta.url));
 const json = (value) => JSON.parse(JSON.stringify(value));
@@ -628,42 +629,33 @@ test("a flush during pending removal cannot overwrite the committed market snaps
 test("offline session restoration accepts an explicitly cached empty watchlist", async () => {
   const notices = [];
   const owner = "unit-test-profile";
+  const f = await createGuestFixture();
+  await f.storage.savePreferences(owner, { engine: "kline", rangeDays: 180 });
+  await f.storage.saveWatchlistSnapshot(owner, []);
+  const source = structuredClone(f.database.stores.preferences.get(`watchlist:${owner}`));
   let historyLoads = 0;
   let state = { owner: "guest", rows: [], candles: [], pricesDirection: new Map() };
   class OfflineBankClient extends EventTarget {
     rows = [];
     authenticated = false;
-    snapshot() { return { rows: this.rows, status: "error", error: "offline" }; }
+    snapshot() {
+      return { rows: this.rows, status: "error", error: "offline" };
+    }
     async start() {
       throw new Error("simulated offline transport");
     }
     async close() {}
   }
-  const { load } = sources(
-    {
-      "services/storage.ts": {
-        PUBLIC_OWNER: "public",
-        adoptLegacyGuestWorkspace: async () => "source-empty",
-        prepareProfileV2: async () => {},
-        copyPublicProfile: async () => ({ conflict: false, count: 0 }),
-        loadWatchlist: async () => [],
-        saveWatchlistSnapshot: async () => {},
-        saveMarket: async () => {},
-        migrateLegacy: async () => {},
-        lastProfile: async () => undefined,
-        restoreSession: async () => ({ owner, name: "Offline", token: "unit-test-only-not-real" }),
-        loadMarket: async (requestedOwner) => {
-          assert.ok([owner, "public"].includes(requestedOwner));
-          return { rows: [], at: Date.now() };
-        },
-        loadPreferences: async () => ({ symbol: "ONE" })
-      },
-      "services/tbank-client.ts": { TBankClient: OfflineBankClient },
-      "services/profile-key.ts": { profileKey: async () => owner }
-    },
-    { window: new EventTarget(), navigator: { onLine: false } }
-  );
-  const { TerminalSession } = load("screens/terminal/controller-session.ts");
+  // Real COW migration/storage/session; only authentication restore and offline transport are fake.
+  f.storage.restoreSession = async () => ({
+    owner,
+    name: "Offline",
+    token: "unit-test-only-not-real"
+  });
+  f.load("services/tbank-client.ts").TBankClient = OfflineBankClient;
+  const navigatorDescriptor = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: { onLine: false } });
+  const { TerminalSession } = f.load("screens/terminal/controller-session.ts");
   const session = new TerminalSession({
     getState: () => state,
     update: (patch) => {
@@ -680,16 +672,27 @@ test("offline session restoration accepts an explicitly cached empty watchlist",
   try {
     await session.start();
     assert.equal(state.ready, true);
-    assert.equal(state.owner, owner);
+    assert.equal(state.owner, "device");
     assert.equal(state.authenticated, true);
     assert.equal(state.status, "offline");
     assert.equal(state.error, null);
     assert.deepEqual(symbols(state.rows), []);
     assert.equal(session.client.authenticated, true);
-    assert.equal(session.client.owner, owner);
+    assert.equal(session.client.owner, "device");
+    assert.equal(session.workspaceBinding.primaryOwner, owner);
+    assert.equal(state.preferences.engine, "kline");
+    assert.equal(state.preferences.rangeDays, 180);
+    assert.deepEqual(await f.storage.loadWatchlist("profile-v2:device"), []);
+    assert.deepEqual(f.database.stores.preferences.get(`watchlist:${owner}`), source);
+    assert.equal(
+      f.database.stores.preferences.get("device-workspace-migration:v1").binding.owner,
+      "device"
+    );
     assert.equal(historyLoads, 2);
     assert.deepEqual(notices, []);
   } finally {
     session.dispose();
+    if (navigatorDescriptor) Object.defineProperty(globalThis, "navigator", navigatorDescriptor);
+    else delete globalThis.navigator;
   }
 });

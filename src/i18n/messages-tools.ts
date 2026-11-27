@@ -5,6 +5,7 @@ export const toolMessages = {
   Стрелка: "Arrow",
   Демонстрация: "Demonstration",
   Ластик: "Eraser",
+  "Без магнита": "Magnet off",
   "Линии тренда": "Trend lines",
   Линии: "Lines",
   "Линия данных": "Info line",

@@ -5,107 +5,74 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { sourceModules } from "./helpers/watchlist-sections.mjs";
 
 function fixture() {
-  const status = { phase: "disconnected", automatic: true, pendingChanges: false };
-  const state = { preferences: { locale: "ru" }, name: "", marketReady: true };
-  let online = true;
-  const controller = {
-    subscribe: () => () => {},
-    getSnapshot: () => state,
-    setDialog(dialog, initialAccountSection) {
-      Object.assign(state, { dialog, initialAccountSection });
-    }
+  const status = { provider: "google-drive", enabled: false, configured: true, prepared: false, preparing: false, connected: false, phase: "disabled", automatic: true, pendingChanges: false, authorizationStored: false, credentialSaveError: false };
+  const state = { preferences: { locale: "en" }, name: "", marketReady: true };
+  const controller = { subscribe: () => () => {}, getSnapshot: () => state,
+    setDialog(dialog, initialAccountSection) { Object.assign(state, { dialog, initialAccountSection }); }
   };
   const drive = { subscribe: () => () => {}, getSnapshot: () => status };
+  const yandex = { subscribe: () => () => {}, getSnapshot: () => ({ enabled: false }) };
   const load = sourceModules({
     react: {
-      memo: (render) => render,
-      useContext: () => controller,
-      useEffect: () => {},
-      useRef: (current) => ({ current }),
-      useState: (initial) => [initial, () => {}],
-      useSyncExternalStore: (subscribe, getSnapshot) =>
-        subscribe === drive.subscribe || subscribe === controller.subscribe ? getSnapshot() : online
-    },
-    "react/jsx-runtime": jsx,
+      useEffect: () => {}, useState: (initial) => [initial, () => {}],
+      useSyncExternalStore: (_subscribe, getSnapshot) => getSnapshot()
+    }, "react/jsx-runtime": jsx,
     "screens/terminal/context.tsx": {
-      TerminalContext: {},
-      useTerminal: () => ({ controller, state })
+      useTerminal: (select) => ({ controller, state: select ? select(state) : state }),
+      useTerminalController: () => controller,
+      useTerminalState: (_controller, select) => select(state)
     },
-    "screens/terminal/controller-drive.ts": { terminalDrive: () => drive },
-    "screens/terminal/GoogleDriveSettings.tsx": { GoogleDriveSettings: () => null },
+    "screens/terminal/controller-cloud-sync.ts": { CLOUD_PROVIDERS: ["google-drive", "yandex-disk"], terminalCloudSync: (_controller, id) => id === "google-drive" ? drive : yandex },
+    "screens/terminal/CloudSyncSettings.tsx": { CloudSyncSettings: () => null },
+    "screens/terminal/BackupTransferSettings.tsx": { BackupTransferSettings: () => null },
     "screens/terminal/StoragePanel.tsx": { StoragePanel: () => null },
     "screens/terminal/ApplicationInfo.tsx": { ApplicationInfo: () => null },
     "screens/terminal/LegacyGuestRecovery.tsx": { LegacyGuestRecovery: () => null },
     "screens/terminal/Modal.tsx": { Modal: ({ children }) => children }
   });
-  return {
-    status,
-    state,
-    setOnline: (value) => {
-      online = value;
-    },
-    render: load("screens/terminal/DrivePauseBanner.js").DrivePauseBanner,
-    account: () => renderToStaticMarkup(load("screens/terminal/AccountDialog.js").AccountDialog())
+  load("i18n/preferences.ts").setDisplayPreferences({ locale: "en" });
+  return { status, state, render: load("screens/terminal/DrivePauseBanner.js").DrivePauseBanner,
+    account: () => renderToStaticMarkup(load("screens/terminal/AccountDialog.js").AccountDialog()),
+    locale(value) { state.preferences.locale = value; load("i18n/preferences.ts").setDisplayPreferences({ locale: value }); }
   };
 }
 
-test("Drive banner waits for a linked automatic profile and opens its existing settings tab", () => {
-  const f = fixture();
-  const markup = () => renderToStaticMarkup(f.render());
-  const hidden = () => assert.match(markup(), /data-active="false"/);
-  assert.match(f.account(), /id="account-section-drive" hidden=""/);
-  hidden();
-  Object.assign(f.status, { pauseReason: "auth-required", pendingChanges: true });
-  hidden();
-  Object.assign(f.status, { lastSyncedAt: "2026-11-26T08:00:00Z", automatic: false });
-  hidden();
-  f.status.automatic = true;
-  assert.match(markup(), /role="status" aria-atomic="true"/);
-  assert.match(markup(), /data-reason="auth"/);
-  assert.match(markup(), /Войдите в Google повторно/);
-  assert.match(markup(), /Изменения ещё не синхронизированы/);
-  const action = f.render().props.children[1];
-  assert.equal(action.props["aria-describedby"], "drive-pause-description");
-  assert.deepEqual(
-    action.props.children.slice(0, 3).map(({ props }) => props.children),
-    ["Google Диск", "Нужен вход", "Не отправлено"]
-  );
+test("cloud banner remains absent while disabled and opens the shared cloud tab when action is required", () => {
+  const f = fixture(), markup = () => renderToStaticMarkup(f.render());
+  assert.match(f.account(), /id="account-section-cloud" hidden=""/);
+  assert.equal(markup(), "");
+  Object.assign(f.status, { phase: "auth-required", pauseReason: "auth-required", pendingChanges: true, lastSyncedAt: "2026-11-26T08:00:00Z" });
+  assert.equal(markup(), "");
+  f.status.enabled = true;
+  assert.match(markup(), /role="status"/); assert.match(markup(), /Sign in again/);
+  assert.match(markup(), /class="drive-pause-pending"/);
+  const providerElement = f.render().props.children[0];
+  const action = providerElement.type(providerElement.props).props.children;
   action.props.onClick();
-  assert.equal(f.state.dialog, "account");
-  assert.match(f.account(), /id="account-section-drive">/);
-
-  f.state.preferences.locale = "en";
+  assert.equal(f.state.dialog, "account"); assert.equal(f.state.initialAccountSection, "cloud");
+  assert.match(f.account(), /id="account-section-cloud">/);
+  f.state.initialAccountSection = "drive";
+  assert.match(f.account(), /id="account-section-cloud">/);
   f.status.pendingChanges = false;
-  assert.match(markup(), /Sign in to Google again/);
-  assert.doesNotMatch(markup(), /Changes haven.t synced yet/);
   assert.doesNotMatch(markup(), /class="drive-pause-pending"/);
-  f.status.pauseReason = undefined;
-  hidden();
+  f.locale("ru");
+  assert.doesNotMatch(markup(), /Sign in again/);
+  Object.assign(f.status, { enabled: false, automatic: false });
+  assert.equal(markup(), "");
 });
 
-test("Drive banner distinguishes offline, remote failure, conflicts and forced format pause", () => {
-  const f = fixture();
-  const markup = () => renderToStaticMarkup(f.render());
-  Object.assign(f.status, { phase: "idle", connected: true, connectedThisSession: true });
-  f.setOnline(false);
-  assert.match(markup(), /Нет интернета/);
-  f.setOnline(true);
-  Object.assign(f.status, { phase: "syncing", pauseReason: "offline" });
-  assert.match(markup(), /Связь восстановлена/);
-  Object.assign(f.status, { phase: "syncing", pauseReason: "network" });
-  assert.match(markup(), /Нет связи с Google Диском/);
-  Object.assign(f.status, { phase: "conflict", pauseReason: undefined });
-  assert.match(markup(), /data-reason="conflict"/);
-  assert.match(markup(), /class="drive-pause-reason">Конфликт версий/);
-  assert.match(markup(), /выберите версию рабочего пространства/);
-  f.status.legacyAvailable = true;
-  assert.match(markup(), /data-reason="legacy"/);
-  assert.match(markup(), /class="drive-pause-reason">Старые версии/);
-  assert.match(markup(), /проверьте снимки старого формата/);
-  Object.assign(f.status, { phase: "error", error: "unsupported-format", automatic: false });
-  assert.match(markup(), /data-active="false"/);
-  f.status.automaticBlockedByFormat = true;
-  assert.match(markup(), /data-reason="format"/);
-  assert.match(markup(), /Обновите приложение/);
-  assert.doesNotMatch(markup(), /Изменения ещё не синхронизированы/);
+test("enabled cloud banners distinguish offline, conflicts and unsupported format without stale pause during a retry", () => {
+  const f = fixture(), markup = () => renderToStaticMarkup(f.render());
+  Object.assign(f.status, { enabled: true, phase: "error", connected: true, pauseReason: "offline" });
+  assert.match(markup(), /Offline/);
+  f.status.phase = "syncing";
+  assert.equal(markup(), "");
+  Object.assign(f.status, { phase: "error", pauseReason: "network" });
+  assert.match(markup(), /Cannot reach cloud storage/);
+  Object.assign(f.status, { phase: "conflict", pauseReason: undefined, automatic: false });
+  assert.match(markup(), /Choose a version/);
+  Object.assign(f.status, { phase: "error", error: "unsupported-format" });
+  assert.match(markup(), /Update the app/);
+  f.status.enabled = false;
+  assert.equal(markup(), "");
 });

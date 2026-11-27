@@ -8,11 +8,13 @@ import { chartPriceFormat } from "./price-format.js";
 import type { ChartAdapter, ChartOptions } from "./adapter.js";
 import { beginKlinePan, freezeKlinePriceScale } from "./kline-price-scale.js";
 import { focusRange } from "./navigation.js";
-import { PendingChartView, signedRightOffset } from "./view-camera.js";
+import { PendingChartView } from "./view-camera.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { stablePriceAxisWidth } from "./price-axis-layout.js";
 import { chartPalette } from "../model/theme.js";
 import { klineLastPrice } from "./kline-last-price.js";
+import { klineAxisLabels } from "./kline-axis-labels.js";
+import { attachKlineFrontProjection } from "./kline-front-projection.js";
 import { attachCalendarXAxis } from "./kline-calendar-axis.js";
 import { klineDateFormatter } from "../i18n/chart-formatters.js";
 import { intlLocale } from "../i18n/preferences.js";
@@ -31,7 +33,7 @@ import {
 } from "./kline-drawing-indicators.js";
 import type { KlineDrawingContext } from "./kline-drawing-indicators.js";
 import { klineTechnical } from "./kline-technical.js";
-import { preserveKlineCamera } from "./kline-preserve-camera.js";
+import { preserveKlineCamera, readKlineCameraOffset } from "./kline-preserve-camera.js";
 import { klineLink } from "./kline-link.js";
 import {
   getKlineManualPriceRange,
@@ -39,7 +41,8 @@ import {
   zoomKlineSelection
 } from "./kline-selection-zoom.js";
 import { selectionZoomBounds } from "./selection-zoom.js";
-import { klineMainStyle } from "./kline-main-style.js";
+import { klineBarStyle, klineMainStyle } from "./kline-main-style.js";
+import { attachKlineAxisTouch } from "./kline-axis-touch.js";
 
 export function makeKline(options: ChartOptions): ChartAdapter {
   const camera = new UserCameraEvents(options);
@@ -95,32 +98,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       indicator: { tooltip: { showRule: TooltipShowRule.None } },
       candle: {
         ...candleStyle,
-        bar: {
-          noChangeColor:
-            settings.bodyVisible === false ? "transparent" : (settings.upColor ?? "#53b987"),
-          noChangeBorderColor:
-            settings.borderVisible === false
-              ? "transparent"
-              : (settings.borderUpColor ?? "#53b987"),
-          noChangeWickColor:
-            settings.wickVisible === false ? "transparent" : (settings.wickUpColor ?? "#336854"),
-          upColor: settings.bodyVisible === false ? "transparent" : (settings.upColor ?? "#53b987"),
-          downColor:
-            settings.bodyVisible === false ? "transparent" : (settings.downColor ?? "#eb4d5c"),
-          upBorderColor:
-            settings.borderVisible === false
-              ? "transparent"
-              : (settings.borderUpColor ?? "#53b987"),
-          downBorderColor:
-            settings.borderVisible === false
-              ? "transparent"
-              : (settings.borderDownColor ?? "#eb4d5c"),
-          upWickColor:
-            settings.wickVisible === false ? "transparent" : (settings.wickUpColor ?? "#336854"),
-          downWickColor:
-            settings.wickVisible === false ? "transparent" : (settings.wickDownColor ?? "#7f323f"),
-          ...candleStyle.bar
-        },
+        bar: klineBarStyle(settings, candleStyle.bar),
         tooltip: { showRule: TooltipShowRule.None },
         priceMark: {
           last: lastPrice.styles()
@@ -141,7 +119,19 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     }
   });
   if (!chart) throw new Error("Не удалось создать KLineChart.");
-  const updateLastPriceText = () => lastPrice.update(chart, data.at(-1));
+  const stopAxisTouch = attachKlineAxisTouch(container, chart);
+  const axisLabels = klineAxisLabels(
+    chart,
+    lastPrice,
+    settings,
+    () => data,
+    () => priceFormat,
+    pointToPixel,
+    (timestamp) =>
+      toPixel({ dataIndex: logicalForTime(data, timestamp, TIMEFRAMES[timeframe].ms) }).x ?? null,
+    () => chart.getSize("candle_pane", DomPosition.Main) ?? { width: 0, height: 0 },
+    paintFront
+  );
   const detachCalendarXAxis = attachCalendarXAxis(
     chart,
     () => data,
@@ -283,11 +273,14 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     () => dataReady
   );
   const adapter: ChartAdapter = {
+    setDrawingAxisLabels(next) {
+      if (!live.retired) axisLabels.setDrawings(next);
+    },
+    setCandleCountdown(next) {
+      if (!live.retired) camera.programmatic(() => axisLabels.setCountdown(next));
+    },
     setLastPriceLabelColors(colors) {
-      if (live.retired) return;
-      camera.programmatic(() => {
-        if (lastPrice.configure(chart, colors, data.at(-1))) paintFront();
-      });
+      if (!live.retired) camera.programmatic(() => axisLabels.setColors(colors));
     },
     updatePriceFormat(metadata) {
       if (
@@ -317,6 +310,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
           next.precision
         );
         chart.setStyles({ yAxis: { size: axisWidth } });
+        axisLabels.refresh();
       });
     },
     ...navigation,
@@ -324,7 +318,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       if (live.retired) return;
       dataReady = false;
       data = [...next];
-      updateLastPriceText();
+      axisLabels.refresh();
       model.reset(data, activeMtpPeriods(indicators));
       technical?.setData(data);
       chart.applyNewData(data);
@@ -350,7 +344,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       }
       if (historical) model.reset(data, activeMtpPeriods(indicators));
       else model.update(data);
-      updateLastPriceText();
+      axisLabels.refresh();
       technical?.setData(data);
       if (historical) {
         camera.programmatic(() => preserveKlineCamera(chart, () => chart.applyNewData(data)));
@@ -374,7 +368,7 @@ export function makeKline(options: ChartOptions): ChartAdapter {
           ? {
               camera: {
                 barSpace,
-                rightOffsetBars: signedRightOffset(size.width, lastPixel.x, barSpace)
+                rightOffsetBars: readKlineCameraOffset(chart)
               }
             }
           : {}),
@@ -476,6 +470,9 @@ export function makeKline(options: ChartOptions): ChartAdapter {
       paintFront();
     },
     destroy() {
+      stopAxisTouch();
+      stopFrontProjection();
+      axisLabels.dispose();
       technical?.dispose();
       disposeKlineDrawingContext(drawingContext);
       detachCanvasResize();
@@ -497,5 +494,6 @@ export function makeKline(options: ChartOptions): ChartAdapter {
     paintFront
   );
   technical.update(options.technicalIndicators ?? [], options.technicalPaneLayout);
+  const stopFrontProjection = attachKlineFrontProjection(chart, paintFront, () => !live.retired);
   return live;
 }

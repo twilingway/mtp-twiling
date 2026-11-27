@@ -2,7 +2,7 @@ import { createContext, useContext, useMemo, useSyncExternalStore } from "react"
 import type { TerminalController } from "./controller.js";
 import type { TerminalState } from "./state.js";
 import { selectedSnapshot, shallowEqual } from "./snapshot-selector.js";
-import { selectControlsState } from "./terminal-state-selection.js";
+import { equalTerminalState, selectControlsState } from "./terminal-state-selection.js";
 export const TerminalContext = createContext<TerminalController | null>(null);
 const identity = (state: TerminalState) => state;
 export function useTerminalController() {
@@ -21,12 +21,17 @@ export function useTerminalState<Selection>(
   );
   return useSyncExternalStore(controller.subscribe, getSelected, getSelected);
 }
+/** The default snapshot ignores crosshair-only updates. Select crosshair explicitly for hover UI. */
 export function useTerminal<Selection = TerminalState>(
-  select: (state: TerminalState) => Selection = identity as (state: TerminalState) => Selection,
-  equal: (before: Selection, next: Selection) => boolean = Object.is
+  select?: (state: TerminalState) => Selection,
+  equal?: (before: Selection, next: Selection) => boolean
 ) {
   const controller = useTerminalController();
-  const state = useTerminalState(controller, select, equal);
+  const state = useTerminalState(
+    controller,
+    select ?? (identity as (state: TerminalState) => Selection),
+    equal ?? (select ? Object.is : (equalTerminalState as (a: Selection, b: Selection) => boolean))
+  );
   return { controller, state };
 }
 export function useTerminalControls() {

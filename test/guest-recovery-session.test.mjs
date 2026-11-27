@@ -15,7 +15,7 @@ const oldLayout = {
   chartSettings: { theme: "light", grid: false, scaleFontSize: 13 }
 };
 
-test("actual TerminalSession public bootstrap adopts legacy settings before client snapshot and reads no vault/bank values", async () => {
+test("actual TerminalSession canonical bootstrap recovers legacy settings before client snapshot without reading the vault", async () => {
   const f = await createGuestFixture();
   await f.storage.savePreferences("guest", oldLayout);
   f.storage.restoreSession = async () => undefined;
@@ -53,7 +53,7 @@ test("actual TerminalSession public bootstrap adopts legacy settings before clie
   });
   try {
     await session.start();
-    assert.equal(state.owner, "public");
+    assert.equal(state.owner, "device");
     assert.equal(state.preferences.engine, "kline");
     assert.equal(state.preferences.rangeDays, 180);
     assert.equal(state.preferences.chartSettings.grid, false);
@@ -61,13 +61,14 @@ test("actual TerminalSession public bootstrap adopts legacy settings before clie
     assert.equal(state.preferences.chartSettings.scaleFontSize, 13);
     assert.equal(state.authenticated, false);
     assert.ok(f.database.transactions.every((tx) => !tx.names.includes("vault")));
-    assert.ok(f.database.reads.every((read) => read.key !== "session" && read.owner !== "bank-A"));
+    assert.ok(f.database.reads.every((read) => read.key !== "session"));
+    assert.deepEqual(f.database.stores.preferences.get("layout:guest").value, oldLayout);
   } finally {
     session.dispose();
   }
 });
 
-test("the public controller opens a v2 layout that already contains an empty selection", async () => {
+test("the canonical controller opens legacy v2 layout without changing its source or empty selection", async () => {
   const f = await createGuestFixture();
   const storage = f.load("services/storage-v2.ts");
   const { TerminalController } = f.load("screens/terminal/controller.ts");
@@ -81,11 +82,11 @@ test("the public controller opens a v2 layout that already contains an empty sel
     await controller.start();
     const state = controller.getSnapshot();
     assert.equal(state.marketReady, true);
-    assert.equal(state.owner, "public");
+    assert.equal(state.owner, "device");
     assert.equal(state.preferences.symbol, "");
     assert.equal(state.preferences.chartSettings.theme, "light");
     assert.equal(state.preferences.engine, "kline");
-    assert.deepEqual(await storage.loadPreferences("public"), {
+    assert.deepEqual(await storage.loadPreferences("device"), {
       ...oldLayout,
       instrumentUid: null
     });
@@ -108,7 +109,7 @@ test("guest settings with no selection survive reload and export as a valid port
     await first.setPreferences({ locale: "en", engine: "kline" });
     await first.toggleIndicator("ma");
 
-    const layout = f.database.stores.preferences.get("layout:profile-v2:public").value;
+    const layout = f.database.stores.preferences.get("layout:profile-v2:device").value;
     assert.equal(Object.hasOwn(layout, "symbol"), false);
     assert.equal(layout.instrumentUid, null);
     const backup = validateBackup(await first.exportBackup(false));

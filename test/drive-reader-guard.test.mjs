@@ -11,6 +11,7 @@ import {
   hash,
   tick
 } from "./drive-reader-guard-helpers.mjs";
+import { createGuestFixture } from "./helpers/guest-recovery-database.mjs";
 
 const load = sourceLoader(root);
 const legacyFixtures = JSON.parse(
@@ -275,28 +276,25 @@ test("a late head after blob upload prevents the snapshot commit", async () => {
   );
 });
 
-function localFixture(value) {
-  const records = new Map(
-      value === undefined
-        ? []
-        : [
-            [
-              "drive-v2:owner",
-              { id: "drive-v2:owner", owner: "owner", value: structuredClone(value) }
-            ]
-          ]
-    ),
-    writes = [];
+async function localFixture(value) {
+  const { database, storageDB } = await createGuestFixture();
+  const id = "drive-v2:owner";
+  if (value !== undefined)
+    database.stores.preferences.set(id, { id, owner: "owner", value: structuredClone(value) });
+  const writes = [];
+  database.hooks.beforeWriteComplete = (_tx, _store, _kind, record) =>
+    writes.push(structuredClone(record));
   const loader = sourceLoader(root, {
-    "services/storage-db.ts": {
-      get: async (_store, key) => structuredClone(records.get(key)),
-      put: async (_store, record) => {
-        writes.push(structuredClone(record));
-        records.set(record.id, structuredClone(record));
-      }
-    }
+    "services/storage-db.ts": storageDB
   });
-  return { ...loader("services/drive/local.ts"), records, writes, loader };
+  return {
+    ...loader("services/drive/local.ts"),
+    writes,
+    loader,
+    get records() {
+      return database.stores.preferences;
+    }
+  };
 }
 const association = () => ({
   schemaVersion: 1,
@@ -312,7 +310,7 @@ for (const kind of ["version", "extension"]) {
     const value = association();
     if (kind === "version") value.schemaVersion = 2;
     else value.futureMinimumReader = 99;
-    const f = localFixture(value),
+    const f = await localFixture(value),
       original = JSON.stringify([...f.records]);
     await assert.rejects(f.loadDriveRecord("owner"), code("unsupported-format"));
     assert.equal(f.writes.length, 0);
@@ -323,7 +321,7 @@ for (const kind of ["version", "extension"]) {
       const value = association();
       if (kind === "version") value.schemaVersion = 2;
       else value.futureMinimumReader = 99;
-      const f = localFixture(value),
+      const f = await localFixture(value),
         calls = [],
         abort = new AbortController();
       const { DriveCoordinator } = f.loader("services/drive/coordinator.ts");
@@ -386,20 +384,20 @@ for (const kind of ["version", "extension"]) {
     });
 }
 test("only missing association bootstraps; supported association retains heads and optional flags", async () => {
-  const fresh = localFixture();
+  const fresh = await localFixture();
   const created = await fresh.loadDriveRecord("owner");
   assert.equal(created.schemaVersion, 1);
   assert.deepEqual(created.baseHeads, []);
   assert.equal(fresh.writes.length, 2);
   const value = association(),
-    existing = localFixture(value),
+    existing = await localFixture(value),
     loaded = await existing.loadDriveRecord("owner");
   assert.deepEqual(loaded.baseHeads, value.baseHeads);
   assert.equal(loaded.automatic, false);
   assert.equal(existing.writes.length, 0);
 });
 test("malformed current association does not trigger destructive bootstrap", async () => {
-  const f = localFixture({ ...association(), markerId: "invalid" });
+  const f = await localFixture({ ...association(), markerId: "invalid" });
   await assert.rejects(f.loadDriveRecord("owner"), code("remote-invalid"));
   assert.equal(f.writes.length, 0);
 });
@@ -557,12 +555,12 @@ test("format-only guard leaves image byte integrity to actual download", async (
 });
 test("actionable unsupported RU/EN copy uses the existing error UI and disables automatic control", () => {
   const ui = readFileSync(
-    new URL("../src/screens/terminal/GoogleDriveSettings.tsx", import.meta.url),
+    new URL("../src/screens/terminal/CloudProviderSettings.tsx", import.meta.url),
     "utf8"
   );
   assert.match(ui, /"unsupported-format":/);
   assert.match(ui, /status.error === "unsupported-format"/);
-  const messages = load("i18n/messages-drive.ts").driveMessages;
+  const messages = load("i18n/messages-cloud.ts").cloudMessages;
   assert.ok(
     Object.values(messages).some(
       (message) => message.includes("Update the app") && message.includes("Data is retained")

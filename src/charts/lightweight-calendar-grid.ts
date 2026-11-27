@@ -1,4 +1,5 @@
 import { calendarAxisTicks } from "../model/intervals/axis-ticks.js";
+import type { CalendarAxisTick } from "../model/intervals/axis-ticks.js";
 import type { Candle, Timeframe } from "../model/types.js";
 import type { CalendarAxisDisplay } from "../i18n/calendar-axis.js";
 
@@ -16,9 +17,11 @@ export function paintCalendarGrid(
     color: string;
     pixelRatio?: number;
     display?: CalendarAxisDisplay;
+    ticks?: readonly CalendarAxisTick[] | null;
   }
 ): number {
-  const ticks = calendarAxisTicks(data, timeframe, options);
+  const ticks =
+    options.ticks !== undefined ? options.ticks : calendarAxisTicks(data, timeframe, options);
   if (!ticks?.length) return 0;
   const ratio = Math.max(1, options.pixelRatio ?? 1);
   context.save();
@@ -51,9 +54,11 @@ export function paintCalendarAxis(
     fontSize: number;
     fontFamily: string;
     display: CalendarAxisDisplay;
+    ticks?: readonly CalendarAxisTick[] | null;
   }
 ): void {
-  const ticks = calendarAxisTicks(data, timeframe, options);
+  const ticks =
+    options.ticks !== undefined ? options.ticks : calendarAxisTicks(data, timeframe, options);
   if (!ticks?.length) return;
   context.save();
   context.fillStyle = options.color;

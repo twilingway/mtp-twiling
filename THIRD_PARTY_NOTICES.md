@@ -6,7 +6,13 @@ Copyright (c) 2025 TradingView, Inc.
 
 https://www.tradingview.com/
 
-Licensed under the Apache License, Version 2.0. The license is supplied in `node_modules/lightweight-charts/LICENSE`.
+Licensed under the Apache License, Version 2.0. The license is supplied in
+`node_modules/lightweight-charts/LICENSE`.
+
+MTP modifies the pinned SDK in memory during the development and production builds to add an
+optional native candle rectangle hook. The original candle geometry, copyright and license header
+are retained. Installed dependency files are not modified. The build transform and its exact SDK
+version/SHA256 guards are in `scripts/lightweight-native-rect-plugin.mjs`.
 
 ## KLineChart 9.8.12
 
@@ -18,11 +24,13 @@ TradingView Lightweight Charts
 
 Copyright (c) 2019 TradingView, Inc. https://www.tradingview.com
 
-Licensed under the Apache License, Version 2.0. The license and original notices are supplied in `node_modules/klinecharts/LICENSE` and `node_modules/klinecharts/NOTICE`.
+Licensed under the Apache License, Version 2.0. The license and original notices are supplied in
+`node_modules/klinecharts/LICENSE` and `node_modules/klinecharts/NOTICE`.
 
 ## TradingView reference materials
 
-Downloaded public TradingView HTML/JavaScript is retained only in ignored local reference artifacts. It is not incorporated into this application's implementation or served to clients.
+Downloaded public TradingView HTML/JavaScript is retained only in ignored local reference artifacts.
+It is not incorporated into this application's implementation or served to clients.
 
 ## Lunar phase ephemeris
 

@@ -4,7 +4,12 @@ import type { TerminalState } from "./state.js";
 export function importWritable(
   state: Pick<
     TerminalState,
-    "owner" | "importingBackup" | "importRecoveryRequired" | "profileTransition" | "annotationReady"
+    | "owner"
+    | "importingBackup"
+    | "importRecoveryRequired"
+    | "profileTransition"
+    | "annotationReady"
+    | "workspaceMigrationIncomplete"
   >,
   owner = state.owner
 ): boolean {
@@ -13,6 +18,7 @@ export function importWritable(
     state.annotationReady !== false &&
     !state.importingBackup &&
     !state.importRecoveryRequired &&
+    !state.workspaceMigrationIncomplete &&
     !state.profileTransition
   );
 }

@@ -119,7 +119,7 @@ export class DriveAuth {
     }
     if (epoch !== this.epoch || !credential) return undefined;
     this.install(credential);
-    return this.authorization(epoch, true, false);
+    return this.authorization(epoch, credential.credentialId, true, false);
   }
 
   private async accept(response: TokenResponse, epoch: number): Promise<void> {
@@ -162,7 +162,7 @@ export class DriveAuth {
     if (epoch !== this.epoch || !this.pending) return;
     const pending = this.pending;
     this.pending = undefined;
-    pending.resolve(this.authorization(epoch, stored, !stored));
+    pending.resolve(this.authorization(epoch, credential.credentialId, stored, !stored));
   }
   private install(credential: DriveCredential): void {
     this.credential = credential;
@@ -173,11 +173,13 @@ export class DriveAuth {
   }
   private authorization(
     epoch: number,
+    credentialId: string,
     stored: boolean,
     persistenceError: boolean
   ): DriveAuthorization {
     return {
       connectionId: crypto.randomUUID(),
+      credentialId,
       signal: this.controller.signal,
       stored,
       persistenceError,
@@ -229,6 +231,12 @@ export class DriveAuth {
     this.pending = undefined;
     this.reset();
     pending?.reject(new DriveError("auth-cancelled", "Google Диск приостановлен."));
+  }
+
+  /** Stop this lease and forget only its owner's saved credential. */
+  async forgetOwner(owner: string): Promise<void> {
+    this.suspend();
+    await this.vault.remove(owner, DRIVE_CLIENT_ID);
   }
 
   /** revoke=true is reserved for a separate explicit user action. */

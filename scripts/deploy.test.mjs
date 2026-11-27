@@ -69,6 +69,8 @@ test("semantic version must increase for release inputs only", () => {
     "src/main.tsx",
     "public/index.html",
     "scripts/build.mjs",
+    "scripts/browser-build-config.mjs",
+    "scripts/lightweight-native-rect-plugin.mjs",
     "package.json",
     "server.mjs",
     "deploy/static/nginx.conf"
@@ -93,6 +95,8 @@ test("version preparation works cold and ignores generated outputs on repetition
     "pnpm-lock.yaml",
     "tsconfig.json",
     "scripts/build.mjs",
+    "scripts/browser-build-config.mjs",
+    "scripts/lightweight-native-rect-plugin.mjs",
     "scripts/prepare-version.mjs",
     "scripts/service-worker.template.js",
     "server.mjs",

@@ -222,6 +222,18 @@ export function isPriceAxisLabelThemes(value: unknown): boolean {
   );
 }
 
+export function isBarColorThemes(value: unknown): boolean {
+  return axisColorFields(
+    value,
+    (theme, palette) =>
+      (theme === "light" || theme === "dark") &&
+      axisColorFields(
+        palette,
+        (key, value) => (key === "upColor" || key === "downColor") && color(value)
+      )
+  );
+}
+
 export function isChartSettings(value: unknown): value is ChartSettings {
   return (
     isRecord(value) &&
@@ -236,6 +248,7 @@ export function isChartSettings(value: unknown): value is ChartSettings {
       grid: boolean,
       upColor: color,
       downColor: color,
+      barColors: isBarColorThemes,
       wickUpColor: color,
       wickDownColor: color,
       borderUpColor: color,

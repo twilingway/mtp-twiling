@@ -56,6 +56,7 @@ export class TerminalHistory {
       source = this.source;
     return (
       this.bridge.isAlive() &&
+      !state.profileTransition &&
       id === this.requestId &&
       client === this.bridge.getClient() &&
       owner === state.owner &&
@@ -110,6 +111,7 @@ export class TerminalHistory {
     const row = selectedMarketRow(state.rows, state.preferences);
     if (
       !this.bridge.isAlive() ||
+      state.profileTransition ||
       !client ||
       !row?.uid ||
       (state.loading && !refresh) ||

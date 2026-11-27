@@ -39,7 +39,7 @@ test("translated choice labels preserve the canonical values saved by the form",
   anchors.props.onChange({ target: { value: "calendar-day" } });
   await fixture.submit(fixture.render());
   assert.equal(fixture.writes[0].technicalIndicators[0].params.anchor, "calendar-day");
-  assert.equal(technicalChoiceLabel("1M", "ru"), "1 месяц");
-  assert.equal(technicalChoiceLabel("1M", "en"), "1 month");
+  assert.equal(technicalChoiceLabel("1M", "ru"), "Месяц");
+  assert.equal(technicalChoiceLabel("1M", "en"), "Month");
   assert.equal(technicalChoiceLabel("1m", "ru"), "1 минута");
 });

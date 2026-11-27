@@ -70,10 +70,13 @@ export function NativeChartTypeMenu() {
     };
     const dismiss = () => setPlacement(null);
     document.addEventListener("pointerdown", outside);
+    const scroller = trigger.current?.closest(".toolbar-scroll");
+    scroller?.addEventListener("scroll", dismiss, { passive: true });
     window.addEventListener("resize", dismiss);
     window.addEventListener("blur", dismiss);
     return () => {
       document.removeEventListener("pointerdown", outside);
+      scroller?.removeEventListener("scroll", dismiss);
       window.removeEventListener("resize", dismiss);
       window.removeEventListener("blur", dismiss);
     };

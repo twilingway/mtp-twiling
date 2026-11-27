@@ -57,7 +57,8 @@ export class TBankClient extends EventTarget {
   constructor(
     private readonly token: string,
     public readonly name: string,
-    private readonly cache: Cache
+    private readonly cache: Cache,
+    private readonly workspaceOwner?: string
   ) {
     super();
     this.candleStream = new BankCandleStream(
@@ -134,7 +135,7 @@ export class TBankClient extends EventTarget {
     return this.transport.request(service, method, body, signal);
   }
   async start(): Promise<BankSnapshot> {
-    this.owner = await profileKey(this.token);
+    this.owner = this.workspaceOwner ?? (await profileKey(this.token));
     await this.request("MarketDataService", "GetLastPrices", { instrumentId: ["SBER_TQBR"] });
     this.authenticated = true;
     const cached = await this.cache.loadMarket(this.owner);

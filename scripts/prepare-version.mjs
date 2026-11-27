@@ -36,6 +36,8 @@ export async function prepareVersion(projectRoot = root) {
     "package.json",
     "pnpm-lock.yaml",
     "scripts/build.mjs",
+    "scripts/browser-build-config.mjs",
+    "scripts/lightweight-native-rect-plugin.mjs",
     "scripts/prepare-version.mjs",
     "scripts/service-worker.template.js",
     "server.mjs",

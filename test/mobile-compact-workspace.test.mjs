@@ -43,6 +43,7 @@ function setup({ open = true, mobile = true } = {}) {
   const noop = () => null;
   const load = createSourceLoader({
     react,
+    "react-dom": { createPortal: (node) => node },
     "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: Symbol("fragment") },
     "screens/terminal/context.js": {
       TerminalContext: noop,
@@ -58,20 +59,17 @@ function setup({ open = true, mobile = true } = {}) {
   return { actions, controller, load };
 }
 
-test("mobile header shows the full chart count and routes modes through the workspace controller", () => {
+test("account workspace content routes panel modes without a duplicate layout trigger", () => {
   const { actions, controller, load } = setup();
   const { MobileChartTools } = load("screens/terminal/MobileChartTools.js");
   const tree = MobileChartTools({
     controller,
     panelOpen: true,
     objectsOpen: true,
-    count: 16,
-    onChartCountChange: () => {},
-    children: "persistent installation and fullscreen actions"
+    onAction: () => actions.push(["close account"])
   });
   const trigger = find(tree, (node) => node.props?.className === "mobile-workspace-trigger");
-  assert.match(trigger.props["aria-label"], /16$/);
-  assert.equal(trigger.props.children[1].props.children, 16);
+  assert.equal(trigger, null);
   const objects = find(tree, (node) => node.props?.["aria-controls"] === "objects-view");
   assert.equal(objects.props["aria-pressed"], true);
   const watchlist = find(tree, (node) => node.props?.["aria-controls"] === "watchlist-view");
@@ -83,9 +81,9 @@ test("mobile header shows the full chart count and routes modes through the work
   );
   chart.props.onClick();
   assert.deepEqual(actions, [
-    ["open", false],
+    ["close account"],
     ["panel", "watchlist", false, true],
-    ["open", false],
+    ["close account"],
     ["chart"]
   ]);
 });
@@ -94,42 +92,45 @@ test("mobile history uses the active chart and does not duplicate its original i
   const { actions, controller, load } = setup();
   const { MobileChartTools } = load("screens/terminal/MobileChartTools.js");
   const { ChartRangeControl } = load("screens/terminal/intervals/ChartRangeControl.js");
-  const tree = MobileChartTools({ controller, panelOpen: false, objectsOpen: false, count: 2 });
+  const tree = MobileChartTools({ controller, panelOpen: false, objectsOpen: false });
   const compact = find(tree, (node) => node.type === ChartRangeControl);
   const select = find(ChartRangeControl(compact.props), (node) => node.type === "select");
   assert.equal(select.props.value, 180);
   assert.equal(select.props.id, "mobile-chart-range");
   assert.equal(
     find(ChartRangeControl({ slot: 2 }), (node) => node.type === "select").props.id,
-    "range-2"
+    "range-plot-2"
   );
   select.props.onChange({ target: { value: "30" } });
   assert.deepEqual(actions, [["active preferences", { rangeDays: 30 }]]);
 });
 
-test("mobile menu leaves install entry points mounted while closed", () => {
-  const { controller, load } = setup({ open: false });
+test("workspace actions remain available inside the account menu and honor recovery locks", () => {
+  const { actions, controller, load } = setup();
   const { MobileChartTools } = load("screens/terminal/MobileChartTools.js");
-  const install = { type: "div", props: { id: "install-actions" } };
-  const tree = MobileChartTools({
+  const { ClockZoneControl } = load("screens/terminal/ClockZoneControl.js");
+  const { ChartRangeControl } = load("screens/terminal/intervals/ChartRangeControl.js");
+  const tree = MobileChartTools({ controller, panelOpen: false, objectsOpen: false });
+  assert.ok(find(tree, (node) => node.type === "nav"));
+  assert.ok(find(tree, (node) => node.type === ClockZoneControl));
+  assert.ok(find(tree, (node) => node.type === ChartRangeControl));
+  assert.equal(
+    find(tree, (node) => node.props?.className === "mobile-workspace-trigger"),
+    null
+  );
+  assert.equal(
+    find(tree, (node) => node.props?.className === "mobile-workspace-layout"),
+    null
+  );
+  const blocked = MobileChartTools({
     controller,
     panelOpen: false,
     objectsOpen: false,
-    count: 1,
-    children: install
+    disabled: true
   });
-  assert.equal(
-    find(tree, (node) => node.props?.id === "install-actions"),
-    install
-  );
-  assert.equal(
-    find(tree, (node) => node.props?.id === "mobile-workspace-panel").props["data-open"],
-    false
-  );
-  assert.equal(
-    find(tree, (node) => node.type === "nav"),
-    null
-  );
+  assert.equal(blocked.props.disabled, true);
+  find(blocked, (node) => node.props?.["aria-controls"] === "watchlist-view").props.onClick();
+  assert.deepEqual(actions, []);
 });
 
 test("mobile objects use their exact drawing settings and return control to the workspace", () => {

@@ -47,7 +47,10 @@ export async function restoreImportedProfile(
 ): Promise<void> {
   const { owner, name } = bridge.getState(),
     client = bridge.getClient(),
-    sessionValid = () => bridge.session.matches(client) && owner === bridge.getState().owner,
+    sessionValid = () =>
+      bridge.session.matches(client) &&
+      !bridge.getState().profileTransition &&
+      owner === bridge.getState().owner,
     valid = () => {
       if (!sessionValid()) return false;
       assertImportCurrent(guard);
@@ -102,7 +105,10 @@ export async function importTerminalBackup(
     summary = onProgress ? summarizeBackupFile(data) : undefined,
     { owner } = bridge.getState(),
     client = bridge.getClient(),
-    valid = () => bridge.session.matches(client) && owner === bridge.getState().owner;
+    valid = () =>
+      bridge.session.matches(client) &&
+      !bridge.getState().profileTransition &&
+      owner === bridge.getState().owner;
   await bridge.editing.flush();
   if (!valid()) return;
   assertImportCurrent(options.valid);
@@ -136,7 +142,20 @@ export async function importTerminalBackup(
       }
       throw error;
     }
-    if (!valid()) return;
+    try {
+      options.onCommitted?.();
+    } catch (error) {
+      bridge.editing.reset();
+      invalidateImportedView(bridge, true);
+      throw error;
+    }
+    if (!valid()) {
+      if (owner === bridge.getState().owner) {
+        bridge.editing.reset();
+        invalidateImportedView(bridge, true);
+      }
+      return;
+    }
     try {
       assertImportCurrent(options.valid);
     } catch (error) {
@@ -144,7 +163,6 @@ export async function importTerminalBackup(
       invalidateImportedView(bridge, true);
       throw error;
     }
-    options.onCommitted?.();
     // Commit succeeded: invalidate all old/newborn canvas work before any next await.
     bridge.editing.reset();
     invalidateImportedView(bridge, false);

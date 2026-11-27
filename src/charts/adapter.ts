@@ -14,6 +14,9 @@ export { logicalForTime, timeForLogical } from "../model/intervals/projected-tim
 import type { DisplayPreferences } from "../i18n/preferences.js";
 import { chartPriceFormat } from "./price-format.js";
 import type { PriceMetadata } from "./price-format.js";
+import type { CandleCountdownLabel } from "./last-price-label.js";
+import type { DrawingAxisLabels } from "./drawing-axis-labels.js";
+export type { DrawingAxisLabels } from "./drawing-axis-labels.js";
 import type {
   TechnicalCalculationContext,
   TechnicalIndicatorInstance
@@ -63,6 +66,8 @@ export interface ChartAdapter {
   updateBar(bar: Candle): void;
   updatePriceFormat?(metadata: PriceMetadata): void;
   setLastPriceLabelColors?(colors: PriceAxisLabelColors | null): void;
+  setCandleCountdown?(countdown: CandleCountdownLabel | null): void;
+  setDrawingAxisLabels?(labels: DrawingAxisLabels | null): void;
   updateTechnicalInputs?(inputs: TechnicalSupplementalInputs): void;
   updateTechnicalIndicators?(
     instances: readonly TechnicalIndicatorInstance[],

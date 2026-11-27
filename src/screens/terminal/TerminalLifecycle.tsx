@@ -3,7 +3,7 @@ import { memo, useEffect, useEffectEvent, useState } from "react";
 import { setupPwa } from "../../services/pwa.js";
 import { DRAWING_CLIPBOARD_MIME } from "../../model/drawing-editing.js";
 import { useTerminal } from "./context.js";
-import { startTerminalDrive } from "./controller-drive.js";
+import { startTerminalCloudSync } from "./controller-cloud-sync.js";
 import { TransferMutationBarrier } from "./TransferMutationBarrier.js";
 import { WelcomeGate } from "./WelcomeDialog.js";
 import type { TerminalController } from "./controller.js";
@@ -27,7 +27,7 @@ export function TerminalLifecycle({ chartEditor }: { chartEditor?: TerminalContr
   const selectedEditor = useEffectEvent(() => chartEditor ?? controller);
   const [settledController, setSettledController] = useState<typeof controller | null>(null);
   useEffect(() => {
-    const disposeDrive = startTerminalDrive(controller);
+    const disposeDrive = startTerminalCloudSync(controller);
     const stopAnnotations = controller.editing.observeWorkspaceAnnotations();
     const lifecycle = new AbortController();
     let active = true,

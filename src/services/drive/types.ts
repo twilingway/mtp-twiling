@@ -28,6 +28,8 @@ export class DriveError extends Error {
 }
 export interface DriveAuthorization {
   readonly connectionId: string;
+  /** Local vault generation, never sent in a cloud snapshot. */
+  readonly credentialId?: string;
   readonly signal: AbortSignal;
   readonly stored?: boolean;
   readonly persistenceError?: boolean;

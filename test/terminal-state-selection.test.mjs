@@ -5,7 +5,8 @@ import { sourceLoader } from "./helpers/market-source-loader.mjs";
 const load = sourceLoader();
 const { selectedSnapshot, shallowEqual } = load("screens/terminal/snapshot-selector.ts");
 const { shareMarketRows } = load("screens/terminal/market-state-sharing.ts");
-const { selectShellState, selectToolbarState, selectControlsState, selectPanelState } = load(
+const { importWritable } = load("screens/terminal/controller-transfer-guard.ts");
+const { equalTerminalState, selectShellState, selectToolbarState, selectControlsState, selectPanelState } = load(
   "screens/terminal/terminal-state-selection.ts"
 );
 const row = (uid, price = 10) => ({
@@ -15,6 +16,18 @@ const fixture = () => ({
   owner: "profile", ready: true, authenticated: true, status: "connected", name: "Name",
   preferences: { symbol: "A", instrumentUid: "A", timeframe: "1d", rightPanelCollapsed: false },
   rows: [row("A"), row("B")], pricesDirection: new Map(), candles: [], dialog: null
+});
+
+test("control selections preserve the workspace migration mutation barrier", () => {
+  let state = fixture();
+  const controls = selectedSnapshot(() => state, selectControlsState, shallowEqual);
+  const ready = controls();
+  assert.equal(importWritable(ready), true);
+  state = { ...state, workspaceMigrationIncomplete: true };
+  assert.notEqual(controls(), ready);
+  assert.equal(importWritable(controls()), false);
+  state = { ...state, workspaceMigrationIncomplete: false };
+  assert.equal(importWritable(controls()), true);
 });
 
 test("unrelated mutable provider quotes retain instrument snapshots and direction identity", () => {
@@ -90,4 +103,43 @@ test("a selector never returns a fresh object for the same snapshot", () => {
   const state = fixture();
   const read = selectedSnapshot(() => state, (snapshot) => ({ price: snapshot.rows[0].price }));
   assert.equal(read(), read());
+});
+
+test("the default terminal snapshot ignores only crosshair, including clear", () => {
+  let state = { ...fixture(), crosshairBar: null };
+  const read = selectedSnapshot(() => state, (snapshot) => snapshot, equalTerminalState);
+  const initial = read();
+  for (let timestamp = 0; timestamp < 100; timestamp++) {
+    state = { ...state, crosshairBar: { timestamp } };
+    assert.equal(read(), initial);
+  }
+  state = { ...state, crosshairBar: null };
+  assert.equal(read(), initial);
+  for (const [key, value] of Object.entries({
+    ...fixture(), candles: [{ close: 12 }], preferences: { symbol: "B" },
+    importingBackup: true, importRecoveryRequired: true, historyViewReady: false,
+    historyViewFallback: true, loading: true, historyHelp: "retry", chartRevision: 2,
+    selectedObject: "drawing", toast: "Saved", futureField: undefined
+  })) {
+    const before = read();
+    state = { ...state, [key]: value !== null && typeof value === "object" ? structuredClone(value) : `${value}-changed` };
+    assert.notEqual(read(), before, `${key} must invalidate`);
+    assert.equal(read(), state);
+  }
+  const before = read();
+  const { futureField: removed, ...next } = state;
+  state = next;
+  assert.notEqual(read(), before);
+  assert.ok(removed);
+});
+
+test("explicit selectors retain Object.is semantics on crosshair-only snapshots", () => {
+  let state = { ...fixture(), crosshairBar: null };
+  const full = selectedSnapshot(() => state, (snapshot) => snapshot);
+  const fresh = selectedSnapshot(() => state, (snapshot) => ({ rows: snapshot.rows }));
+  const hover = selectedSnapshot(() => state, (snapshot) => snapshot.crosshairBar);
+  const before = [full(), fresh(), hover()];
+  state = { ...state, crosshairBar: { timestamp: 10 } };
+  [full, fresh, hover].forEach((read, index) => assert.notEqual(read(), before[index]));
+  assert.equal(hover(), state.crosshairBar);
 });

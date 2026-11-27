@@ -24,6 +24,8 @@ export function isReleaseInput(file) {
       "package.json",
       "pnpm-lock.yaml",
       "scripts/build.mjs",
+      "scripts/browser-build-config.mjs",
+      "scripts/lightweight-native-rect-plugin.mjs",
       "scripts/prepare-version.mjs",
       "scripts/build-vendor.mjs",
       "scripts/service-worker.template.js",

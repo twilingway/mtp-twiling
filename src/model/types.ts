@@ -217,6 +217,11 @@ export interface PriceAxisLabelPalette {
   drawings?: PriceAxisLabelColors;
 }
 export type PriceAxisLabelThemes = Partial<Record<"light" | "dark", PriceAxisLabelPalette>>;
+export interface BarColors {
+  upColor?: string;
+  downColor?: string;
+}
+export type BarColorThemes = Partial<Record<"light" | "dark", BarColors>>;
 export interface ChartSettings {
   chartType?: NativeChartType;
   ohlcDisplay?: OhlcDisplay;
@@ -239,6 +244,7 @@ export interface ChartSettings {
   grid?: boolean;
   upColor?: string;
   downColor?: string;
+  barColors?: BarColorThemes;
   background?: string;
   scaleFontSize?: number;
   showLegend?: boolean;

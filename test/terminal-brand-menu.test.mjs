@@ -44,6 +44,7 @@ function fixture() {
       useId: () => "brand-menu",
       useEffect: () => {}
     },
+    "react-dom": { createPortal: (node) => node },
     "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: Symbol("fragment") },
     "screens/terminal/context.js": {
       useTerminalState: (target, select) => select(target.getSnapshot()),
@@ -86,19 +87,19 @@ function fixture() {
   };
 }
 
-const trigger = (tree) => find(tree, (node) => node.props.className === "brand");
+const trigger = (tree) => find(tree, (node) => node.props.id === "account-button");
 const dialog = (tree) => find(tree, (node) => node.props.role === "dialog");
 const button = (tree, name) =>
   find(tree, (node) => node.type === "button" && node.props.children === name);
 
-test("logo opens MTP Twiling, focuses back on Escape and scopes settings actions", () => {
+test("avatar opens the merged account menu, focuses back on Escape and scopes settings actions", () => {
   const f = fixture();
   assert.equal(trigger(f.menu()).props["aria-expanded"], false);
   trigger(f.menu()).props.onClick();
   const menu = f.menu();
   assert.equal(dialog(menu).props.hidden, false);
   assert.equal(dialog(menu).props.id, trigger(menu).props["aria-controls"]);
-  assert.equal(find(menu, (node) => node.type === "h2").props.children, "MTP Twiling");
+  assert.equal(find(menu, (node) => node.type === "h2").props.children, "МТП Twiling");
   const theme = find(menu, (node) => node.type === "select" && node.props.value === "dark");
   const language = find(menu, (node) => node.type === "select" && node.props.value === "en");
   theme.props.onChange({ currentTarget: { value: "light" } });
@@ -127,7 +128,7 @@ test("logo opens MTP Twiling, focuses back on Escape and scopes settings actions
   assert.equal(f.accountActions.at(-1), "welcome");
 });
 
-test("stale or blocked logo controls cannot change the active profile", () => {
+test("stale or blocked account controls cannot change the active profile", () => {
   const f = fixture();
   trigger(f.menu()).props.onClick();
   const previous = f.menu();
@@ -135,16 +136,34 @@ test("stale or blocked logo controls cannot change the active profile", () => {
   button(previous, "Chart settings").props.onClick();
   assert.deepEqual(f.editorActions, []);
   f.setAccountState({ importingBackup: true });
-  assert.equal(trigger(f.menu()).props.disabled, true);
-  assert.equal(dialog(f.menu()).props.hidden, true);
+  assert.equal(trigger(f.menu()).props.disabled, undefined);
+  const blocked = f.menu();
+  assert.equal(button(blocked, "Chart settings").props.disabled, true);
+  button(blocked, "Account and sources").props.onClick();
+  assert.deepEqual(f.accountActions, ["account"]);
 });
 
-test("toolbar keeps the active-chart ticker search without a magnifier and routes the logo explicitly", () => {
+test("toolbar keeps ticker search and installation inside the single account menu", () => {
   const f = fixture();
   const toolbar = f.toolbar();
   const logo = find(toolbar, (node) => node.type === f.TerminalBrandMenu);
   assert.equal(logo.props.account, f.account);
   assert.equal(logo.props.editor, f.controller);
+  for (const open of [false, true]) {
+    const content = logo.props.children(() => {}, open);
+    assert.equal(
+      find(content, (node) => node.props.id === "install-actions").props.id,
+      "install-actions"
+    );
+  }
+  assert.equal(
+    find(toolbar, (node) => node.props.id === "engine"),
+    null
+  );
+  assert.equal(
+    find(toolbar, (node) => node.props.id === "account-button"),
+    null
+  );
   const ticker = find(toolbar, (node) => node.props.id === "symbol-button");
   assert.equal(ticker.props["aria-label"], "BTCUSDT · Find symbol");
   assert.equal(ticker.props.children.props.children, "BTCUSDT");

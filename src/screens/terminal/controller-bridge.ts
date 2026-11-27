@@ -23,6 +23,8 @@ export interface SessionBridge extends TerminalBridge {
   isClearingHistory: () => boolean;
   mutateCandles: (candles: Candle[]) => void;
   flush: () => Promise<void>;
+  settleTransfers?: () => Promise<void>;
+  captureCameraViews?: () => Promise<void>;
 }
 export const defaultPreferences = (): TerminalPreferences => ({
   locale: "ru",

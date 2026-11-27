@@ -1,12 +1,12 @@
 import { t } from "../../i18n/messages.js";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { DEFAULT_FIB_LEVELS, drawingStyle, hitDrawing } from "../../model/drawing-model.js";
+import { hitDrawing } from "../../model/drawing-model.js";
 import { isDrawing } from "../../model/backup-format.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { snapDrawingPoint } from "../../model/drawing-magnet.js";
 import { chartBackground } from "../../model/theme.js";
-import type { Drawing, DrawingPoint, PixelPoint } from "../../model/types.js";
+import type { Drawing, PixelPoint } from "../../model/types.js";
 import type { ChartAdapter, TechnicalSupplementalInputs } from "../../charts/adapter.js";
 import { nativePriceStep, roundPriceToStep } from "../../charts/price-format.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
@@ -23,6 +23,11 @@ import { useChartMeasurementInput } from "./chart-measurement-input.js";
 import { publishWorkspaceCrosshair } from "./workspace-sync-controller.js";
 import { useOhlcInspection } from "./ohlc-inspection-input.js";
 import { OhlcCandleCard } from "./OhlcCandleCard.js";
+import {
+  createDrawingContextSource,
+  createDrawingInput,
+  observeOwnedDrawingTouch
+} from "./chart-drawing-touch.js";
 const chartControls =
   "[data-image-id],.indicator-legend,.technical-pane-legends,.calendar-analysis-overlays";
 
@@ -55,6 +60,7 @@ export function ChartCanvas({
 }
 interface Drag {
   id: string;
+  pointerId: number;
   handle: number;
   start: PixelPoint;
   original: Drawing;
@@ -87,7 +93,8 @@ export function ChartGestures({
   drawingProjection?: EventTarget;
 }) {
   const { controller, state } = useTerminal(),
-    draft = useRef<DrawingPoint[]>([]),
+    body = useRef<HTMLDivElement>(null),
+    contextSource = useMemo(createDrawingContextSource, []),
     pointer = useRef<HTMLSpanElement>(null),
     drag = useRef<Drag | null>(null),
     pan = useRef<NativePan | null>(null);
@@ -113,7 +120,6 @@ export function ChartGestures({
     };
   }, []);
   useEffect(() => {
-    draft.current = [];
     drag.current = null;
     finishNativePan(pan);
   }, [
@@ -133,7 +139,7 @@ export function ChartGestures({
   };
   const measurement = useChartMeasurementInput(controller, state, pixel, chartControls);
   const ohlc = useOhlcInspection(controller, state, pixel, chartControls);
-  const find = (p: PixelPoint) => {
+  const find = (p: PixelPoint, touch = false) => {
     const chart = controller.chart;
     if (!chart) return null;
     const size = chart.plotSize();
@@ -144,7 +150,8 @@ export function ChartGestures({
           p,
           (point) => chart.pointToPixel(point),
           size.width,
-          size.height
+          size.height,
+          touch ? 22 : 10
         );
   };
   const stop = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -172,30 +179,54 @@ export function ChartGestures({
             : "default"
           : "crosshair";
   };
-  const drawingPoint = (p: PixelPoint, temporary: boolean) => {
-    const chart = controller.chart;
-    const raw = chart?.pixelToPoint(p.x, p.y);
-    if (!chart || !raw) return null;
-    const current = controller.getSnapshot(),
-      options = drawingToolbarSettings(current.preferences.chartSettings);
-    const mode = temporary ? (options.magnet === "off" ? "weak" : "off") : options.magnet;
-    const flags = current.preferences.indicators;
-    const indicators =
-      flags.mtpAll && current.preferences.chartSettings.mtpAllHidden
-        ? { ...flags, mtpAll: false, mtp160: false, mtp440: false, mtp640: false }
-        : flags;
-    const point = snapDrawingPoint(
-      raw,
-      p,
-      current.candles,
-      (point) => chart.pointToPixel(point),
-      mode,
-      options.snapIndicators && !options.indicatorsHidden ? indicators : undefined
-    );
-    const step = nativePriceStep(selectedMarketRow(current.rows, current.preferences));
-    return { ...point, value: roundPriceToStep(point.value, step) };
-  };
+  const drawingPoint = useCallback(
+    (p: PixelPoint, temporary: boolean) => {
+      const chart = controller.chart;
+      const raw = chart?.pixelToPoint(p.x, p.y);
+      if (!chart || !raw) return null;
+      const current = controller.getSnapshot(),
+        options = drawingToolbarSettings(current.preferences.chartSettings);
+      const mode = temporary ? (options.magnet === "off" ? "weak" : "off") : options.magnet;
+      const flags = current.preferences.indicators;
+      const indicators =
+        flags.mtpAll && current.preferences.chartSettings.mtpAllHidden
+          ? { ...flags, mtpAll: false, mtp160: false, mtp440: false, mtp640: false }
+          : flags;
+      const point = snapDrawingPoint(
+        raw,
+        p,
+        current.candles,
+        (point) => chart.pointToPixel(point),
+        mode,
+        options.snapIndicators && !options.indicatorsHidden ? indicators : undefined
+      );
+      const step = nativePriceStep(selectedMarketRow(current.rows, current.preferences));
+      return { ...point, value: roundPriceToStep(point.value, step) };
+    },
+    [controller]
+  );
+  const drawingInput = useMemo(
+    () => createDrawingInput(controller, drawingPoint),
+    [controller, drawingPoint]
+  );
+  useEffect(() => {
+    drawingInput.cancel();
+    return drawingInput.cancel;
+  }, [
+    drawingInput,
+    state.owner,
+    state.preferences.symbol,
+    state.preferences.instrumentUid,
+    state.preferences.timeframe,
+    state.activeTool
+  ]);
+  useEffect(() => {
+    const element = body.current;
+    if (!element) return;
+    return observeOwnedDrawingTouch(element, () => Boolean(drag.current) || drawingInput.active());
+  }, [drawingInput]);
   function down(event: ReactPointerEvent<HTMLDivElement>) {
+    if (drag.current) return stop(event);
     if (
       event.button !== 0 ||
       (event.target instanceof Element && event.target.closest(chartControls))
@@ -207,41 +238,9 @@ export function ChartGestures({
       size = chart.plotSize();
     if (p.x > size.width || p.y > size.height) return;
     controller.setContext(null);
-    const tool = controller.getSnapshot().activeTool;
-    if (tool) {
-      stop(event);
-      const point = drawingPoint(p, event.ctrlKey || event.metaKey);
-      if (!point) return;
-      draft.current.push(point);
-      const required = [
-        "horizontalStraightLine",
-        "horizontalRayLine",
-        "verticalStraightLine"
-      ].includes(tool)
-        ? 1
-        : tool === "fibonacciExtension"
-          ? 3
-          : 2;
-      if (draft.current.length >= required) {
-        const candidate: unknown = {
-          id: crypto.randomUUID(),
-          name: tool,
-          points: [...draft.current],
-          settings: {
-            ...drawingStyle({ name: tool }),
-            levelStyles: structuredClone(DEFAULT_FIB_LEVELS)
-          },
-          ...controller.getSnapshot().preferences.chartSettings.drawingTemplates?.[
-            `default:${tool}`
-          ]
-        };
-        if (isDrawing(candidate)) void controller.addDrawing(candidate);
-        else controller.notify(t("Не удалось создать рисунок."));
-        draft.current = [];
-      } else controller.setPreview({ id: "preview", name: tool, points: [...draft.current] });
-      return;
-    }
-    const hit = find(p);
+    if (drawingInput.down(event, p)) return;
+    if (event.isPrimary === false) return;
+    const hit = find(p, event.pointerType === "touch");
     const tools = drawingToolbarSettings(controller.getSnapshot().preferences.chartSettings);
     if (tools.cursor === "eraser") {
       stop(event);
@@ -270,6 +269,7 @@ export function ChartGestures({
     stop(event);
     drag.current = {
       id: drawing.id,
+      pointerId: event.pointerId,
       handle: hit.handle,
       start: p,
       original: structuredClone(drawing),
@@ -311,17 +311,9 @@ export function ChartGestures({
       }
       return;
     }
-    if (current.activeTool && draft.current.length) {
-      const point = drawingPoint(p, event.ctrlKey || event.metaKey);
-      if (point)
-        controller.setPreview({
-          id: "preview",
-          name: current.activeTool,
-          points: [...draft.current, point]
-        });
-      return;
-    }
+    if (drawingInput.move(event, p)) return;
     const active = drag.current;
+    if (active && active.pointerId !== event.pointerId) return;
     if (!active || !controller.editing.gestureActive(active.token)) {
       drag.current = null;
       const size = chart.plotSize(),
@@ -371,11 +363,13 @@ export function ChartGestures({
     }
   }
   function up(event: ReactPointerEvent<HTMLDivElement>) {
+    contextSource.up(event);
+    if (drawingInput.up(event, pixel(event))) return;
     if (event.pointerId === pan.current?.pointerId) {
       finishNativePan(pan);
       cursor(event.currentTarget, cursorKind());
     }
-    if (!drag.current) return;
+    if (!drag.current || drag.current.pointerId !== event.pointerId) return;
     stop(event);
     const token = drag.current.token;
     drag.current = null;
@@ -391,6 +385,10 @@ export function ChartGestures({
       );
   }
   function cancel(event: ReactPointerEvent<HTMLDivElement>) {
+    if (drawingInput.active() && !drawingInput.owns(event.pointerId)) return;
+    if (drag.current && drag.current.pointerId !== event.pointerId) return;
+    contextSource.up(event);
+    if (drawingInput.active()) drawingInput.cancel();
     finishNativePan(pan);
     if (!drag.current) return;
     drag.current = null;
@@ -401,9 +399,15 @@ export function ChartGestures({
   }
   return (
     <div
+      ref={body}
       className={`chart-body ${state.activeTool ? "drawing-active" : ""}`}
       style={{ minHeight: minimumHeight }}
       onPointerDownCapture={(event) => {
+        event.currentTarget.dataset.drawingTouch = String(event.pointerType === "touch");
+        contextSource.down(
+          event,
+          Boolean(find(pixel(event), event.pointerType === "touch")) || Boolean(state.activeTool)
+        );
         if (!measurement.down(event) && cameraInput.down(event) !== false) {
           down(event);
           ohlc.down(event, measurement.active() || pan.current?.pointerId !== event.pointerId);
@@ -466,7 +470,7 @@ export function ChartGestures({
         if (event.target instanceof Element && event.target.closest(chartControls)) return;
         event.preventDefault();
         event.stopPropagation();
-        if (ohlc.touchPress()) return;
+        if (ohlc.touchPress() || contextSource.suppress(event.nativeEvent)) return;
         const hit = find(pixel(event));
         controller.selectObject(hit?.id ?? null);
         controller.setContext({

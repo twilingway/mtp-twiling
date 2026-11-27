@@ -144,7 +144,7 @@ test("a superseded saved login leaves startup pending until the current empty wa
     assert.deepEqual(notes, []);
     secondFinished.resolve();
     await manual;
-    assert.equal(state().owner, "bank-B");
+    assert.equal(state().owner, "device");
     assert.equal(state().watchlistStartup, "ready");
     assert.deepEqual(state().rows, []);
   } finally {
@@ -170,7 +170,10 @@ test("manual login may replace session restoration and alone settle startup", as
       await startup;
       if (failed) await assert.rejects(manual, /Synthetic login failure/);
       else await manual;
-      assert.equal(state().watchlistStartup, failed ? "error" : "ready");
+      assert.equal(state().watchlistStartup, "ready");
+      assert.equal(state().owner, "device");
+      assert.equal(state().workspaceMigrationIncomplete, false);
+      if (failed) assert.equal(state().authenticated, false);
       assert.deepEqual(notes, []);
     } finally {
       restoration.resolve(undefined);

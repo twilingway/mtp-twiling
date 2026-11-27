@@ -62,6 +62,19 @@ function fileHash(file: DriveFile, kind: "snapshot" | "blob", namespace: string)
     throw invalid();
   return hash;
 }
+function physicalSnapshotIdentity(files: readonly DriveFile[]): string {
+  return JSON.stringify(
+    [...files]
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .map(({ id, version, size, appProperties }) => [
+        id,
+        version ?? null,
+        size,
+        appProperties.mtpKey,
+        appProperties.mtpHash
+      ])
+  );
+}
 function inspectGraph(snapshots: RemoteSnapshot[], namespace: string): DriveInspection {
   const nodes = new Map<string, RemoteSnapshot>();
   for (const snapshot of snapshots) {
@@ -124,6 +137,13 @@ export class DriveSync {
   ) {}
 
   async inspect(): Promise<DriveInspection> {
+    return (await this.inspectWithPhysicalFiles()).inspection;
+  }
+
+  private async inspectWithPhysicalFiles(): Promise<{
+    inspection: DriveInspection;
+    files: DriveFile[];
+  }> {
     const files = await this.store.list("snapshot");
     if (files.length > 10000 || files.reduce((sum, file) => sum + file.size, 0) > 64 * 1024 * 1024)
       throw new DriveError("limit", "Слишком большой каталог снимков Google Диска.");
@@ -169,7 +189,7 @@ export class DriveSync {
     }
     const inspection = inspectGraph(snapshots, this.namespace);
     this.manifestCache = next;
-    return inspection;
+    return { inspection, files };
   }
 
   private async readManifestText(file: DriveFile, hash: string): Promise<string> {
@@ -193,6 +213,51 @@ export class DriveSync {
     const snapshot = inspection.snapshots.find((item) => item.manifest.nodeId === nodeId);
     if (!snapshot) throw invalid();
     const blobs = await this.blobIndex();
+    return this.downloadSnapshot(snapshot, blobs, report);
+  }
+
+  /** Read the pinned archive one backup at a time, with one shared blob listing. */
+  async visitArchiveSnapshots(
+    expected: DriveInspection,
+    nodeIds: readonly string[],
+    visit: (snapshot: RemoteSnapshot, backup: Backup) => Promise<void>,
+    signal?: AbortSignal
+  ): Promise<void> {
+    const pinned = structuredClone(expected);
+    const requested = [...nodeIds];
+    if (!requested.length || new Set(requested).size !== requested.length) throw invalid();
+    signal?.throwIfAborted();
+    const before = await this.inspectWithPhysicalFiles();
+    assertDriveInspectionUnchanged(pinned, before.inspection);
+    const physicalIdentity = physicalSnapshotIdentity(before.files);
+    const snapshots = new Map(
+      before.inspection.snapshots.map((snapshot) => [snapshot.manifest.nodeId, snapshot])
+    );
+    const selected = requested.map((nodeId) => {
+      const snapshot = snapshots.get(nodeId);
+      if (!snapshot) throw invalid();
+      return snapshot;
+    });
+    const blobs = await this.blobIndex();
+    for (const snapshot of selected) {
+      signal?.throwIfAborted();
+      const backup = await this.downloadSnapshot(snapshot, blobs);
+      signal?.throwIfAborted();
+      await visit(snapshot, backup);
+    }
+    signal?.throwIfAborted();
+    const after = await this.inspectWithPhysicalFiles();
+    assertDriveInspectionUnchanged(pinned, after.inspection);
+    if (physicalIdentity !== physicalSnapshotIdentity(after.files))
+      throw new DriveError("conflict", "Во время подготовки архива изменились файлы снимков.");
+    signal?.throwIfAborted();
+  }
+
+  private async downloadSnapshot(
+    snapshot: RemoteSnapshot,
+    blobs: Map<string, DriveFile[]>,
+    report?: DriveReport
+  ): Promise<Backup> {
     const manifest = snapshot.manifest;
     let transferredBytes = 0;
     const totalFiles = manifest.images.length + 1;

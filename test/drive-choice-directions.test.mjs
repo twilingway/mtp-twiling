@@ -3,18 +3,41 @@ import test from "node:test";
 import * as jsx from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 import { sourceModules } from "./helpers/watchlist-sections.mjs";
-
+function walk(node, predicate, result = []) {
+  if (Array.isArray(node)) node.forEach((item) => walk(item, predicate, result));
+  else if (node?.props) {
+    if (typeof node.type === "function") return walk(node.type(node.props), predicate, result);
+    if (predicate(node)) result.push(node);
+    walk(node.props.children, predicate, result);
+  }
+  return result;
+}
 function fixture() {
-  const calls = [];
-  const local = { instruments: 3, drawings: 2, images: 1, date: "2026-11-26T08:21:00.000Z" };
-  const remote = { ...local, date: "2026-11-25T08:00:00.000Z", nodeId: "remote-1" };
+  const calls = [],
+    local = { instruments: 3, drawings: 2, images: 1, date: "2026-11-26T08:21:00.000Z" };
+  const remote = { ...local, date: "2026-11-25T08:00:00.000Z", id: "remote-1" };
   const status = {
+    provider: "google-drive",
+    enabled: true,
+    configured: true,
     phase: "conflict",
     prepared: true,
     connected: true,
-    conflict: { local, remotes: [remote, { ...remote, nodeId: "remote-2" }] }
+    automatic: false,
+    conflict: { local, remotes: [remote, { ...remote, id: "remote-2" }] }
   };
-  const state = { owner: "profile", marketReady: true, backupBusy: false };
+  const state = { owner: "device", ready: true, marketReady: true, backupBusy: false };
+  const provider = {
+    id: "google-drive",
+    getSnapshot: () => status,
+    subscribe: () => () => {},
+    choose: async (choice) => {
+      calls.push(["choose", choice]);
+    },
+    receive: async (id) => {
+      calls.push(["receive", id]);
+    }
+  };
   const load = sourceModules({
     react: {
       useEffect() {},
@@ -22,26 +45,15 @@ function fixture() {
       useSyncExternalStore: (_subscribe, getSnapshot) => getSnapshot()
     },
     "react/jsx-runtime": jsx,
-    "screens/terminal/context.tsx": { useTerminal: () => ({ controller: {}, state }) },
-    "screens/terminal/controller-drive.ts": {
-      terminalDrive: () => ({
-        getSnapshot: () => status,
-        choose: async (choice) => calls.push(choice)
-      })
-    }
+    "screens/terminal/context.tsx": { useTerminal: () => ({ controller: {}, state }) }
   });
-  const { GoogleDriveSettings } = load("screens/terminal/GoogleDriveSettings.js");
+  const { CloudProviderSettings } = load("screens/terminal/CloudProviderSettings.js");
   const { setDisplayPreferences } = load("i18n/preferences.js");
-  const page = () => GoogleDriveSettings();
-  const section = (id) => page().props.children.find((node) => node?.props?.id === id);
-  const conflict = () => section("google-drive-conflict");
-  const buttons = (node) =>
-    node.props.children
-      .flat()
-      .filter((child) => child?.type === "div")
-      .map((child) => child.props.children.find(({ type }) => type === "button"));
+  const page = () => CloudProviderSettings({ provider });
+  const section = (id) => walk(page(), (node) => node.props.id === id)[0];
   return {
     calls,
+    provider,
     local,
     remote,
     status,
@@ -49,87 +61,103 @@ function fixture() {
     setDisplayPreferences,
     page,
     section,
-    conflict,
-    buttons
+    conflict: () => section("google-drive-conflict"),
+    buttons: (node) => walk(node, (child) => child.type === "button")
   };
 }
 
-test("Drive choice shows cloud first and keeps visible arrows wired to the correct versions", () => {
+test("shared cloud choice keeps both locales and arrows wired to exact remote/local selections", () => {
   const f = fixture();
-  for (const [locale, download, upload, cloudTitle, localTitle, created, checked] of [
-    [
-      "ru",
-      "Получить из Google Диска",
-      "Отправить на Google Диск",
-      "Версия на Google Диске",
-      "Версия на этом устройстве",
-      "Снимок создан",
-      "Версия проверена"
-    ],
+  const checkedAt = "2026-11-26T09:00:00.000Z";
+  f.status.comparison = { ...f.status.conflict, checkedAt };
+  for (const [locale, download, upload, remoteTitle, localTitle, created, checked] of [
     [
       "en",
-      "Get from Google Drive",
-      "Send to Google Drive",
-      "Google Drive version",
-      "Version on this device",
+      "Receive this version",
+      "Send this device&#x27;s version",
+      "In Google Drive",
+      "On this device",
       "Snapshot created",
-      "Version checked"
+      "State checked"
+    ],
+    [
+      "ru",
+      "Получить эту версию",
+      "Отправить версию устройства",
+      "В Google Диске",
+      "На этом устройстве",
+      "Снимок создан",
+      "Проверено состояние"
     ]
   ]) {
     f.setDisplayPreferences({ locale });
     const markup = renderToStaticMarkup(f.conflict());
-    assert.ok(markup.includes(`<h5>${cloudTitle} 1</h5>`));
-    assert.ok(markup.includes(`<h5>${cloudTitle} 2</h5>`));
+    assert.equal(markup.split(`<h5>${remoteTitle}</h5>`).length - 1, 2);
     assert.ok(markup.includes(`<h5>${localTitle}</h5>`));
-    assert.ok(markup.includes(`</span> ${download}`));
-    assert.ok(markup.includes(`</span> ${upload}`));
-    assert.ok(markup.includes(`${created}: <time dateTime="${f.remote.date}">`));
-    assert.ok(markup.includes(`${checked}: <time dateTime="${f.local.date}">`));
+    assert.ok(markup.includes(download));
+    assert.ok(markup.includes(upload));
+    assert.ok(markup.includes(created));
+    assert.ok(markup.includes(checked));
+    assert.ok(markup.includes(f.remote.date));
+    assert.ok(markup.includes(checkedAt));
+    assert.ok(
+      !markup.includes(f.local.date),
+      "the local creation/edit date must not be inferred from a summary"
+    );
   }
   const buttons = f.buttons(f.conflict());
   assert.deepEqual(
-    buttons.map(({ props }) => props["data-drive-remote"]),
-    [0, 1, undefined]
+    buttons.map(({ props }) => props["data-cloud-remote"]),
+    [undefined, 0, 1]
   );
   assert.deepEqual(
     buttons.map(({ props }) => props["aria-describedby"]),
-    ["google-drive-receive-effect", "google-drive-receive-effect", "google-drive-send-effect"]
+    ["google-drive-send-effect", "google-drive-receive-effect", "google-drive-receive-effect-1"]
   );
-  assert.equal(buttons.at(-1).props.id, "google-drive-choose-local");
+  assert.equal(buttons[0].props.id, "google-drive-choose-local");
   assert.deepEqual(
     buttons.map(({ props }) => props.children[0].props.children),
-    ["↓", "↓", "↑"]
+    ["↑", "↓", "↓"]
   );
-  for (const { props } of buttons) props.onClick();
-  assert.deepEqual(f.calls, ["remote-1", "remote-2", "local"]);
-
+  buttons.forEach(({ props }) => props.onClick());
+  assert.deepEqual(f.calls, [
+    ["choose", { kind: "local" }],
+    ["receive", "remote-1"],
+    ["receive", "remote-2"]
+  ]);
   f.state.backupBusy = true;
   assert.ok(f.buttons(f.conflict()).every(({ props }) => props.disabled));
 });
 
-test("empty Drive choice offers only upload and omits absent preview timestamps", () => {
+test("empty cloud history offers only explicit send and omits absent preview timestamps", () => {
   const f = fixture();
+  f.setDisplayPreferences({ locale: "en" });
   f.status.conflict = { local: { ...f.local, date: undefined }, remotes: [] };
-  const conflict = f.conflict();
-  const markup = renderToStaticMarkup(conflict);
-  assert.match(markup, /пока нет снимков этого профиля/);
-  assert.doesNotMatch(markup, /<time|google-drive-receive-effect|data-drive-remote/);
+  const conflict = f.conflict(),
+    markup = renderToStaticMarkup(conflict);
+  assert.match(markup, /No snapshots are available/);
+  assert.doesNotMatch(markup, /<time|google-drive-receive-effect|data-cloud-remote/);
   const [send] = f.buttons(conflict);
   assert.equal(f.buttons(conflict).length, 1);
-  assert.equal(send.props.id, "google-drive-choose-local");
+  assert.match(markup, /Check time unknown/);
   send.props.onClick();
-  assert.deepEqual(f.calls, ["local"]);
+  assert.deepEqual(f.calls, [["choose", { kind: "local" }]]);
 });
 
-test("only the selected Drive button shows progress and the confirmed result replaces the choice", () => {
+test("only the selected direction reports busy progress and success is shown only after confirmation", () => {
   const f = fixture();
-  f.setDisplayPreferences({ locale: "ru" });
-  for (const [nodeId, index, progress, result] of [
-    ["local", 2, "Отправляем…", "Версия устройства отправлена на Google Диск."],
-    ["remote-2", 1, "Получаем…", "Версия с Google Диска применена на устройстве."]
+  f.setDisplayPreferences({ locale: "en" });
+  for (const [selection, index, progress, result] of [
+    [{ kind: "local" }, 0, "Sending", "The device version was sent to cloud storage."],
+    [
+      { kind: "remote", id: "remote-2" },
+      2,
+      "Getting",
+      "The cloud version was applied on this device."
+    ]
   ]) {
     f.status.phase = "syncing";
-    f.status.choiceAction = { nodeId, state: "running" };
+    f.status.choiceAction = { selection, state: "running" };
     const buttons = f.buttons(f.conflict());
     assert.ok(buttons.every(({ props }) => props.disabled));
     assert.deepEqual(
@@ -137,46 +165,74 @@ test("only the selected Drive button shows progress and the confirmed result rep
       buttons.map((_, position) => position === index)
     );
     assert.ok(renderToStaticMarkup(buttons[index]).includes(progress));
-    assert.equal(f.section("google-drive-choice-result").props.role, "status");
     assert.doesNotMatch(
       renderToStaticMarkup(f.page()),
-      /применена на устройстве|отправлена на Google Диск/u
+      /was applied on this device|was sent to cloud storage/
     );
-
     const previous = f.status.conflict;
     f.status.conflict = undefined;
     f.status.phase = "idle";
-    f.status.choiceAction = { nodeId, state: "confirmed" };
+    f.status.choiceAction = { selection, state: "confirmed" };
     assert.equal(f.conflict(), undefined);
     assert.equal(f.section("google-drive-choice-result").props.children, result);
     f.status.conflict = previous;
   }
 });
 
-test("Drive feedback explains review, blocked work, failures and retry in Russian and English", () => {
+test("review, blocked work, quota and local-save remain explicit and retryable", () => {
   const f = fixture();
-  f.setDisplayPreferences({ locale: "ru" });
-  f.status.choiceAction = { nodeId: "local", state: "review" };
-  assert.match(renderToStaticMarkup(f.page()), /Сравните их и повторите выбор/u);
+  f.setDisplayPreferences({ locale: "en" });
+  f.status.choiceAction = { selection: { kind: "local" }, state: "review" };
+  assert.match(renderToStaticMarkup(f.page()), /Versions changed/);
   f.state.loading = true;
   f.status.choiceAction.state = "blocked";
-  assert.match(renderToStaticMarkup(f.page()), /Дождитесь загрузки графика/u);
+  assert.match(renderToStaticMarkup(f.page()), /Wait for the chart/);
   f.state.loading = false;
   f.status.choiceAction.state = "unconfirmed";
   f.status.conflict = undefined;
   f.status.phase = "error";
   f.status.error = "quota";
-  const markup = renderToStaticMarkup(f.page());
-  assert.match(markup, /Отправка на Google Диск не подтверждена/u);
-  assert.match(markup, /Google временно ограничил запросы/u);
-  assert.match(markup, /Повторить синхронизацию/u);
+  const quota = renderToStaticMarkup(f.page());
+  assert.match(quota, /Sending to cloud storage is unconfirmed/);
+  assert.match(quota, /quota exceeded/);
+  assert.match(quota, /Retry sync/);
   f.status.error = "local-save";
-  const checkpoint = renderToStaticMarkup(f.page());
-  assert.match(checkpoint, /Не удалось сохранить отметку синхронизации на этом устройстве/u);
-  assert.doesNotMatch(checkpoint, /Нет связи с Google/u);
+  const saved = renderToStaticMarkup(f.page());
+  assert.match(saved, /Could not save the result on this device/);
+  assert.doesNotMatch(saved, /Cannot reach cloud/);
+});
 
+test("ordinary receive never falls back to a cloud-writing choice; legacy migration is explicit", () => {
+  const f = fixture();
   f.setDisplayPreferences({ locale: "en" });
-  const english = renderToStaticMarkup(f.page());
-  assert.match(english, /Sending to Google Drive was not confirmed/);
-  assert.match(english, /Retry sync/);
+  delete f.provider.receive;
+  const remote = () =>
+    f.buttons(f.conflict()).find(({ props }) => props["data-cloud-remote"] === 0);
+  assert.equal(remote().props.disabled, true);
+  remote().props.onClick();
+  assert.deepEqual(f.calls, []);
+  f.status.migrationRequired = true;
+  assert.equal(remote().props.disabled, false);
+  assert.match(renderToStaticMarkup(remote()), /Migrate and receive/);
+  assert.match(
+    renderToStaticMarkup(f.conflict()),
+    /Migration updates legacy saves in Google Drive/
+  );
+  remote().props.onClick();
+  assert.deepEqual(f.calls, [["choose", { kind: "remote", id: "remote-1" }]]);
+});
+
+test("a confirmed local receive does not claim that multiple cloud versions were resolved", () => {
+  const f = fixture();
+  f.setDisplayPreferences({ locale: "en" });
+  f.status.choiceAction = { selection: { kind: "remote", id: "remote-1" }, state: "confirmed" };
+  assert.match(renderToStaticMarkup(f.page()), /multiple cloud versions still remain/);
+  f.status.lastSyncedAt = "2026-11-25T08:00:00.000Z";
+  f.status.phase = "idle";
+  f.status.choiceAction = undefined;
+  assert.match(renderToStaticMarkup(f.page()), /Last confirmed exchange/);
+  assert.doesNotMatch(
+    renderToStaticMarkup(f.page()),
+    /Operation confirmed|was applied on this device/
+  );
 });

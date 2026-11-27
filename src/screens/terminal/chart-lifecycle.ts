@@ -24,6 +24,8 @@ import { watchChartPriceMetadata } from "./chart-price-metadata.js";
 import { publishWorkspaceCrosshair } from "./workspace-sync-controller.js";
 import { persistTechnicalPaneLayout } from "./technical-indicator-actions.js";
 import type { TerminalPreferences } from "./state.js";
+import { drawingHandleRadius } from "./chart-drawing-touch.js";
+import { observeChartAdapterReady } from "./chart-adapter-ready.js";
 
 function technicalInputs(preferences: TerminalPreferences) {
   const instances = preferences.technicalIndicators ?? [];
@@ -54,6 +56,7 @@ export function useChartCanvas(
     fittedWorkspaceHistory = useRef(false),
     dataFallback = useRef(false),
     adapterRef = useRef<ChartAdapter | null>(null),
+    adapterReadyRef = useRef<ReturnType<typeof observeChartAdapterReady> | null>(null),
     typeRange = useRef<{
       owner: string;
       revision: number;
@@ -113,6 +116,11 @@ export function useChartCanvas(
         selectedMarketRow(current.rows, current.preferences)?.uid === uid
       );
     };
+    const readiness = observeChartAdapterReady(
+      controller,
+      () => (dataRef.current.length ? owned : null),
+      () => matches() && owned !== null && controller.chart === owned
+    );
     const initialize = async () => {
       const snapshot = controller.getSnapshot(),
         instrument = selectedMarketRow(snapshot.rows, snapshot.preferences);
@@ -189,7 +197,11 @@ export function useChartCanvas(
             project,
             width,
             height,
-            current.selectedObject
+            current.selectedObject,
+            drawingHandleRadius(
+              container,
+              window.matchMedia?.("(pointer: coarse)").matches ?? false
+            )
           );
           if (layer === "front") drawingProjection?.dispatchEvent(new Event("change"));
         }
@@ -213,6 +225,7 @@ export function useChartCanvas(
         waitingForSlotAnchor = slot !== undefined && !viewAnchorCovered(view, candles);
       owned.persistView = ready && !showingFallback && !waitingForSlotAnchor;
       adapterRef.current = owned;
+      adapterReadyRef.current = readiness;
       controller.chart = owned;
       const currentPreferences = controller.getSnapshot().preferences;
       owned.setLastPriceLabelColors?.(lastPriceLabelColors(currentPreferences.chartSettings));
@@ -240,6 +253,7 @@ export function useChartCanvas(
         fittedWorkspaceHistory.current = !current.loading || !!view;
       }
       if (!ready || !candles.length || waitingForSlotAnchor) pendingSavedView.current = view;
+      readiness.check();
     };
     void initialize().catch((error: unknown) => {
       if (matches())
@@ -282,7 +296,11 @@ export function useChartCanvas(
         if (view) void saveView(owner, key, view).catch(() => {});
       }
       owned?.destroy();
-      if (controller.chart === owned) controller.chart = null;
+      if (owned && controller.chart === owned) {
+        controller.chart = null;
+      }
+      readiness.stop();
+      if (adapterReadyRef.current === readiness) adapterReadyRef.current = null;
       adapterRef.current = null;
       dataRef.current = [];
       dataFallback.current = false;
@@ -318,18 +336,28 @@ export function useChartCanvas(
       waitingForSlotAnchor =
         controller.workspaceSlot !== undefined && !viewAnchorCovered(pending, next);
     if (adapter?.retired || state.importRecoveryRequired) return;
+    const previousPersistView = adapter?.persistView;
+    const publishReadiness = () => {
+      if (adapter && controller.chart === adapter && previousPersistView !== adapter.persistView)
+        adapterReadyRef.current?.check();
+    };
     if (adapter)
       adapter.persistView =
         !fallback &&
         !waitingForSlotAnchor &&
         !state.importingBackup &&
         state.historyViewReady !== false;
-    if (state.importingBackup || state.historyViewReady === false) return;
-    if (!adapter || !next.length) return;
+    if (state.importingBackup || state.historyViewReady === false || !adapter || !next.length) {
+      publishReadiness();
+      return;
+    }
     const firstWorkspaceHistory =
       controller.workspaceSlot !== undefined && !fittedWorkspaceHistory.current && !pending;
     if (firstWorkspaceHistory && !state.loading) fittedWorkspaceHistory.current = true;
-    if (next === previous) return;
+    if (next === previous) {
+      publishReadiness();
+      return;
+    }
     const incremental =
       previous.length > 0 &&
       next.length >= previous.length &&
@@ -353,6 +381,8 @@ export function useChartCanvas(
     dataRef.current = next;
     dataFallback.current = fallback;
     if (!waitingForSlotAnchor) pendingSavedView.current = undefined;
+    if (!previous.length && controller.chart === adapter) adapterReadyRef.current?.check();
+    else publishReadiness();
   }, [
     controller,
     state.candles,

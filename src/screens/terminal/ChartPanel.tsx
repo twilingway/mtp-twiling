@@ -16,8 +16,8 @@ import { DrawingAxisLabels } from "./DrawingAxisLabels.js";
 import { SelectedDrawingLock } from "./SelectedDrawingLock.js";
 import { CandleCountdown } from "./CandleCountdown.js";
 import { IndicatorLegend } from "./IndicatorLegend.js";
-import { ohlcCandleIndex, ohlcDisplayMode } from "../../model/ohlc-legend.js";
-import { OhlcLegend, OhlcLegendIcon } from "./OhlcLegend.js";
+import { ohlcDisplayMode } from "../../model/ohlc-legend.js";
+import { ChartOhlcMeta } from "./ChartOhlcMeta.js";
 import { ChartRangeControl } from "./intervals/ChartRangeControl.js";
 import { InlineTimeframeControl } from "./intervals/InlineTimeframeControl.js";
 import { ChartNavigation } from "./ChartNavigation.js";
@@ -35,12 +35,10 @@ const Version = memo(function Version() {
 export function ChartPanel({
   slot = 1,
   active = true,
-  gridDepth = false,
   activate
 }: {
   slot?: number;
   active?: boolean;
-  gridDepth?: boolean;
   activate?: () => void;
 } = {}) {
   const [scrollTop, setScrollTop] = useState(0);
@@ -53,11 +51,6 @@ export function ChartPanel({
     p = state.preferences,
     row = selectedMarketRow(state.rows, p),
     ohlcMode = ohlcDisplayMode(p.chartSettings),
-    hoveredIndex =
-      ohlcMode === "corner" && state.crosshairBar
-        ? ohlcCandleIndex(state.candles, state.crosshairBar.timestamp)
-        : -1,
-    barIndex = hoveredIndex >= 0 ? hoveredIndex : state.candles.length - 1,
     digits = row ? precision(row) : 2,
     busy = available && (state.loading || state.importingBackup === true);
   const openInterest = useOpenInterest(controller, state, row);
@@ -125,11 +118,11 @@ export function ChartPanel({
     >
       <div
         className="chart-heading"
-        data-grid-depth={gridDepth || undefined}
+        data-grid-depth="true"
         style={{
           maxHeight: headingHeight,
           visibility: headingHeight === 0 ? "hidden" : undefined,
-          ...(gridDepth && price?.width && { width: price.width, right: "auto" })
+          ...(price?.width && { width: price.width, right: "auto" })
         }}
       >
         <div className="chart-instrument-heading">
@@ -176,26 +169,11 @@ export function ChartPanel({
             </span>
             <InlineTimeframeControl slot={slot} provider={row?.providerRef?.provider} />
             <SelectedDrawingLock />
-            {ohlcMode === "icon" && (
-              <OhlcLegendIcon
-                key={JSON.stringify([state.owner, p.symbol, p.instrumentUid, p.timeframe])}
-                bar={state.candles[barIndex]}
-                previousClose={state.candles[barIndex - 1]?.close}
-                digits={digits}
-                settings={p.chartSettings}
-              />
-            )}
+            {ohlcMode === "icon" && <ChartOhlcMeta />}
           </div>
-          {gridDepth && <ChartRangeControl slot={slot} placement="plot" />}
+          <ChartRangeControl slot={slot} placement="plot" />
         </div>
-        {ohlcMode === "corner" && (
-          <OhlcLegend
-            bar={state.candles[barIndex]}
-            previousClose={state.candles[barIndex - 1]?.close}
-            digits={digits}
-            settings={p.chartSettings}
-          />
-        )}
+        {ohlcMode === "corner" && <ChartOhlcMeta />}
         <div className="chart-price">
           <strong id={slot === 1 ? "chart-price" : undefined}>{number(row?.price, digits)}</strong>
           <span id={slot === 1 ? "chart-change" : undefined} className={signClass(row?.change)}>
@@ -225,9 +203,9 @@ export function ChartPanel({
             refresh={extra.calendar.refresh}
             {...(p.locale ? { locale: p.locale } : {})}
           />
-          <ImageLayer />
+          <ImageLayer drawingProjection={drawingProjection} />
           <DrawingAxisLabels drawingProjection={drawingProjection} />
-          {slot === 1 && <CandleCountdown />}
+          <CandleCountdown drawingProjection={drawingProjection} />
           <SupplementalStudyStatusContext.Provider value={studyStatus}>
             <TechnicalIndicatorPanels metrics={metrics} />
           </SupplementalStudyStatusContext.Provider>
@@ -309,7 +287,6 @@ export function ChartPanel({
         </ChartGestures>
       </div>
       {slot === 1 && <ChartNavigation />}
-      {!gridDepth && <ChartRangeControl slot={slot} />}
       {slot === 1 && <Version />}
     </section>
   );

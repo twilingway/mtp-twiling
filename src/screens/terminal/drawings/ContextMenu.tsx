@@ -6,11 +6,16 @@ import type { Drawing, ImageAsset } from "../../../model/types.js";
 import { INDICATOR_NAMES } from "../state.js";
 import { useTerminal } from "../context.js";
 import { ChevronIcon } from "./controls/ChevronIcon.js";
+import { MobileObjectWidget, useMobileObjectWidget } from "./MobileObjectWidget.js";
+import { selectedWidgetObject } from "./mobile-object-widget.js";
+import { bindMobileObjectMenuDismiss } from "./mobile-object-menu-dismiss.js";
 
 type LayerAction = "front" | "back" | "forward" | "backward";
 export function ContextMenu() {
   const { controller, state } = useTerminal();
+  const mobile = useMobileObjectWidget();
   const ref = useRef<HTMLDivElement>(null);
+  const restoreWidgetFocus = useRef(false);
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState<"name" | "size" | null>(null);
   const [value, setValue] = useState("");
@@ -36,6 +41,25 @@ export function ContextMenu() {
     setEditing(null);
   }, [menu]);
   useEffect(() => {
+    if (!mobile) return;
+    if (menu) ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    else if (restoreWidgetFocus.current) {
+      restoreWidgetFocus.current = false;
+      document.querySelector<HTMLButtonElement>(".mobile-object-widget button:last-child")?.focus();
+    }
+  }, [menu, mobile]);
+  useEffect(() => {
+    if (!mobile) return;
+    return bindMobileObjectMenuDismiss(document, {
+      current: controller.getSnapshot,
+      contains: (target) => ref.current?.contains(target) ?? false,
+      dismiss: () => {
+        restoreWidgetFocus.current = true;
+        controller.setContext(null);
+      }
+    });
+  }, [controller, mobile]);
+  useEffect(() => {
     if (!menu) return;
     const outside = (event: PointerEvent) => {
       if (event.target instanceof Node && !ref.current?.contains(event.target))
@@ -55,6 +79,7 @@ export function ContextMenu() {
         return;
       if (window.getSelection()?.toString()) return;
       if (event.key === "Escape") {
+        restoreWidgetFocus.current = mobile && !!controller.getSnapshot().contextMenu;
         controller.setContext(null);
         return;
       }
@@ -68,8 +93,13 @@ export function ContextMenu() {
     };
     document.addEventListener("keydown", key);
     return () => document.removeEventListener("keydown", key);
-  }, [controller, state.selectedObject, state.drawings, state.images, run]);
-  if (!menu || !target) return null;
+  }, [controller, state.selectedObject, state.drawings, state.images, run, mobile]);
+  if (!menu || !target)
+    return mobile &&
+      !state.dialog &&
+      selectedWidgetObject(state.selectedObject, state.drawings, state.images) ? (
+      <MobileObjectWidget key={state.selectedObject} />
+    ) : null;
   const act = (action: () => void) => {
     action();
     close();
@@ -169,7 +199,7 @@ export function ContextMenu() {
       ref={ref}
       className={`chart-context-menu ${x + 490 > window.innerWidth ? "submenu-left" : ""}`}
       role="menu"
-      style={{ left: x, top: y }}
+      style={{ left: x, top: y, ...(mobile && { maxHeight: `calc(100dvh - ${y + 6}px)` }) }}
       onContextMenu={(event) => event.preventDefault()}
     >
       {drawing && (

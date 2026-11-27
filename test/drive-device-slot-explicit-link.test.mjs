@@ -1,0 +1,801 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { sourceLoader } from "./helpers/market-source-loader.mjs";
+
+const load = sourceLoader({ "services/storage-db.ts": {} });
+const { DriveAuth } = load("services/drive/auth.ts");
+const { EncryptedDriveAuthVault } = load("services/drive/auth-vault.ts");
+const { driveCredentialId } = load("services/drive/auth-credential-id.ts");
+const { GoogleSlotProvider } = load("services/drive/device-slot-provider.ts");
+const { googleSlotFence, updateGoogleSlotTarget } = load("services/drive/device-slot-link.ts");
+const { googleSlotStorageOwner, GOOGLE_SLOT_ACTIVE_OWNER } = load(
+  "services/drive/workspace-binding.ts"
+);
+const { DRIVE_SCOPE, DRIVE_CLIENT_ID } = load("services/drive/types.ts");
+const { prepareDriveBackup, driveBackupDigest, sha256 } = load("services/drive/backup.ts");
+const { DEVICE_SLOT_NAMESPACE, deviceSlotKey } = load("services/drive/device-slot-model.ts");
+const { prepareDeviceSlotVersion, encodeDeviceSlotPackage } = load(
+  "services/drive/device-slot-package.ts"
+);
+
+const workspaceId = "00000000-0000-4000-8000-000000000010";
+const deviceId = "00000000-0000-4000-8000-000000000011";
+const revisionId = "00000000-0000-4000-8000-000000000012";
+const workspaceB = "00000000-0000-4000-8000-000000000020";
+const revisionB = "00000000-0000-4000-8000-000000000022";
+const selectedToken = (account) => `synthetic-new-Google-account-${account}`;
+const legacyOwners = ["legacy-A", "legacy-B", "device"];
+const backup = (symbol) => ({
+  application: "personal-terminal",
+  schemaVersion: 2,
+  layout: { symbol },
+  watchlist: [],
+  drawings: [],
+  images: [],
+  views: []
+});
+
+async function fixture(t, hasRemote, hasRemoteB = false) {
+  const now = Date.now();
+  const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, [
+    "encrypt",
+    "decrypt"
+  ]);
+  const sealed = new Map();
+  const vaultReads = [];
+  const vaultWrites = [];
+  const vault = new EncryptedDriveAuthVault(
+    async () => ({
+      key: async () => key,
+      read: async (id) => {
+        vaultReads.push(id);
+        return sealed.get(id);
+      },
+      write: async (record) => {
+        vaultWrites.push(record.id);
+        sealed.set(record.id, structuredClone(record));
+      },
+      remove: async (id, credentialId) => {
+        vaultWrites.push(id);
+        if (!credentialId || sealed.get(id)?.credentialId === credentialId) sealed.delete(id);
+      }
+    }),
+    () => now
+  );
+  for (const owner of legacyOwners) {
+    await vault.save(
+      {
+        version: 1,
+        credentialId: crypto.randomUUID(),
+        owner,
+        clientId: DRIVE_CLIENT_ID,
+        token: `synthetic-legacy-${owner}`,
+        issuedAt: now,
+        expiresAt: now + 60000,
+        scopes: [DRIVE_SCOPE]
+      },
+      new AbortController().signal
+    );
+  }
+  const before = structuredClone(sealed);
+  vaultWrites.length = 0;
+
+  const records = new Map(
+    legacyOwners.map((owner) => [
+      owner,
+      {
+        schemaVersion: 3,
+        generation: 5,
+        enabled: true,
+        automatic: true,
+        mode: "normal",
+        baseHeads: []
+      }
+    ])
+  );
+  const originalRecords = structuredClone(records);
+  const scope = {
+    owner: "device",
+    session: {},
+    cloudOwner: "device",
+    ready: true,
+    blocked: false,
+    associationConflict: true,
+    revision: 1
+  };
+  const explicitOwner = googleSlotStorageOwner(scope);
+  const newRecord = () => ({
+    schemaVersion: 3,
+    generation: 0,
+    automatic: false,
+    mode: "normal",
+    baseHeads: []
+  });
+  let local = backup("SBER");
+  let popup;
+  let reads = 0;
+  let applies = 0;
+  let captureBarrier;
+  let mediaBarrier;
+  let failPointer = false;
+  const remoteFile = async (id, workspaceId, revisionId, symbol) => {
+    const version = await prepareDeviceSlotVersion(await prepareDriveBackup(backup(symbol)));
+    const revision = { deviceId, seq: 1, revisionId };
+    const envelope = {
+      protocol: 3,
+      previous: null,
+      current: {
+        protocol: 3,
+        workspaceId,
+        legacyArchive: null,
+        ...revision,
+        previousRevisionId: null,
+        accepted: [revision],
+        payload: version.reference
+      }
+    };
+    const media = encodeDeviceSlotPackage(envelope, version, null);
+    return {
+      envelope,
+      media,
+      checksum: await sha256(media),
+      file: {
+        id,
+        size: String(media.size),
+        appProperties: {
+          mtpNamespace: DEVICE_SLOT_NAMESPACE,
+          mtpKind: "device-slot",
+          mtpKey: deviceSlotKey(workspaceId, deviceId)
+        }
+      }
+    };
+  };
+  const remoteA = await remoteFile("synthetic-account-a", workspaceId, revisionId, "GAZP");
+  const remote = {
+    A: hasRemote ? remoteA : undefined,
+    B: hasRemoteB
+      ? await remoteFile("synthetic-account-b", workspaceB, revisionB, "YDEX")
+      : undefined
+  };
+  const calls = [];
+  const makeProvider = () => {
+    const auth = new DriveAuth(
+      async () => ({
+        initTokenClient(config) {
+          popup = config;
+          return {
+            requestAccessToken: (options) => assert.deepEqual(options, { prompt: "select_account" })
+          };
+        }
+      }),
+      () => now,
+      vault
+    );
+    const provider = new GoogleSlotProvider(
+      {
+        scope: () => scope,
+        capture: async () => {
+          const barrier = captureBarrier;
+          captureBarrier = undefined;
+          if (barrier) {
+            barrier.enter();
+            await barrier.wait;
+          }
+          return {
+            backup: local,
+            digest: await driveBackupDigest(local),
+            prepared: await prepareDriveBackup(local),
+            revision: scope.revision
+          };
+        },
+        apply: async (id, data, expectedRevision, guard, committed) => {
+          assert.equal(id, "google-drive");
+          assert.equal(scope.revision, expectedRevision);
+          assert.equal(guard.isCurrent(), true);
+          local = data;
+          applies++;
+          committed(++scope.revision);
+        }
+      },
+      {
+        auth,
+        load: async (owner) => {
+          assert.ok(owner === explicitOwner || owner.startsWith(`${explicitOwner}:`));
+          return records.get(owner) ?? newRecord();
+        },
+        save: async (owner, prior, patch) => {
+          assert.ok(owner === explicitOwner || owner.startsWith(`${explicitOwner}:`));
+          assert.equal(prior.generation, (records.get(owner) ?? newRecord()).generation);
+          if (failPointer && owner === GOOGLE_SLOT_ACTIVE_OWNER && patch.activeGoogleSlotOwner)
+            throw new Error("synthetic active-pointer failure");
+          const next = { ...prior, ...patch, generation: prior.generation + 1 };
+          records.set(owner, next);
+          return next;
+        },
+        hasHistory: () => assert.fail("Ambiguous history cannot discover a legacy account"),
+        online: () => true,
+        fetch: async (input, init) => {
+          const headers = new Headers(init.headers);
+          const account =
+            headers.get("Authorization") === `Bearer ${selectedToken("A")}` ? "A" : "B";
+          assert.equal(headers.get("Authorization"), `Bearer ${selectedToken(account)}`);
+          const url = new URL(input);
+          const method = init.method ?? "GET";
+          calls.push(method);
+          assert.equal(method, "GET", "This selected-history fixture never writes cloud data");
+          reads++;
+          const selected = remote[account];
+          if (url.pathname.startsWith("/drive/v2/files/")) {
+            assert.equal(url.pathname, `/drive/v2/files/${selected?.file.id}`);
+            return Response.json({
+              id: selected.file.id,
+              etag: '"v1"',
+              version: "1",
+              fileSize: String(selected.media.size),
+              sha256Checksum: selected.checksum
+            });
+          }
+          if (url.searchParams.get("alt") === "media") {
+            const barrier = mediaBarrier;
+            mediaBarrier = undefined;
+            if (barrier) { barrier.enter(); await barrier.wait; }
+            assert.equal(
+              url.pathname,
+              `/drive/v3/files/${selected?.file.id}`,
+              "No account may read the other account's pinned file"
+            );
+            return new Response(selected.media);
+          }
+          const v3 = url.searchParams.get("q").includes(DEVICE_SLOT_NAMESPACE);
+          return Response.json({ files: selected && v3 ? [selected.file] : [] });
+        }
+      }
+    );
+    t.after(() => provider.dispose());
+    return provider;
+  };
+  const assertLegacyUnchanged = async () => {
+    for (const owner of legacyOwners) {
+      const id = driveCredentialId(owner);
+      assert.deepEqual(
+        sealed.get(id),
+        before.get(id),
+        "Encrypted bytes and AAD owner remain unchanged"
+      );
+      assert.deepEqual(records.get(owner), originalRecords.get(owner));
+      assert.ok(!vaultWrites.includes(id));
+    }
+  };
+  const connect = async (provider, cancelled = false, account = "A") => {
+    await provider.prepare();
+    const promise = provider.connectFromUserGesture();
+    if (cancelled) popup.error_callback({ type: "popup_closed" });
+    else
+      popup.callback({
+        access_token: selectedToken(account),
+        expires_in: 3600,
+        scope: DRIVE_SCOPE
+      });
+    await promise;
+  };
+  return {
+    device: makeProvider(),
+    makeProvider,
+    connect,
+    get explicitOwner() {
+      return records.get(GOOGLE_SLOT_ACTIVE_OWNER)?.activeGoogleSlotOwner ?? explicitOwner;
+    },
+    failPointer: () => {
+      failPointer = true;
+    },
+    async saveAsOriginalExplicitLink() {
+      const owner = records.get(GOOGLE_SLOT_ACTIVE_OWNER).activeGoogleSlotOwner;
+      const credential = await vault.load(owner, DRIVE_CLIENT_ID);
+      await vault.save({ ...credential, owner: explicitOwner }, new AbortController().signal);
+      records.set(explicitOwner, { ...records.get(owner), enabled: true });
+      records.delete(GOOGLE_SLOT_ACTIVE_OWNER);
+    },
+    remoteA,
+    pauseMedia() {
+      let enter, release;
+      const entered = new Promise((done) => { enter = done; });
+      const wait = new Promise((done) => { release = done; });
+      mediaBarrier = { enter, wait };
+      return { entered, release };
+    },
+    pauseCapture() {
+      let enter, release;
+      const entered = new Promise((done) => {
+        enter = done;
+      });
+      const wait = new Promise((done) => {
+        release = done;
+      });
+      captureBarrier = { enter, wait };
+      return { entered, release };
+    },
+    sealed,
+    records,
+    assertLegacyUnchanged,
+    vaultReads,
+    vaultWrites,
+    calls,
+    reads: () => reads,
+    applies: () => applies
+  };
+}
+
+test("ambiguous aliases do not auto-restore and cancelling explicit OAuth preserves exact old vault data", async (t) => {
+  const f = await fixture(t, true);
+  f.device.resume();
+  await f.device.prepare();
+  await f.device.sync();
+  assert.equal(f.device.getSnapshot().enabled, false);
+  assert.deepEqual(f.vaultReads, []);
+  assert.deepEqual(f.calls, []);
+  await f.device.setEnabled(true);
+  await f.connect(f.device, true);
+  assert.equal(f.device.getSnapshot().connected, false);
+  assert.equal(f.records.get(f.explicitOwner)?.explicitGoogleCredential, undefined);
+  assert.deepEqual(f.vaultReads, []);
+  assert.deepEqual(f.vaultWrites, []);
+  assert.deepEqual(f.calls, []);
+  await f.assertLegacyUnchanged();
+});
+
+test("explicit OAuth pins the credential, awaits history choice and resumes the same account after reload", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true);
+  await f.connect(f.device);
+  const link = f.records.get(f.explicitOwner).explicitGoogleCredential;
+  assert.ok(link);
+  assert.deepEqual(f.vaultWrites, [
+    driveCredentialId(f.explicitOwner),
+    driveCredentialId(f.explicitOwner)
+  ]);
+
+  await f.device.sync();
+  const preview = f.device.getSnapshot().conflict;
+  assert.deepEqual(
+    preview.remotes.map(({ id }) => id),
+    [revisionId]
+  );
+  assert.equal(f.applies(), 0);
+  f.device.dispose();
+
+  const reloaded = f.makeProvider();
+  reloaded.resume();
+  await reloaded.prepare();
+  await reloaded.sync();
+  assert.equal(reloaded.getSnapshot().connected, true);
+  assert.equal(f.applies(), 0);
+  await reloaded.choose({ kind: "remote", id: revisionId });
+  assert.equal(reloaded.getSnapshot().phase, "idle");
+  assert.equal(f.applies(), 1);
+  assert.deepEqual(f.records.get(f.explicitOwner).baseHeads, [revisionId]);
+
+  const next = f.makeProvider();
+  reloaded.dispose();
+  next.resume();
+  await next.prepare();
+  await next.sync();
+  assert.equal(next.getSnapshot().phase, "idle");
+  assert.equal(f.applies(), 1);
+  assert.equal(f.records.get(f.explicitOwner).explicitGoogleCredential, link);
+  assert.deepEqual(f.vaultReads, [
+    driveCredentialId(f.explicitOwner),
+    driveCredentialId(f.explicitOwner)
+  ]);
+  await f.assertLegacyUnchanged();
+});
+
+test("newly linked empty Google account awaits consent to publish the local version", async (t) => {
+  const f = await fixture(t, false);
+  await f.device.setEnabled(true);
+  await f.connect(f.device);
+  await f.device.sync();
+  assert.equal(f.device.getSnapshot().phase, "conflict");
+  assert.deepEqual(f.device.getSnapshot().conflict.remotes, []);
+  assert.equal(f.records.get(f.explicitOwner).scope, undefined);
+  assert.ok(f.reads() > 0);
+  await f.assertLegacyUnchanged();
+});
+
+test("selecting a second empty Google account after accepting the first awaits another choice", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true);
+  await f.connect(f.device);
+  await f.device.sync();
+  await f.device.choose({ kind: "remote", id: revisionId });
+  assert.equal(f.device.getSnapshot().phase, "idle");
+  const ownerA = f.explicitOwner;
+  const recordA = structuredClone(f.records.get(ownerA));
+  const vaultA = structuredClone(f.sealed.get(driveCredentialId(ownerA)));
+
+  await f.connect(f.device, false, "B");
+  await f.device.sync();
+  assert.equal(f.device.getSnapshot().phase, "conflict");
+  assert.deepEqual(f.device.getSnapshot().conflict.remotes, []);
+  assert.equal(f.applies(), 1);
+  assert.notEqual(f.explicitOwner, ownerA);
+  assert.equal(f.records.get(f.explicitOwner).scope, undefined);
+  assert.deepEqual(f.records.get(ownerA), recordA);
+  assert.deepEqual(f.sealed.get(driveCredentialId(ownerA)), vaultA);
+});
+
+test("a second account presents its own workspace without replaying an unresolved publication from A", async (t) => {
+  const f = await fixture(t, true, true);
+  await f.device.setEnabled(true);
+  await f.connect(f.device);
+  await f.device.sync();
+  await f.device.choose({ kind: "remote", id: revisionId });
+  const ownerA = f.explicitOwner;
+  const before = structuredClone(f.records.get(ownerA));
+  const pending = {
+    write: {
+      fileId: f.remoteA.file.id,
+      key: f.remoteA.file.appProperties.mtpKey,
+      baseEtag: null,
+      envelope: f.remoteA.envelope
+    },
+    digest: before.digest
+  };
+  f.records.set(ownerA, { ...before, generation: before.generation + 1, pending });
+  await f.connect(f.device, false, "B");
+  await f.device.sync();
+  assert.deepEqual(
+    f.device.getSnapshot().conflict.remotes.map(({ id }) => id),
+    [revisionB]
+  );
+  assert.equal(f.records.get(f.explicitOwner).pending, undefined);
+  assert.deepEqual(f.records.get(ownerA).pending, pending);
+  await f.device.choose({ kind: "remote", id: revisionB });
+  assert.equal(f.device.getSnapshot().phase, "idle");
+  assert.equal(f.applies(), 2);
+  assert.equal(f.records.get(f.explicitOwner).scope.workspaceId, workspaceB);
+  assert.equal(f.records.get(ownerA).scope.workspaceId, workspaceId);
+});
+
+test("a failed new active pointer leaves the first account and its ciphertext intact", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true);
+  await f.connect(f.device);
+  await f.device.sync();
+  await f.device.choose({ kind: "remote", id: revisionId });
+  const ownerA = f.explicitOwner;
+  const prior = structuredClone(f.records.get(ownerA));
+  const vaultA = structuredClone(f.sealed.get(driveCredentialId(ownerA)));
+  f.failPointer();
+  await f.connect(f.device, false, "B");
+  await f.device.sync();
+  assert.equal(f.explicitOwner, ownerA);
+  assert.deepEqual(f.records.get(ownerA), prior);
+  assert.deepEqual(f.sealed.get(driveCredentialId(ownerA)), vaultA);
+  const reloaded = f.makeProvider();
+  reloaded.resume();
+  await reloaded.prepare();
+  await reloaded.sync();
+  assert.equal(reloaded.getSnapshot().phase, "idle");
+  assert.equal(f.applies(), 1);
+});
+
+test("an already accepted fixed-namespace link restores in place and survives a cancelled new OAuth", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true);
+  await f.connect(f.device);
+  await f.device.sync();
+  await f.device.choose({ kind: "remote", id: revisionId });
+  await f.saveAsOriginalExplicitLink();
+  const ownerA = f.explicitOwner;
+  const vaultA = structuredClone(f.sealed.get(driveCredentialId(ownerA)));
+  f.device.dispose();
+  const reloaded = f.makeProvider();
+  reloaded.resume();
+  await reloaded.prepare();
+  await reloaded.sync();
+  assert.equal(reloaded.getSnapshot().phase, "idle");
+  assert.equal(f.applies(), 1);
+  const prior = structuredClone(f.records.get(ownerA));
+  await f.connect(reloaded, true, "B");
+  assert.equal(f.explicitOwner, ownerA);
+  assert.deepEqual(f.records.get(ownerA), prior);
+  assert.deepEqual(f.sealed.get(driveCredentialId(ownerA)), vaultA);
+});
+
+test("a stale credential generation is rejected both in a live tab and after reload", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true);
+  await f.connect(f.device);
+  const prior = f.records.get(f.explicitOwner);
+  f.records.set(f.explicitOwner, {
+    ...prior,
+    generation: prior.generation + 1,
+    explicitGoogleCredential: crypto.randomUUID()
+  });
+
+  await f.device.sync();
+  assert.equal(f.device.getSnapshot().connected, false);
+  assert.equal(f.device.getSnapshot().phase, "auth-required");
+  assert.deepEqual(f.calls, []);
+
+  const reloaded = f.makeProvider();
+  reloaded.resume();
+  await reloaded.prepare();
+  await reloaded.sync();
+  assert.equal(reloaded.getSnapshot().connected, false);
+  assert.deepEqual(f.calls, []);
+  await f.assertLegacyUnchanged();
+});
+
+for (const change of ["disable", "change account"]) {
+  test(`another tab can ${change} before a paused capture and block the old import`, async (t) => {
+    const f = await fixture(t, true, true);
+    await f.device.setEnabled(true);
+    await f.connect(f.device);
+    await f.device.sync();
+    const ownerA = f.explicitOwner;
+    const recordA = structuredClone(f.records.get(ownerA));
+    const other = f.makeProvider();
+    other.resume();
+    await other.prepare();
+
+    const pause = f.pauseCapture();
+    const applying = f.device.choose({ kind: "remote", id: revisionId });
+    await pause.entered;
+    if (change === "disable") await other.setEnabled(false);
+    else await f.connect(other, false, "B");
+    assert.equal(f.applies(), 0);
+    pause.release();
+    await applying;
+    assert.equal(f.applies(), 0);
+    assert.notEqual(f.device.getSnapshot().phase, "idle");
+    assert.equal(f.device.getSnapshot().connected, false);
+    assert.deepEqual(f.records.get(ownerA), recordA);
+    await f.assertLegacyUnchanged();
+  });
+}
+
+test("disabling waits for an entered local effect but does not wait for a dispatched Google request", async (t) => {
+  const original = Object.getOwnPropertyDescriptor(navigator, "locks");
+  let tail = Promise.resolve();
+  let lastMode;
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: {
+      request(name, { mode }, action) {
+        assert.equal(name, GOOGLE_SLOT_ACTIVE_OWNER);
+        lastMode = mode;
+        const queued = tail.then(action);
+        tail = queued.catch(() => {});
+        return queued;
+      }
+    }
+  });
+  t.after(() => {
+    if (original) Object.defineProperty(navigator, "locks", original);
+    else delete navigator.locks;
+  });
+  const signal = new AbortController().signal;
+  const record = { generation: 1, enabled: true, activeGoogleSlotOwner: "explicit-test-owner" };
+  let pointer = record;
+  const access = {
+    load: async (owner) => owner === GOOGLE_SLOT_ACTIVE_OWNER ? pointer : record,
+    save: async (_owner, prior, patch) => {
+      assert.equal(prior.generation, pointer.generation);
+      pointer = { ...pointer, ...patch, generation: pointer.generation + 1 };
+      return pointer;
+    }
+  };
+  const target = { owner: record.activeGoogleSlotOwner, record, pointer, enabled: true };
+  let stale = false;
+  const fence = googleSlotFence(
+    target,
+    access,
+    signal,
+    () => true,
+    () => {
+      stale = true;
+    }
+  );
+  let enter, release;
+  const entered = new Promise((resolve) => {
+    enter = resolve;
+  });
+  const work = new Promise((resolve) => {
+    release = resolve;
+  });
+  const applying = fence.effect(() => {
+    enter();
+    return work;
+  });
+  await entered;
+  assert.equal(lastMode, "shared");
+  const disabling = updateGoogleSlotTarget(target, { enabled: false }, access, signal);
+  assert.equal(lastMode, "exclusive");
+  try {
+    assert.equal(pointer.enabled, true);
+  } finally {
+    release();
+  }
+  await applying;
+  let disabled = await disabling;
+  assert.equal(disabled.enabled, false);
+  await assert.rejects(fence.check(), { name: "AbortError" });
+  assert.equal(stale, true);
+
+  for (const method of ["POST", "PATCH", "PUT", "DELETE"]) {
+    const enabled = await updateGoogleSlotTarget(disabled, { enabled: true }, access, signal);
+    const next = googleSlotFence(
+      enabled,
+      access,
+      signal,
+      () => true,
+      (state) => assert.equal(state, false)
+    );
+    let dispatch, respond;
+    let requests = 0;
+    const dispatched = new Promise((resolve) => {
+      dispatch = resolve;
+    });
+    const waitForResponse = new Promise((resolve) => {
+      respond = resolve;
+    });
+    const fetcher = next.guardFetch(() => {
+      requests++;
+      dispatch();
+      return waitForResponse;
+    });
+    const request = fetcher("https://example.test", { method });
+    await dispatched;
+    try {
+      assert.equal(lastMode, "shared", `Dispatch for ${method} must hold the account lock`);
+      disabled = await updateGoogleSlotTarget(enabled, { enabled: false }, access, signal);
+      assert.equal(disabled.enabled, false);
+    } finally {
+      respond(new Response(null, { status: 204 }));
+    }
+    assert.equal((await request).status, 204);
+    await assert.rejects(fetcher("https://example.test", { method }), { name: "AbortError" });
+    assert.equal(requests, 1);
+  }
+});
+
+for (const pointerless of [true, false]) test(`off-on lifecycle cannot revive a paused ${pointerless ? "pointerless" : "pointer"} job`, async () => {
+  const signal = new AbortController().signal;
+  let local = { generation: 3, enabled: true, explicitGoogleCredential: "same-credential" };
+  let active = { generation: 5, enabled: true, activeGoogleSlotOwner: "same-owner" };
+  const access = {
+    load: async (owner) => owner === GOOGLE_SLOT_ACTIVE_OWNER ? active : local,
+    save: async (owner, prior, patch) => {
+      const current = owner === GOOGLE_SLOT_ACTIVE_OWNER ? active : local;
+      assert.equal(prior.generation, current.generation);
+      const next = { ...current, ...patch, generation: current.generation + 1 };
+      if (owner === GOOGLE_SLOT_ACTIVE_OWNER) active = next; else local = next;
+      return next;
+    }
+  };
+  const target = { owner: "same-owner", record: local, pointer: pointerless ? undefined : active, enabled: true };
+  let stale = 0, writes = 0;
+  const old = googleSlotFence(target, access, signal, () => true, () => { stale++; });
+  await old.check();
+  const disabled = await updateGoogleSlotTarget(target, { enabled: false }, access, signal);
+  const enabled = await updateGoogleSlotTarget(disabled, { enabled: true }, access, signal);
+  assert.equal(enabled.enabled, true);
+  await assert.rejects(old.check(), { name: "AbortError" });
+  const send = old.guardFetch(async () => { writes++; return new Response(null, { status: 204 }); });
+  for (const method of ["POST", "PUT", "DELETE"]) await assert.rejects(send("https://example.test", { method }), { name: "AbortError" });
+  assert.equal(writes, 0);
+  assert.ok(stale > 0);
+});
+
+test("pointerless fence acknowledges only its own successful local CAS updates", async () => {
+  const signal = new AbortController().signal;
+  let record = { generation: 1, enabled: true };
+  const target = { owner: "device", record, pointer: undefined, enabled: true };
+  const fence = googleSlotFence(target, { load: async () => record }, signal, () => true, () => {});
+  await fence.check();
+  await fence.effect(() => {
+    const prior = record; record = { ...record, generation: record.generation + 1 };
+    fence.acknowledge(prior, record);
+  });
+  await fence.check();
+  record = { ...record, generation: record.generation + 1 };
+  await assert.rejects(fence.check(), { name: "AbortError" });
+  assert.throws(() => fence.acknowledge(target.record, record), { name: "AbortError" });
+});
+
+test("provider inspection preserves dirty/conflict/time and receive uses only GET before native local apply", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true); await f.connect(f.device);
+  const owner = f.explicitOwner, record = structuredClone(f.records.get(owner));
+  const pending = f.device.getSnapshot().pendingChanges;
+  await f.device.inspect();
+  const inspected = f.device.getSnapshot();
+  assert.deepEqual(inspected.comparison.remotes.map(({ id }) => id), [revisionId]);
+  assert.equal(inspected.conflict, undefined);
+  assert.equal(inspected.pendingChanges, pending);
+  assert.equal(inspected.lastSyncedAt, undefined);
+  assert.deepEqual(f.records.get(owner), record);
+  assert.equal(f.applies(), 0);
+  assert.equal(f.calls.every((method) => method === "GET"), true);
+  await f.device.receive(revisionId);
+  assert.equal(f.applies(), 1);
+  assert.equal(f.device.getSnapshot().choiceAction.state, "confirmed");
+  assert.deepEqual(f.records.get(owner).baseHeads, [revisionId]);
+  assert.equal(f.calls.every((method) => method === "GET"), true);
+});
+
+test("off-on in another tab rejects an old paused comparison without applying or publishing it", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true); await f.connect(f.device);
+  const other = f.makeProvider(); other.resume(); await other.prepare();
+  const pause = f.pauseCapture();
+  const checking = f.device.inspect(); await pause.entered;
+  await other.setEnabled(false); await other.setEnabled(true);
+  pause.release(); await checking;
+  assert.equal(f.device.getSnapshot().comparison, undefined);
+  assert.equal(f.applies(), 0);
+  assert.equal(f.calls.length, 0);
+});
+
+test("a stale absent selection refreshes readonly comparison and never falls back to publishing sync", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true); await f.connect(f.device);
+  const record = structuredClone(f.records.get(f.explicitOwner));
+  await f.device.choose({ kind: "local" });
+  assert.equal(f.device.getSnapshot().choiceAction.state, "review");
+  assert.equal(f.device.getSnapshot().comparison.remotes.length, 1);
+  assert.deepEqual(f.records.get(f.explicitOwner), record);
+  assert.equal(f.applies(), 0);
+  assert.equal(f.calls.every((method) => method === "GET"), true);
+});
+
+for (const change of ["mode", "pending"]) test(`durable ${change} generation during receive download blocks native apply`, async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true); await f.connect(f.device); await f.device.inspect();
+  const owner = f.explicitOwner, pause = f.pauseMedia();
+  const receiving = f.device.receive(revisionId); await pause.entered;
+  const prior = f.records.get(owner);
+  const next = { ...prior, generation: prior.generation + 1, ...(change === "mode" ? { mode: "test" } : { pending: { write: { fileId: f.remoteA.file.id, key: f.remoteA.file.appProperties.mtpKey, baseEtag: null, envelope: f.remoteA.envelope }, digest: "a".repeat(64) } }) };
+  f.records.set(owner, next); pause.release(); await receiving;
+  assert.equal(f.applies(), 0);
+  assert.deepEqual(f.records.get(owner), next);
+  assert.notEqual(f.device.getSnapshot().choiceAction?.state, "confirmed");
+  assert.equal(f.calls.every((method) => method === "GET"), true);
+});
+
+test("disable from a receive outcome listener cannot resurrect the old confirmed receipt", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true); await f.connect(f.device); await f.device.inspect();
+  let disabling;
+  const stop = f.device.subscribe(() => {
+    const state = f.device.getSnapshot();
+    if (!disabling && state.phase === "idle" && state.comparison && state.choiceAction?.state === "confirmed") disabling = f.device.setEnabled(false);
+  });
+  t.after(stop);
+  await f.device.receive(revisionId); await disabling;
+  assert.equal(f.applies(), 1);
+  assert.equal(f.device.getSnapshot().phase, "disabled");
+  assert.equal(f.device.getSnapshot().choiceAction, undefined);
+  assert.equal(f.device.getSnapshot().comparison, undefined);
+});
+
+test("reenabling a shipped disabled fixed alias honors the active pointer while preserving its stored record", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true); await f.connect(f.device);
+  await f.saveAsOriginalExplicitLink(); f.device.dispose();
+  const owner = f.explicitOwner, prior = f.records.get(owner);
+  const disabled = { ...prior, enabled: false, generation: prior.generation + 1 };
+  f.records.set(owner, disabled);
+  const next = f.makeProvider(); next.resume(); await next.prepare();
+  assert.equal(next.getSnapshot().enabled, false);
+  await next.setEnabled(true); await next.prepare();
+  assert.equal(next.getSnapshot().enabled, true);
+  assert.equal(next.getSnapshot().connected, true);
+  assert.deepEqual(f.records.get(owner), disabled, "the enable pointer must not rewrite the shipped fixed record");
+  await next.inspect();
+  assert.deepEqual(next.getSnapshot().comparison.remotes.map(({ id }) => id), [revisionId]);
+  assert.equal(next.getSnapshot().connected, true);
+  assert.equal(f.applies(), 0);
+  assert.equal(f.calls.every((method) => method === "GET"), true);
+});

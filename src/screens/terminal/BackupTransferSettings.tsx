@@ -1,3 +1,5 @@
+import { selectTransferSettingsState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { useEffect, useRef, useState } from "react";
 import { t, systemText } from "../../i18n/messages.js";
 import { intlLocale } from "../../i18n/preferences.js";
@@ -66,7 +68,7 @@ function transferDetails(
 }
 
 export function BackupTransferSettings({ active }: { active: boolean }) {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectTransferSettingsState, shallowEqual);
   const [history, setHistory] = useState(false);
   const [transfer, setTransfer] = useState<Transfer>();
   const [receipt, setReceipt] = useState<Receipt>();

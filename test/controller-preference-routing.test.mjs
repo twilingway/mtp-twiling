@@ -1,6 +1,27 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { routingFixture, deferred, until, find } from "./controller-preference-routing-fixture.mjs";
+import { createSourceLoader } from "./technical-volume-registration-fixture.mjs";
+
+function settingsEngineControl(controller) {
+  const jsx = (type, props) => ({ type, props });
+  const load = createSourceLoader({
+    react: {
+      useState: (initial) => [typeof initial === "function" ? initial() : initial, () => {}]
+    },
+    "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: Symbol("fragment") },
+    "react-dom": { createPortal: () => assert.fail("settings fixture must not open a portal") },
+    "screens/terminal/context.js": {
+      useTerminal: () => ({ controller, state: controller.getSnapshot() })
+    }
+  });
+  const settings = load("screens/terminal/ChartSettingsDialog.js").ChartSettingsDialog();
+  const sections = find(settings, (node) => node.props?.content?.instrument);
+  const picker = find(sections.props.content.instrument, (node) =>
+    node.props?.id === "chart-settings-engine"
+  );
+  return load("screens/terminal/ChartEngineSelect.js").ChartEngineSelect(picker.props);
+}
 
 test("switching the timeframe leaves the instrument drawings available during history loading", async (t) => {
   const f = await routingFixture();
@@ -47,7 +68,11 @@ for (const boundary of ["saveView", "editing.flush"]) {
     await entered.promise;
     assert.equal(f.controller.getSnapshot().preferences.timeframe, "1d");
     assert.equal(f.preferenceWrites.length, 0);
-    assert.ok(!find(f.toolbar(), (node) => node.props?.id === "engine").props.disabled);
+    const engineControl = settingsEngineControl(f.controller);
+    assert.equal(engineControl.type, "select");
+    assert.equal(engineControl.props.id, "chart-settings-engine");
+    assert.equal(engineControl.props.value, "tradingview");
+    assert.ok(!engineControl.props.disabled);
     const engine = f.controller.setPreferences({ engine: "kline" });
     gate.resolve();
     await Promise.all([tf, engine]);

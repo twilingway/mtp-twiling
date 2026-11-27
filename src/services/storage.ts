@@ -1,7 +1,6 @@
 import { decodeCandles } from "../model/history-codec.js";
 import { assertImportCurrent, type BackupImportOptions } from "../model/backup-import.js";
 import { replacePortableRecords } from "./storage-portable.js";
-import { driveCredentialId } from "./drive/auth-credential-id.js";
 import { db, get, all, put, transaction, flush } from "./storage-db.js";
 export { flush } from "./storage-db.js";
 export {
@@ -252,11 +251,11 @@ export async function restoreSession(): Promise<Session | null> {
     return null;
   }
 }
-export function clearSession(owner?: string): Promise<void> {
+export function clearSession(_owner?: string): Promise<void> {
+  void _owner; // Compatibility argument; bank logout never owns Google authorization.
   sessionStorage.removeItem("terminal-session");
   return transaction(["vault"], (tx) => {
     tx.objectStore("vault").delete("remembered");
-    if (owner) tx.objectStore("vault").delete(driveCredentialId(owner));
   });
 }
 export async function lastProfile(): Promise<{ owner: string; name: string } | undefined> {

@@ -1,3 +1,5 @@
+import { selectInstrumentDetailsState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { useState } from "react";
 import { providerLabel } from "./provider-label.js";
 import type { MarketRow } from "../../model/types.js";
@@ -26,7 +28,7 @@ const readHistory: HistoryReader = async (...args) =>
   (await import("../../services/storage-v2.js")).loadHistory(...args);
 
 export function InstrumentDetails({ row }: { row: MarketRow }) {
-  const { state, controller } = useTerminal();
+  const { state, controller } = useTerminal(selectInstrumentDetailsState, shallowEqual);
   const session = controller.sessionKey();
   const [open, setOpen] = useState(false);
   const client =

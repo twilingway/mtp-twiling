@@ -8,13 +8,48 @@ import type { TerminalController } from "./controller.js";
 import type { TerminalState } from "./state.js";
 import { cameraPending, flushCamera, subscribeCamera } from "./controller-camera-sync.js";
 import { optionalDriveObserver } from "./controller-drive-observer.js";
-import { marketAvailable } from "./market-readiness.js";
+import { driveWorkspaceBinding } from "../../services/drive/workspace-binding.js";
 import { LEGACY_DRIVE_NAMESPACE } from "../../services/drive/types.js";
 import { activeWorkspaceChart } from "./workspace-active-chart.js";
 import { subscribeWorkspaceAnnotations } from "./workspace-annotations.js";
+import { GoogleSlotProvider } from "../../services/drive/device-slot-provider.js";
+import type { GoogleSlotHost } from "../../services/drive/device-slot-provider.js";
+import type { CloudSyncProvider } from "../../model/cloud-sync.js";
 
 const drives = new WeakMap<TerminalController, DriveCoordinator>();
+const retentionProviders = new WeakMap<TerminalController, GoogleSlotProvider>();
+
+export function createTerminalGoogleSync(host: GoogleSlotHost): GoogleSlotProvider {
+  return new GoogleSlotProvider(host);
+}
+
+export function installTerminalGoogleSync(
+  controller: TerminalController,
+  provider: CloudSyncProvider
+): void {
+  if (!(provider instanceof GoogleSlotProvider))
+    throw new TypeError("Invalid Google sync provider");
+  if (drives.has(controller)) throw new Error("Legacy Google sync provider already created");
+  const current = retentionProviders.get(controller);
+  if (current && current !== provider) throw new Error("Google sync provider already installed");
+  retentionProviders.set(controller, provider);
+}
+
+export function uninstallTerminalGoogleSync(
+  controller: TerminalController,
+  provider: CloudSyncProvider
+): void {
+  if (retentionProviders.get(controller) === provider) retentionProviders.delete(controller);
+}
+
+export function terminalGoogleRetention(
+  controller: TerminalController
+): GoogleSlotProvider | undefined {
+  return retentionProviders.get(controller);
+}
 export function terminalDrive(controller: TerminalController): DriveCoordinator {
+  if (terminalGoogleRetention(controller))
+    throw new Error("Google sync retention provider is active");
   let drive = drives.get(controller);
   if (!drive) {
     drive = new DriveCoordinator(
@@ -24,8 +59,10 @@ export function terminalDrive(controller: TerminalController): DriveCoordinator 
           const chart = activeWorkspaceChart(controller).getSnapshot();
           return {
             owner: state.owner,
-            session: controller.sessionKey(),
-            authenticated: marketAvailable(state),
+            session: controller.cloudSessionKey(),
+            authenticated: !!controller.workspaceBinding(),
+            ...driveWorkspaceBinding(controller.workspaceBinding()),
+            transition: !!state.profileTransition,
             blocked: !!(
               state.profileTransition ||
               cameraPending(controller) ||
@@ -97,6 +134,7 @@ export function portableStateSignature(state: TerminalState): string {
 }
 
 export function startTerminalDrive(controller: TerminalController): () => void {
+  if (terminalGoogleRetention(controller)) return () => {};
   const drive = terminalDrive(controller),
     observer = optionalDriveObserver(controller, drive);
   const unsubscribeCamera = subscribeCamera(controller, (kind) => {

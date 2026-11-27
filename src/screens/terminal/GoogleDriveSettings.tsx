@@ -1,389 +1,132 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { t } from "../../i18n/messages.js";
-import { intlLocale } from "../../i18n/preferences.js";
-import type {
-  DriveChoiceAction,
-  DriveStatus,
-  DriveSummary,
-  DriveChoice
-} from "../../services/drive/coordinator-types.js";
-import { terminalDrive } from "./controller-drive.js";
-import { DriveOperationProgress } from "./DriveOperationProgress.js";
-import { useTerminal } from "./context.js";
+import { GoogleCompactionSettings } from "./GoogleCompactionSettings.js";
+import { terminalGoogleRetention } from "./controller-drive.js";
+import { useTerminal, useTerminalController } from "./context.js";
+import { shallowEqual } from "./snapshot-selector.js";
+import type { TerminalState } from "./state.js";
 
-const phases: Record<DriveStatus["phase"], string> = {
-  disconnected: "Google Диск не подключён",
-  connecting: "Подключаем Google…",
-  idle: "Google Диск подключён",
-  syncing: "Синхронизация…",
-  conflict: "Нужно выбрать версию",
-  "auth-required": "Войдите в Google повторно",
-  error: "Синхронизация остановлена"
-};
-const errors: Record<NonNullable<DriveStatus["error"]>, string> = {
-  "auth-required": "Войдите в Google повторно",
-  "auth-cancelled": "Подключение Google отменено",
-  "not-ready": "Авторизация Google ещё загружается",
-  busy: "Синхронизация уже выполняется",
-  network: "Нет связи с Google. Повторите попытку.",
-  "local-save":
-    "Не удалось сохранить отметку синхронизации на этом устройстве. Повторите синхронизацию.",
-  quota: "Google временно ограничил запросы. Повторите позже.",
-  permission: "Google не предоставил доступ к данным приложения",
-  "remote-invalid": "Данные Google Диска повреждены. Локальные данные сохранены.",
-  "unsupported-format":
-    "Формат синхронизации не поддерживается. Обновите приложение. Данные сохранены, автосинхронизация остановлена.",
-  conflict: "На Google Диске появились другие изменения. Повторите проверку.",
-  limit: "Превышен лимит данных синхронизации",
-  "local-changed": "Локальные данные изменились. Проверяем заново."
-};
-function choiceMessage(action: DriveChoiceAction, loading: boolean, editing: boolean): string {
-  const sending = action.nodeId === "local";
-  switch (action.state) {
-    case "running":
-      return sending ? "Отправляем версию устройства…" : "Получаем версию с Google Диска…";
-    case "confirmed":
-      return sending
-        ? "Версия устройства отправлена на Google Диск."
-        : "Версия с Google Диска применена на устройстве.";
-    case "review":
-      return "Версии изменились. Сравните их и повторите выбор.";
-    case "blocked":
-      if (loading) return "Дождитесь загрузки графика и повторите выбор.";
-      if (editing) return "Завершите или отмените разметку и повторите выбор.";
-      return "Дождитесь завершения операции в рабочем пространстве и повторите выбор.";
-    case "unconfirmed":
-      return sending
-        ? "Отправка на Google Диск не подтверждена."
-        : "Получение версии с Google Диска не подтверждено.";
-  }
-}
-function date(value?: string): string {
-  return value
-    ? new Intl.DateTimeFormat(intlLocale(), { dateStyle: "short", timeStyle: "medium" }).format(
-        new Date(value)
-      )
-    : t("Ещё не выполнялась");
-}
-function Summary({ summary, dateLabel }: { summary: DriveSummary; dateLabel?: string }) {
-  return (
-    <p>
-      {t("Инструментов")}: {summary.instruments} · {t("Рисунки")}: {summary.drawings} ·{" "}
-      {t("Изображения")}: {summary.images}
-      {summary.date ? (
-        <small>
-          {dateLabel ? `${t(dateLabel)}: ` : null}
-          <time dateTime={summary.date}>{date(summary.date)}</time>
-        </small>
-      ) : dateLabel ? null : (
-        <small>{date()}</small>
-      )}
-    </p>
-  );
-}
+type GoogleRetention = NonNullable<ReturnType<typeof terminalGoogleRetention>>;
+const selectRetentionControls = (state: TerminalState) => ({
+  importRecoveryRequired: state.importRecoveryRequired,
+  locale: state.preferences.locale
+});
 export function GoogleDriveSettings() {
-  const { controller, state } = useTerminal(),
-    [legacyChoices, setLegacyChoices] = useState<DriveChoice[] | null>(null),
-    drive = terminalDrive(controller),
-    status = useSyncExternalStore(drive.subscribe, drive.getSnapshot, drive.getSnapshot),
-    conflict = status.conflict,
-    choice = status.choiceAction,
-    activeChoice = choice?.state === "running" ? choice.nodeId : undefined,
-    busy =
-      status.phase === "connecting" ||
-      status.phase === "syncing" ||
-      !!state.backupBusy ||
-      !!state.importRecoveryRequired;
-  useEffect(() => {
-    void drive.prepare();
-  }, [drive]);
-  useEffect(() => setLegacyChoices(null), [state.owner]);
+  const controller = useTerminalController();
+  const google = terminalGoogleRetention(controller);
+  return google ? <RetentionDetails google={google} /> : null;
+}
+function RetentionDetails({ google }: { google: GoogleRetention }) {
+  const { controller, state } = useTerminal(selectRetentionControls, shallowEqual);
+  const status = useSyncExternalStore(google.subscribe, google.getSnapshot, google.getSnapshot);
+  const [busy, setBusy] = useState(false);
+  const capability = status.writeCapability;
+  const blocked =
+    busy ||
+    capability?.phase === "checking" ||
+    status.phase === "syncing" ||
+    !status.connected ||
+    !!state.importRecoveryRequired;
+  const run = (operation: () => Promise<unknown>) => {
+    setBusy(true);
+    void operation()
+      .catch(() => controller.notify(t("Операция Google не подтверждена. Повторите проверку.")))
+      .finally(() => setBusy(false));
+  };
+  const downloadArchive = async () => {
+    const archive = await google.prepareLegacyArchive();
+    if (!archive) return;
+    const url = URL.createObjectURL(archive),
+      link = document.createElement("a");
+    link.href = url;
+    link.download = `mtp-drive-${new Date().toISOString().slice(0, 10)}.mtp-drive-archive`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  if (!status.enabled) return null;
   return (
-    <section className="transfer-settings drive-settings" id="google-drive-settings">
-      <h3>{t("Личный Google Диск")}</h3>
-      <a className="settings-link" href="./privacy.html" target="_blank" rel="noopener">
-        {t("Политика конфиденциальности")}
-      </a>
-      <p>
-        {t(
-          "Настройки, инструменты, индикаторы, рисунки и изображения синхронизируются с вашим Google Диском. Ключ банка и история котировок остаются на устройстве."
-        )}
-      </p>
-      <div className="drive-status-card" data-drive-phase={status.phase}>
-        <p id="google-drive-status" role="status">
-          {t(phases[status.phase])}
-        </p>
-        <DriveOperationProgress progress={status.progress} previous={status.lastOperation} />
-        <p className="drive-pending-status">
-          {t(
-            status.pendingChanges
-              ? "Есть несинхронизированные изменения"
-              : status.lastSyncedAt && status.connected && status.phase === "idle" && !status.error
-                ? "Изменения синхронизированы"
-                : status.lastSyncedAt
-                  ? "Данные сохранены на устройстве. Ожидаем проверки Google Диска."
-                  : "Синхронизация ещё не выполнялась"
-          )}
-        </p>
-        <small>
-          {t("Последняя синхронизация")}:{" "}
-          <time id="google-drive-last-sync" dateTime={status.lastSyncedAt}>
-            {date(status.lastSyncedAt)}
-          </time>
+    <>
+      {capability?.phase === "cleanup-pending" && capability.cleanupPending > 0 && (
+        <small role="status" data-google-write-capability="cleanup-pending">
+          {t("Google Диск: удаление временных данных проверки будет повторено автоматически.")}
         </small>
-      </div>
-      {!state.marketReady && <p>{t("Дождитесь открытия локального профиля")}</p>}
-      {!status.connected ? (
-        <button
-          id="google-drive-connect"
-          className="primary-button"
-          type="button"
-          disabled={!state.marketReady || busy || !status.prepared || state.profileTransition}
-          onClick={() => {
-            void drive.connect();
-          }}
-        >
-          {status.preparing
-            ? t("Загружаем вход Google…")
-            : status.phase === "auth-required"
-              ? t("Войти в Google повторно")
-              : t("Войти в Google")}
-        </button>
-      ) : (
-        <div className="drive-actions">
-          <button
-            id="google-drive-sync-now"
-            className="primary-button"
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              void drive.sync();
-            }}
-          >
-            {t(
-              choice?.state === "unconfirmed" && !conflict
-                ? "Повторить синхронизацию"
-                : "Синхронизировать сейчас"
-            )}
-          </button>
-          <button id="google-drive-disconnect" type="button" onClick={drive.disconnect}>
-            {t("Отключить Google Диск")}
-          </button>
-        </div>
       )}
-      {!status.prepared && !status.preparing && (
-        <button
-          type="button"
-          onClick={() => {
-            void drive.prepare();
-          }}
-        >
-          {t("Повторить загрузку входа")}
-        </button>
-      )}
-      <label className="checkbox-label drive-automatic">
-        <input
-          id="google-drive-automatic"
-          type="checkbox"
-          checked={status.automatic}
-          disabled={
-            busy ||
-            !state.marketReady ||
-            state.profileTransition ||
-            status.error === "unsupported-format"
-          }
-          onChange={(event) => {
-            void drive
-              .setAutomatic(event.target.checked)
-              .catch(() => controller.notify(t("Не удалось сохранить настройку синхронизации")));
-          }}
-        />
-        {t("Автоматическая синхронизация")}
-      </label>
-      {status.automatic && status.pauseReason && (
-        <p className="drive-pause-status" role="status">
+      <GoogleCompactionSettings google={google} status={status} blocked={blocked} />
+      <details className="cloud-google-details" open={!!status.migrationRequired}>
+        <summary>
           {t(
-            status.pauseReason === "auth-required"
-              ? "Автосинхронизация на паузе: подключите Google."
-              : status.pauseReason === "offline"
-                ? "Автосинхронизация на паузе: нет интернета."
-                : "Автосинхронизация на паузе: Google Диск недоступен. Повторим при восстановлении связи."
+            status.migrationRequired
+              ? "Перенос старых сохранений"
+              : "Версии и резервные копии Google"
           )}
-        </p>
-      )}
-      {status.error && (
-        <p role="alert" id="google-drive-error">
-          {t(
-            !status.prepared && status.error === "network"
-              ? "Не удалось загрузить вход Google. Нажмите «Повторить загрузку входа»."
-              : status.pauseReason === "offline"
-                ? "Нет интернета. Подключитесь и повторите синхронизацию."
-                : choice?.state === "unconfirmed" && status.error === "local-changed"
-                  ? "Локальные данные изменились. Повторите синхронизацию, чтобы проверить версии."
-                  : errors[status.error]
-          )}
-        </p>
-      )}
-      {status.legacyAvailable && (
-        <div className="drive-conflict" id="google-drive-legacy">
-          <h4>{t("На Google Диске найден формат 1")}</h4>
-          <p>
-            {t(
-              "Формат 2 синхронизируется отдельно. Обновите приложение на других устройствах. Старый поток не изменяется; перенос выбранного снимка заменит локальные настройки этого профиля только после вашего выбора."
-            )}
-          </p>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => {
-              void drive.legacy
-                .inspect()
-                .then(setLegacyChoices)
-                .catch((error: unknown) =>
-                  controller.notify(
-                    error instanceof Error ? error.message : "Legacy import unavailable"
-                  )
-                );
-            }}
-          >
-            {t("Посмотреть старые снимки")}
-          </button>
-          {legacyChoices && (
-            <>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => {
-                  void drive.legacy
-                    .choose("local")
-                    .catch((error: unknown) =>
-                      controller.notify(
-                        error instanceof Error ? error.message : "Legacy import unavailable"
-                      )
-                    );
-                }}
-              >
-                {t("Оставить данные устройства и начать формат 2")}
-              </button>
-              {legacyChoices.map((remote) => (
-                <div key={remote.nodeId}>
-                  <Summary summary={remote} />
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => {
-                      void drive.legacy
-                        .choose(remote.nodeId)
-                        .catch((error: unknown) =>
-                          controller.notify(
-                            error instanceof Error ? error.message : "Legacy import unavailable"
-                          )
-                        );
-                    }}
-                  >
-                    {t("Перенести этот снимок в формат 2")}
-                  </button>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-      )}
-      {choice && (
-        <p
-          id="google-drive-choice-result"
-          className="drive-choice-result"
-          data-state={choice.state}
-          role={choice.state === "unconfirmed" || choice.state === "blocked" ? "alert" : "status"}
-        >
-          {t(choiceMessage(choice, state.loading, !!(state.preview || state.activeTool)))}
-        </p>
-      )}
-      {conflict && (
-        <div id="google-drive-conflict" className="drive-conflict" aria-busy={!!activeChoice}>
-          <h4>{t("Выберите версию рабочего пространства")}</h4>
-          {conflict.remotes.length === 0 ? (
-            <p>{t("На подключённом Google Диске пока нет снимков этого профиля.")}</p>
-          ) : (
-            <p id="google-drive-receive-effect">
-              {t(
-                "Получение заменит настройки, список инструментов, индикаторы, виды графиков, рисунки и изображения этого профиля. Облачные снимки сохранятся."
-              )}
-              {conflict.remotes.length > 1
-                ? ` ${t("Выбранная версия станет текущей и на Google Диске.")}`
-                : null}
+        </summary>
+        {busy && <p role="status">{t("Выполняем действие…")}</p>}
+        {status.migrationRequired && (
+          <div className="cloud-google-migration">
+            <p>
+              {t("Старые сохранения Google доступны в архиве. Сначала скачайте и проверьте его.")}
             </p>
-          )}
-          {conflict.remotes.map((remote, index) => (
-            <div key={remote.nodeId}>
-              <h5>
-                {t("Версия на Google Диске")}
-                {conflict.remotes.length > 1 ? ` ${index + 1}` : null}
-              </h5>
-              <Summary summary={remote} dateLabel="Снимок создан" />
-              <button
-                type="button"
-                data-drive-remote={index}
-                aria-describedby="google-drive-receive-effect"
-                aria-busy={activeChoice === remote.nodeId}
-                disabled={busy}
-                onClick={() => {
-                  void drive.choose(remote.nodeId);
-                }}
-              >
-                <span aria-hidden="true">↓</span>{" "}
-                {t(activeChoice === remote.nodeId ? "Получаем…" : "Получить из Google Диска")}
-              </button>
-            </div>
-          ))}
-          <div>
-            <h5>{t("Версия на этом устройстве")}</h5>
-            <Summary summary={conflict.local} dateLabel="Версия проверена" />
-            <p id="google-drive-send-effect">
-              {t(
-                "Отправка сохранит настройки, список инструментов, индикаторы, виды графиков, рисунки и изображения этого профиля как новую текущую версию на Google Диске."
-              )}
-              {conflict.remotes.length > 0 ? ` ${t("Облачные снимки сохранятся.")}` : null}
-            </p>
-            <button
-              id="google-drive-choose-local"
-              type="button"
-              aria-describedby="google-drive-send-effect"
-              aria-busy={activeChoice === "local"}
-              disabled={busy}
-              onClick={() => {
-                void drive.choose("local");
-              }}
-            >
-              <span aria-hidden="true">↑</span>{" "}
-              {t(activeChoice === "local" ? "Отправляем…" : "Отправить на Google Диск")}
+            <button type="button" disabled={blocked} onClick={() => run(downloadArchive)}>
+              {t("Скачать архив старых снимков")}
             </button>
+            <label>
+              {t("Проверить скачанный архив")}
+              <input
+                type="file"
+                accept=".mtp-drive-archive,application/octet-stream"
+                disabled={blocked}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (file) run(() => google.verifyLegacyArchive(file));
+                }}
+              />
+            </label>
+            {status.archive && (
+              <p role="status">
+                {status.archive.count} {t("снимков в архиве")} ·{" "}
+                {status.archive.bytes.toLocaleString()} bytes ·{" "}
+                {t(status.archive.verified ? "Архив проверен" : "Нужно проверить архив")}
+              </p>
+            )}
           </div>
-        </div>
-      )}
-      {status.credentialSaveError && (
-        <p className="drive-storage-error" role="alert">
-          {t(
-            status.connected
-              ? "Не удалось сохранить вход Google на устройстве. В текущем окне подключение работает; после перезапуска войдите снова."
-              : "Не удалось удалить сохранённый вход Google на устройстве. Повторите удаление."
-          )}
-        </p>
-      )}
-      {!status.connected && status.credentialSaveError && (
-        <button type="button" onClick={drive.disconnect}>
-          {t("Повторить удаление входа Google")}
-        </button>
-      )}
-      <small className="drive-auth-note">
-        {t(
-          status.error === "unsupported-format"
-            ? "Синхронизация на паузе. Сохранённый вход Google не удаляется, срок доступа остаётся прежним."
-            : status.authorizationStored
-              ? "Вход сохранён на этом устройстве. Когда срок доступа Google истечёт, синхронизация приостановится до повторного подключения."
-              : "Подключение Google будет сохранено на этом устройстве в зашифрованном виде до окончания срока токена."
         )}
-      </small>
-    </section>
+        {status.previousVersions && status.previousVersions.length > 0 && (
+          <div>
+            <h4>{t("Предыдущие версии Google")}</h4>
+            <p>
+              {t(
+                "Восстановление заменит настройки и разметку на устройстве. Облачные снимки сохранятся."
+              )}
+            </p>
+            {status.previousVersions.map((version) => (
+              <p key={version.id}>
+                {version.size.toLocaleString()} bytes{" "}
+                <button
+                  type="button"
+                  disabled={blocked}
+                  onClick={() => run(() => google.restorePrevious(version.id))}
+                >
+                  {t("Восстановить предыдущую версию")}
+                </button>
+              </p>
+            ))}
+          </div>
+        )}
+        <details className="cloud-google-diagnostics">
+          <summary>{t("Диагностика Google")}</summary>
+          <p>{t("Проверка подключения не отправляет рабочее пространство.")}</p>
+          <button
+            type="button"
+            disabled={blocked}
+            onClick={() => run(() => google.runUploadProbe())}
+          >
+            {t("Повторить проверку подключения")}
+          </button>
+        </details>
+      </details>
+    </>
   );
 }

@@ -325,70 +325,38 @@ test("five localized buttons expose names, isolate events and revalidate loading
   assert.equal((html.match(/disabled=""/g) ?? []).length, 5);
 });
 
-test("compact navigation opens only from its toggle and closes without consuming outside chart input", () => {
-  const calls = [], effects = [], listeners = new Map(), container = {};
-  let open = false;
-  const document = {
-    addEventListener(name, listener) { listeners.set(name, listener); },
-    removeEventListener(name) { listeners.delete(name); }
-  };
-  const chart = { resetView: () => calls.push("reset"), scroll() {}, zoom() {} };
+test("compact charts render no navigation pad or position RAF; desktop restarts and cleans up RAF", () => {
+  let compact = true, frames = 0, cancelled = 0;
+  const effects = [];
+  const chart = { resetView() {}, scroll() {}, zoom() {} };
   const state = { preferences: { locale: "ru" } };
   const load = modules({
     react: {
-      useSyncExternalStore: () => true,
+      useSyncExternalStore: () => compact,
       useRef: () => ({ current: null }),
       useMemo: (factory) => factory(),
-      useEffect: (effect) => effects.push(effect),
-      useState: (initial) => initial === null
-        ? [{ chart, left: 140, top: 200 }, () => {}]
-        : [open, (value) => { open = value; }]
+      useEffect: (effect, dependencies) => effects.push({ effect, dependencies }),
+      useState: () => [{ chart, left: 140, top: 200 }, () => {}]
     },
     "react/jsx-runtime": jsxRuntime,
-    "./context.js": { useTerminal: () => ({ state, controller: { chart, getSnapshot: () => state } }) },
-    "./chart-navigation-state.js": { chartNavigationReady: () => true },
-    "./controller-camera-sync.js": { userCameraAction: (_controller, _chart, action) => action() }
-  }, { document });
+    "./context.js": {
+      useTerminal: () => ({ state, controller: { chart, getSnapshot: () => state } })
+    },
+    "./chart-navigation-state.js": { chartNavigationReady: () => true }
+  }, { requestAnimationFrame: () => ++frames, cancelAnimationFrame: () => cancelled++ });
   const { ChartNavigation } = load("screens/terminal/ChartNavigation.js");
-  const render = () => {
-    effects.length = 0;
-    const panel = ChartNavigation();
-    panel.props.ref.current = container;
-    const disclosure = panel.props.children;
-    const [toggle, tray] = disclosure.type(disclosure.props).props.children;
-    return { panel, toggle, tray, effect: effects.at(-1) };
-  };
-
-  const closed = render();
-  assert.equal(closed.panel.props["data-compact"], true);
-  assert.equal(closed.toggle.props["aria-label"], "Навигация графика");
-  assert.equal(closed.toggle.props["aria-expanded"], false);
-  assert.equal(closed.toggle.props["aria-controls"], closed.tray.props.id);
-  assert.equal(closed.tray.props.hidden, true);
-  assert.equal(closed.effect(), undefined);
-  assert.equal(listeners.size, 0);
-
-  closed.toggle.props.onClick();
-  const expanded = render();
-  assert.equal(expanded.toggle.props["aria-expanded"], true);
-  assert.equal(expanded.tray.props.hidden, false);
-  assert.equal(expanded.tray.props.children.length, 5);
-  expanded.tray.props.children[4].props.onClick();
-  assert.deepEqual(calls, ["reset"]);
-  const cleanup = expanded.effect();
-  listeners.get("pointerdown")({ composedPath: () => [container] });
-  assert.equal(open, true);
-  listeners.get("pointerdown")({ composedPath: () => [] });
-  assert.equal(open, false);
+  assert.equal(ChartNavigation(), null);
+  const compactPosition = effects.at(-1);
+  assert.equal(compactPosition.effect(), undefined);
+  assert.equal(compactPosition.dependencies[0], true);
+  assert.equal(frames, 0);
+  effects.length = 0;
+  compact = false;
+  assert.ok(ChartNavigation());
+  const desktopPosition = effects.at(-1);
+  assert.equal(desktopPosition.dependencies[0], false);
+  const cleanup = desktopPosition.effect();
+  assert.equal(frames, 1);
   cleanup();
-  assert.equal(listeners.size, 0);
-
-  render().toggle.props.onClick();
-  const keyboard = render();
-  keyboard.toggle.props.ref.current = { focus: () => calls.push("focus") };
-  const closeKeyboard = keyboard.effect();
-  listeners.get("keydown")({ key: "Escape", preventDefault() {}, stopPropagation() {} });
-  assert.equal(open, false);
-  assert.deepEqual(calls, ["reset", "focus"]);
-  closeKeyboard();
+  assert.equal(cancelled, 1);
 });

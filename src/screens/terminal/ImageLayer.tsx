@@ -1,13 +1,23 @@
 import { t } from "../../i18n/messages.js";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { ImageAsset, PixelPoint } from "../../model/types.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { useTerminal } from "./context.js";
-function ImageAnnotation({ asset }: { asset: ImageAsset }) {
+import { bindImageProjection } from "./drawing-projection.js";
+import { createDrawingContextSource } from "./chart-drawing-touch.js";
+function ImageAnnotation({
+  asset,
+  drawingProjection
+}: {
+  asset: ImageAsset;
+  drawingProjection: EventTarget;
+}) {
   const { controller } = useTerminal(),
     [url, setUrl] = useState(""),
-    [point, setPoint] = useState<PixelPoint | null>(null),
+    root = useRef<HTMLDivElement>(null),
+    contextSource = useMemo(createDrawingContextSource, []),
+    point = useRef<PixelPoint | null>(null),
     drag = useRef<{
       x: number;
       y: number;
@@ -21,6 +31,7 @@ function ImageAnnotation({ asset }: { asset: ImageAsset }) {
     } | null>(null);
   const value = asset;
   const cancel = (event: ReactPointerEvent<HTMLDivElement>) => {
+    contextSource.up(event);
     if (!drag.current) return;
     drag.current = null;
     controller.editing.cancelGesture();
@@ -33,33 +44,32 @@ function ImageAnnotation({ asset }: { asset: ImageAsset }) {
     setUrl(objectUrl);
     return () => URL.revokeObjectURL(objectUrl);
   }, [asset.blob]);
-  useEffect(() => {
-    let id = 0,
-      previous = 0;
-    const frame = (now: number) => {
-      if (now - previous > 32) {
-        const next = controller.chart?.pointToPixel(value.point) ?? null;
-        setPoint((old) => (old?.x === next?.x && old?.y === next?.y ? old : next));
-        previous = now;
-      }
-      id = requestAnimationFrame(frame);
-    };
-    id = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(id);
-  }, [controller, value.point]);
+  useLayoutEffect(() => {
+    const element = root.current;
+    if (!element) return;
+    return bindImageProjection(
+      element,
+      drawingProjection,
+      () => controller.chart?.pointToPixel(value.point) ?? null,
+      (next) => {
+        point.current = next;
+      },
+      value.visible !== false
+    );
+  }, [controller, drawingProjection, value.point, value.visible]);
   return (
     <div
+      ref={root}
       className={`image-annotation ${value.lock ? "locked" : ""}`}
       data-image-id={asset.id}
-      hidden={!point || value.visible === false}
       style={{
-        transform: `translate(${point?.x ?? 0}px,${point?.y ?? 0}px)`,
         width: value.width,
         cursor: "pointer"
       }}
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (contextSource.suppress(event.nativeEvent)) return;
         controller.selectObject(asset.id);
         controller.setContext({
           x: event.clientX,
@@ -68,6 +78,7 @@ function ImageAnnotation({ asset }: { asset: ImageAsset }) {
         });
       }}
       onPointerDown={(event) => {
+        contextSource.down(event, true);
         if (
           event.button !== 0 ||
           (event.target instanceof Element && event.target.closest("button"))
@@ -81,11 +92,11 @@ function ImageAnnotation({ asset }: { asset: ImageAsset }) {
           if (!value.lock && !tools.drawingsLocked) void controller.deleteImage(asset.id);
           return;
         }
-        if (!point || value.lock || tools.drawingsLocked) return;
+        if (!point.current || value.lock || tools.drawingsLocked) return;
         drag.current = {
           x: event.clientX,
           y: event.clientY,
-          pixel: point,
+          pixel: point.current,
           original: { ...asset, point: { ...asset.point } },
           resizing:
             event.target instanceof Element && event.target.classList.contains("image-resize"),
@@ -138,6 +149,7 @@ function ImageAnnotation({ asset }: { asset: ImageAsset }) {
         });
       }}
       onPointerUp={(event) => {
+        contextSource.up(event);
         const active = drag.current;
         if (!active) return;
         event.preventDefault();
@@ -173,7 +185,7 @@ function ImageAnnotation({ asset }: { asset: ImageAsset }) {
     </div>
   );
 }
-export function ImageLayer() {
+export function ImageLayer({ drawingProjection }: { drawingProjection: EventTarget }) {
   const { state } = useTerminal();
   return (
     <div
@@ -187,6 +199,7 @@ export function ImageLayer() {
           <ImageAnnotation
             key={`${state.owner}:${state.preferences.symbol}:${image.id}`}
             asset={image}
+            drawingProjection={drawingProjection}
           />
         ))}
     </div>

@@ -56,6 +56,7 @@ function fixtures(annotations = async () => ({ drawings: [], images: [] })) {
     };
     drawingSettings = { setDialog: (dialog) => this.update({ dialog }) };
     editing = { reset() {} };
+    saveView = async () => {};
     constructor(slot) {
       this.workspaceSlot = slot;
     }

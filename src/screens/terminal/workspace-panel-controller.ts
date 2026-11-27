@@ -36,7 +36,7 @@ function panelTimeframe(
 }
 
 function availability(parent: TerminalState, row: WorkspacePanelRow | undefined): boolean {
-  return !!row && marketAvailable(parent) && (parent.authenticated || !!row.providerRef);
+  return !!row && marketAvailable(parent);
 }
 
 function knownRows(
@@ -134,6 +134,12 @@ export class WorkspacePanelController extends TerminalController {
 
   configure(row: WorkspacePanelRow | undefined, parent: TerminalState): void {
     const state = this.getSnapshot();
+    if (parent.profileTransition && !state.profileTransition) {
+      this.retireFeed?.();
+      this.retireFeed = undefined;
+      this.disconnect?.();
+      this.disconnect = undefined;
+    }
     const market = this.sessionKey();
     const ready = availability(parent, row);
     const local =
@@ -145,7 +151,12 @@ export class WorkspacePanelController extends TerminalController {
     this.configuredOwner = parent.owner;
     this.row = row;
     const route =
-      row && market && ready && importWritable(parent)
+      row &&
+      market &&
+      ready &&
+      !parent.importingBackup &&
+      !parent.importRecoveryRequired &&
+      !parent.workspaceMigrationIncomplete
         ? {
             owner: parent.owner,
             row,
@@ -168,13 +179,18 @@ export class WorkspacePanelController extends TerminalController {
         ? this.combinedPreferences(parent.preferences, local, row)
         : state.preferences;
     this.shared = parent.preferences;
+    const sameDocument =
+      parent.owner === state.owner &&
+      state.preferences.symbol === (row?.symbol ?? "") &&
+      state.preferences.instrumentUid === (row?.uid ?? null);
     const resetAnnotations =
-      parent.owner !== state.owner ||
-      this.route?.market !== route?.market ||
-      this.route?.row.symbol !== route?.row.symbol ||
-      this.route?.row.uid !== route?.row.uid ||
-      parent.importingBackup ||
-      parent.importRecoveryRequired;
+      !sameDocument || parent.importingBackup || parent.importRecoveryRequired;
+    const preserveCandles =
+      sameDocument &&
+      state.preferences.timeframe === preferences.timeframe &&
+      state.preferences.rangeDays === preferences.rangeDays &&
+      !parent.importingBackup &&
+      !parent.importRecoveryRequired;
     if (reset) {
       if (resetAnnotations) this.editing.reset();
       this.stop();
@@ -188,6 +204,7 @@ export class WorkspacePanelController extends TerminalController {
       marketReady: ready,
       status: parent.status,
       profileTransition: !!parent.profileTransition,
+      workspaceMigrationIncomplete: !!parent.workspaceMigrationIncomplete,
       importingBackup: !!parent.importingBackup,
       importRecoveryRequired: !!parent.importRecoveryRequired,
       backupBusy: !!parent.backupBusy,
@@ -198,7 +215,7 @@ export class WorkspacePanelController extends TerminalController {
       this.update({
         ...patch,
         chartRevision: state.chartRevision + 1,
-        candles: [],
+        candles: preserveCandles ? state.candles : [],
         ...(resetAnnotations ? { annotationReady: false, drawings: [], images: [] } : {}),
         crosshairBar: null,
         selectedObject: null,
@@ -217,7 +234,7 @@ export class WorkspacePanelController extends TerminalController {
       (Object.keys(patch) as (keyof typeof patch)[]).some((key) => patch[key] !== state[key])
     )
       this.update(patch);
-    if (!reset || !route) return;
+    if ((!reset && this.retireFeed) || !route || !importWritable(parent)) return;
     const reconnect = (event: Event) => {
       const reference = route.row.providerRef;
       const detail = (event as CustomEvent<PublicMarketReconnect>).detail;
@@ -295,6 +312,8 @@ export class WorkspacePanelController extends TerminalController {
       (!Number.isFinite(rangeDays) || rangeDays < 1 || rangeDays > 3650)
     )
       throw new RangeError("Недопустимая глубина истории.");
+    if (timeframe !== undefined || rangeDays !== undefined || engine !== undefined)
+      void this.saveView().catch(() => {});
     this.local = {
       ...local,
       ...(indicators && { indicators }),

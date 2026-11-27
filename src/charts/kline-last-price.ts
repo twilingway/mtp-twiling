@@ -7,6 +7,7 @@ type NativeChart = Pick<Chart, "setStyles">;
 /** KLine 9.8 shares its last-price line color with the axis label background. */
 export function klineLastPrice(settings: ChartSettings) {
   let custom = lastPriceLabelColors(settings);
+  let composite = false;
   let up = lastPriceStyle(settings, true, custom),
     down = lastPriceStyle(settings, false, custom),
     text = up.text;
@@ -15,14 +16,21 @@ export function klineLastPrice(settings: ChartSettings) {
     settings.priceLine !== false && (up.fill !== up.color || down.fill !== down.color);
   const styles = () => ({
     show: true,
-    line: { show: settings.priceLine !== false && !separate() },
+    line: { show: !composite && settings.priceLine !== false && !separate() },
     upColor: up.fill,
     downColor: down.fill,
     noChangeColor: up.fill,
-    text: { color: text, paddingLeft: 4, paddingRight: 4 }
+    text: { show: !composite, color: text, paddingLeft: 4, paddingRight: 4 }
   });
   return {
     styles,
+    direction,
+    setComposite(chart: NativeChart, enabled: boolean) {
+      if (enabled === composite) return false;
+      composite = enabled;
+      chart.setStyles({ candle: { priceMark: { last: styles() } } });
+      return true;
+    },
     update(chart: NativeChart, bar: Candle | undefined) {
       const nextText = direction(bar).text;
       if (nextText === text) return;
@@ -45,7 +53,7 @@ export function klineLastPrice(settings: ChartSettings) {
       height: number,
       project: (bar: Candle) => number | undefined
     ) {
-      if (!bar || !separate()) return;
+      if (!bar || composite || !separate()) return;
       const y = project(bar);
       if (y === undefined || !Number.isFinite(y) || y < 0 || y > height) return;
       ctx.save();

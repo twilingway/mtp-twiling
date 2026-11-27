@@ -2,8 +2,10 @@ import { AreaSeries, BarSeries, CandlestickSeries, LineSeries } from "lightweigh
 import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
 import { NATIVE_CHART_LINE, resolveNativeChartType } from "../model/native-chart-type.js";
 import type { Candle, ChartSettings } from "../model/types.js";
+import { barColors } from "../model/bar-palette.js";
 import { lightweightPriceFormat } from "./price-format.js";
 import type { ChartPriceFormat } from "./price-format.js";
+import { createLightweightNativeRectCull } from "./lightweight-native-rect-cull.js";
 
 export type LightweightMainSeries = ISeriesApi<"Candlestick" | "Bar" | "Line" | "Area">;
 
@@ -16,7 +18,8 @@ export function lightweightMainSeries(
   format: ChartPriceFormat
 ) {
   const type = resolveNativeChartType(settings),
-    color = NATIVE_CHART_LINE;
+    color = NATIVE_CHART_LINE,
+    rectCull = type === "candles" ? createLightweightNativeRectCull() : null;
   const common = {
     priceLineVisible: false,
     lastValueVisible: false,
@@ -28,8 +31,7 @@ export function lightweightMainSeries(
       ...common,
       openVisible: true,
       thinBars: true,
-      upColor: settings.upColor ?? "#53b987",
-      downColor: settings.downColor ?? "#eb4d5c"
+      ...barColors(settings)
     });
   else if (type === "line")
     series = chart.addSeries(LineSeries, {
@@ -51,6 +53,7 @@ export function lightweightMainSeries(
   else
     series = chart.addSeries(CandlestickSeries, {
       ...common,
+      ...(rectCull ? { mtpNativeRectCull: rectCull.hook } : {}),
       upColor: settings.bodyVisible === false ? "transparent" : (settings.upColor ?? "#53b987"),
       downColor: settings.bodyVisible === false ? "transparent" : (settings.downColor ?? "#eb4d5c"),
       wickUpColor: settings.wickUpColor ?? "#336854",
@@ -68,6 +71,7 @@ export function lightweightMainSeries(
   };
   return {
     series,
+    dispose: () => rectCull?.dispose(),
     setData: (bars: readonly Candle[]) => series.setData(bars.map(row)),
     update: (bar: Candle, historical: boolean) => series.update(row(bar), historical)
   };

@@ -1,18 +1,11 @@
 import { t } from "../../i18n/messages.js";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { candleCloseAt, formatCountdown } from "../../model/candle-clock.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import type { TradingCalendarDay } from "../../model/candle-clock.js";
 import { useTerminal } from "./context.js";
-import { lastPriceStyle } from "../../model/last-price-style.js";
 
-interface CountdownPosition {
-  key: string;
-  top: number;
-  width: number;
-}
-
-export function CandleCountdown() {
+export function CandleCountdown({ drawingProjection }: { drawingProjection: EventTarget }) {
   const { controller, state } = useTerminal();
   const [now, setNow] = useState(Date.now());
   const [retry, setRetry] = useState(0);
@@ -20,7 +13,6 @@ export function CandleCountdown() {
     key: string;
     days: readonly TradingCalendarDay[];
   } | null>(null);
-  const [position, setPosition] = useState<CountdownPosition | null>(null);
   const { timeframe, chartSettings } = state.preferences;
   const uid = selectedMarketRow(state.rows, state.preferences)?.uid;
   const bar = state.candles.at(-1);
@@ -66,39 +58,27 @@ export function CandleCountdown() {
       clearTimeout(retryTimer);
     };
   }, [controller, active, uid, timestamp, timeframe, key, retry]);
-  useEffect(() => {
-    if (!active || !bar) return;
-    let frame = 0;
-    let previous = 0;
-    const update = (time: number) => {
-      if (time - previous > 50) {
-        const chart = controller.chart;
-        const pixel = chart?.pointToPixel({ timestamp: bar.timestamp, value: bar.close });
-        const size = chart?.plotSize();
-        const totalWidth = document.getElementById("chart")?.clientWidth ?? 0;
-        const next =
-          pixel && size && pixel.y >= 0 && pixel.y + 25 < size.height
-            ? { key, top: Math.round(pixel.y + 8), width: Math.max(0, totalWidth - size.width) }
-            : null;
-        setPosition((old) =>
-          old?.key === next?.key && old?.top === next?.top && old?.width === next?.width
-            ? old
-            : next
-        );
-        previous = time;
-      }
-      frame = requestAnimationFrame(update);
-    };
-    frame = requestAnimationFrame(update);
-    return () => cancelAnimationFrame(frame);
-  }, [controller, active, bar, key]);
   const closesAt =
     active && timestamp !== undefined && calendar?.key === key
       ? candleCloseAt(timestamp, timeframe, now, calendar.days)
       : null;
-  if (!closesAt || !position || position.key !== key || position.width < 38 || !bar) return null;
-  const { fill, text } = lastPriceStyle(chartSettings, bar.close >= bar.open);
-  const countdown = formatCountdown(closesAt - now).replace("д", t("д"));
+  const countdown = closesAt ? formatCountdown(closesAt - now).replace("д", t("д")) : null;
+  useLayoutEffect(() => {
+    let attached: typeof controller.chart = null;
+    const update = () => {
+      const chart = controller.chart;
+      if (!chart || chart.retired || attached === chart) return;
+      attached = chart;
+      chart.setCandleCountdown?.(
+        timestamp !== undefined && countdown ? { timestamp, text: countdown } : null
+      );
+    };
+    drawingProjection.addEventListener("change", update);
+    update();
+    return () => drawingProjection.removeEventListener("change", update);
+  }, [controller, drawingProjection, timestamp, countdown, state.chartRevision]);
+  useEffect(() => () => controller.chart?.setCandleCountdown?.(null), [controller]);
+  if (!closesAt || !countdown) return null;
   return (
     <time
       className="candle-countdown"
@@ -106,12 +86,6 @@ export function CandleCountdown() {
       aria-live="off"
       aria-label={t("До закрытия свечи: ") + countdown}
       dateTime={new Date(closesAt).toISOString()}
-      style={{
-        top: position.top,
-        width: position.width,
-        background: fill,
-        color: text
-      }}
     >
       {countdown}
     </time>

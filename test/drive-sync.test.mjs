@@ -28,7 +28,13 @@ function load(relative) {
 const { DRIVE_SCOPE, DRIVE_NAMESPACE } = load("services/drive/types.ts");
 const { DriveAuth: RealDriveAuth } = load("services/drive/auth.ts");
 class DriveAuth extends RealDriveAuth {
-  constructor(loader, now) { super(loader, now, { load: async () => undefined, save: async () => {}, remove: async () => {} }); }
+  constructor(loader, now) {
+    super(loader, now, {
+      load: async () => undefined,
+      save: async () => {},
+      remove: async () => {}
+    });
+  }
 }
 const { sanitizeDriveBackup, sha256, prepareDriveBackup, validateManifest, driveBackupDigest } =
   load("services/drive/backup.ts");
@@ -41,11 +47,15 @@ test("default browser fetch keeps its global receiver instead of the transport i
   globalThis.fetch = function () {
     assert.equal(this, globalThis, "native browser fetch requires the global receiver");
     calls++;
-    return Promise.resolve(new Response(JSON.stringify({ files: [] }), {
-      headers: { "Content-Type": "application/json" }
-    }));
+    return Promise.resolve(
+      new Response(JSON.stringify({ files: [] }), {
+        headers: { "Content-Type": "application/json" }
+      })
+    );
   };
-  t.after(() => { globalThis.fetch = original; });
+  t.after(() => {
+    globalThis.fetch = original;
+  });
   const transport = new DriveTransport(authorization());
   assert.deepEqual(await transport.list("snapshot"), []);
   assert.equal(calls, 1);
@@ -378,6 +388,66 @@ test("Concurrent devices preserve both heads; stale publish blocks and explicit 
   assert.deepEqual(resolved.inspection.heads, [resolved.nodeId]);
   assert.equal((await a.download(resolved.nodeId)).layout.chartSettings.theme, "light");
   assert.equal(store.files.filter((file) => file.appProperties.mtpKind === "snapshot").length, 4);
+});
+
+test("Archive reads a pinned set of full snapshots with one shared blob listing", async () => {
+  class CountedStore extends MemoryStore {
+    listed = [];
+    async list(kind) {
+      this.listed.push(kind);
+      return super.list(kind);
+    }
+  }
+  const store = new CountedStore();
+  const sync = new DriveSync(store);
+  const first = await sync.publish(fixture(), { deviceId, parents: [] });
+  const second = await sync.publish(fixture("light"), { deviceId, parents: [first.nodeId] });
+  store.listed.length = 0;
+  const archived = [];
+  await sync.visitArchiveSnapshots(
+    second.inspection,
+    [first.nodeId, second.nodeId],
+    async (snapshot, backup) => {
+      archived.push([snapshot.manifest.nodeId, backup]);
+    }
+  );
+  assert.deepEqual(archived, [
+    [first.nodeId, sanitizeDriveBackup(fixture())],
+    [second.nodeId, sanitizeDriveBackup(fixture("light"))]
+  ]);
+  assert.deepEqual(store.listed, ["snapshot", "blob", "snapshot"]);
+});
+
+test("A late legacy writer invalidates the archive scan without removing any snapshot", async () => {
+  const store = new MemoryStore();
+  const sync = new DriveSync(store);
+  const first = await sync.publish(fixture(), { deviceId, parents: [] });
+  await assert.rejects(
+    sync.visitArchiveSnapshots(first.inspection, [first.nodeId], async () => {
+      await sync.publish(fixture("light"), { deviceId, parents: [first.nodeId] });
+    }),
+    code("conflict")
+  );
+  assert.equal((await sync.inspect()).snapshots.length, 2);
+});
+
+test("A new physical duplicate also invalidates a legacy archive scan", async () => {
+  const store = new MemoryStore();
+  const sync = new DriveSync(store);
+  const first = await sync.publish(fixture(), { deviceId, parents: [] });
+  await assert.rejects(
+    sync.visitArchiveSnapshots(first.inspection, [first.nodeId], async ({ file }) => {
+      await store.create(
+        "snapshot",
+        first.nodeId,
+        file.appProperties.mtpHash,
+        store.contents.get(file.id)
+      );
+    }),
+    code("conflict")
+  );
+  assert.equal((await sync.inspect()).snapshots.length, 1);
+  assert.equal((await store.list("snapshot")).length, 2);
 });
 
 test("Tampered blobs stop before import; missing parents and cycles are rejected", async () => {

@@ -12,6 +12,8 @@ import {
   updatePriceAxisLabelColor
 } from "../../model/last-price-style.js";
 import { PriceAxisLabelFields } from "./PriceAxisLabelFields.js";
+import { BarPaletteFields } from "./BarPaletteFields.js";
+import { updateBarColor } from "../../model/bar-palette.js";
 import { TimeZonePicker } from "./ClockZoneControl.js";
 import { ChartEngineSelect } from "./ChartEngineSelect.js";
 import { ChartSettingsSections } from "./ChartSettingsSections.js";
@@ -131,6 +133,12 @@ export function ChartSettingsDialog() {
                 >
                   {t("Цвета как в вашем TradingView")}
                 </button>
+                <BarPaletteFields
+                  settings={settings}
+                  onChange={(theme, field, color) =>
+                    setSettings((previous) => updateBarColor(previous, theme, field, color))
+                  }
+                />
               </>
             ),
             status: (

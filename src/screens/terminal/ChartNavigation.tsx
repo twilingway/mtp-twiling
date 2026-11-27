@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import type { SyntheticEvent, PointerEvent, KeyboardEvent, ReactNode, RefObject } from "react";
+import type { SyntheticEvent, PointerEvent, KeyboardEvent } from "react";
 import type { ChartAdapter } from "../../charts/adapter.js";
 import { navigationText } from "../../i18n/messages-navigation.js";
 import { chartNavigationReady } from "./chart-navigation-state.js";
@@ -31,70 +31,6 @@ function subscribeCompactLayout(listener: () => void): () => void {
   const query = window.matchMedia(compactQuery);
   query.addEventListener("change", listener);
   return () => query.removeEventListener("change", listener);
-}
-
-function CompactNavigation({
-  container,
-  label,
-  hold,
-  children
-}: {
-  container: RefObject<HTMLDivElement | null>;
-  label: string;
-  hold: ChartScrollHold;
-  children: ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const toggle = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    const close = () => {
-      hold.cancel();
-      setOpen(false);
-    };
-    const outside = (event: Event) => {
-      if (container.current && !event.composedPath().includes(container.current)) close();
-    };
-    const escape = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      event.preventDefault();
-      event.stopPropagation();
-      close();
-      toggle.current?.focus();
-    };
-    document.addEventListener("pointerdown", outside, true);
-    document.addEventListener("focusin", outside, true);
-    document.addEventListener("keydown", escape, true);
-    return () => {
-      document.removeEventListener("pointerdown", outside, true);
-      document.removeEventListener("focusin", outside, true);
-      document.removeEventListener("keydown", escape, true);
-      hold.cancel();
-    };
-  }, [container, hold, open]);
-  return (
-    <>
-      <button
-        ref={toggle}
-        type="button"
-        aria-label={label}
-        title={label}
-        aria-expanded={open}
-        aria-controls="chart-navigation-actions"
-        onClick={() => {
-          if (open) hold.cancel();
-          setOpen(!open);
-        }}
-      >
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M4 12h16M12 4v16M7 9l-3 3 3 3m10-6 3 3-3 3m-8-8 3-3 3 3m-6 10 3 3 3-3" />
-        </svg>
-      </button>
-      <div id="chart-navigation-actions" className="chart-navigation-actions" hidden={!open}>
-        {children}
-      </div>
-    </>
-  );
 }
 
 export function ChartNavigation() {
@@ -145,6 +81,7 @@ export function ChartNavigation() {
     };
   }, [compact, controller, hold]);
   useEffect(() => {
+    if (compact) return;
     let frame = 0,
       previous = -Infinity;
     const update = (time: number) => {
@@ -175,7 +112,7 @@ export function ChartNavigation() {
     };
     frame = requestAnimationFrame(update);
     return () => cancelAnimationFrame(frame);
-  }, [controller]);
+  }, [compact, controller]);
   const chart = controller.chart,
     ready = position?.chart === chart && chartNavigationReady(state, chart);
   const available = (action: Action) =>
@@ -261,6 +198,7 @@ export function ChartNavigation() {
       </svg>
     </button>
   ));
+  if (compact) return null;
   return (
     <div
       ref={ref}
@@ -282,17 +220,7 @@ export function ChartNavigation() {
         stop(event);
       }}
     >
-      {compact ? (
-        <CompactNavigation
-          container={ref}
-          label={navigationText("navigation", state.preferences.locale)}
-          hold={hold}
-        >
-          {actions}
-        </CompactNavigation>
-      ) : (
-        actions
-      )}
+      {actions}
     </div>
   );
 }

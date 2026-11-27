@@ -7,8 +7,24 @@ const source = readFileSync(new URL("../src/model/mtp.ts", import.meta.url), "ut
 const { outputText } = ts.transpileModule(source, {
   compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ES2022 }
 });
+const helperSource = readFileSync(
+  new URL("../src/model/screen-line-simplifier.ts", import.meta.url),
+  "utf8"
+);
+const helperOutput = ts.transpileModule(helperSource, {
+  compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ES2022 }
+}).outputText;
+const helperUrl = `data:text/javascript;base64,${Buffer.from(helperOutput).toString("base64")}`;
+const rasterSource = readFileSync(
+  new URL("../src/model/mtp-raster-cache.ts", import.meta.url),
+  "utf8"
+);
+const rasterOutput = ts.transpileModule(rasterSource, {
+  compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ES2022 }
+}).outputText;
+const rasterUrl = `data:text/javascript;base64,${Buffer.from(rasterOutput).toString("base64")}`;
 const { MtpModel, MTP_COMBINED_PERIODS, lightweightMtp } = await import(
-  `data:text/javascript;base64,${Buffer.from(outputText).toString("base64")}`
+  `data:text/javascript;base64,${Buffer.from(outputText.replace('"./screen-line-simplifier.js"', JSON.stringify(helperUrl)).replace('"./mtp-raster-cache.js"', JSON.stringify(rasterUrl))).toString("base64")}`
 );
 
 function modelWith(length = 1100) {
@@ -254,6 +270,86 @@ test("nonfinite source values retain original gaps without contaminating affine 
   fixture.draw(actual);
   sameGeometry(actual.paths, expected.paths, 1e-7);
   assert.equal(fixture.counts().y, 3 + 151);
+});
+
+test("LW raster integration paints the original full paths once at native DPR", () => {
+  const originalCanvas = globalThis.OffscreenCanvas;
+  const surfaces = [];
+  globalThis.OffscreenCanvas = class {
+    constructor(width, height) {
+      this.width = width;
+      this.height = height;
+      this.context = { ...canvas(), setTransform() {} };
+      surfaces.push(this);
+    }
+    getContext() {
+      return this.context;
+    }
+  };
+  try {
+    const model = modelWith(),
+      expected = canvas();
+    const xFor = (index) => index / 10,
+      yFor = (price) => 500 - price * 2;
+    model.draw(expected, 0, 1099, xFor, yFor);
+    let primitive,
+      blits = 0;
+    const series = {
+      priceToCoordinate: yFor,
+      priceScale: () => ({ options: () => ({ mode: 0 }) }),
+      attachPrimitive(value) {
+        primitive = value;
+      },
+      detachPrimitive() {}
+    };
+    const mtp = lightweightMtp(
+      {
+        timeScale: () => ({
+          getVisibleLogicalRange: () => ({ from: 0, to: 1099 }),
+          logicalToCoordinate: xFor
+        })
+      },
+      series,
+      model
+    );
+    const context = {
+      ...canvas(false),
+      translate() {},
+      drawImage() {
+        blits++;
+      },
+      globalCompositeOperation: "source-over",
+      filter: "none",
+      shadowBlur: 0,
+      shadowOffsetX: 0,
+      shadowOffsetY: 0,
+      lineCap: "butt",
+      lineJoin: "miter",
+      miterLimit: 10
+    };
+    const target = {
+      useBitmapCoordinateSpace(draw) {
+        draw({
+          context,
+          horizontalPixelRatio: 2.75,
+          verticalPixelRatio: 2.75,
+          bitmapSize: { width: 808, height: 1848 }
+        });
+      }
+    };
+    const renderer = primitive.paneViews()[0].renderer();
+    renderer.drawBackground(target);
+    assert.equal(surfaces.length, 1);
+    sameGeometry(surfaces[0].context.paths, expected.paths, 1e-7);
+    renderer.drawBackground(target);
+    assert.equal(surfaces.length, 1, "unchanged geometry reuses the full-quality settled image");
+    assert.equal(blits, 2);
+    mtp.destroy();
+    assert.equal(surfaces[0].width, 0);
+  } finally {
+    if (originalCanvas === undefined) delete globalThis.OffscreenCanvas;
+    else globalThis.OffscreenCanvas = originalCanvas;
+  }
 });
 
 test(

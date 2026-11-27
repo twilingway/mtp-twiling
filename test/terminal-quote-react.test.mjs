@@ -1,0 +1,314 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import * as React from "react";
+import * as jsx from "react/jsx-runtime";
+import * as ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
+import { sourceModules, row } from "./helpers/watchlist-sections.mjs";
+
+const noop = () => {};
+const bar = (timestamp, close) => ({ timestamp, open: close - 1, high: close + 1,
+  low: close - 2, close, volume: 10 });
+const find = (node, predicate) => {
+  if (!node || typeof node !== "object") return undefined;
+  if (predicate(node)) return node;
+  for (const child of [node.props?.children].flat(Infinity)) {
+    const found = find(child, predicate);
+    if (found) return found;
+  }
+};
+const text = (node) => typeof node === "string" ? node : node && typeof node === "object" ?
+  [node.props?.children].flat(Infinity).map(text).join(" ") : "";
+
+function environment() {
+  const keys = ["window", "document", "requestAnimationFrame", "cancelAnimationFrame", "ResizeObserver"];
+  const saved = Object.fromEntries(keys.map((key) => [key, globalThis[key]]));
+  const frames = new Map();
+  let frameId = 0;
+  class Element {}
+  const doc = { nodeType: 9, addEventListener: noop, removeEventListener: noop, activeElement: null,
+    documentElement: { classList: { add: noop, remove: noop } },
+    defaultView: { HTMLElement: Element, HTMLIFrameElement: class extends Element {} } };
+  globalThis.window = { event: undefined, HTMLIFrameElement: class {},
+    addEventListener: noop, removeEventListener: noop,
+    matchMedia: () => ({ matches: false, addEventListener: noop, removeEventListener: noop }) };
+  globalThis.document = doc;
+  globalThis.ResizeObserver = class { observe() {} disconnect() {} };
+  globalThis.requestAnimationFrame = (run) => { frames.set(++frameId, run); return frameId; };
+  globalThis.cancelAnimationFrame = (id) => frames.delete(id);
+  const advanceFrame = () => {
+    const entry = frames.entries().next().value;
+    if (entry) { frames.delete(entry[0]); entry[1](); }
+  };
+  return {
+    container: { nodeType: 1, tagName: "DIV", nodeName: "DIV", namespaceURI: "http://www.w3.org/1999/xhtml",
+      ownerDocument: doc, addEventListener: noop, removeEventListener: noop },
+    advanceFrame,
+    pendingFrames: () => frames.size,
+    flushFrames: () => { while (frames.size) advanceFrame(); },
+    restore: () => { for (const key of keys) {
+      if (saved[key] === undefined) delete globalThis[key]; else globalThis[key] = saved[key];
+    } }
+  };
+}
+
+test("real controller quote/candle events leave static component hooks idle and quotes live", async (t) => {
+  const env = environment();
+  // AccountDialog's body/hooks are measured; its optional cloud children are not rendered here.
+  const unexpectedCloudUse = () => assert.fail("Quote profiler must not initialize optional cloud providers");
+  const load = sourceModules({ react: React, "react/jsx-runtime": jsx, "react-dom": ReactDOM,
+    "services/storage.ts": {}, "services/storage-db.ts": {},
+    "screens/terminal/controller-cloud-sync.ts": {
+      CLOUD_PROVIDERS: ["google-drive", "yandex-disk"],
+      terminalCloudSync: unexpectedCloudUse,
+      startTerminalCloudSync: unexpectedCloudUse
+    },
+    "screens/terminal/controller-drive.ts": { terminalGoogleRetention: unexpectedCloudUse }
+  });
+  const { TerminalController } = load("screens/terminal/controller.js");
+  const { TerminalContext, useTerminal } = load("screens/terminal/context.js");
+  const { TIMEFRAMES } = load("model/history-codec.js");
+  const { viewKey } = load("screens/terminal/controller-bridge.js");
+  const c = new TerminalController(), rows = [row("A"), row("B")];
+  c.update({ owner: "test-owner", ready: true, watchlistStartup: "ready", marketReady: true,
+    status: "connected", dialog: "account", objectPanel: true, rows: structuredClone(rows),
+    preferences: { ...c.getSnapshot().preferences, symbol: "A", instrumentUid: "uid-A", timeframe: "1d", rightPanelTab: "objects" },
+    candles: [bar(1000, 100)] });
+  const client = new EventTarget();
+  c.session.client = client;
+  c.session.attach(client, 0);
+  const components = Object.fromEntries(["Toolbar", "DrawingToolbar", "Watchlist", "AccountDialog",
+    "RightPanel", "ApplicationInfo", "BackupTransferSettings", "WatchlistSectionsTable",
+    "WatchlistFlagFilter", "InstrumentDetails", "DetailsDivider"].map((name) =>
+    [name, load(`screens/terminal/${name}.js`)[name]]));
+  components.ObjectTree = load("screens/terminal/drawings/ObjectTree.js").ObjectTree;
+  components.TechnicalObjectTree = load("screens/terminal/TechnicalIndicatorPanels.js").TechnicalObjectTree;
+  components.ChartMeasurementButton = load("screens/terminal/ChartMeasurement.js").ChartMeasurementButton;
+  const zoom = load("screens/terminal/ChartRangeZoom.js");
+  components.ChartRangeZoomButton = zoom.ChartRangeZoomButton;
+  components.ChartZoomOutButton = zoom.ChartZoomOutButton;
+  function DefaultReader() { useTerminal(); return null; }
+  const counts = {}, latest = {};
+  const readers = { DefaultReader, ...Object.fromEntries(Object.entries(components).map(([name, Component]) =>
+    [name, function Reader() {
+      latest[name] = Component({ onChoose: noop, active: false, row: rows[0], query: "", sort: null,
+        direction: 1, onSort: noop, onManualOrder: noop });
+      return null;
+    }])) };
+  const root = createRoot(env.container);
+  const sync = (run) => ReactDOM.flushSync(run);
+  const render = () => root.render(React.createElement(TerminalContext, { value: c },
+    Object.entries(readers).map(([id, Component]) => React.createElement(React.Profiler, {
+      id, key: id, onRender: () => { counts[id] = (counts[id] ?? 0) + 1; }
+    }, React.createElement(Component)))));
+  const change = (patch) => sync(() => c.update(patch));
+  const snapshot = () => ({ rows, marketReady: true, authenticated: false, status: "connected", error: null });
+  const measure = (name, run, quote) => {
+    const before = { ...counts };
+    for (let index = 0; index < 20; index++) sync(() => run(index));
+    const commits = Object.fromEntries(Object.keys(counts).map((key) => [key, counts[key] - before[key]]));
+    for (const key of Object.keys(counts)) assert.equal(commits[key],
+      key === "DefaultReader" || (quote && ["Watchlist", "WatchlistSectionsTable", "WatchlistFlagFilter"].includes(key)) ? 20 : 0,
+      `${name}: ${key}`);
+    t.diagnostic(JSON.stringify({ name, events: 20, commits }));
+  };
+  try {
+    sync(render);
+    measure("selected quote", (index) => { rows[0].price = 101 + index;
+      client.dispatchEvent(new CustomEvent("state", { detail: snapshot() })); }, true);
+    assert.match(text(find(latest.Watchlist, (node) => node.props?.id === "detail-price")), /120/);
+    measure("unselected quote", (index) => { rows[1].price = 201 + index;
+      client.dispatchEvent(new CustomEvent("state", { detail: snapshot() })); }, true);
+    measure("live candle", (index) => {
+      client.dispatchEvent(new CustomEvent("candle", { detail: { uid: "uid-A", interval: TIMEFRAMES["1d"].stream,
+        bar: bar(1000, 101 + index) } }));
+      env.flushFrames();
+    }, false);
+    assert.equal(c.getSnapshot().candles[0].close, 120);
+
+    const beforeAttachment = c.getSnapshot();
+    assert.equal(latest.ChartZoomOutButton.props.disabled, true);
+    c.chart = { source: { owner: beforeAttachment.owner, uid: "uid-A", viewKey: viewKey(beforeAttachment.preferences) },
+      getView: () => ({}), zoom: noop };
+    sync(render); // A parent/menu render after asynchronous attachment, with no store update.
+    assert.equal(c.getSnapshot(), beforeAttachment);
+    assert.equal(latest.ChartZoomOutButton.props.disabled, false);
+    delete c.chart.zoom;
+    sync(render);
+    assert.equal(c.getSnapshot(), beforeAttachment);
+    assert.equal(latest.ChartZoomOutButton.props.disabled, true);
+    c.chart = null;
+
+    change({ authenticated: true, status: "disconnected", error: "API connection failed", name: "Account name" });
+    assert.match(text(latest.AccountDialog), /API connection failed/);
+    assert.match(text(latest.ApplicationInfo), /API connection failed/);
+    assert.match(text(latest.AccountDialog), /Account name/);
+    change({ activeTool: "segment" });
+    assert.ok(find(latest.DrawingToolbar, (node) => node.props?.active === true));
+    sync(() => find(latest.DrawingToolbar, (node) => node.props?.id === "cursors").props.onMenu({ focus: noop }));
+    assert.ok(find(latest.DrawingToolbar, (node) => node.props?.id === "drawing-toolbar-menu"));
+    change({ dialog: "drawing-settings" });
+    await new Promise(setImmediate);
+    sync(noop);
+    assert.equal(Boolean(find(latest.DrawingToolbar, (node) => node.props?.id === "drawing-toolbar-menu")), false);
+    const drawing = { id: "d1", name: "segment", points: [], title: "Saved line" };
+    change({ drawings: [drawing], selectedObject: "d1" });
+    assert.match(find(latest.ObjectTree, (node) => node.props?.["data-object"] === "d1").props.className, /selected/);
+    change({ objectPanel: false });
+    assert.equal(latest.ObjectTree, null);
+
+    const prefs = { ...c.getSnapshot().preferences, locale: "en", symbol: "B", instrumentUid: "uid-B" };
+    load("i18n/preferences.js").setDisplayPreferences(prefs);
+    change({ owner: "next-owner", preferences: prefs, objectPanel: true, activeTool: null });
+    assert.equal(latest.ChartMeasurementButton.props["aria-label"], "Ruler");
+    assert.equal(latest.ChartRangeZoomButton.props["aria-label"], "Zoom to selection");
+    assert.match(text(find(latest.Watchlist, (node) => node.props?.id === "detail-symbol")), /B/);
+    c.chart = { source: { owner: "next-owner", uid: "uid-B", viewKey: viewKey(prefs) }, getView: () => ({}), zoom: noop };
+    change({ chartRevision: c.getSnapshot().chartRevision + 1, candles: [bar(1000, 200)] });
+    assert.equal(latest.ChartZoomOutButton.props.disabled, false);
+    sync(() => latest.ChartMeasurementButton.props.onClick());
+    assert.equal(latest.ChartMeasurementButton.props["aria-pressed"], true);
+    sync(() => latest.ChartRangeZoomButton.props.onClick());
+    assert.equal(latest.ChartRangeZoomButton.props["aria-pressed"], true);
+    assert.equal(latest.ChartMeasurementButton.props["aria-pressed"], false);
+    change({ historyViewReady: false });
+    assert.equal(latest.ChartMeasurementButton.props.disabled, true);
+    assert.equal(latest.ChartRangeZoomButton.props.disabled, true);
+    assert.equal(latest.ChartZoomOutButton.props.disabled, true);
+  } finally {
+    sync(() => root.unmount());
+    await new Promise(setImmediate);
+    env.restore();
+  }
+});
+
+test("actual async canvas lifecycle waits for a later native view frame without parent/store updates", async () => {
+  const env = environment();
+  let releaseView;
+  const viewGate = new Promise((resolve) => { releaseView = resolve; });
+  const calls = [];
+  const load = sourceModules({ react: React, "react/jsx-runtime": jsx, "react-dom": ReactDOM,
+    "services/storage.ts": {}, "services/storage-db.ts": {},
+    "services/chart-camera.ts": { loadChartView: () => viewGate, saveAdapterView: async () => {},
+      saveChartView: async () => {} },
+    "screens/terminal/chart-price-metadata.ts": { watchChartPriceMetadata: () => noop },
+    "charts/lightweight.ts": { makeLightweight: () => {
+      let nativeViewReady = false;
+      return { getView: () => nativeViewReady ? { camera: { barSpace: 8 } } : null, zoom: noop,
+        setView: () => calls.push("view"), setData: () => {
+          calls.push("data");
+          requestAnimationFrame(() => requestAnimationFrame(() => { nativeViewReady = true; }));
+        },
+        updateBar: () => calls.push("tick"), redrawDrawings: noop,
+        destroy: () => calls.push("destroy") };
+    } }
+  });
+  const { TerminalController } = load("screens/terminal/controller.js");
+  const { TerminalContext } = load("screens/terminal/context.js");
+  const { ChartZoomOutButton } = load("screens/terminal/ChartRangeZoom.js");
+  const { useChartCanvas } = load("screens/terminal/chart-lifecycle.js");
+  const { chartAdapterReadySignal } = load("screens/terminal/chart-adapter-ready.js");
+  const c = new TerminalController();
+  c.update({ owner: "lifecycle-owner", marketReady: true, ready: true, rows: [row("A")],
+    preferences: { ...c.getSnapshot().preferences, symbol: "A", instrumentUid: "uid-A" },
+    candles: [bar(1000, 100)] });
+  c.notify = (message) => assert.fail(message);
+  const signal = chartAdapterReadySignal(c), otherSignal = chartAdapterReadySignal({});
+  const stop = signal.subscribe(() => {
+    assert.ok(c.chart === null || calls.includes("data"), "ready must follow initial setData");
+    assert.ok(c.chart === null || c.chart.getView(), "notification must wait for an actual native view");
+    assert.equal(otherSignal.getSnapshot(), 0, "controllers have independent signals");
+  });
+  let button, commits = 0;
+  const visible = (state) => state.drawings;
+  const supplemental = {};
+  function Canvas() {
+    const ref = React.useRef({ closest: () => null });
+    useChartCanvas(ref, visible, supplemental);
+    return null;
+  }
+  function Button() { button = ChartZoomOutButton({ onChoose: noop }); return null; }
+  const root = createRoot(env.container), sync = (run) => ReactDOM.flushSync(run);
+  const render = (canvas = true) => root.render(React.createElement(TerminalContext, { value: c },
+    canvas && React.createElement(Canvas, { key: "canvas" }),
+    React.createElement(React.Profiler, { key: "button", id: "zoom", onRender: () => { commits++; } },
+      React.createElement(Button))));
+  try {
+    sync(() => render());
+    assert.equal(button.props.disabled, true);
+    assert.equal(c.chart, null);
+    const before = c.getSnapshot(), revision = before.chartRevision;
+    releaseView({ camera: { barSpace: 8 } });
+    await new Promise(setImmediate);
+    sync(noop); // Flush the external signal only; do not rerender the parent or mutate the store.
+    assert.equal(c.getSnapshot(), before);
+    assert.equal(c.getSnapshot().chartRevision, revision);
+    assert.deepEqual(calls.slice(0, 2), ["view", "data"]);
+    assert.equal(c.chart.getView(), null);
+    assert.equal(button.props.disabled, true);
+    assert.equal(signal.getSnapshot(), 0, "pending native layout must not publish readiness");
+    env.advanceFrame();
+    env.advanceFrame();
+    sync(noop);
+    assert.equal(c.chart.getView(), null);
+    assert.equal(signal.getSnapshot(), 0, "null-to-null probes must remain silent");
+    env.flushFrames();
+    sync(noop);
+    assert.equal(button.props.disabled, false);
+    assert.equal(signal.getSnapshot(), 1);
+    assert.equal(env.pendingFrames(), 0, "the ready transition must stop the retry loop");
+    const readyCommits = commits;
+    for (let index = 0; index < 20; index++) sync(() => c.update({ candles: [bar(1000, 101 + index)] }));
+    assert.equal(commits, readyCommits, "live candle content must not publish readiness");
+    assert.equal(signal.getSnapshot(), 1);
+    const beforeCleanup = c.getSnapshot();
+    sync(() => render(false));
+    await new Promise(setImmediate);
+    sync(noop);
+    assert.equal(c.chart, null);
+    assert.equal(c.getSnapshot(), beforeCleanup);
+    assert.equal(button.props.disabled, true);
+    assert.equal(signal.getSnapshot(), 2);
+    assert.equal(env.pendingFrames(), 0);
+  } finally {
+    stop();
+    sync(() => root.unmount());
+    await new Promise(setImmediate);
+    env.restore();
+  }
+});
+
+test("adapter readiness retries are bounded, guard route changes and cancel on cleanup", () => {
+  const env = environment();
+  const { chartAdapterReadySignal, observeChartAdapterReady } = sourceModules()("screens/terminal/chart-adapter-ready.js");
+  const controller = {};
+  const signal = chartAdapterReadySignal(controller);
+  let reads = 0, valid = true, current = null;
+  const chart = { getView: () => { reads++; return null; } };
+  const observer = observeChartAdapterReady(controller, () => current, () => valid);
+  try {
+    observer.check();
+    assert.equal(env.pendingFrames(), 0, "empty initial history must not poll");
+    current = chart;
+    observer.check();
+    env.flushFrames();
+    assert.equal(reads, 121, "one immediate probe and at most 120 frame retries");
+    assert.equal(env.pendingFrames(), 0);
+    assert.equal(signal.getSnapshot(), 0);
+    observer.check();
+    valid = false;
+    const before = reads;
+    env.advanceFrame();
+    assert.equal(reads, before, "stale owner/session/route guards must run before reading the adapter");
+    assert.equal(env.pendingFrames(), 0);
+    valid = true;
+    observer.check();
+    observer.stop();
+    assert.equal(env.pendingFrames(), 0);
+    env.flushFrames();
+    assert.equal(signal.getSnapshot(), 0, "pending cleanup must not publish a false ready transition");
+  } finally {
+    observer.stop();
+    env.restore();
+  }
+});

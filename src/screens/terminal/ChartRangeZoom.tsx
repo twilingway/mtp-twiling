@@ -7,18 +7,30 @@ import {
   chartRangeZoomSession,
   type ZoomRectangle
 } from "./chart-range-zoom-input.js";
-import { useTerminal } from "./context.js";
-import { chartNavigationReady } from "./chart-navigation-state.js";
+import { useTerminal, useTerminalController } from "./context.js";
+import { shallowEqual } from "./snapshot-selector.js";
+import type { TerminalState } from "./state.js";
+import {
+  chartNavigationReady,
+  chartNavigationSelectionReady,
+  selectChartNavigationState
+} from "./chart-navigation-state.js";
 import { userCameraAction } from "./controller-camera-sync.js";
 import { DrawingToolIcon } from "./DrawingToolIcon.js";
+import { chartAdapterReadySignal } from "./chart-adapter-ready.js";
 
 const labels = { ru: "Увеличить выбранную область", en: "Zoom to selection" };
+const selectRangeZoomButtonState = (state: TerminalState) => ({
+  locale: state.preferences.locale,
+  activeTool: state.activeTool,
+  ready: chartRangeZoomReady(state)
+});
 
 export function ChartRangeZoomButton({ onChoose }: { onChoose?: () => void } = {}) {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectRangeZoomButtonState, shallowEqual);
   const session = chartRangeZoomSession(controller);
   const armed = useSyncExternalStore(session.subscribe, session.isArmed, session.isArmed);
-  const label = labels[state.preferences.locale ?? "ru"];
+  const label = labels[state.locale ?? "ru"];
   return (
     <button
       type="button"
@@ -27,7 +39,7 @@ export function ChartRangeZoomButton({ onChoose }: { onChoose?: () => void } = {
       aria-label={label}
       aria-pressed={armed}
       title={label}
-      disabled={!chartRangeZoomReady(state)}
+      disabled={!state.ready}
       onClick={() => {
         onChoose?.();
         if (!armed) {
@@ -43,9 +55,13 @@ export function ChartRangeZoomButton({ onChoose }: { onChoose?: () => void } = {
 }
 
 export function ChartZoomOutButton({ onChoose }: { onChoose: () => void }) {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectChartNavigationState, shallowEqual);
+  const adapterReady = chartAdapterReadySignal(controller);
+  useSyncExternalStore(adapterReady.subscribe, adapterReady.getSnapshot, adapterReady.getSnapshot);
   const chart = controller.chart;
-  const label = t("Уменьшить масштаб", state.preferences.locale);
+  // Adapter attachment and capabilities can change without a new store snapshot.
+  const ready = chartNavigationSelectionReady(state, chart) && !!chart.zoom;
+  const label = t("Уменьшить масштаб", state.locale);
   return (
     <button
       id="zoom-out"
@@ -53,7 +69,7 @@ export function ChartZoomOutButton({ onChoose }: { onChoose: () => void }) {
       className="tool"
       title={label}
       aria-label={label}
-      disabled={!chartNavigationReady(state, chart) || !chart.zoom}
+      disabled={!ready}
       onClick={() => {
         const activeChart = controller.chart;
         if (!chartNavigationReady(controller.getSnapshot(), activeChart) || !activeChart.zoom)
@@ -68,7 +84,7 @@ export function ChartZoomOutButton({ onChoose }: { onChoose: () => void }) {
 }
 
 export function ChartRangeZoom({ active }: { active: boolean }) {
-  const { controller } = useTerminal();
+  const controller = useTerminalController();
   const session = chartRangeZoomSession(controller);
   const armed = useSyncExternalStore(session.subscribe, session.isArmed, session.isArmed);
   const anchor = useRef<HTMLSpanElement>(null);

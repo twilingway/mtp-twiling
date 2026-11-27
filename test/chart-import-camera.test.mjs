@@ -8,7 +8,7 @@ import ts from "typescript";
 
 const root = fileURLToPath(new URL("../src/", import.meta.url));
 function sources(overrides) {
-  const context = vm.createContext({ console, Map, Date, Math, TextEncoder, TextDecoder }),
+  const context = vm.createContext({ console, Map, Date, Math, TextEncoder, TextDecoder, DOMException }),
     modules = new Map();
   function load(relative) {
     const file = path.resolve(root, relative).replace(/\.js$/, ".ts"),
@@ -63,6 +63,7 @@ async function fixture(fails = false) {
         db.set(id, { id, owner: account, value: view.value });
       }
       await camera.saveAdapterView(outgoing, account, key);
+      controls.onImportReturn?.();
       return { drawings: 0, images: 0, history: 0 };
     },
     loadWatchlist: async () => undefined
@@ -162,12 +163,41 @@ test("backup camera survives outgoing cleanup while only the importing owner's s
   const restored = await f.camera.loadChartView(f.owner, f.key);
   assert.equal(restored.camera.barSpace, 15);
   assert.equal(restored.anchor.timestamp, 1700000000000);
-  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline:1d"), false);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline"), false);
   assert.equal(f.db.has("layout:owner"), true);
   assert.equal(f.db.has(`view:${f.owner}:${f.key}`), true);
-  assert.equal(f.db.has("chart-camera:profile-v2:owner:child:kline:1d"), true);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:child:kline"), true);
   const other = await f.camera.loadChartView("owner:child", "RTSI:1d:kline:365");
   assert.equal(other.camera.barSpace, 21);
+});
+
+test("native commit notifies once before a late guard cancellation and leaves recoverable UI state", async () => {
+  const f = await fixture();
+  let current = true, commits = 0;
+  f.controls.onImportReturn = () => { current = false; };
+  await assert.rejects(f.importTerminalBackup(f.backup, f.bridge, {
+    valid: () => current,
+    onCommitted: () => { commits++; }
+  }), { name: "AbortError" });
+  assert.equal(commits, 1);
+  assert.equal(f.state.importRecoveryRequired, true);
+  assert.equal(f.events.filter((event) => event === "import").length, 1);
+  assert.deepEqual(f.db.get(`view:${f.owner}:${f.key}`).value, f.incoming);
+});
+
+test("native commit during a bank transition reports the commit and restores later without repeating writes", async () => {
+  const f = await fixture();
+  let commits = 0;
+  f.controls.onImportReturn = () => { f.state.profileTransition = true; };
+  await f.importTerminalBackup(f.backup, f.bridge, { onCommitted: () => { commits++; } });
+  assert.equal(commits, 1);
+  assert.equal(f.state.importRecoveryRequired, true);
+  assert.equal(f.events.includes("prepare"), false);
+  f.state.profileTransition = false;
+  await f.restoreImportedProfile(f.bridge);
+  assert.equal(f.state.importRecoveryRequired, false);
+  assert.equal(f.events.filter((event) => event === "import").length, 1);
+  assert.deepEqual(await f.camera.loadChartView(f.owner, f.key), f.incoming);
 });
 
 test("failed import restores outgoing persistence and retains the shared camera", async () => {
@@ -180,7 +210,7 @@ test("failed import restores outgoing persistence and retains the shared camera"
   assert.equal(f.events.filter((event) => event === "view.save").length, 2);
   assert.equal(f.events.includes("history.reset"), false);
   assert.equal(f.events.includes("editing.reset"), false);
-  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline:1d"), true);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline"), true);
 });
 
 test("invalid backup does not flush, retire the adapter, or reset history", async () => {
@@ -192,7 +222,7 @@ test("invalid backup does not flush, retire the adapter, or reset history", asyn
   assert.equal(f.outgoing.persistView, undefined);
   assert.equal(f.outgoing.retired, undefined);
   assert.equal(f.state.chartRevision, 0);
-  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline:1d"), true);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline"), true);
 });
 
 test("successful import remains retired when late lifecycle/data work re-enables persistView", async () => {

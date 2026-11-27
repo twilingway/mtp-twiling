@@ -287,6 +287,8 @@ function fixture() {
     views: [{ key, value: initialView() }]
   };
   const modules = sources({
+    // This camera unit fixture never starts a workspace migration or opens IndexedDB.
+    "services/storage-db.ts": {},
     "services/storage.ts": {
       flush: async () => {
         flushes.storage++;

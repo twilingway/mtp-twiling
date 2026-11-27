@@ -108,9 +108,9 @@ export const INTERVALS: readonly IntervalDefinition[] = [
   native("2h", "2 часа", "2ч", "hours", 10, "2_HOUR", "2_HOUR", 3, "month", 2400),
   derived("3h", "3 часа", "3ч", "hours", "1h", { minutes: 180 }),
   native("4h", "4 часа", "4ч", "hours", 11, "4_HOUR", "4_HOUR", 3, "month", 700),
-  native("1d", "1 день", "1Д", "days", 5, "DAY", "ONE_DAY", 6, "year", 2400),
-  native("1w", "1 неделя", "1Н", "days", 12, "WEEK", "WEEK", 5, "year", 300),
-  native("1M", "1 месяц", "1М", "days", 13, "MONTH", "MONTH", 10, "year", 120),
+  native("1d", "День", "Д", "days", 5, "DAY", "ONE_DAY", 6, "year", 2400),
+  native("1w", "Неделя", "Н", "days", 12, "WEEK", "WEEK", 5, "year", 300),
+  native("1M", "Месяц", "М", "days", 13, "MONTH", "MONTH", 10, "year", 120),
   derived("3M", "3 месяца", "3М", "days", "1M", { months: 3 }),
   derived("6M", "6 месяцев", "6М", "days", "1M", { months: 6 }),
   derived("12M", "12 месяцев", "12М", "days", "1M", { months: 12 })

@@ -1,3 +1,5 @@
+import { selectStoragePanelState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { HistorySettingsModel, selectedHistory } from "../../model/history-settings.js";
 import { t } from "../../i18n/messages.js";
@@ -15,7 +17,7 @@ function bytes(value: number): string {
   );
 }
 export function StoragePanel() {
-  const { controller, state } = useTerminal(),
+  const { controller, state } = useTerminal(selectStoragePanelState, shallowEqual),
     session = controller.sessionKey(),
     [model] = useState(
       () =>

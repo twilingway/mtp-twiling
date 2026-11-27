@@ -60,6 +60,7 @@
 
 .chart-panel .chart-heading[data-grid-depth="true"] {
   container: workspace-price-header / inline-size;
+  min-inline-size: 52px;
   max-inline-size: 100%;
   padding: 5px 6px;
 }
@@ -136,7 +137,7 @@
 .chart-instrument-heading .chart-range-control[data-placement="plot"] {
   position: relative;
   flex: none;
-  min-inline-size: 0;
+  min-inline-size: 40px;
   min-block-size: 24px;
   padding: 0;
   border: 1px solid var(--control-line);
@@ -175,7 +176,8 @@
   align-items: center;
   justify-content: center;
   gap: 4px;
-  min-inline-size: 24px;
+  min-inline-size: 38px;
+  min-block-size: 22px;
   padding-inline: 4px;
   white-space: nowrap;
   font-size: 11px;
@@ -206,7 +208,7 @@
 }
 
 @container workspace-price-header (max-width: 122px) {
-  .chart-depth-days {
+  .chart-depth-icon {
     display: none;
   }
 }
@@ -231,13 +233,22 @@
   }
 }
 
-@media (pointer: coarse) {
-  .chart-timeframe-inline,
+@media (pointer: coarse), (max-width: 800px) {
+  .chart-timeframe-inline {
+    min-block-size: 40px;
+  }
+
   .chart-instrument-heading .chart-range-control[data-placement="plot"] {
-    min-block-size: 32px;
+    min-block-size: 42px;
+  }
+
+  .chart-range-control[data-placement="plot"] select {
+    min-block-size: 40px;
+    box-sizing: border-box;
   }
 
   .chart-depth-pill {
-    min-inline-size: 30px;
+    min-inline-size: 38px;
+    min-block-size: 40px;
   }
 }
