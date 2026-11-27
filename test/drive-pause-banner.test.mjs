@@ -17,7 +17,11 @@ function fixture() {
       useEffect: () => {}, useState: (initial) => [initial, () => {}],
       useSyncExternalStore: (_subscribe, getSnapshot) => getSnapshot()
     }, "react/jsx-runtime": jsx,
-    "screens/terminal/context.tsx": { useTerminal: () => ({ controller, state }) },
+    "screens/terminal/context.tsx": {
+      useTerminal: (select) => ({ controller, state: select ? select(state) : state }),
+      useTerminalController: () => controller,
+      useTerminalState: (_controller, select) => select(state)
+    },
     "screens/terminal/controller-cloud-sync.ts": { CLOUD_PROVIDERS: ["google-drive", "yandex-disk"], terminalCloudSync: (_controller, id) => id === "google-drive" ? drive : yandex },
     "screens/terminal/CloudSyncSettings.tsx": { CloudSyncSettings: () => null },
     "screens/terminal/BackupTransferSettings.tsx": { BackupTransferSettings: () => null },

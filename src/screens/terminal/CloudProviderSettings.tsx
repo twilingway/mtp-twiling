@@ -9,6 +9,8 @@ import type {
 import { t } from "../../i18n/messages.js";
 import { intlLocale } from "../../i18n/preferences.js";
 import { useTerminal } from "./context.js";
+import { shallowEqual } from "./snapshot-selector.js";
+import type { TerminalState } from "./state.js";
 import { cloudOperationTiming } from "./cloud-operation-clock.js";
 const phases: Record<CloudSyncStatus["phase"], string> = {
   disabled: "Синхронизация выключена",
@@ -70,6 +72,17 @@ function Summary({
     </p>
   );
 }
+const selectCloudControls = (state: TerminalState) => ({
+  profileTransition: state.profileTransition,
+  backupBusy: state.backupBusy,
+  importRecoveryRequired: state.importRecoveryRequired,
+  workspaceMigrationIncomplete: state.workspaceMigrationIncomplete,
+  loading: state.loading,
+  ready: state.ready,
+  preview: !!state.preview,
+  activeTool: !!state.activeTool,
+  locale: state.preferences.locale
+});
 export function CloudProviderSettings({
   provider,
   children
@@ -77,7 +90,7 @@ export function CloudProviderSettings({
   provider: CloudSyncProvider;
   children?: ReactNode;
 }) {
-  const { state } = useTerminal();
+  const { state } = useTerminal(selectCloudControls, shallowEqual);
   const status = useSyncExternalStore(
     provider.subscribe,
     provider.getSnapshot,

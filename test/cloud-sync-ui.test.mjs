@@ -38,7 +38,11 @@ function modules(providers = new Map()) {
   const load = sourceModules({
     react,
     "react/jsx-runtime": jsx,
-    "screens/terminal/context.tsx": { useTerminal: () => ({ state, controller }) },
+    "screens/terminal/context.tsx": {
+      useTerminal: (select) => ({ state: select ? select(state) : state, controller }),
+      useTerminalController: () => controller,
+      useTerminalState: (_controller, select) => select(state)
+    },
     "screens/terminal/controller-cloud-sync.ts": {
       CLOUD_PROVIDERS: ["google-drive", "yandex-disk"],
       terminalCloudSync: (_controller, id) => providers.get(id)

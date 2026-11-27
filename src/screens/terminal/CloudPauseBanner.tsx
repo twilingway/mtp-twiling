@@ -1,11 +1,14 @@
 import { useSyncExternalStore } from "react";
 import { t } from "../../i18n/messages.js";
 import type { CloudProviderId } from "../../model/cloud-sync.js";
-import { useTerminal } from "./context.js";
+import { useTerminalController, useTerminalState } from "./context.js";
+import type { TerminalState } from "./state.js";
 import { CLOUD_PROVIDERS, terminalCloudSync } from "./controller-cloud-sync.js";
 
+const selectLocale = (state: TerminalState) => state.preferences.locale;
 function ProviderPause({ id }: { id: CloudProviderId }) {
-  const { controller } = useTerminal();
+  const controller = useTerminalController();
+  useTerminalState(controller, selectLocale);
   const provider = terminalCloudSync(controller, id);
   const status = useSyncExternalStore(
     provider.subscribe,

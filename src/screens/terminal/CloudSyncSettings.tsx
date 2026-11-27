@@ -1,11 +1,14 @@
 import { t } from "../../i18n/messages.js";
-import { useTerminal } from "./context.js";
+import { useTerminalController, useTerminalState } from "./context.js";
+import type { TerminalState } from "./state.js";
 import { terminalCloudSync } from "./controller-cloud-sync.js";
 import { CloudProviderSettings } from "./CloudProviderSettings.js";
 import { GoogleDriveSettings } from "./GoogleDriveSettings.js";
 
+const selectLocale = (state: TerminalState) => state.preferences.locale;
 export function CloudSyncSettings() {
-  const { controller } = useTerminal();
+  const controller = useTerminalController();
+  useTerminalState(controller, selectLocale);
   return (
     <section id="cloud-sync-settings" className="transfer-settings cloud-sync-settings">
       <h3>{t("Облачная синхронизация")}</h3>

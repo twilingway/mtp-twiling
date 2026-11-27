@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { t } from "../../i18n/messages.js";
 import { terminalGoogleRetention } from "./controller-drive.js";
-import { useTerminal } from "./context.js";
+import { useTerminal, useTerminalController } from "./context.js";
+import { shallowEqual } from "./snapshot-selector.js";
+import type { TerminalState } from "./state.js";
 
 type GoogleRetention = NonNullable<ReturnType<typeof terminalGoogleRetention>>;
+const selectRetentionControls = (state: TerminalState) => ({
+  importRecoveryRequired: state.importRecoveryRequired,
+  locale: state.preferences.locale
+});
 export function GoogleDriveSettings() {
-  const { controller } = useTerminal();
+  const controller = useTerminalController();
   const google = terminalGoogleRetention(controller);
   return google ? <RetentionDetails google={google} /> : null;
 }
 function RetentionDetails({ google }: { google: GoogleRetention }) {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectRetentionControls, shallowEqual);
   const status = useSyncExternalStore(google.subscribe, google.getSnapshot, google.getSnapshot);
   const [busy, setBusy] = useState(false);
   const [elapsed, setElapsed] = useState(0),
