@@ -7,23 +7,35 @@ import { physicalOwner, prepareProfileV2 } from "./storage-v2-migration.js";
 
 interface SharedView {
   symbol: string;
+  timeframe?: string;
   camera: ChartCamera;
 }
-const memory = new Map<string, SharedView & { owner: string }>();
-function scope(owner: string, source: { engine: string; timeframe: string }): string {
-  return `chart-camera:${physicalOwner(owner)}:${source.engine}:${source.timeframe}`;
+const memory = new Map<string, SharedView & { owner: string; key?: string; view?: ChartView }>();
+const writes = new Map<string, Promise<void>>();
+function scope(owner: string, source: { engine: string }): string {
+  return `chart-camera:${physicalOwner(owner)}:${source.engine}`;
 }
 export async function saveChartView(owner: string, key: string, view: ChartView): Promise<void> {
   const source = parseChartViewKey(key);
   if (!source) return;
-  const { symbol } = source;
-  const shared = isChartCamera(view.camera) ? { symbol, camera: view.camera } : undefined;
+  const { symbol, timeframe } = source;
+  const shared = isChartCamera(view.camera)
+    ? { symbol, timeframe, camera: { ...view.camera } }
+    : undefined;
   const id = scope(owner, source);
-  if (shared) memory.set(id, { ...shared, owner });
-  await Promise.all([
-    saveView(owner, key, view),
-    ...(shared ? [put("preferences", { id, owner: physicalOwner(owner), value: shared })] : [])
-  ]);
+  const snapshot = {
+    ...view,
+    ...(view.camera ? { camera: { ...view.camera } } : {}),
+    ...(view.anchor ? { anchor: { ...view.anchor } } : {})
+  };
+  if (shared) memory.set(id, { ...shared, owner, key, view: snapshot });
+  const write = shared
+    ? (writes.get(id) ?? Promise.resolve())
+        .catch(() => {})
+        .then(() => put("preferences", { id, owner: physicalOwner(owner), value: shared }))
+    : undefined;
+  if (write) writes.set(id, write);
+  await Promise.all([saveView(owner, key, snapshot), ...(write ? [write] : [])]);
 }
 /** Keep the legacy depth key; a later import transaction wins in IDB transaction order. */
 export async function copyDepthChartView(
@@ -51,7 +63,12 @@ export async function loadChartView(owner: string, key: string): Promise<ChartVi
   const source = parseChartViewKey(key);
   if (!source) return undefined;
   const id = scope(owner, source),
-    [saved, record] = await Promise.all([loadView(owner, key), get("preferences", id)]);
+    [saved, current, legacy] = await Promise.all([
+      loadView(owner, key),
+      get("preferences", id),
+      get("preferences", `${id}:${source.timeframe}`)
+    ]),
+    record = current ?? legacy;
   let shared = memory.get(id);
   if (!shared && record && typeof record === "object" && "value" in record) {
     const value: unknown = record.value;
@@ -63,11 +80,26 @@ export async function loadChartView(owner: string, key: string): Promise<ChartVi
       "camera" in value &&
       isChartCamera(value.camera)
     ) {
-      shared = { symbol: value.symbol, camera: value.camera, owner };
-      memory.set(id, shared);
+      shared = {
+        symbol: value.symbol,
+        camera: value.camera,
+        owner,
+        ...(record === legacy
+          ? { timeframe: source.timeframe }
+          : "timeframe" in value && typeof value.timeframe === "string"
+            ? { timeframe: value.timeframe }
+            : {})
+      };
+      // Legacy per-timeframe records remain a fallback, never a cross-timeframe memory entry.
+      if (record !== legacy) memory.set(id, shared);
     }
   }
-  return chooseChartView(source.symbol, saved, shared);
+  return chooseChartView(
+    source.symbol,
+    shared?.key === key ? (shared.view ?? saved) : saved,
+    shared,
+    source.timeframe
+  );
 }
 
 export async function saveAdapterView(
@@ -82,6 +114,11 @@ export async function saveAdapterView(
 
 /** A backup's per-symbol views take precedence over outgoing live shared-camera state. */
 export async function resetSharedChartCamera(owner: string): Promise<void> {
+  await Promise.all(
+    [...writes].flatMap(([key, write]) =>
+      memory.get(key)?.owner === owner ? [write.catch(() => {})] : []
+    )
+  );
   const records = await all("preferences");
   const ids = records.flatMap((record) => {
     if (!record || typeof record !== "object" || !("id" in record) || !("owner" in record))

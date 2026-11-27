@@ -4,6 +4,7 @@ import { selectedMarketRow } from "../../model/selected-instrument.js";
 import type { TerminalController } from "./controller.js";
 import type { TerminalPreferences } from "./state.js";
 import { viewKey } from "./controller-bridge.js";
+import { fenceCameraWrites } from "./controller-camera-sync.js";
 
 type Controller = Pick<TerminalController, "getSnapshot" | "chart" | "subscribe"> &
   Partial<Pick<TerminalController, "workspaceSlot">>;
@@ -30,10 +31,12 @@ export async function saveControllerView(controller: Controller): Promise<void> 
   )
     return;
   const view = chart?.getView();
-  if (!view) return;
+  if (!view || (controller.workspaceSlot === undefined && state.owner === "guest")) return;
+  const saved = fenceCameraWrites(controller);
   if (controller.workspaceSlot !== undefined)
     await saveWorkspaceView(state.owner, controller.workspaceSlot, key, view);
-  else if (state.owner !== "guest") await saveChartView(state.owner, key, view);
+  else await saveChartView(state.owner, key, view);
+  saved();
 }
 
 export function historyDepthTransition(

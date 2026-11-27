@@ -11,16 +11,28 @@ interface CameraState {
   listeners: Set<(kind: Change) => void>;
   writes: Promise<void>;
   sequence: number;
+  writeRevision: number;
   pending?: { scope: symbol; sequence: number; current: () => boolean } | undefined;
 }
-const cameras = new WeakMap<TerminalController, CameraState>();
-function cameraState(controller: TerminalController): CameraState {
+const cameras = new WeakMap<object, CameraState>();
+function cameraState(controller: object): CameraState {
   let state = cameras.get(controller);
   if (!state) {
-    state = { listeners: new Set(), writes: Promise.resolve(), sequence: 0 };
+    state = { listeners: new Set(), writes: Promise.resolve(), sequence: 0, writeRevision: 0 };
     cameras.set(controller, state);
   }
   return state;
+}
+/** A live capture supersedes queued snapshots; only its successful write may release its epoch. */
+export function fenceCameraWrites(controller: object): () => void {
+  const state = cameraState(controller),
+    revision = ++state.writeRevision,
+    pending = state.pending;
+  return () => {
+    if (state.writeRevision !== revision || !pending || state.pending !== pending) return;
+    state.pending = undefined;
+    if (pending.current()) state.listeners.forEach((listener) => listener("change"));
+  };
 }
 export function cameraPending(controller: TerminalController): boolean {
   const state = cameraState(controller);
@@ -101,7 +113,8 @@ export function cameraCallbacks(
     onCameraChange: (view) => {
       if (!valid()) return;
       const captured = chart();
-      const sequence = state.pending?.sequence;
+      const sequence = state.pending?.sequence,
+        revision = ++state.writeRevision;
       const snapshot = {
         ...view,
         ...(view.camera ? { camera: { ...view.camera } } : {}),
@@ -110,17 +123,17 @@ export function cameraCallbacks(
       const owner = controller.getSnapshot().owner,
         key = viewKey(controller.getSnapshot().preferences);
       state.writes = state.writes.then(async () => {
-        if (!valid() || chart() !== captured) return;
+        if (!valid() || chart() !== captured || state.writeRevision !== revision) return;
         try {
           await save(owner, key, snapshot);
-          if (valid()) {
+          if (valid() && state.writeRevision === revision) {
             failed = false;
             if (state.pending?.scope === scope && state.pending.sequence === sequence)
               state.pending = undefined;
             emit("change");
           }
         } catch {
-          if (valid() && !failed) {
+          if (valid() && state.writeRevision === revision && !failed) {
             failed = true;
             controller.notify(
               t(

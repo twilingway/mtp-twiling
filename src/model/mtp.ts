@@ -1,4 +1,6 @@
 import type { Candle, IndicatorOptions, MtpKey } from "./types.js";
+import { ScreenLineSimplifier } from "./screen-line-simplifier.js";
+import { MtpRasterCache } from "./mtp-raster-cache.js";
 // Exact periods transcribed from the user's three original Pine sources.
 export const MTP_DEFINITIONS: Record<
   Exclude<MtpKey, "mtpAll">,
@@ -56,6 +58,8 @@ export class MtpModel {
   prefix: Float64Array;
   bounds: Bounds[];
   length = 0;
+  revision = 0;
+  resetRevision = 0;
   styles: IndicatorOptions | undefined;
   styleKey: MtpKey | undefined;
   constructor() {
@@ -65,6 +69,8 @@ export class MtpModel {
     this.bounds = [];
   }
   reset(data: readonly Candle[], periods: readonly number[]) {
+    this.revision++;
+    this.resetRevision++;
     this.data = data;
     this.periods = periods;
     this.prefix = new Float64Array(Math.max(1024, data.length * 2) + 1);
@@ -104,6 +110,7 @@ export class MtpModel {
       return;
     }
     this.data = data;
+    this.revision++;
     const i = data.length - 1;
     if (i >= 0) {
       this.prefix[i + 1] = (this.prefix[i] ?? 0) + (data[i]?.close ?? 0);
@@ -132,7 +139,8 @@ export class MtpModel {
     from: number,
     to: number,
     xFor: (index: number) => number | null,
-    yFor: (price: number | null) => number | null
+    yFor: (price: number | null) => number | null,
+    bitmap?: { verticalPixelRatio: number }
   ) {
     const start = Math.max(0, Math.floor(from) - 1),
       end = Math.min(this.data.length - 1, Math.ceil(to) + 1);
@@ -140,6 +148,20 @@ export class MtpModel {
     const step = Math.max(1, Math.ceil((end - start) / 3000));
     // Every period shares the axis; keep null/nonfinite gaps and each period's sampling phase.
     const xCoordinates = new Array<number | null | undefined>(end - start + 1);
+    let simplifier: ScreenLineSimplifier | undefined;
+    if (
+      bitmap &&
+      start < end &&
+      Number.isFinite(bitmap.verticalPixelRatio) &&
+      bitmap.verticalPixelRatio > 0
+    ) {
+      const firstX = xFor(start),
+        nextX = xFor(start + 1);
+      xCoordinates[0] = firstX;
+      if (start < end) xCoordinates[1] = nextX;
+      if (firstX != null && nextX != null && nextX > firstX && nextX - firstX < 1)
+        simplifier = new ScreenLineSimplifier(0.25 / bitmap.verticalPixelRatio);
+    }
     ctx.save();
     ctx.setLineDash([]);
     ctx.strokeStyle = "#1e90ff";
@@ -160,13 +182,25 @@ export class MtpModel {
         if (x === undefined) xCoordinates[offset] = x = xFor(i);
         const y = yFor(value);
         if (x == null || y == null || !Number.isFinite(x) || !Number.isFinite(y)) {
+          if (begun && simplifier) {
+            const last = simplifier.finish();
+            if (last) ctx.lineTo(last.x, last.y);
+          }
           begun = false;
           continue;
         }
         if (!begun) {
           ctx.moveTo(x, y);
+          simplifier?.reset(x, y);
           begun = true;
+        } else if (simplifier) {
+          const point = simplifier.push(x, y);
+          if (point) ctx.lineTo(point.x, point.y);
         } else ctx.lineTo(x, y);
+      }
+      if (begun && simplifier) {
+        const last = simplifier.finish();
+        if (last) ctx.lineTo(last.x, last.y);
       }
       ctx.stroke();
     }
@@ -178,6 +212,7 @@ export interface MtpBitmapScope {
   context: CanvasRenderingContext2D;
   horizontalPixelRatio: number;
   verticalPixelRatio: number;
+  bitmapSize?: { width: number; height: number };
 }
 export interface MtpDrawTarget {
   useBitmapCoordinateSpace(action: (scope: MtpBitmapScope) => void): void;
@@ -249,8 +284,14 @@ function lightweightPriceProjection(series: MtpSeries, model: MtpModel, from: nu
     return Number.isFinite(y) ? y : native(price);
   };
 }
-export function lightweightMtp(chart: MtpChart, series: MtpSeries, model: MtpModel) {
+export function lightweightMtp(
+  chart: MtpChart,
+  series: MtpSeries,
+  model: MtpModel,
+  container?: HTMLElement
+) {
   let requestUpdate = () => {};
+  const raster = new MtpRasterCache(() => requestUpdate(), container);
   const primitive: MtpPrimitive = {
     attached(params) {
       requestUpdate = params.requestUpdate;
@@ -266,20 +307,34 @@ export function lightweightMtp(chart: MtpChart, series: MtpSeries, model: MtpMod
               const timeScale = chart.timeScale();
               const range = timeScale.getVisibleLogicalRange();
               if (!range) return;
-              target.useBitmapCoordinateSpace(
-                ({ context, horizontalPixelRatio, verticalPixelRatio }) => {
-                  context.save();
-                  context.scale(horizontalPixelRatio, verticalPixelRatio);
+              target.useBitmapCoordinateSpace((scope) => {
+                const { context, horizontalPixelRatio, verticalPixelRatio } = scope;
+                context.save();
+                context.scale(horizontalPixelRatio, verticalPixelRatio);
+                const xFor = (index: number) => timeScale.logicalToCoordinate(index);
+                const paint = (target: CanvasRenderingContext2D) =>
                   model.draw(
-                    context,
+                    target,
                     range.from,
                     range.to,
-                    (index) => timeScale.logicalToCoordinate(index),
+                    xFor,
                     lightweightPriceProjection(series, model, range.from, range.to)
                   );
-                  context.restore();
-                }
-              );
+                if (
+                  !raster.draw({
+                    scope,
+                    model,
+                    from: range.from,
+                    to: range.to,
+                    mode: series.priceScale?.().options().mode,
+                    xFor,
+                    yFor: (price) => series.priceToCoordinate(price),
+                    paint
+                  })
+                )
+                  paint(context);
+                context.restore();
+              });
             }
           })
         }
@@ -297,6 +352,7 @@ export function lightweightMtp(chart: MtpChart, series: MtpSeries, model: MtpMod
       requestUpdate();
     },
     destroy() {
+      raster.destroy();
       series.detachPrimitive(primitive);
     }
   };

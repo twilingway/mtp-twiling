@@ -295,6 +295,8 @@ export class WorkspacePanelController extends TerminalController {
       (!Number.isFinite(rangeDays) || rangeDays < 1 || rangeDays > 3650)
     )
       throw new RangeError("Недопустимая глубина истории.");
+    if (timeframe !== undefined || rangeDays !== undefined || engine !== undefined)
+      void this.saveView().catch(() => {});
     this.local = {
       ...local,
       ...(indicators && { indicators }),

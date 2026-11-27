@@ -208,8 +208,8 @@ export async function routingFixture() {
   );
   controller = new (load("screens/terminal/controller.ts").TerminalController)();
   const DAY = 86400000;
-  const bars = Array.from({ length: 501 }, (_, i) => ({
-    timestamp: Date.now() - (500 - i) * DAY,
+  const bars = Array.from({ length: 1001 }, (_, i) => ({
+    timestamp: Date.now() - (1000 - i) * DAY,
     open: 10,
     high: 12,
     low: 9,
@@ -229,8 +229,15 @@ export async function routingFixture() {
       });
       const result = await hooks.candles?.(symbol, timeframe, range, options);
       if (result) return result;
+      const interval = load("model/intervals/native-timeframes.ts").NATIVE_TIMEFRAME_CONFIG[timeframe].ms ?? 30 * DAY;
+      const available = interval === DAY
+        ? bars
+        : Array.from({ length: 1001 }, (_, i) => ({
+            ...bars[0],
+            timestamp: Date.now() - (1000 - i) * interval
+          }));
       return {
-        candles: bars.filter((bar) => bar.timestamp >= range.from),
+        candles: available.filter((bar) => bar.timestamp >= range.from),
         requests: 0,
         cached: true
       };

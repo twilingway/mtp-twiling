@@ -56,7 +56,7 @@ test("shared camera crosses symbols without old date anchors; same-symbol reload
   assert.equal(signedRightOffset(800, 1034, 12), -20);
 });
 
-test("camera persistence scopes owner/engine/timeframe and keeps signed historical offset", async () => {
+test("camera persistence scopes owner/engine, shares timeframes, and keeps signed historical offset", async () => {
   const db = new Map(),
     views = new Map();
   const load = sources({
@@ -85,7 +85,7 @@ test("camera persistence scopes owner/engine/timeframe and keeps signed historic
   assert.equal(switched.anchor, undefined);
   assert.equal((await loadChartView("owner1", "GAZP:1d:kline:365")).anchor.timestamp, 2000);
   assert.equal(await loadChartView("owner2", "RTSI:1d:kline:365"), undefined);
-  assert.equal(await loadChartView("owner1", "RTSI:1h:kline:365"), undefined);
+  assert.equal((await loadChartView("owner1", "RTSI:1h:kline:365")).camera.rightOffsetBars, -123.25);
   assert.equal(await loadChartView("owner1", "RTSI:1d:tradingview:365"), undefined);
   await saveChartView("owner1", "RUS:GAZP:1d:kline:365", view);
   assert.equal((await loadChartView("owner1", "RUS:GAZP:1d:kline:365")).anchor.timestamp, 2000);

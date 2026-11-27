@@ -225,9 +225,9 @@ export function ChartPanel({
             refresh={extra.calendar.refresh}
             {...(p.locale ? { locale: p.locale } : {})}
           />
-          <ImageLayer />
+          <ImageLayer drawingProjection={drawingProjection} />
           <DrawingAxisLabels drawingProjection={drawingProjection} />
-          {slot === 1 && <CandleCountdown />}
+          <CandleCountdown drawingProjection={drawingProjection} />
           <SupplementalStudyStatusContext.Provider value={studyStatus}>
             <TechnicalIndicatorPanels metrics={metrics} />
           </SupplementalStudyStatusContext.Provider>

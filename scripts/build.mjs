@@ -1,8 +1,14 @@
-import { readFile, writeFile, readdir, mkdir, unlink, copyFile } from "node:fs/promises";
+import { readFile, writeFile, readdir, unlink } from "node:fs/promises";
 import { join, dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { prepareVersion } from "./prepare-version.mjs";
+import {
+  browserBuildOptions,
+  browserEntryPoints,
+  installEntryPoints,
+  copyBrowserLicenses
+} from "./browser-build-config.mjs";
 const root = dirname(dirname(fileURLToPath(import.meta.url))),
   publicDir = join(root, "public");
 async function walk(dir) {
@@ -53,31 +59,15 @@ for (const file of legacy) {
   }
 }
 const { version, buildId } = await prepareVersion(root);
-const browserBuild = {
-  absWorkingDir: root,
-  bundle: true,
-  platform: "browser",
-  target: "es2023",
-  outdir: "public",
-  metafile: true,
-  minify: true,
-  legalComments: "eof"
-};
+const browserBuild = browserBuildOptions(root, "public");
 const installCapture = await build({
   ...browserBuild,
-  entryPoints: { "pwa-install-entry": "src/pwa-install-entry.ts" },
+  entryPoints: installEntryPoints,
   format: "iife"
 });
 const result = await build({
   ...browserBuild,
-  entryPoints: {
-    "app-entry": "src/main.tsx",
-    "history-codec": "src/model/history-codec.ts",
-    "market-model": "src/model/market-model.ts",
-    mtp: "src/model/mtp.ts",
-    "drawing-model": "src/model/drawing-model.ts",
-    "backup-format": "src/model/backup-format.ts"
-  },
+  entryPoints: browserEntryPoints,
   splitting: true,
   format: "esm",
   chunkNames: "assets/[name]-[hash]",
@@ -88,23 +78,7 @@ const outputs = [
   ...Object.keys(result.metafile.outputs)
 ];
 await writeFile(join(root, ".build-manifest.json"), JSON.stringify(outputs));
-await mkdir(join(publicDir, "licenses"), { recursive: true });
-for (const [dependency, files] of [
-  ["lightweight-charts", ["LICENSE", "NOTICE"]],
-  ["klinecharts", ["LICENSE", "NOTICE"]],
-  ["react", ["LICENSE"]],
-  ["react-dom", ["LICENSE"]]
-])
-  for (const file of files) {
-    try {
-      await copyFile(
-        join(root, "node_modules", dependency, file),
-        join(publicDir, "licenses", dependency + "-" + file + ".txt")
-      );
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-    }
-  }
+await copyBrowserLicenses(root, publicDir);
 const staticFiles = (await walk(publicDir)).filter(
   (file) => !["version.json", "service-worker.js"].includes(relative(publicDir, file))
 );

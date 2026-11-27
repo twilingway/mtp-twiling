@@ -191,6 +191,14 @@ test("an auxiliary chart changes only its own type and saves its own camera befo
     [
       "preferences",
       { id: `workspace-camera:${JSON.stringify([parent.owner, 2, view])}`, value: camera }
+    ],
+    [
+      "preferences",
+      {
+        id: `workspace-camera-shared:${JSON.stringify([parent.owner, 2, initial.preferences.symbol, initial.preferences.engine])}`,
+        owner: parent.owner,
+        value: { symbol: initial.preferences.symbol, timeframe: initial.preferences.timeframe, camera: camera.camera }
+      }
     ]
   ]);
 });

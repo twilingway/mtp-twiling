@@ -1,6 +1,6 @@
 {
   "name": "mtp-twiling",
-  "version": "0.3.43",
+  "version": "0.3.44",
   "private": true,
   "type": "module",
   "description": "Личный браузерный терминал с прямым T‑Invest API и локальными сохранениями",
@@ -8,7 +8,7 @@
     "node": ">=22.21.0"
   },
   "scripts": {
-    "dev": "pnpm build && node server.mjs",
+    "dev": "node scripts/dev.mjs",
     "start": "node server.mjs",
     "typecheck": "node scripts/prepare-version.mjs && tsc --noEmit",
     "build": "pnpm typecheck && node scripts/build.mjs",

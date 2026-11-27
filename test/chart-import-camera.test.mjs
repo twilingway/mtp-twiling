@@ -162,10 +162,10 @@ test("backup camera survives outgoing cleanup while only the importing owner's s
   const restored = await f.camera.loadChartView(f.owner, f.key);
   assert.equal(restored.camera.barSpace, 15);
   assert.equal(restored.anchor.timestamp, 1700000000000);
-  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline:1d"), false);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline"), false);
   assert.equal(f.db.has("layout:owner"), true);
   assert.equal(f.db.has(`view:${f.owner}:${f.key}`), true);
-  assert.equal(f.db.has("chart-camera:profile-v2:owner:child:kline:1d"), true);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:child:kline"), true);
   const other = await f.camera.loadChartView("owner:child", "RTSI:1d:kline:365");
   assert.equal(other.camera.barSpace, 21);
 });
@@ -180,7 +180,7 @@ test("failed import restores outgoing persistence and retains the shared camera"
   assert.equal(f.events.filter((event) => event === "view.save").length, 2);
   assert.equal(f.events.includes("history.reset"), false);
   assert.equal(f.events.includes("editing.reset"), false);
-  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline:1d"), true);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline"), true);
 });
 
 test("invalid backup does not flush, retire the adapter, or reset history", async () => {
@@ -192,7 +192,7 @@ test("invalid backup does not flush, retire the adapter, or reset history", asyn
   assert.equal(f.outgoing.persistView, undefined);
   assert.equal(f.outgoing.retired, undefined);
   assert.equal(f.state.chartRevision, 0);
-  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline:1d"), true);
+  assert.equal(f.db.has("chart-camera:profile-v2:owner:kline"), true);
 });
 
 test("successful import remains retired when late lifecycle/data work re-enables persistView", async () => {

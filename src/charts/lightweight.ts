@@ -1,5 +1,5 @@
 import { ColorType, CrosshairMode, createChart } from "lightweight-charts";
-import type { IPriceLine, ISeriesPrimitive, Logical, Time, UTCTimestamp } from "lightweight-charts";
+import type { ISeriesPrimitive, Logical, Time, UTCTimestamp } from "lightweight-charts";
 import { MtpModel, activeMtpPeriods, lightweightMtp } from "../model/mtp.js";
 import { TIMEFRAMES } from "../model/history-codec.js";
 import type { Candle, ChartView, DrawingPoint } from "../model/types.js";
@@ -9,7 +9,7 @@ import type { ChartAdapter, ChartOptions } from "./adapter.js";
 import { PendingChartView } from "./view-camera.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { chartPalette } from "../model/theme.js";
-import { lastPriceLabelColors, lastPriceStyle } from "../model/last-price-style.js";
+import { lightweightAxisLabels } from "./lightweight-axis-labels.js";
 import { hasCalendarAxis } from "../model/intervals/axis-ticks.js";
 import { paintCalendarAxis, paintCalendarGrid } from "./lightweight-calendar-grid.js";
 import { lightweightDateFormatters } from "../i18n/chart-formatters.js";
@@ -24,6 +24,7 @@ import { lightweightDrawingX } from "./lightweight-drawing-projection.js";
 import { lightweightBarTime as time, lightweightMainSeries } from "./lightweight-main-series.js";
 import { lightweightLoadedFit } from "./lightweight-loaded-fit.js";
 import { lightweightLink } from "./lightweight-link.js";
+import { stablePriceAxisWidth } from "./price-axis-layout.js";
 import {
   preserveLightweightCamera,
   preserveLightweightProjection,
@@ -43,8 +44,6 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     settleFrame: number | null = null;
   const pendingView = new PendingChartView();
   let pendingPriceRange: { from: number; to: number } | undefined;
-  let lastPriceLabel: IPriceLine | null = null;
-  let labelColors = lastPriceLabelColors(settings);
   const palette = chartPalette(settings);
   const dateFormatters = lightweightDateFormatters(timeframe, options);
   const display = calendarAxisDisplay(timeframe, options);
@@ -66,7 +65,11 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       },
       horzLines: { color: palette.grid, visible: settings.grid !== false }
     },
-    rightPriceScale: { borderColor: palette.border, scaleMargins: { top: 0.08, bottom: 0.22 } },
+    rightPriceScale: {
+      borderColor: palette.border,
+      scaleMargins: { top: 0.08, bottom: 0.22 },
+      minimumWidth: stablePriceAxisWidth(row, settings.scaleFontSize ?? 11, container.clientWidth)
+    },
     timeScale: {
       borderColor: palette.border,
       timeVisible: !["1d", "1w", "1M"].includes(timeframe),
@@ -99,6 +102,22 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
   );
   const main = lightweightMainSeries(chart, settings, priceFormat);
   const { series } = main;
+  const axisLabels = lightweightAxisLabels(
+    series,
+    settings,
+    () => data,
+    () => priceFormat,
+    pointToPixel,
+    (timestamp) =>
+      lightweightDrawingX(
+        chart.timeScale(),
+        logicalForTime(data, timestamp, TIMEFRAMES[timeframe].ms)
+      ),
+    () => ({
+      width: chart.timeScale().width(),
+      height: technical.metrics()[0]?.height ?? container.clientHeight - 28
+    })
+  );
   const legacy = lightweightLegacy(chart, options, lightweightPriceFormat(priceFormat));
   series.setSeriesOrder(3);
   const model = new MtpModel();
@@ -117,7 +136,8 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       attachPrimitive: (primitive) => series.attachPrimitive(primitive),
       detachPrimitive: (primitive) => series.detachPrimitive(primitive)
     },
-    model
+    model,
+    container
   );
   const primitive: ISeriesPrimitive<Time> = {
     attached: (params) => {
@@ -201,6 +221,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
         : []
   };
   series.attachPrimitive(primitive);
+  series.attachPrimitive(axisLabels.primitive);
   const loadedFit = lightweightLoadedFit(
     chart.timeScale(),
     () => data.length,
@@ -214,28 +235,6 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       ),
       y = series.priceToCoordinate(point.value);
     return x == null || y == null ? null : { x, y };
-  }
-  function updateLastPriceLabel() {
-    const bar = data.at(-1);
-    if (!bar) {
-      if (lastPriceLabel) series.removePriceLine(lastPriceLabel);
-      lastPriceLabel = null;
-      return;
-    }
-    const { color, fill, text } = lastPriceStyle(settings, bar.close >= bar.open, labelColors);
-    const label = {
-      price: bar.close,
-      color,
-      axisLabelColor: fill,
-      axisLabelTextColor: text,
-      axisLabelVisible: true,
-      lineVisible: settings.priceLine !== false,
-      lineWidth: 1 as const,
-      lineStyle: 2,
-      title: ""
-    };
-    if (lastPriceLabel) lastPriceLabel.applyOptions(label);
-    else lastPriceLabel = series.createPriceLine(label);
   }
   function restoreView() {
     if (settingData) return;
@@ -287,14 +286,14 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     () => data
   );
   const adapter: ChartAdapter = {
+    setDrawingAxisLabels(next) {
+      if (!live.retired) axisLabels.setDrawings(next);
+    },
+    setCandleCountdown(next) {
+      if (!live.retired) camera.programmatic(() => axisLabels.setCountdown(next));
+    },
     setLastPriceLabelColors(colors) {
-      if (
-        live.retired ||
-        (colors?.fill === labelColors?.fill && colors?.text === labelColors?.text)
-      )
-        return;
-      labelColors = colors;
-      camera.programmatic(updateLastPriceLabel);
+      if (!live.retired) camera.programmatic(() => axisLabels.setColors(colors));
     },
     updatePriceFormat(metadata) {
       if (
@@ -342,7 +341,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
         series.priceScale().setVisibleRange(pendingPriceRange);
         pendingPriceRange = undefined;
       }
-      updateLastPriceLabel();
+      axisLabels.refresh();
       legacy.setData(data);
       preserveLightweightProjection(chart, () => technical.setData(data), projectionDelta);
       mtp.update();
@@ -371,7 +370,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       if (historical && index < 0) main.setData(data);
       else main.update(bar, historical);
       if (index < 0) loadedFit.updateMinimum();
-      updateLastPriceLabel();
+      axisLabels.refresh();
       if (historical && index < 0) legacy.setData(data);
       else legacy.update(data, bar, historical);
       preserveLightweightProjection(chart, () => technical.setData(data), projectionDelta);
