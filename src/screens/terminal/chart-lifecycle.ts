@@ -24,6 +24,7 @@ import { watchChartPriceMetadata } from "./chart-price-metadata.js";
 import { publishWorkspaceCrosshair } from "./workspace-sync-controller.js";
 import { persistTechnicalPaneLayout } from "./technical-indicator-actions.js";
 import type { TerminalPreferences } from "./state.js";
+import { drawingHandleRadius } from "./chart-drawing-touch.js";
 
 function technicalInputs(preferences: TerminalPreferences) {
   const instances = preferences.technicalIndicators ?? [];
@@ -190,10 +191,10 @@ export function useChartCanvas(
             width,
             height,
             current.selectedObject,
-            container.closest<HTMLElement>(".chart-body")?.dataset.drawingTouch === "true" ||
-              window.matchMedia?.("(pointer: coarse)").matches
-              ? 13
-              : 5
+            drawingHandleRadius(
+              container,
+              window.matchMedia?.("(pointer: coarse)").matches ?? false
+            )
           );
           if (layer === "front") drawingProjection?.dispatchEvent(new Event("change"));
         }

@@ -7,6 +7,12 @@ import type { TerminalController } from "./controller.js";
 
 type PlotPointer = PointerEvent<HTMLDivElement>;
 
+/** Actual pointer input overrides device media queries on hybrid devices. */
+export function drawingHandleRadius(container: HTMLElement, coarse: boolean): number {
+  const touch = container.closest<HTMLElement>(".chart-body")?.dataset.drawingTouch;
+  return (touch === undefined ? coarse : touch === "true") ? 13 : 5;
+}
+
 /** Multi-click on mouse; a single captured drag for two-point touch tools. */
 export function createDrawingInput(
   controller: TerminalController,

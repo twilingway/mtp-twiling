@@ -325,15 +325,17 @@ test("five localized buttons expose names, isolate events and revalidate loading
   assert.equal((html.match(/disabled=""/g) ?? []).length, 5);
 });
 
-test("compact charts do not render the four-arrow navigation pad", () => {
+test("compact charts render no navigation pad or position RAF; desktop restarts and cleans up RAF", () => {
+  let compact = true, frames = 0, cancelled = 0;
+  const effects = [];
   const chart = { resetView() {}, scroll() {}, zoom() {} };
   const state = { preferences: { locale: "ru" } };
   const load = modules({
     react: {
-      useSyncExternalStore: () => true,
+      useSyncExternalStore: () => compact,
       useRef: () => ({ current: null }),
       useMemo: (factory) => factory(),
-      useEffect() {},
+      useEffect: (effect, dependencies) => effects.push({ effect, dependencies }),
       useState: () => [{ chart, left: 140, top: 200 }, () => {}]
     },
     "react/jsx-runtime": jsxRuntime,
@@ -341,7 +343,20 @@ test("compact charts do not render the four-arrow navigation pad", () => {
       useTerminal: () => ({ state, controller: { chart, getSnapshot: () => state } })
     },
     "./chart-navigation-state.js": { chartNavigationReady: () => true }
-  });
+  }, { requestAnimationFrame: () => ++frames, cancelAnimationFrame: () => cancelled++ });
   const { ChartNavigation } = load("screens/terminal/ChartNavigation.js");
   assert.equal(ChartNavigation(), null);
+  const compactPosition = effects.at(-1);
+  assert.equal(compactPosition.effect(), undefined);
+  assert.equal(compactPosition.dependencies[0], true);
+  assert.equal(frames, 0);
+  effects.length = 0;
+  compact = false;
+  assert.ok(ChartNavigation());
+  const desktopPosition = effects.at(-1);
+  assert.equal(desktopPosition.dependencies[0], false);
+  const cleanup = desktopPosition.effect();
+  assert.equal(frames, 1);
+  cleanup();
+  assert.equal(cancelled, 1);
 });

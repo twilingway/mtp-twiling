@@ -8,6 +8,7 @@ import { useTerminal } from "../context.js";
 import { ChevronIcon } from "./controls/ChevronIcon.js";
 import { MobileObjectWidget, useMobileObjectWidget } from "./MobileObjectWidget.js";
 import { selectedWidgetObject } from "./mobile-object-widget.js";
+import { bindMobileObjectMenuDismiss } from "./mobile-object-menu-dismiss.js";
 
 type LayerAction = "front" | "back" | "forward" | "backward";
 export function ContextMenu() {
@@ -47,6 +48,17 @@ export function ContextMenu() {
       document.querySelector<HTMLButtonElement>(".mobile-object-widget button:last-child")?.focus();
     }
   }, [menu, mobile]);
+  useEffect(() => {
+    if (!mobile) return;
+    return bindMobileObjectMenuDismiss(document, {
+      current: controller.getSnapshot,
+      contains: (target) => ref.current?.contains(target) ?? false,
+      dismiss: () => {
+        restoreWidgetFocus.current = true;
+        controller.setContext(null);
+      }
+    });
+  }, [controller, mobile]);
   useEffect(() => {
     if (!menu) return;
     const outside = (event: PointerEvent) => {
@@ -187,7 +199,7 @@ export function ContextMenu() {
       ref={ref}
       className={`chart-context-menu ${x + 490 > window.innerWidth ? "submenu-left" : ""}`}
       role="menu"
-      style={{ left: x, top: y }}
+      style={{ left: x, top: y, ...(mobile && { maxHeight: `calc(100dvh - ${y + 6}px)` }) }}
       onContextMenu={(event) => event.preventDefault()}
     >
       {drawing && (

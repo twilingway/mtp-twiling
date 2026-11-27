@@ -1,4 +1,26 @@
 export const accountMessages = {
+  Помощь: "Help",
+  "Ключ банка — на устройстве. Облако — по желанию.":
+    "Bank key: on this device. Cloud sync is optional.",
+  "Больше не показывать": "Don't show again",
+  Приватность: "Privacy",
+  "Графики, индикаторы и разметка.": "Charts, indicators and drawings.",
+  "Bybit и OKX — без ключа банка.": "Bybit and OKX work without a bank key.",
+  "Открыть графики": "Open charts",
+  "Ключ банка остаётся на устройстве. Личное облако — по желанию.":
+    "Your bank key stays on this device. Personal cloud sync is optional.",
+  "Источники и данные": "Sources and data",
+  "Котировки и ключ банка": "Quotes and bank key",
+  "Для российских инструментов нужен личный токен Т‑Инвестиций с правами только для чтения. Сделки в терминале не выполняются.":
+    "Russian instruments require your own read-only T-Invest token. The terminal does not place trades.",
+  "Хранение и синхронизация": "Storage and sync",
+  "История, рисунки и изображения сохраняются в браузере. Очистка данных сайта удалит локальные сохранения.":
+    "History, drawings and images stay in your browser. Clearing site data deletes local saves.",
+  "Для переноса настроек и разметки между устройствами можно подключить личное облако в настройках. История свечей остаётся локальной и экспортируется отдельно в JSON.":
+    "Connect your personal cloud in settings to move settings and drawings between devices. Candle history stays local and can be exported separately as JSON.",
+  "Помощь всегда доступна в меню MTP Twiling.": "Help is always available in the MTP Twiling menu.",
+  "Ссылки приложения": "Application links",
+  Конфиденциальность: "Privacy",
   "Сертификат Т‑Банка": "T-Bank certificate",
   "Сертификат Т‑Банка на Android": "T-Bank certificate on Android",
   "Поиск инструмента в хранилище": "Search stored instruments",

@@ -1,5 +1,4 @@
 import { useTerminal } from "../context.js";
-import { ClockZoneControl } from "../ClockZoneControl.js";
 import { t } from "../../../i18n/messages.js";
 const RANGE_OPTIONS = [
   [1, "1 день"],
@@ -14,19 +13,12 @@ const RANGE_OPTIONS = [
 /** History lookback is independent of candle interval and camera zoom. */
 export function ChartRangeControl({
   slot = 1,
-  placement = "footer"
-}: { slot?: number; placement?: "footer" | "toolbar" | "plot" } = {}) {
+  placement = "plot"
+}: { slot?: number; placement?: "toolbar" | "plot" } = {}) {
   const { controller, state } = useTerminal();
   const days = state.preferences.rangeDays;
   const plot = placement === "plot";
-  const id =
-    placement === "toolbar"
-      ? "mobile-chart-range"
-      : plot
-        ? `range-plot-${slot}`
-        : slot === 1
-          ? "range"
-          : `range-${slot}`;
+  const id = placement === "toolbar" ? "mobile-chart-range" : `range-plot-${slot}`;
   const label = plot ? `${t("Глубина загрузки")} · ${t("График")} ${slot}` : t("Период истории");
   return (
     <div
@@ -78,12 +70,6 @@ export function ChartRangeControl({
           </option>
         ))}
       </select>
-      {slot === 1 && placement === "footer" && (
-        <>
-          <span className="chart-range-note">{t("Глубина загрузки")}</span>
-          <ClockZoneControl />
-        </>
-      )}
     </div>
   );
 }

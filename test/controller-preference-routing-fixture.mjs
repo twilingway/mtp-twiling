@@ -279,7 +279,7 @@ export async function routingFixture() {
   const rangeProps = () =>
     find(
       load("screens/terminal/intervals/ChartRangeControl.tsx").ChartRangeControl(),
-      (node) => node.props?.id === "range"
+      (node) => node.props?.id === "range-plot-1"
     ).props;
   const toolbar = () => load("screens/terminal/Toolbar.tsx").Toolbar();
   let cleanup;
