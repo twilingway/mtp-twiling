@@ -1,4 +1,8 @@
 import type { ChartLayoutDefinition } from "../../model/chart-workspace-layout.js";
+import {
+  readWorkspaceLocal,
+  writeWorkspaceLocal
+} from "../../services/workspace-identity-local.js";
 
 export interface LayoutSizes {
   column?: readonly number[];
@@ -32,7 +36,7 @@ export function readWorkspaceGridSizes(
   narrow: boolean
 ): LayoutSizes {
   try {
-    const text = globalThis.localStorage.getItem(key);
+    const text = readWorkspaceLocal(key);
     const value: unknown = text === null || text.length > 4_096 ? null : JSON.parse(text);
     if (!value || typeof value !== "object") return {};
     const column = narrow
@@ -47,7 +51,7 @@ export function readWorkspaceGridSizes(
 
 export function writeWorkspaceGridSizes(key: string, sizes: LayoutSizes): void {
   try {
-    globalThis.localStorage.setItem(key, JSON.stringify(sizes));
+    writeWorkspaceLocal(key, JSON.stringify(sizes));
   } catch {
     // The open workspace keeps the measured tracks if browser storage is unavailable.
   }

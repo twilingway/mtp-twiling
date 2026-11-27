@@ -2,6 +2,10 @@ import { isProfilePreferences } from "../../model/backup-format.js";
 import { THEME_PALETTES, terminalTheme } from "../../model/theme.js";
 import type { ChartSettings, IndicatorFlags } from "../../model/types.js";
 import type { TerminalPreferences } from "./state.js";
+import {
+  readWorkspaceLocal,
+  writeWorkspaceLocal
+} from "../../services/workspace-identity-local.js";
 
 export type PanelPreferences = Pick<
   TerminalPreferences,
@@ -31,7 +35,7 @@ function storageKey(owner: string, slot: number, field: "instrument" | "preferen
 
 function read(owner: string, slot: number, field: "instrument" | "preferences"): string | null {
   try {
-    return globalThis.localStorage.getItem(storageKey(owner, slot, field));
+    return readWorkspaceLocal(storageKey(owner, slot, field));
   } catch {
     return null;
   }
@@ -39,7 +43,7 @@ function read(owner: string, slot: number, field: "instrument" | "preferences"):
 
 function write(owner: string, slot: number, field: "instrument" | "preferences", value: string) {
   try {
-    globalThis.localStorage.setItem(storageKey(owner, slot, field), value);
+    writeWorkspaceLocal(storageKey(owner, slot, field), value);
   } catch {
     // The live layout remains usable when storage is blocked or full.
   }
