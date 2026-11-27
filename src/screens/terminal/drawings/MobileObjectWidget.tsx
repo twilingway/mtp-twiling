@@ -83,7 +83,7 @@ export function MobileObjectWidget() {
         controller.selectObject(null);
     };
     const key = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
+      if (event.key !== "Escape" || event.defaultPrevented) return;
       event.preventDefault();
       controller.selectObject(null);
     };

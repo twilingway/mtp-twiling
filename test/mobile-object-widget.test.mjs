@@ -66,6 +66,7 @@ function menuDismissHarness({ mobile = true, kind = "drawing" } = {}) {
     })
   };
   let focused = null;
+  let onMenuClose = () => {};
   const state = {
     selectedObject: "selected",
     contextMenu: {
@@ -85,7 +86,9 @@ function menuDismissHarness({ mobile = true, kind = "drawing" } = {}) {
   const controller = {
     getSnapshot: () => state,
     setContext: (contextMenu) => {
+      const closing = state.contextMenu !== null && contextMenu === null;
       state.contextMenu = contextMenu;
+      if (closing) onMenuClose();
     },
     selectObject: (selectedObject) => {
       state.selectedObject = selectedObject;
@@ -203,6 +206,10 @@ function menuDismissHarness({ mobile = true, kind = "drawing" } = {}) {
     render,
     Widget,
     focused: () => focused,
+    document,
+    onMenuClose: (callback) => {
+      onMenuClose = callback;
+    },
     dispose: () => hooks.forEach((hook) => hook?.cleanup?.()),
     listeners
   };
@@ -264,6 +271,51 @@ test("mobile shield does not swallow menu actions, keyboard Escape or focus rest
   assert.equal(harness.render().type, harness.Widget);
   assert.equal(harness.focused(), "widget");
   harness.dispose();
+});
+
+test("menu Escape survives synchronous widget remount and competing document shortcuts", () => {
+  for (const kind of ["drawing", "image"]) {
+    const harness = menuDismissHarness({ kind });
+    const widget = componentHarness(
+      kind === "drawing"
+        ? { id: "selected", name: "segment", points: [] }
+        : { id: "selected", name: "Photo" }
+    );
+    const widgetCleanup = widget.effects.map((effect) => effect());
+    const widgetKey = widget.handlers.get("keydown").fn;
+    let competingEscapes = 0;
+    const globalShortcut = (event) => {
+      if (event.key === "Escape") {
+        competingEscapes++;
+        harness.state.selectedObject = null;
+      }
+    };
+    harness.document.addEventListener("keydown", globalShortcut);
+    harness.onMenuClose(() => {
+      assert.equal(harness.render().type, harness.Widget);
+      // Reentrant mount during native dispatch must not turn this Escape into widget dismissal.
+      harness.document.addEventListener("keydown", widgetKey);
+    });
+    const closingEscape = harness.dispatch("keydown", { key: "Escape" });
+    assert.ok(closingEscape.defaultPrevented);
+    assert.equal(competingEscapes, 0);
+    assert.equal(harness.state.selectedObject, "selected");
+    assert.equal(harness.state.contextMenu, null);
+    assert.equal(harness.focused(), "widget");
+    // A handled event is also safe if a reentrant listener is invoked directly.
+    widgetKey(closingEscape);
+    assert.equal(widget.state.selectedObject, "selected");
+    harness.dispatch("keydown", { key: "Escape" });
+    assert.equal(competingEscapes, 1);
+    assert.equal(widget.state.selectedObject, null);
+    assert.equal(harness.state.selectedObject, null);
+    assert.equal(harness.render(), null);
+    harness.document.removeEventListener("keydown", globalShortcut);
+    harness.document.removeEventListener("keydown", widgetKey);
+    widgetCleanup.forEach((cleanup) => cleanup());
+    harness.dispose();
+    assert.equal(harness.listeners.length, 0);
+  }
 });
 
 test("desktop object menus and mobile chart/indicator menus retain ordinary outside actions", () => {
