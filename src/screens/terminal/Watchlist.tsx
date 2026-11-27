@@ -1,9 +1,10 @@
 import { t, systemText } from "../../i18n/messages.js";
 import { timeZoneOffset } from "../../i18n/timezones.js";
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { precision } from "../../charts/adapter.js";
-import { useTerminal } from "./context.js";
+import { useTerminal, useTerminalState } from "./context.js";
+import { selectPreferences } from "./terminal-state-selection.js";
 import { number, signClass, timeLabel } from "./state.js";
 import { WatchlistSectionsTable } from "./WatchlistSectionsTable.js";
 import { watchlistStartupNotice } from "./WatchlistStartupStatus.js";
@@ -19,12 +20,12 @@ type SortKey = "symbol" | "price" | "change" | "changePercent";
 export function Watchlist({ chartEditor }: { chartEditor?: TerminalController } = {}) {
   const { controller, state } = useTerminal();
   const editor = chartEditor ?? controller;
-  const chartState = useSyncExternalStore(editor.subscribe, editor.getSnapshot, editor.getSnapshot);
+  const chartPreferences = useTerminalState(editor, selectPreferences);
   const [query, setQuery] = useState(""),
     [sort, setSort] = useState<SortKey | null>(null),
     [direction, setDirection] = useState(-1);
   const startup = watchlistStartupNotice(state);
-  const selected = startup ? undefined : selectedMarketRow(state.rows, chartState.preferences);
+  const selected = startup ? undefined : selectedMarketRow(state.rows, chartPreferences);
   const source = selected?.providerRef ? providerLabel(selected.providerRef) : null;
   const visible = state.rows.filter(
     (row) =>

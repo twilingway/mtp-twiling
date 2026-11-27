@@ -32,7 +32,7 @@ export interface MtpRasterFrame {
   mode: number | undefined;
   xFor(index: number): number | null;
   yFor(price: number): number | null;
-  paint(context: CanvasRenderingContext2D): void;
+  paint(context: CanvasRenderingContext2D, from?: number, to?: number): void;
 }
 interface Cached {
   surface: Surface;
@@ -59,6 +59,7 @@ interface Cached {
   priceLowY: number;
   priceHighY: number;
   fullHistory: boolean;
+  previewOnly: boolean;
 }
 const finite = (values: readonly (number | null)[]): values is number[] =>
   values.every((value) => value !== null && Number.isFinite(value));
@@ -183,6 +184,10 @@ export class MtpRasterCache {
   draw(frame: MtpRasterFrame): boolean {
     if (this.disposed) return false;
     const { scope, model, mode } = frame;
+    if (!model.periods.length) {
+      this.release();
+      return false;
+    }
     const size = scope.bitmapSize;
     const horizontalRatio = scope.horizontalPixelRatio,
       verticalRatio = scope.verticalPixelRatio;
@@ -208,7 +213,17 @@ export class MtpRasterCache {
     }
     const firstX = frame.xFor(0),
       nextX = frame.xFor(1);
-    if (firstX === null || nextX === null || !(nextX > firstX && nextX - firstX < 1)) {
+    const start = Math.max(0, Math.floor(frame.from) - 1),
+      end = Math.min(model.data.length - 1, Math.ceil(frame.to) + 1);
+    const heavy = model.periods.length >= 30 && (end - start + 1) * model.periods.length >= 8192;
+    if (
+      firstX === null ||
+      nextX === null ||
+      !Number.isFinite(firstX) ||
+      !Number.isFinite(nextX) ||
+      nextX <= firstX ||
+      (nextX - firstX >= 1 && !heavy)
+    ) {
       this.release();
       return false;
     }
@@ -257,24 +272,16 @@ export class MtpRasterCache {
         previewScale &&
         ((!changedGeometry && !changedData) || (!this.ready && (!changedData || held)))
       ) {
+        // Extra offscreen segments can affect wide stroke joins. Settled ordinary frames must
+        // use precisely the caller's native range; keep the expanded raster for movement only.
+        if (cached.previewOnly && !changedGeometry) return false;
         this.blit(scope.context, cached, matrix);
         return true;
       }
     }
     const domain = model.extrema(0, model.data.length - 1);
     if (!domain || !(domain.maxValue > domain.minValue) || model.data.length < 2) return false;
-    const indices = [
-      Math.max(0, Math.floor(frame.from) - 1),
-      Math.min(model.data.length - 1, Math.ceil(frame.to) + 1)
-    ];
-    if (indices[1]! - indices[0]! < 2) return false;
-    // LW's public logicalToCoordinate accepts bar indices; fractional probes can return zero.
-    indices.push(Math.floor((indices[0]! + indices[1]!) / 2));
-    const prices = [domain.minValue, domain.maxValue, (domain.minValue + domain.maxValue) / 2];
-    const x = indices.map((index) => frame.xFor(index)),
-      y = prices.map((price) => frame.yFor(price));
-    if (!finite(x) || !finite(y) || x[0] === x[1] || y[0] === y[1]) return false;
-    // Padding captures offscreen price geometry without changing the original sampling range.
+    // Padding captures offscreen price geometry at unchanged device resolution.
     const factor = Math.min(
       1.4,
       Math.sqrt((4 * 1024 * 1024) / (size.width * size.height)),
@@ -283,6 +290,20 @@ export class MtpRasterCache {
     );
     const padPixelsX = Math.floor((size.width * (factor - 1)) / 2);
     const padPixelsY = Math.floor((size.height * (factor - 1)) / 2);
+    // Extend only unsampled ordinary-spacing paths: changing a dense sampling phase is unsafe.
+    const extra =
+      nextX - firstX >= 1 ? Math.ceil(padPixelsX / horizontalRatio / (nextX - firstX)) : 0;
+    const captureStart = Math.max(0, start - extra),
+      captureEnd = Math.min(model.data.length - 1, end + extra);
+    const extend = extra > 0 && captureEnd - captureStart <= 3000;
+    const indices = extend ? [captureStart, captureEnd] : [start, end];
+    if (indices[1]! - indices[0]! < 2) return false;
+    // LW's public logicalToCoordinate accepts bar indices; fractional probes can return zero.
+    indices.push(Math.floor((indices[0]! + indices[1]!) / 2));
+    const prices = [domain.minValue, domain.maxValue, (domain.minValue + domain.maxValue) / 2];
+    const x = indices.map((index) => frame.xFor(index)),
+      y = prices.map((price) => frame.yFor(price));
+    if (!finite(x) || !finite(y) || x[0] === x[1] || y[0] === y[1]) return false;
     this.release(); // Never retain two full-size raster allocations.
     let surface: Surface | null;
     try {
@@ -303,7 +324,11 @@ export class MtpRasterCache {
     context.lineCap = scope.context.lineCap;
     context.lineJoin = scope.context.lineJoin;
     context.miterLimit = scope.context.miterLimit;
-    frame.paint(context);
+    frame.paint(
+      context,
+      extend ? frame.from - extra : frame.from,
+      extend ? frame.to + extra : frame.to
+    );
     // Include stroke joins and antialiasing when proving that uncached regions are empty.
     const lineWidth = Math.max(
       1,
@@ -336,11 +361,13 @@ export class MtpRasterCache {
       logicalTo: x[1]! + margin,
       priceLowY: Math.min(y[0]!, y[1]!) - margin,
       priceHighY: Math.max(y[0]!, y[1]!) + margin,
-      fullHistory: indices[0] === 0 && indices[1] === model.data.length - 1
+      fullHistory: indices[0] === 0 && indices[1] === model.data.length - 1,
+      previewOnly: indices[0] !== start || indices[1] !== end
     };
     this.cached = cached;
     this.observed = identity;
     this.cancelTimer();
+    if (cached.previewOnly) return false;
     matrix = identity;
     this.blit(scope.context, cached, matrix);
     return true;

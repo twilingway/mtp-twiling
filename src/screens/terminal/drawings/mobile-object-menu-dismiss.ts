@@ -9,6 +9,14 @@ interface DismissBridge {
 /** Consume the dismissing gesture before chart capture handlers and native SDK input. */
 export function bindMobileObjectMenuDismiss(document: Document, bridge: DismissBridge) {
   let shield: { primary: number; pointers: Set<number> } | null = null;
+  const ownsMenu = () => {
+    const { contextMenu: menu, selectedObject } = bridge.current();
+    return (
+      menu !== null &&
+      (menu.target.kind === "drawing" || menu.target.kind === "image") &&
+      menu.target.id === selectedObject
+    );
+  };
   const consume = (event: Event) => {
     if (event.cancelable) event.preventDefault();
     event.stopImmediatePropagation();
@@ -22,15 +30,7 @@ export function bindMobileObjectMenuDismiss(document: Document, bridge: DismissB
       }
       // A new independent gesture ends any stale compatibility-click shield.
       shield = null;
-      const { contextMenu: menu, selectedObject } = bridge.current();
-      if (
-        !menu ||
-        (menu.target.kind !== "drawing" && menu.target.kind !== "image") ||
-        menu.target.id !== selectedObject ||
-        !(event.target instanceof Node) ||
-        bridge.contains(event.target)
-      )
-        return;
+      if (!ownsMenu() || !(event.target instanceof Node) || bridge.contains(event.target)) return;
       shield = { primary: event.pointerId, pointers: new Set([event.pointerId]) };
       consume(event);
       bridge.dismiss();
@@ -56,6 +56,12 @@ export function bindMobileObjectMenuDismiss(document: Document, bridge: DismissB
   const touch = (event: TouchEvent) => {
     if (shield) consume(event);
   };
+  const key = (event: KeyboardEvent) => {
+    if (event.key !== "Escape" || event.defaultPrevented || !ownsMenu()) return;
+    // Close this menu before document bubble shortcuts can clear selection or focus intent.
+    consume(event);
+    bridge.dismiss();
+  };
   const pointerEvents = ["pointerdown", "pointermove", "pointerup", "pointercancel"] as const;
   const mouseEvents = ["mousedown", "mouseup", "click", "contextmenu"] as const;
   const touchEvents = ["touchstart", "touchmove", "touchend", "touchcancel"] as const;
@@ -63,10 +69,12 @@ export function bindMobileObjectMenuDismiss(document: Document, bridge: DismissB
   for (const type of mouseEvents) document.addEventListener(type, compatibility, true);
   for (const type of touchEvents)
     document.addEventListener(type, touch, { capture: true, passive: false });
+  document.addEventListener("keydown", key, true);
   return () => {
     for (const type of pointerEvents) document.removeEventListener(type, pointer, true);
     for (const type of mouseEvents) document.removeEventListener(type, compatibility, true);
     for (const type of touchEvents) document.removeEventListener(type, touch, true);
+    document.removeEventListener("keydown", key, true);
     shield = null;
   };
 }

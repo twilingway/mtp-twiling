@@ -1,6 +1,19 @@
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import type { TerminalState } from "./state.js";
 
+/** Crosshair is volatile; consumers must explicitly select it to receive hover updates. */
+export function equalTerminalState(before: TerminalState, next: TerminalState): boolean {
+  const keys = (Object.keys(before) as (keyof TerminalState)[]).filter(
+    (key) => key !== "crosshairBar"
+  );
+  return (
+    keys.length === Object.keys(next).filter((key) => key !== "crosshairBar").length &&
+    keys.every((key) => Object.hasOwn(next, key) && Object.is(before[key], next[key]))
+  );
+}
+
+export const selectPreferences = (state: TerminalState) => state.preferences;
+
 export const selectShellState = (state: TerminalState) => ({
   owner: state.owner,
   ready: state.ready,

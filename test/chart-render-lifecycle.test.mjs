@@ -9,7 +9,10 @@ import ts from "typescript";
 const root = fileURLToPath(new URL("../src/", import.meta.url));
 function sourceModules(overrides) {
   const modules = new Map(),
-    context = vm.createContext({ console, Map, Date, Math, Promise, structuredClone });
+    context = vm.createContext({
+      console, Map, Date, Math, Promise, structuredClone,
+      window: { matchMedia: (query) => ({ media: query, matches: false }) }
+    });
   function load(relative) {
     if (Object.hasOwn(overrides, relative)) return overrides[relative];
     const file = path.resolve(root, relative).replace(/\.js$/, ".ts"),
@@ -172,7 +175,7 @@ test("toolbar settings preserve the live adapter/canvas/camera; hiding drawings 
     }
   });
   const { useChartCanvas } = load("screens/terminal/chart-lifecycle.ts"),
-    ref = { current: {} },
+    ref = { current: { closest: () => null } },
     visible = (current) =>
       current.preferences.chartSettings.drawingTools?.drawingsHidden ? [] : current.drawings;
   async function render() {
