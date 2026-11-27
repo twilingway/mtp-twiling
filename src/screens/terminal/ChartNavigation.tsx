@@ -81,6 +81,7 @@ export function ChartNavigation() {
     };
   }, [compact, controller, hold]);
   useEffect(() => {
+    if (compact) return;
     let frame = 0,
       previous = -Infinity;
     const update = (time: number) => {
@@ -111,7 +112,7 @@ export function ChartNavigation() {
     };
     frame = requestAnimationFrame(update);
     return () => cancelAnimationFrame(frame);
-  }, [controller]);
+  }, [compact, controller]);
   const chart = controller.chart,
     ready = position?.chart === chart && chartNavigationReady(state, chart);
   const available = (action: Action) =>

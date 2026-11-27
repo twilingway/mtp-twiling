@@ -7,7 +7,7 @@ import ts from "typescript";
 import * as jsxRuntime from "react/jsx-runtime";
 
 const load = sourceLoader({ "i18n/messages.ts": { t: (value) => value } });
-const { createDrawingInput, createDrawingContextSource } = load(
+const { createDrawingInput, createDrawingContextSource, drawingHandleRadius } = load(
   "screens/terminal/chart-drawing-touch.ts"
 );
 const { hitDrawing, paintDrawings } = load("model/drawing-model.ts");
@@ -365,4 +365,12 @@ test("ChartSurface preserves the editing owner when a second finger moves, relea
   surface.props.onPointerUpCapture(event(1, 150));
   assert.equal(previews, 1);
   assert.deepEqual(finished, [1]);
+  const canvas = { closest: () => target };
+  assert.equal(drawingHandleRadius(canvas, true), 13);
+  surface.props.onPointerDownCapture({ ...event(1), pointerType: "mouse", button: 2 });
+  assert.equal(target.dataset.drawingTouch, "false");
+  assert.equal(drawingHandleRadius(canvas, true), 5);
+  delete target.dataset.drawingTouch;
+  assert.equal(drawingHandleRadius(canvas, true), 13);
+  assert.equal(drawingHandleRadius(canvas, false), 5);
 });
