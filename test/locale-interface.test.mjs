@@ -10,6 +10,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
 const sourceRoot = fileURLToPath(new URL("../src/", import.meta.url));
+const accountName = "Личный аккаунт";
+const avatarMarkup = `<span class="avatar" aria-hidden="true">${accountName.slice(0, 1).toLocaleUpperCase()}</span>`;
 globalThis.window = { innerWidth: 1440 };
 const nodeRequire = createRequire(import.meta.url),
   modules = new Map();
@@ -60,7 +62,7 @@ function render(file, name, locale) {
     preferences,
     rows: [],
     owner: "test-owner",
-    name: "Личный аккаунт",
+    name: accountName,
     candles: [],
     drawings: [],
     images: [],
@@ -108,8 +110,9 @@ test("main English UI and dialogs render translated text and tooltips while reta
   for (const [file, name] of components) {
     const markup = render(file, name, "en");
     const allowed = markup
+      .replaceAll(avatarMarkup, "")
       .replaceAll("Русский", "")
-      .replaceAll("Личный аккаунт", "")
+      .replaceAll(accountName, "")
       .replaceAll("Мой рисунок", "")
       .replaceAll("Т‑Инвестиции", "")
       .replaceAll("Т‑Банк", "")
@@ -120,7 +123,9 @@ test("main English UI and dialogs render translated text and tooltips while reta
       `${name} contains untranslated interface text: ${allowed.match(/[А-ЯЁа-яё][^<>"{}]*/g)?.join("; ")}`
     );
   }
-  assert.match(render("Toolbar.tsx", "Toolbar", "en"), /Личный аккаунт/);
+  const toolbar = render("Toolbar.tsx", "Toolbar", "en");
+  assert.match(toolbar, /Личный аккаунт/);
+  assert.ok(toolbar.includes(avatarMarkup), "the user's avatar initial remains untranslated");
 });
 test("Russian remains the default interface language", () => {
   assert.match(render("ChartSettingsDialog.tsx", "ChartSettingsDialog", "ru"), /Настройки графика/);

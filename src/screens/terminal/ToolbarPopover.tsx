@@ -16,11 +16,14 @@ export function ToolbarPopover({
   keepMounted?: boolean;
   children: ReactNode;
 }) {
-  const [host] = useState(() => document.createElement("div"));
+  const [host] = useState(() =>
+    typeof document === "undefined" ? null : document.createElement("div")
+  );
   const root = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<CSSProperties>();
   const dismiss = useEffectEvent(onClose);
   useLayoutEffect(() => {
+    if (!host) return;
     host.className = "toolbar-portal-host";
     const attach = () => (document.fullscreenElement ?? document.body).append(host);
     attach();
@@ -79,7 +82,7 @@ export function ToolbarPopover({
       document.removeEventListener("pointerdown", outside);
     };
   }, [anchor, open]);
-  if (!open && !keepMounted) return null;
+  if (!host || (!open && !keepMounted)) return null;
   return createPortal(
     <div
       ref={root}
