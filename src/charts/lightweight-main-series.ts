@@ -2,6 +2,7 @@ import { AreaSeries, BarSeries, CandlestickSeries, LineSeries } from "lightweigh
 import type { IChartApi, ISeriesApi, UTCTimestamp } from "lightweight-charts";
 import { NATIVE_CHART_LINE, resolveNativeChartType } from "../model/native-chart-type.js";
 import type { Candle, ChartSettings } from "../model/types.js";
+import { barColors } from "../model/bar-palette.js";
 import { lightweightPriceFormat } from "./price-format.js";
 import type { ChartPriceFormat } from "./price-format.js";
 
@@ -28,8 +29,7 @@ export function lightweightMainSeries(
       ...common,
       openVisible: true,
       thinBars: true,
-      upColor: settings.upColor ?? "#53b987",
-      downColor: settings.downColor ?? "#eb4d5c"
+      ...barColors(settings)
     });
   else if (type === "line")
     series = chart.addSeries(LineSeries, {

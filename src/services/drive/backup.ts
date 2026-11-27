@@ -1,5 +1,6 @@
 import {
   fromBase64,
+  isBarColorThemes,
   isPriceAxisLabelThemes,
   isRecord,
   toBase64,
@@ -58,7 +59,8 @@ const chartSettings: Shape = {
     indicators.split(" ").map((key) => [key, scalars("opacity color width")])
   ),
   drawingTemplates: { $: { settings: drawingSettings, visibility } },
-  priceAxisLabels: { light: priceAxisLabelPalette, dark: priceAxisLabelPalette }
+  priceAxisLabels: { light: priceAxisLabelPalette, dark: priceAxisLabelPalette },
+  barColors: { light: scalars("upColor downColor"), dark: scalars("upColor downColor") }
 };
 const backupShape: Shape = {
   ...scalars("application schemaVersion exportedAt"),
@@ -156,6 +158,12 @@ function project(value: unknown, shape: Shape): unknown {
 /** Deep allowlist; never serializes local owner, history, tokens or market quote fields. */
 export function sanitizeDriveBackup(value: unknown): Backup {
   if (isRecord(value) && isRecord(value.layout) && isRecord(value.layout.chartSettings)) {
+    const colors = Object.getOwnPropertyDescriptor(value.layout.chartSettings, "barColors");
+    if (
+      colors &&
+      (!("value" in colors) || (colors.value !== undefined && !isBarColorThemes(colors.value)))
+    )
+      throw new DriveError("remote-invalid", "Некорректные цвета баров.");
     const labels = Object.getOwnPropertyDescriptor(value.layout.chartSettings, "priceAxisLabels");
     if (
       labels &&

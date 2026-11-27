@@ -2,6 +2,7 @@ import { chartBackground, terminalTheme } from "../model/theme.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { volumeAverageSettings } from "../model/volume-average.js";
 import { resolveNativeChartType } from "../model/native-chart-type.js";
+import { barColors } from "../model/bar-palette.js";
 import type {
   ChartSettings,
   IndicatorFlags,
@@ -47,6 +48,9 @@ export function chartRenderConfigKey(settings: ChartSettings, flags: IndicatorFl
       bodyVisible: settings.bodyVisible !== false,
       upColor: settings.upColor ?? "#53b987",
       downColor: settings.downColor ?? "#eb4d5c",
+      ...(resolveNativeChartType(settings) === "bars"
+        ? { barColors: { [terminalTheme(settings)]: barColors(settings) } }
+        : {}),
       wickUpColor: settings.wickUpColor ?? "#336854",
       wickDownColor: settings.wickDownColor ?? "#7f323f",
       borderUpColor: settings.borderUpColor ?? "#53b987",

@@ -116,6 +116,11 @@ test("all sections share a chart settings draft and one submit persists it", asy
   const { render, preferences, changes, dialogs } = fixture();
   let view = render();
   field(view.panels[0], "upColor").onChange({ target: { value: "#ffff00" } });
+  find(view.panels[0], (node) => node.type?.name === "BarPaletteFields").props.onChange(
+    "light",
+    "upColor",
+    "#123456"
+  );
   view.tabs[1].props.onClick();
   view = render();
   field(view.panels[1], "showLegend").onChange({ target: { checked: false } });
@@ -142,6 +147,7 @@ test("all sections share a chart settings draft and one submit persists it", asy
       chartSettings: {
         theme: "dark",
         upColor: "#ffff00",
+        barColors: { light: { upColor: "#123456" } },
         showLegend: false,
         scaleFontSize: 14,
         grid: false
@@ -157,6 +163,11 @@ test("cancel closes the form and leaves the current chart settings untouched", (
   const { render, preferences, changes, dialogs } = fixture();
   const view = render();
   field(view.panels[0], "upColor").onChange({ target: { value: "#ffff00" } });
+  find(view.panels[0], (node) => node.type?.name === "BarPaletteFields").props.onChange(
+    "dark",
+    "downColor",
+    "#654321"
+  );
   view.tabs[3].props.onClick();
   find(
     render().form,
@@ -165,4 +176,5 @@ test("cancel closes the form and leaves the current chart settings untouched", (
   assert.deepEqual(dialogs, [null]);
   assert.deepEqual(changes, []);
   assert.equal(preferences.chartSettings.upColor, "#33aa77");
+  assert.equal(preferences.chartSettings.barColors, undefined);
 });
