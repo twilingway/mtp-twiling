@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { t } from "../../i18n/messages.js";
-import { useTerminal } from "./context.js";
+import { useTerminalControls } from "./context.js";
 import { INDICATOR_NAMES } from "./state.js";
 import { MtpIndicatorGroup } from "./MtpIndicatorGroup.js";
 import { changeMenuIndicator, persistMtpMenuCollapsed } from "./indicator-menu-actions.js";
 import { useIndicatorMenuAction } from "./useIndicatorMenuAction.js";
 
 export function TerminalIndicatorControls() {
-  const { controller, state } = useTerminal(),
+  const { controller, state } = useTerminalControls(),
     p = state.preferences;
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null),

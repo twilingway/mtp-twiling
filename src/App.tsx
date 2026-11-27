@@ -2,6 +2,8 @@ import { systemText } from "./i18n/messages.js";
 import { useLayoutEffect, useMemo, useState } from "react";
 import { TerminalContext, useTerminal } from "./screens/terminal/context.js";
 import { TerminalController } from "./screens/terminal/controller.js";
+import { selectShellState } from "./screens/terminal/terminal-state-selection.js";
+import { shallowEqual } from "./screens/terminal/snapshot-selector.js";
 import { Toolbar } from "./screens/terminal/Toolbar.js";
 import { DrivePauseBanner } from "./screens/terminal/DrivePauseBanner.js";
 import { RightPanel } from "./screens/terminal/RightPanel.js";
@@ -33,7 +35,7 @@ import {
 } from "./screens/terminal/workspace-presentation.js";
 import type { WorkspacePresentation } from "./screens/terminal/workspace-presentation.js";
 function Terminal() {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectShellState, shallowEqual);
   const [updated, setUpdated] = useState<{ owner: string; presentation: WorkspacePresentation }>();
   const owner = state.owner;
   const saved = useMemo(() => loadWorkspacePresentation(owner), [owner]);
@@ -105,8 +107,8 @@ function Terminal() {
       <DrivePauseBanner />
       <main
         className="workspace"
-        data-right-panel-collapsed={!!state.preferences.rightPanelCollapsed}
-        data-mobile-panel-open={!!state.mobilePanelOpen && !state.preferences.rightPanelCollapsed}
+        data-right-panel-collapsed={!!state.rightPanelCollapsed}
+        data-mobile-panel-open={!!state.mobilePanelOpen && !state.rightPanelCollapsed}
       >
         <TerminalContext value={editor}>
           <DrawingToolbar />

@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { NATIVE_CHART_TYPES, resolveNativeChartType } from "../../model/native-chart-type.js";
 import type { NativeChartType } from "../../model/native-chart-type.js";
 import { t } from "../../i18n/messages.js";
-import { useTerminal } from "./context.js";
+import { useTerminalControls } from "./context.js";
 
 const labels: Record<NativeChartType, string> = {
   candles: "Японские свечи",
@@ -38,7 +38,7 @@ function TypeIcon({ type }: { type: NativeChartType }) {
 }
 
 export function NativeChartTypeMenu() {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminalControls();
   const type = resolveNativeChartType(state.preferences.chartSettings);
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);

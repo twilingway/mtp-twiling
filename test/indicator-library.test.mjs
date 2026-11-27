@@ -514,7 +514,7 @@ test("split controls route main click to library, chevron to quick panel, and di
       useRef: () => refs[refIndex++]
     },
     "screens/terminal/context.js": {
-      useTerminal: () => ({ state, controller: { setDialog: (value) => calls.push(value) } })
+      useTerminalControls: () => ({ state, controller: { setDialog: (value) => calls.push(value) } })
     },
     "screens/terminal/useIndicatorMenuAction.js": {
       useIndicatorMenuAction: () => ({ pending: false, run: (action) => action() })
@@ -583,7 +583,7 @@ test("quick menu Escape still dismisses after an async disabled control moves fo
       useRef: () => refs[refIndex++]
     },
     "screens/terminal/context.js": {
-      useTerminal: () => ({
+      useTerminalControls: () => ({
         state: {
           preferences: { indicators: {}, chartSettings: {} }
         },
