@@ -25,13 +25,7 @@ export interface TimeframeMenuProps {
 
 function IntervalBadgeLabel({ item }: { item: IntervalDefinition }) {
   const label = t(item.shortLabel);
-  if (item.id !== "1d" && item.id !== "1w" && item.id !== "1M") return label;
-  return (
-    <>
-      <span className="interval-label-number">{label.slice(0, 1)}</span>
-      {label.slice(1)}
-    </>
-  );
+  return label;
 }
 
 export function TimeframeMenu({
@@ -101,10 +95,13 @@ export function TimeframeMenu({
     const moved = () => setOpen(false);
     const viewport = window.visualViewport;
     document.addEventListener("pointerdown", outside);
+    const scroller = triggerRef.current?.closest(".toolbar-scroll");
+    scroller?.addEventListener("scroll", moved, { passive: true });
     window.addEventListener("resize", moved);
     viewport?.addEventListener("resize", moved);
     return () => {
       document.removeEventListener("pointerdown", outside);
+      scroller?.removeEventListener("scroll", moved);
       window.removeEventListener("resize", moved);
       viewport?.removeEventListener("resize", moved);
     };
@@ -304,7 +301,7 @@ export function TimeframeMenu({
                 </div>
               ))}
             </div>,
-            document.body
+            document.fullscreenElement ?? document.body
           )
         : null}
     </span>

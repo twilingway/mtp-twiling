@@ -1,0 +1,263 @@
+/* Last toolbar stylesheet: one stable row at every viewport width. */
+header.topbar {
+  display: flex;
+  flex: 0 0 42px;
+  height: 42px;
+  min-height: 42px;
+  max-height: 42px;
+  padding: 0;
+  gap: 0;
+  overflow: visible;
+}
+.topbar > .toolbar-scroll {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 6px;
+  min-width: 0;
+  height: 100%;
+  padding: 0 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+.toolbar-scroll::-webkit-scrollbar {
+  display: none;
+}
+.toolbar-scroll:focus-visible,
+.toolbar-scroll :is(button, a, select):focus-visible {
+  outline-offset: -2px;
+}
+.toolbar-scroll > * {
+  flex-shrink: 0;
+}
+.topbar .toolbar-scroll .divider {
+  display: block;
+  flex: 0 0 1px;
+  margin-inline: 2px;
+}
+.topbar .toolbar-scroll .chart-symbol-controls {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 128px;
+  width: 128px;
+  height: 28px;
+  gap: 0;
+  padding: 1px;
+  border: 1px solid var(--control-line);
+  border-radius: 15px;
+  background: var(--surface-input);
+}
+.topbar .toolbar-scroll .chart-symbol-controls .symbol-button {
+  display: flex;
+  justify-content: flex-start;
+  flex: 1 1 0;
+  inline-size: auto;
+  min-width: 0;
+  max-width: none;
+  height: 24px;
+  min-height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 13px;
+  background: transparent;
+  font-size: 13px;
+}
+.topbar .toolbar-scroll .native-chart-type-trigger {
+  display: grid;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface-hover);
+}
+.topbar .toolbar-scroll .native-chart-type-trigger:is(:hover, [aria-expanded="true"]) {
+  color: var(--accent);
+  background: var(--accent-surface);
+}
+.topbar .toolbar-scroll .timeframes:has(.interval-menu) {
+  display: flex;
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: none;
+  container-type: normal;
+}
+.topbar .toolbar-scroll .interval-menu {
+  inline-size: auto;
+  max-width: none;
+  gap: 4px;
+}
+.topbar .toolbar-scroll .interval-favorites {
+  flex: 0 0 auto;
+  max-inline-size: none;
+  overflow: visible;
+}
+.topbar .toolbar-scroll .interval-favorite {
+  flex: 0 0 28px;
+  inline-size: 28px;
+  min-width: 28px;
+  height: 32px;
+  padding-inline: 2px;
+  font-size: 12px;
+}
+.topbar .toolbar-scroll .interval-menu-trigger {
+  flex: 0 0 52px;
+  inline-size: 52px;
+  min-width: 52px;
+  height: 32px;
+  min-height: 32px;
+  margin: 0;
+  padding-inline: 4px;
+  font-size: 12px;
+}
+.topbar .toolbar-scroll .indicator-control {
+  display: inline-flex;
+  flex: 0 0 146px;
+  width: 146px;
+  min-width: 146px;
+  height: 32px;
+}
+.topbar .toolbar-scroll #indicators-button {
+  display: inline-flex;
+  width: 122px;
+  height: 32px;
+  gap: 5px;
+  padding: 4px;
+  font-size: 13px;
+}
+.topbar .toolbar-scroll #indicators-button span {
+  display: inline;
+}
+.topbar .toolbar-scroll .indicator-quick-trigger {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 32px;
+  padding: 0;
+}
+.topbar .toolbar-scroll .chart-layout-picker {
+  display: block;
+  flex: 0 0 58px;
+  width: 58px;
+}
+.topbar .toolbar-scroll .chart-layout-picker-trigger {
+  width: 58px;
+  height: 32px;
+  font-variant-numeric: tabular-nums;
+}
+.topbar .toolbar-scroll .terminal-brand-menu {
+  flex: 0 0 32px;
+  width: 32px;
+}
+.topbar .toolbar-scroll .brand.account-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  overflow: visible;
+}
+.topbar .toolbar-scroll .account-button .avatar {
+  width: 30px;
+  height: 30px;
+  font-size: 15px;
+}
+.topbar .toolbar-scroll .account-connection {
+  position: absolute;
+  inset-inline-end: 0;
+  bottom: 0;
+}
+.topbar .toolbar-scroll :is(.mobile-workspace-tools, .mobile-workspace-actions) {
+  display: contents;
+}
+.topbar .toolbar-scroll .terminal-fullscreen-control {
+  width: 34px;
+  height: 32px;
+}
+.topbar .toolbar-scroll .terminal-fullscreen-note {
+  white-space: nowrap;
+}
+.topbar .toolbar-scroll .mobile-workspace-trigger {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 32px;
+  min-height: 32px;
+}
+.toolbar-portal-host {
+  display: contents;
+}
+.toolbar-popover {
+  position: fixed;
+  z-index: 1160;
+  max-width: calc(100vw - 16px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  white-space: normal;
+}
+.toolbar-popover
+  > :is(
+    .terminal-brand-popover,
+    .chart-layout-picker-popover,
+    .indicator-quick-panel,
+    .mobile-workspace-panel
+  ) {
+  position: relative;
+  inset: auto;
+  max-height: none;
+  max-block-size: none;
+  max-width: calc(100vw - 16px);
+  margin: 0;
+}
+.toolbar-popover > .indicator-quick-panel {
+  z-index: 102;
+  width: 260px;
+}
+.toolbar-popover > .indicator-menu-dismiss {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: default;
+}
+.toolbar-popover > .mobile-workspace-panel {
+  width: min(340px, calc(100vw - 16px));
+}
+.toolbar-popover .install-actions:not([hidden]) {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.toolbar-popover .install-certificate-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  font-size: 12px;
+}
+.toolbar-popover .mobile-workspace-options :is(.chart-range-control, .mobile-workspace-zone) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 6px;
+  border: 1px solid var(--control-line);
+  border-radius: 5px;
+  background: var(--surface-input);
+  font-size: 12px;
+}
+.toolbar-popover .mobile-workspace-zone {
+  flex-wrap: wrap;
+}

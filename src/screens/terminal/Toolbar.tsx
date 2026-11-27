@@ -1,9 +1,9 @@
+import { ToolbarScroll } from "./ToolbarScroll.js";
 import { chartLayout } from "../../model/chart-workspace-layout.js";
 import { t } from "../../i18n/messages.js";
 import { useTerminal, useTerminalState } from "./context.js";
 import { selectControlsState, selectToolbarState } from "./terminal-state-selection.js";
 import { shallowEqual } from "./snapshot-selector.js";
-import { ChartEngineSelect } from "./ChartEngineSelect.js";
 import { NativeChartTypeMenu } from "./NativeChartTypeMenu.js";
 import { ChartLayoutPicker } from "./ChartLayoutPicker.js";
 import type { ChartLayoutPickerProps } from "./ChartLayoutPicker.js";
@@ -39,122 +39,94 @@ export function Toolbar({
   const accountState = useTerminalState(account, selectControlsState, shallowEqual);
   return (
     <header className="topbar">
-      <TerminalBrandMenu
-        key={accountState.owner}
-        account={account}
-        accountState={accountState}
-        editor={controller}
-      />
-      <div className="divider" />
-      <div className="chart-symbol-controls">
-        <button
-          type="button"
-          className="symbol-button"
-          id="symbol-button"
-          aria-haspopup="dialog"
-          aria-label={`${ticker} · ${searchLabel}`}
-          onClick={() =>
-            state.ready ? controller.setDialog("instruments") : account.setDialog("account")
-          }
-          title={`${ticker} · ${searchLabel}`}
-        >
-          <b id="top-symbol">{ticker}</b>
-        </button>
-        <NativeChartTypeMenu />
-      </div>
-      <nav className="timeframes" aria-label={t("Таймфрейм")}>
-        <TimeframeMenu
-          value={p.timeframe}
-          favorites={p.favoriteIntervals ?? DEFAULT_INTERVAL_FAVORITES}
-          availability={{
-            ...DERIVED_INTERVAL_UNAVAILABLE,
-            ...(state.selectedProvider
-              ? {
-                  "2m": shortIntervalUnavailable,
-                  "10m": shortIntervalUnavailable
-                }
-              : {})
-          }}
-          onSelect={(id) => {
-            if (!isNativeIntervalId(id)) return;
-            const owner = state.owner;
-            void controller
-              .setTimeframe(id)
-              .then(() => {
-                if (controller.getSnapshot().owner === owner)
-                  publishWorkspaceTimeframe(controller, id);
-              })
-              .catch((error: unknown) => {
-                if (controller.getSnapshot().owner === owner)
-                  controller.notify(
-                    error instanceof Error ? error.message : t("Не удалось выполнить действие.")
-                  );
-              });
-          }}
-          onToggleFavorite={(id) => {
-            void controller.setPreferences({
-              favoriteIntervals: toggleIntervalFavorite(
-                p.favoriteIntervals ?? DEFAULT_INTERVAL_FAVORITES,
-                id
-              )
-            });
-          }}
-        />
-      </nav>
-      <div className="divider" />
-      <TerminalIndicatorControls />
-      {layout && <ChartLayoutPicker {...layout} />}
-      <MobileChartTools
-        controller={account}
-        panelOpen={!!accountState.mobilePanelOpen && !accountState.preferences.rightPanelCollapsed}
-        objectsOpen={accountState.objectPanel}
-        count={chartLayout(layout?.layoutId)?.count ?? 1}
-        layout={layout}
-      >
-        <TerminalFullscreenControl />
-        <div className="top-spacer" />
-        <div id="install-actions" className="install-actions" hidden>
-          <button type="button" id="install-app" className="install-button">
-            {t("Установить приложение")}
-          </button>
-          <a
-            className="install-certificate-link"
-            href="./android-certificate.html"
-            target="_blank"
-            rel="noopener"
-            aria-label={t("Сертификат Т‑Банка на Android")}
+      <ToolbarScroll>
+        <TerminalBrandMenu account={account} accountState={accountState} editor={controller}>
+          <div id="install-actions" className="install-actions" hidden>
+            <button type="button" id="install-app" className="install-button">
+              {t("Установить приложение")}
+            </button>
+            <a
+              className="install-certificate-link"
+              href="./android-certificate.html"
+              target="_blank"
+              rel="noopener"
+              aria-label={t("Сертификат Т‑Банка на Android")}
+            >
+              {t("Сертификат Т‑Банка")}
+            </a>
+          </div>
+        </TerminalBrandMenu>
+        <div className="divider" />
+        <div className="chart-symbol-controls">
+          <button
+            type="button"
+            className="symbol-button"
+            id="symbol-button"
+            aria-haspopup="dialog"
+            aria-label={`${ticker} · ${searchLabel}`}
+            onClick={() =>
+              state.ready ? controller.setDialog("instruments") : account.setDialog("account")
+            }
+            title={`${ticker} · ${searchLabel}`}
           >
-            {t("Сертификат Т‑Банка")}
-          </a>
+            <b id="top-symbol">{ticker}</b>
+          </button>
+          <NativeChartTypeMenu />
         </div>
-      </MobileChartTools>
-      <label className="engine-label" htmlFor="engine">
-        {t("График")}
-      </label>
-      <ChartEngineSelect
-        id="engine"
-        value={p.engine}
-        onChange={(engine) => {
-          void controller.setPreferences({ engine });
-        }}
-      />
-      <button
-        id="account-button"
-        className="account-button"
-        title={t("Аккаунт и настройки")}
-        onClick={() => account.setDialog("account")}
-      >
-        <span className="avatar">{t("Я")}</span>
-        <i
-          className={`account-connection ${accountState.status}`}
-          aria-label={
-            accountState.authenticated && accountState.status === "connected"
-              ? t("Т-Банк подключён")
-              : t("Т-Банк не подключён")
+        <nav className="timeframes" aria-label={t("Таймфрейм")}>
+          <TimeframeMenu
+            value={p.timeframe}
+            favorites={p.favoriteIntervals ?? DEFAULT_INTERVAL_FAVORITES}
+            availability={{
+              ...DERIVED_INTERVAL_UNAVAILABLE,
+              ...(state.selectedProvider
+                ? {
+                    "2m": shortIntervalUnavailable,
+                    "10m": shortIntervalUnavailable
+                  }
+                : {})
+            }}
+            onSelect={(id) => {
+              if (!isNativeIntervalId(id)) return;
+              const owner = state.owner;
+              void controller
+                .setTimeframe(id)
+                .then(() => {
+                  if (controller.getSnapshot().owner === owner)
+                    publishWorkspaceTimeframe(controller, id);
+                })
+                .catch((error: unknown) => {
+                  if (controller.getSnapshot().owner === owner)
+                    controller.notify(
+                      error instanceof Error ? error.message : t("Не удалось выполнить действие.")
+                    );
+                });
+            }}
+            onToggleFavorite={(id) => {
+              void controller.setPreferences({
+                favoriteIntervals: toggleIntervalFavorite(
+                  p.favoriteIntervals ?? DEFAULT_INTERVAL_FAVORITES,
+                  id
+                )
+              });
+            }}
+          />
+        </nav>
+        <div className="divider" />
+        <TerminalIndicatorControls />
+        {layout && <ChartLayoutPicker {...layout} />}
+        <MobileChartTools
+          controller={account}
+          panelOpen={
+            !!accountState.mobilePanelOpen && !accountState.preferences.rightPanelCollapsed
           }
-        />
-        <span id="account-name">{accountState.name || t("Аккаунт и источники")}</span>
-      </button>
+          objectsOpen={accountState.objectPanel}
+          count={chartLayout(layout?.layoutId)?.count ?? 1}
+          layout={layout}
+        >
+          <TerminalFullscreenControl />
+        </MobileChartTools>
+      </ToolbarScroll>
     </header>
   );
 }

@@ -1,4 +1,10 @@
 export const intervalMessages = {
+  Д: "D",
+  Н: "W",
+  М: "M",
+  День: "Day",
+  Неделя: "Week",
+  Месяц: "Month",
   "Агрегация из": "Aggregated from",
   "Показать названия индикаторов": "Show indicator names",
   "Свернуть названия индикаторов": "Collapse indicator names",

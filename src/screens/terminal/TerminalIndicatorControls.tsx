@@ -1,3 +1,4 @@
+import { ToolbarPopover } from "./ToolbarPopover.js";
 import { useEffect, useRef, useState } from "react";
 import { t } from "../../i18n/messages.js";
 import { useTerminalControls } from "./context.js";
@@ -91,66 +92,68 @@ export function TerminalIndicatorControls() {
       </button>
       {open && (
         <>
-          <button
-            type="button"
-            className="indicator-menu-dismiss"
-            tabIndex={-1}
-            aria-label={t("Закрыть быстрое меню")}
-            onPointerDown={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              close(true);
-            }}
-          />
-          <div
-            ref={panel}
-            className="popover indicator-quick-panel"
-            id="indicators-panel"
-            role="dialog"
-            aria-label={t("Быстрый выбор индикаторов")}
-            aria-busy={pending}
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <strong>{t("Индикаторы")}</strong>
-            <MtpIndicatorGroup
-              flags={p.indicators}
-              collapsed={p.chartSettings.mtpMenuCollapsed === true}
-              disabled={blocked}
-              onCollapse={() => run(() => persistMtpMenuCollapsed(controller))}
-              onToggle={(key) => {
-                void run(() => changeMenuIndicator(controller, key));
-              }}
-            />
-            {(["volume", "ma", "ema"] as const).map((key) => (
-              <label key={key}>
-                <input
-                  type="checkbox"
-                  id={`indicator-${key}`}
-                  checked={!!p.indicators[key]}
-                  disabled={blocked}
-                  onChange={() => {
-                    void run(() => changeMenuIndicator(controller, key));
-                  }}
-                />
-                {t(INDICATOR_NAMES[key])}
-              </label>
-            ))}
+          <ToolbarPopover anchor={trigger} open={open} onClose={() => close()}>
             <button
               type="button"
-              disabled={blocked}
-              onClick={() => {
-                close();
-                controller.editIndicator("volume");
+              className="indicator-menu-dismiss"
+              tabIndex={-1}
+              aria-label={t("Закрыть быстрое меню")}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
               }}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                close(true);
+              }}
+            />
+            <div
+              ref={panel}
+              className="popover indicator-quick-panel"
+              id="indicators-panel"
+              role="dialog"
+              aria-label={t("Быстрый выбор индикаторов")}
+              aria-busy={pending}
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => event.stopPropagation()}
             >
-              {t("Настройки объёма")}
-            </button>
-          </div>
+              <strong>{t("Индикаторы")}</strong>
+              <MtpIndicatorGroup
+                flags={p.indicators}
+                collapsed={p.chartSettings.mtpMenuCollapsed === true}
+                disabled={blocked}
+                onCollapse={() => run(() => persistMtpMenuCollapsed(controller))}
+                onToggle={(key) => {
+                  void run(() => changeMenuIndicator(controller, key));
+                }}
+              />
+              {(["volume", "ma", "ema"] as const).map((key) => (
+                <label key={key}>
+                  <input
+                    type="checkbox"
+                    id={`indicator-${key}`}
+                    checked={!!p.indicators[key]}
+                    disabled={blocked}
+                    onChange={() => {
+                      void run(() => changeMenuIndicator(controller, key));
+                    }}
+                  />
+                  {t(INDICATOR_NAMES[key])}
+                </label>
+              ))}
+              <button
+                type="button"
+                disabled={blocked}
+                onClick={() => {
+                  close();
+                  controller.editIndicator("volume");
+                }}
+              >
+                {t("Настройки объёма")}
+              </button>
+            </div>
+          </ToolbarPopover>
         </>
       )}
     </div>

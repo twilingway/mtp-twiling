@@ -19,6 +19,7 @@ function modules(overrides = {}) {
       return load("services/storage.js");
     if (Object.hasOwn(overrides, relative)) return overrides[relative];
     if (relative === "react") return react;
+    if (relative === "react-dom") return { createPortal: (node) => node };
     if (relative === "react/jsx-runtime") return jsx;
     const candidate = path.resolve(root, relative).replace(/\.js$/, ".ts"),
       file = existsSync(candidate) ? candidate : candidate + "x";
@@ -344,8 +345,12 @@ test("hiding combined MTP keeps a single legend row and never reveals its separa
   f.controller.update({ preferences: { ...initial, indicators } });
   const capture = () => {
     const { chartSettings, indicators } = f.controller.getSnapshot().preferences;
-    const keys = indicatorLegendKeys(chartSettings, indicators).filter((key) => key.startsWith("mtp"));
-    const drawn = chartRenderConfigFromKey(chartRenderConfigKey(chartSettings, indicators)).indicators;
+    const keys = indicatorLegendKeys(chartSettings, indicators).filter((key) =>
+      key.startsWith("mtp")
+    );
+    const drawn = chartRenderConfigFromKey(
+      chartRenderConfigKey(chartSettings, indicators)
+    ).indicators;
     return { chartSettings, indicators, keys, drawn };
   };
 
@@ -355,7 +360,9 @@ test("hiding combined MTP keeps a single legend row and never reveals its separa
   assert.deepEqual(hidden.keys, ["mtpAll"]);
   assert.equal(hidden.chartSettings.mtpAllHidden, true);
   assert.equal(indicatorShown(hidden.chartSettings, indicators, "mtpAll"), false);
-  assert.ok(!Object.entries(hidden.drawn).some(([key, enabled]) => key.startsWith("mtp") && enabled));
+  assert.ok(
+    !Object.entries(hidden.drawn).some(([key, enabled]) => key.startsWith("mtp") && enabled)
+  );
 
   await f.controller.toggleIndicator("mtpAll");
   const shown = capture();
@@ -514,7 +521,10 @@ test("split controls route main click to library, chevron to quick panel, and di
       useRef: () => refs[refIndex++]
     },
     "screens/terminal/context.js": {
-      useTerminalControls: () => ({ state, controller: { setDialog: (value) => calls.push(value) } })
+      useTerminalControls: () => ({
+        state,
+        controller: { setDialog: (value) => calls.push(value) }
+      })
     },
     "screens/terminal/useIndicatorMenuAction.js": {
       useIndicatorMenuAction: () => ({ pending: false, run: (action) => action() })

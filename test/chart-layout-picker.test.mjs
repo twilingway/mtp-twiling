@@ -17,6 +17,7 @@ function setup({ layoutId = "single", desktopOpen = false } = {}) {
           ? [desktopOpen, (open) => events.push(["open", open])]
           : [browsing, (value) => (browsing = value)]
     },
+    "react-dom": { createPortal: (node) => node },
     "react/jsx-runtime": { jsx, jsxs: jsx }
   });
   const { ChartLayoutOptions, ChartLayoutPicker } = load("screens/terminal/ChartLayoutPicker.js");

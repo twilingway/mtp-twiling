@@ -1,3 +1,4 @@
+import { ToolbarPopover } from "./ToolbarPopover.js";
 import { useEffect, useId, useRef, useState } from "react";
 import { t } from "../../i18n/messages.js";
 import {
@@ -134,13 +135,19 @@ export function ChartLayoutPicker(props: ChartLayoutPickerProps) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   const layout = chartLayout(props.layoutId);
   const count = layout?.count ?? 1;
   const label = t("Раскладка графиков");
   useEffect(() => {
     if (!open) return;
     const outside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !root.current?.contains(event.target)) setOpen(false);
+      if (
+        event.target instanceof Node &&
+        !root.current?.contains(event.target) &&
+        !panel.current?.contains(event.target)
+      )
+        setOpen(false);
     };
     document.addEventListener("pointerdown", outside);
     return () => document.removeEventListener("pointerdown", outside);
@@ -154,7 +161,11 @@ export function ChartLayoutPicker(props: ChartLayoutPickerProps) {
       ref={root}
       className="chart-layout-picker"
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+        if (
+          !event.currentTarget.contains(event.relatedTarget) &&
+          !panel.current?.contains(event.relatedTarget)
+        )
+          setOpen(false);
       }}
       onKeyDown={(event) => {
         if (open && event.key === "Escape") {
@@ -178,17 +189,19 @@ export function ChartLayoutPicker(props: ChartLayoutPickerProps) {
         <span>{count}</span>
         <span aria-hidden="true" className="chart-layout-picker-chevron" />
       </button>
-      <div id={id} className="chart-layout-picker-popover" hidden={!open}>
-        {open && (
-          <ChartLayoutOptions
-            {...props}
-            onLayoutChange={(layoutId) => {
-              props.onLayoutChange(layoutId);
-              close();
-            }}
-          />
-        )}
-      </div>
+      <ToolbarPopover anchor={trigger} open={open} onClose={() => setOpen(false)}>
+        <div ref={panel} id={id} className="chart-layout-picker-popover" hidden={!open}>
+          {open && (
+            <ChartLayoutOptions
+              {...props}
+              onLayoutChange={(layoutId) => {
+                props.onLayoutChange(layoutId);
+                close();
+              }}
+            />
+          )}
+        </div>
+      </ToolbarPopover>
     </div>
   );
 }

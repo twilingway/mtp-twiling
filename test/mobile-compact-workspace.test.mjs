@@ -43,6 +43,7 @@ function setup({ open = true, mobile = true } = {}) {
   const noop = () => null;
   const load = createSourceLoader({
     react,
+    "react-dom": { createPortal: (node) => node },
     "react/jsx-runtime": { jsx, jsxs: jsx, Fragment: Symbol("fragment") },
     "screens/terminal/context.js": {
       TerminalContext: noop,

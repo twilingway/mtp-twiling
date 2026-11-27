@@ -194,6 +194,7 @@ export async function routingFixture() {
         }),
         useTerminalState: (target, select) => select(target.getSnapshot())
       },
+      "screens/terminal/ToolbarPopover.tsx": { ToolbarPopover: () => null },
       "screens/terminal/ClockZoneControl.tsx": { ClockZoneControl: () => null },
       "screens/terminal/TerminalIndicatorControls.tsx": { TerminalIndicatorControls: () => null },
       "screens/terminal/NativeChartTypeMenu.tsx": { NativeChartTypeMenu: () => null },
@@ -229,13 +230,16 @@ export async function routingFixture() {
       });
       const result = await hooks.candles?.(symbol, timeframe, range, options);
       if (result) return result;
-      const interval = load("model/intervals/native-timeframes.ts").NATIVE_TIMEFRAME_CONFIG[timeframe].ms ?? 30 * DAY;
-      const available = interval === DAY
-        ? bars
-        : Array.from({ length: 1001 }, (_, i) => ({
-            ...bars[0],
-            timestamp: Date.now() - (1000 - i) * interval
-          }));
+      const interval =
+        load("model/intervals/native-timeframes.ts").NATIVE_TIMEFRAME_CONFIG[timeframe].ms ??
+        30 * DAY;
+      const available =
+        interval === DAY
+          ? bars
+          : Array.from({ length: 1001 }, (_, i) => ({
+              ...bars[0],
+              timestamp: Date.now() - (1000 - i) * interval
+            }));
       return {
         candles: available.filter((bar) => bar.timestamp >= range.from),
         requests: 0,
