@@ -605,3 +605,512 @@ test("disable before a failed native attempt prevents late intent cleanup and pe
   assert.equal(f.coordinator.getSnapshot().choiceAction.state, "confirmed");
   f.coordinator.dispose();
 });
+
+test("inspection preserves prior sync, dirty state, association, pending upload and apply recovery", async () => {
+  const f = await fixture();
+  await f.coordinator.prepare();
+  await f.coordinator.sync();
+  await f.coordinator.choose({ kind: "local" });
+  const priorSync = f.coordinator.getSnapshot().lastSyncedAt;
+  f.edit();
+  f.coordinator.localIntent();
+  const captured = await f.host.capture(),
+    pending = await encodeBundle(captured.prepared, {
+      revisionId: crypto.randomUUID(),
+      deviceId: crypto.randomUUID(),
+      parents: [],
+      createdAt: "2026-11-27T10:00:00Z",
+      digest: captured.digest
+    });
+  await f.journal.savePending(
+    config.clientId,
+    {
+      version: 1,
+      accountId: f.disk.auth.accountId,
+      credentialGeneration: f.disk.auth.credentialGeneration,
+      name: revisionName(pending.revision),
+      ...pending
+    },
+    new AbortController().signal
+  );
+  await f.journal.saveApplyIntent(
+    config.clientId,
+    {
+      version: 1,
+      accountId: f.disk.auth.accountId,
+      credentialGeneration: f.disk.auth.credentialGeneration,
+      operationId: crypto.randomUUID(),
+      targetId: pending.revision.revisionId,
+      heads: [pending.revision.revisionId],
+      digest: captured.digest
+    },
+    new AbortController().signal
+  );
+  const records = structuredClone(f.backend.records),
+    calls = f.disk.calls.length;
+  for (const name of [
+    "association",
+    "applyIntent",
+    "pending",
+    "accept",
+    "archivePending",
+    "clearPending",
+    "saveApplyIntent",
+    "clearApplyIntent",
+    "archiveApplyIntent"
+  ])
+    f.journal[name] = async () => {
+      throw new Error(`Unexpected inspection journal call: ${name}`);
+    };
+  await f.coordinator.inspect();
+  const status = f.coordinator.getSnapshot();
+  assert.ok(status.comparison);
+  assert.equal(status.phase, "idle");
+  assert.equal(status.conflict, undefined);
+  assert.equal(status.pendingChanges, true);
+  assert.equal(status.lastSyncedAt, priorSync);
+  assert.equal(f.applies(), 0);
+  assert.equal(f.disk.puts(), 1);
+  assert.deepEqual(f.backend.records, records);
+  assert.ok(
+    f.disk.calls.slice(calls).every(({ init }) => !["PUT", "POST", "DELETE"].includes(init.method))
+  );
+  f.coordinator.dispose();
+});
+
+test("empty inspection presents local summary without conflict, upload, apply or invented metadata", async () => {
+  const f = await fixture();
+  await f.coordinator.prepare();
+  await f.coordinator.inspect();
+  const status = f.coordinator.getSnapshot();
+  assert.deepEqual(status.comparison.local, { instruments: 0, drawings: 0, images: 0 });
+  assert.deepEqual(status.comparison.remotes, []);
+  assert.ok(Number.isFinite(Date.parse(status.comparison.checkedAt)));
+  assert.equal(status.comparison.local.date, undefined);
+  assert.equal(status.conflict, undefined);
+  assert.equal(status.lastSyncedAt, undefined);
+  assert.equal(f.disk.puts(), 0);
+  assert.equal(f.applies(), 0);
+  f.coordinator.dispose();
+});
+
+for (const direction of ["local", "remote"]) {
+  for (const change of ["local", "heads"]) {
+    test(`${direction} decision with changed ${change} refreshes only; reviewed retry keeps its direction`, async () => {
+      const f = await fixture(),
+        remote = await seedRemote(f);
+      await f.coordinator.prepare();
+      await f.coordinator.inspect();
+      if (change === "local") f.edit();
+      else await seedRemote(f);
+      const records = structuredClone(f.backend.records);
+      const decide = () =>
+        direction === "local"
+          ? f.coordinator.choose({ kind: "local" })
+          : f.coordinator.receive(remote.revisionId);
+      await decide();
+      assert.equal(f.coordinator.getSnapshot().choiceAction.state, "review");
+      assert.equal(f.coordinator.getSnapshot().error, "local-changed");
+      assert.ok(f.coordinator.getSnapshot().comparison);
+      assert.equal(f.applies(), 0);
+      assert.equal(f.disk.puts(), 0);
+      assert.deepEqual(f.backend.records, records);
+      await decide();
+      assert.equal(f.applies(), direction === "remote" ? 1 : 0);
+      assert.equal(f.disk.puts(), direction === "local" ? 1 : 0);
+      assert.equal(f.coordinator.getSnapshot().choiceAction.state, "confirmed");
+      f.coordinator.dispose();
+    });
+  }
+}
+
+test("send requires a reviewed preview even before the first comparison", async () => {
+  const f = await fixture();
+  await f.coordinator.prepare();
+  await f.coordinator.choose({ kind: "local" });
+  assert.equal(f.disk.puts(), 0);
+  assert.equal(f.coordinator.getSnapshot().choiceAction.state, "review");
+  await f.coordinator.choose({ kind: "local" });
+  assert.equal(f.disk.puts(), 1);
+  assert.equal(f.applies(), 0);
+  f.coordinator.dispose();
+});
+
+test("receiving a pinned version preserves every cloud branch and the unresolved conflict", async () => {
+  const f = await fixture(),
+    first = await seedRemote(f),
+    second = await seedRemote(f);
+  await f.coordinator.prepare();
+  await f.coordinator.inspect();
+  const comparison = f.coordinator.getSnapshot().comparison;
+  assert.equal(comparison.remotes.length, 2);
+  assert.equal(comparison.remotes.find(({ id }) => id === first.revisionId).date, first.createdAt);
+  assert.ok(comparison.remotes.every(({ deviceLabel }) => deviceLabel === undefined));
+  assert.equal(f.coordinator.getSnapshot().conflict, undefined);
+  const files = [...f.disk.files.keys()];
+  await f.coordinator.receive(second.revisionId);
+  assert.equal(f.applies(), 1);
+  assert.equal(f.disk.puts(), 0);
+  assert.deepEqual([...f.disk.files.keys()], files);
+  assert.equal(f.coordinator.getSnapshot().choiceAction.state, "confirmed");
+  assert.equal(f.coordinator.getSnapshot().conflict.remotes.length, 2);
+  assert.equal(f.coordinator.getSnapshot().phase, "conflict");
+  await f.coordinator.sync();
+  assert.equal(f.coordinator.getSnapshot().phase, "conflict");
+  assert.equal(f.coordinator.getSnapshot().conflict.remotes.length, 2);
+  assert.equal(f.disk.puts(), 0);
+  f.coordinator.dispose();
+});
+
+test("local intent and disconnect invalidate comparison; disabled inspect/receive produce no traffic", async () => {
+  const f = await fixture(),
+    remote = await seedRemote(f);
+  await f.coordinator.prepare();
+  await f.coordinator.inspect();
+  f.coordinator.localIntent();
+  assert.equal(f.coordinator.getSnapshot().comparison, undefined);
+  await f.coordinator.receive(remote.revisionId);
+  assert.equal(f.applies(), 0);
+  assert.equal(f.coordinator.getSnapshot().choiceAction.state, "review");
+  await f.coordinator.setEnabled(false);
+  assert.equal(f.coordinator.getSnapshot().comparison, undefined);
+  const calls = f.disk.calls.length;
+  await f.coordinator.inspect();
+  await f.coordinator.receive(remote.revisionId);
+  assert.equal(f.disk.calls.length, calls);
+  assert.equal(f.coordinator.getSnapshot().comparison, undefined);
+  f.coordinator.dispose();
+});
+
+test("disconnect during inspection ignores a late result without changing recovery records", async () => {
+  const f = await fixture(),
+    remote = await seedRemote(f),
+    started = deferred(),
+    finish = deferred();
+  await f.coordinator.prepare();
+  f.disk.hooks.before = async (url) => {
+    if (url.searchParams.has("limit")) {
+      started.resolve();
+      await finish.promise;
+    }
+  };
+  const inspecting = f.coordinator.inspect();
+  await started.promise;
+  await f.coordinator.setEnabled(false);
+  const records = structuredClone(f.backend.records);
+  finish.resolve();
+  await inspecting;
+  assert.equal(f.coordinator.getSnapshot().phase, "disabled");
+  assert.equal(f.coordinator.getSnapshot().comparison, undefined);
+  assert.equal(f.applies(), 0);
+  assert.equal(f.disk.puts(), 0);
+  assert.deepEqual(f.backend.records, records);
+  assert.ok(f.disk.files.has(revisionName(remote)));
+  f.coordinator.dispose();
+});
+
+test("inspection does not reconcile a committed receipt; explicit retry still avoids a second import", async () => {
+  const f = await fixture(),
+    remote = await seedRemote(f),
+    apply = f.host.apply;
+  await f.coordinator.prepare();
+  await f.coordinator.inspect();
+  f.host.apply = async (...args) => {
+    await apply(...args);
+    throw Object.assign(new Error("UI restore"), { code: "local-save" });
+  };
+  await f.coordinator.receive(remote.revisionId);
+  const records = structuredClone(f.backend.records);
+  assert.equal(f.applies(), 1);
+  await f.coordinator.inspect();
+  assert.deepEqual(f.backend.records, records);
+  assert.equal(f.coordinator.getSnapshot().choiceAction.state, "unconfirmed");
+  await f.coordinator.receive(remote.revisionId);
+  assert.equal(f.applies(), 1);
+  assert.equal(f.coordinator.getSnapshot().choiceAction.state, "confirmed");
+  f.coordinator.dispose();
+});
+
+for (const direction of ["local", "remote"]) {
+  test(`${direction} detects a changed header/file fingerprint under the same remote ID`, async () => {
+    const f = await fixture(),
+      remote = await seedRemote(f);
+    await f.coordinator.prepare();
+    await f.coordinator.inspect();
+    const payload = new Blob([
+        JSON.stringify({
+          application: "personal-terminal",
+          schemaVersion: 2,
+          drawings: [],
+          images: [],
+          layout: { timeframe: "1h" }
+        })
+      ]),
+      changed = await encodeBundle(
+        { payload, images: [] },
+        {
+          revisionId: remote.revisionId,
+          deviceId: remote.deviceId,
+          parents: remote.parents,
+          createdAt: remote.createdAt,
+          digest: await payloadDigest(payload)
+        }
+      ),
+      fetcher = f.disk.fetcher;
+    f.disk.files.set(revisionName(remote), changed.body);
+    f.disk.fetcher = async (...args) => {
+      const response = await fetcher(...args),
+        url = new URL(args[0]);
+      if (!url.searchParams.has("limit")) return response;
+      const listing = await response.json();
+      listing._embedded.items = listing._embedded.items.map((item) => ({
+        ...item,
+        md5: "b".repeat(32),
+        modified: "2026-11-27T12:00:01Z"
+      }));
+      return Response.json(listing);
+    };
+    const records = structuredClone(f.backend.records);
+    if (direction === "local") await f.coordinator.choose({ kind: "local" });
+    else await f.coordinator.receive(remote.revisionId);
+    assert.equal(f.coordinator.getSnapshot().choiceAction.state, "review");
+    assert.equal(f.coordinator.getSnapshot().error, "local-changed");
+    assert.equal(f.applies(), 0);
+    assert.equal(f.disk.puts(), 0);
+    assert.deepEqual(f.backend.records, records);
+    f.coordinator.dispose();
+  });
+
+  test(`${direction} refuses a local edit during remote decoding before publishing or importing`, async () => {
+    const f = await fixture(),
+      remote = await seedRemote(f),
+      decode = f.host.decode;
+    await f.coordinator.prepare();
+    await f.coordinator.inspect();
+    f.host.decode = async (...args) => {
+      const backup = await decode(...args);
+      f.edit();
+      return backup;
+    };
+    if (direction === "local") await f.coordinator.choose({ kind: "local" });
+    else await f.coordinator.receive(remote.revisionId);
+    assert.equal(f.coordinator.getSnapshot().error, "local-changed");
+    assert.equal(f.applies(), 0);
+    assert.equal(f.disk.puts(), 0);
+    assert.equal(await f.journal.association(config.clientId, f.disk.auth.accountId), undefined);
+    f.coordinator.dispose();
+  });
+}
+
+test("session change clears comparison and ignores a late inspection result", async () => {
+  const f = await fixture(),
+    started = deferred(),
+    finish = deferred(),
+    scope = f.host.scope;
+  await seedRemote(f);
+  await f.coordinator.prepare();
+  await f.coordinator.inspect();
+  f.disk.hooks.before = async (url) => {
+    if (url.searchParams.has("limit")) {
+      started.resolve();
+      await finish.promise;
+    }
+  };
+  const inspecting = f.coordinator.inspect();
+  await started.promise;
+  f.host.scope = () => ({ ...scope(), ready: false, session: {} });
+  f.coordinator.profileChanged();
+  finish.resolve();
+  await inspecting;
+  assert.equal(f.coordinator.getSnapshot().connected, false);
+  assert.equal(f.coordinator.getSnapshot().comparison, undefined);
+  assert.equal(f.applies(), 0);
+  assert.equal(f.disk.puts(), 0);
+  f.coordinator.dispose();
+});
+
+test("failed inspection removes stale comparison while preserving historical sync and dirty state", async () => {
+  const f = await fixture();
+  await f.coordinator.prepare();
+  await f.coordinator.inspect();
+  await f.coordinator.choose({ kind: "local" });
+  const lastSyncedAt = f.coordinator.getSnapshot().lastSyncedAt;
+  f.edit();
+  f.coordinator.localIntent();
+  await f.coordinator.inspect();
+  f.disk.fetcher = async () => new Response(null, { status: 503 });
+  await f.coordinator.inspect();
+  assert.equal(f.coordinator.getSnapshot().comparison, undefined);
+  assert.equal(f.coordinator.getSnapshot().error, "network");
+  assert.equal(f.coordinator.getSnapshot().lastSyncedAt, lastSyncedAt);
+  assert.equal(f.coordinator.getSnapshot().pendingChanges, true);
+  assert.equal(f.applies(), 0);
+  assert.equal(f.disk.puts(), 1);
+  f.coordinator.dispose();
+});
+
+for (const direction of ["local", "remote"]) {
+  test(`${direction} rechecks cloud heads after asynchronous remote decoding`, async () => {
+    const f = await fixture(),
+      remote = await seedRemote(f),
+      decode = f.host.decode;
+    await f.coordinator.prepare();
+    await f.coordinator.inspect();
+    let changed = false;
+    f.host.decode = async (...args) => {
+      const result = await decode(...args);
+      if (!changed) {
+        changed = true;
+        await seedRemote(f);
+      }
+      return result;
+    };
+    const records = structuredClone(f.backend.records);
+    if (direction === "local") await f.coordinator.choose({ kind: "local" });
+    else await f.coordinator.receive(remote.revisionId);
+    assert.equal(f.applies(), 0);
+    assert.equal(f.disk.puts(), 0);
+    assert.equal(f.disk.files.size, 2);
+    assert.equal(f.coordinator.getSnapshot().choiceAction.state, "review");
+    assert.equal(f.coordinator.getSnapshot().comparison.remotes.length, 2);
+    assert.deepEqual(f.backend.records, records);
+    f.coordinator.dispose();
+  });
+}
+
+for (const stage of ["savePending", "metadata", "uploadLink"]) {
+  test(`send fences a local edit during ${stage} before cloud PUT`, async () => {
+    const f = await fixture();
+    await f.coordinator.prepare();
+    await f.coordinator.inspect();
+    if (stage === "savePending") {
+      const save = f.journal.savePending.bind(f.journal);
+      f.journal.savePending = async (...args) => {
+        await save(...args);
+        f.edit();
+      };
+    } else {
+      let changed = false;
+      f.disk.hooks.before = async (url, init) => {
+        const metadata =
+          !url.searchParams.has("limit") &&
+          !url.pathname.endsWith("/upload") &&
+          !url.pathname.endsWith("/download") &&
+          init.method !== "PUT";
+        if (!changed && (stage === "metadata" ? metadata : url.pathname.endsWith("/upload"))) {
+          changed = true;
+          f.edit();
+        }
+      };
+    }
+    await f.coordinator.choose({ kind: "local" });
+    assert.equal(f.disk.puts(), 0);
+    assert.equal(f.applies(), 0);
+    assert.equal(f.coordinator.getSnapshot().choiceAction.state, "review");
+    assert.equal(f.coordinator.getSnapshot().error, "local-changed");
+    assert.equal(await f.journal.association(config.clientId, f.disk.auth.accountId), undefined);
+    assert.ok(await f.journal.pending(config.clientId, f.disk.auth.accountId));
+    f.coordinator.dispose();
+  });
+}
+
+for (const change of ["local", "remote"]) {
+  test(`receive checks ${change} state again after saving its durable apply intent`, async () => {
+    const f = await fixture(),
+      remote = await seedRemote(f),
+      save = f.journal.saveApplyIntent.bind(f.journal);
+    await f.coordinator.prepare();
+    await f.coordinator.inspect();
+    f.journal.saveApplyIntent = async (...args) => {
+      await save(...args);
+      if (change === "local") f.edit();
+      else await seedRemote(f);
+    };
+    await f.coordinator.receive(remote.revisionId);
+    assert.equal(f.applies(), 0);
+    assert.equal(f.disk.puts(), 0);
+    assert.equal(f.coordinator.getSnapshot().choiceAction.state, "review");
+    assert.equal(f.coordinator.getSnapshot().error, "local-changed");
+    assert.equal(await f.journal.association(config.clientId, f.disk.auth.accountId), undefined);
+    assert.equal(await f.journal.applyIntent(config.clientId, f.disk.auth.accountId), undefined);
+    f.coordinator.dispose();
+  });
+}
+
+test("send rechecks remote state after saving a pending upload, before publishing", async () => {
+  const f = await fixture(),
+    save = f.journal.savePending.bind(f.journal);
+  await f.coordinator.prepare();
+  await f.coordinator.inspect();
+  f.journal.savePending = async (...args) => {
+    await save(...args);
+    await seedRemote(f);
+  };
+  await f.coordinator.choose({ kind: "local" });
+  assert.equal(f.applies(), 0);
+  assert.equal(f.disk.puts(), 0);
+  assert.equal(f.disk.files.size, 1);
+  assert.equal(f.coordinator.getSnapshot().choiceAction.state, "review");
+  assert.equal(f.coordinator.getSnapshot().comparison.remotes.length, 1);
+  assert.ok(await f.journal.pending(config.clientId, f.disk.auth.accountId));
+  f.coordinator.dispose();
+});
+
+for (const existing of [true, false]) {
+  test(`inspection ${existing ? "retains an already scheduled automatic job" : "does not schedule a new automatic job"}`, async () => {
+    const f = await fixture(),
+      started = deferred(),
+      finish = deferred(),
+      jobs = new Map(),
+      timeout = globalThis.setTimeout,
+      clear = globalThis.clearTimeout;
+    let runs = 0,
+      id = 0;
+    globalThis.setTimeout = (fn, delay, ...args) => {
+      if (delay !== 750) return timeout(fn, delay, ...args);
+      const handle = { job: ++id };
+      jobs.set(handle, () => fn(...args));
+      return handle;
+    };
+    globalThis.clearTimeout = (handle) => {
+      if (!jobs.delete(handle)) clear(handle);
+    };
+    const fire = () => {
+      const batch = [...jobs.values()];
+      jobs.clear();
+      for (const fn of batch) fn();
+    };
+    try {
+      await f.coordinator.prepare();
+      f.coordinator.sync = async () => {
+        runs++;
+      };
+      await f.coordinator.setAutomatic(true);
+      assert.equal(jobs.size, 1);
+      if (!existing) {
+        fire();
+        assert.equal(runs, 1);
+        runs = 0;
+      }
+      f.disk.hooks.before = async (url) => {
+        if (url.searchParams.has("limit")) {
+          started.resolve();
+          await finish.promise;
+        }
+      };
+      const inspecting = f.coordinator.inspect();
+      await started.promise;
+      if (existing) fire();
+      assert.equal(runs, 0);
+      finish.resolve();
+      await inspecting;
+      assert.equal(jobs.size, existing ? 1 : 0);
+      if (existing) fire();
+      assert.equal(runs, existing ? 1 : 0);
+    } finally {
+      f.coordinator.dispose();
+      globalThis.setTimeout = timeout;
+      globalThis.clearTimeout = clear;
+    }
+  });
+}

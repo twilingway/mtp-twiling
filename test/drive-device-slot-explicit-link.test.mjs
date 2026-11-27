@@ -116,6 +116,7 @@ async function fixture(t, hasRemote, hasRemoteB = false) {
   let reads = 0;
   let applies = 0;
   let captureBarrier;
+  let mediaBarrier;
   let failPointer = false;
   const remoteFile = async (id, workspaceId, revisionId, symbol) => {
     const version = await prepareDeviceSlotVersion(await prepareDriveBackup(backup(symbol)));
@@ -235,6 +236,9 @@ async function fixture(t, hasRemote, hasRemoteB = false) {
             });
           }
           if (url.searchParams.get("alt") === "media") {
+            const barrier = mediaBarrier;
+            mediaBarrier = undefined;
+            if (barrier) { barrier.enter(); await barrier.wait; }
             assert.equal(
               url.pathname,
               `/drive/v3/files/${selected?.file.id}`,
@@ -292,6 +296,13 @@ async function fixture(t, hasRemote, hasRemoteB = false) {
       records.delete(GOOGLE_SLOT_ACTIVE_OWNER);
     },
     remoteA,
+    pauseMedia() {
+      let enter, release;
+      const entered = new Promise((done) => { enter = done; });
+      const wait = new Promise((done) => { release = done; });
+      mediaBarrier = { enter, wait };
+      return { entered, release };
+    },
     pauseCapture() {
       let enter, release;
       const entered = new Promise((done) => {
@@ -568,7 +579,7 @@ test("disabling waits for an entered local effect but does not wait for a dispat
   const record = { generation: 1, enabled: true, activeGoogleSlotOwner: "explicit-test-owner" };
   let pointer = record;
   const access = {
-    load: async () => pointer,
+    load: async (owner) => owner === GOOGLE_SLOT_ACTIVE_OWNER ? pointer : record,
     save: async (_owner, prior, patch) => {
       assert.equal(prior.generation, pointer.generation);
       pointer = { ...pointer, ...patch, generation: pointer.generation + 1 };
@@ -691,4 +702,100 @@ test("pointerless fence acknowledges only its own successful local CAS updates",
   record = { ...record, generation: record.generation + 1 };
   await assert.rejects(fence.check(), { name: "AbortError" });
   assert.throws(() => fence.acknowledge(target.record, record), { name: "AbortError" });
+});
+
+test("provider inspection preserves dirty/conflict/time and receive uses only GET before native local apply", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true); await f.connect(f.device);
+  const owner = f.explicitOwner, record = structuredClone(f.records.get(owner));
+  const pending = f.device.getSnapshot().pendingChanges;
+  await f.device.inspect();
+  const inspected = f.device.getSnapshot();
+  assert.deepEqual(inspected.comparison.remotes.map(({ id }) => id), [revisionId]);
+  assert.equal(inspected.conflict, undefined);
+  assert.equal(inspected.pendingChanges, pending);
+  assert.equal(inspected.lastSyncedAt, undefined);
+  assert.deepEqual(f.records.get(owner), record);
+  assert.equal(f.applies(), 0);
+  assert.equal(f.calls.every((method) => method === "GET"), true);
+  await f.device.receive(revisionId);
+  assert.equal(f.applies(), 1);
+  assert.equal(f.device.getSnapshot().choiceAction.state, "confirmed");
+  assert.deepEqual(f.records.get(owner).baseHeads, [revisionId]);
+  assert.equal(f.calls.every((method) => method === "GET"), true);
+});
+
+test("off-on in another tab rejects an old paused comparison without applying or publishing it", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true); await f.connect(f.device);
+  const other = f.makeProvider(); other.resume(); await other.prepare();
+  const pause = f.pauseCapture();
+  const checking = f.device.inspect(); await pause.entered;
+  await other.setEnabled(false); await other.setEnabled(true);
+  pause.release(); await checking;
+  assert.equal(f.device.getSnapshot().comparison, undefined);
+  assert.equal(f.applies(), 0);
+  assert.equal(f.calls.length, 0);
+});
+
+test("a stale absent selection refreshes readonly comparison and never falls back to publishing sync", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true); await f.connect(f.device);
+  const record = structuredClone(f.records.get(f.explicitOwner));
+  await f.device.choose({ kind: "local" });
+  assert.equal(f.device.getSnapshot().choiceAction.state, "review");
+  assert.equal(f.device.getSnapshot().comparison.remotes.length, 1);
+  assert.deepEqual(f.records.get(f.explicitOwner), record);
+  assert.equal(f.applies(), 0);
+  assert.equal(f.calls.every((method) => method === "GET"), true);
+});
+
+for (const change of ["mode", "pending"]) test(`durable ${change} generation during receive download blocks native apply`, async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true); await f.connect(f.device); await f.device.inspect();
+  const owner = f.explicitOwner, pause = f.pauseMedia();
+  const receiving = f.device.receive(revisionId); await pause.entered;
+  const prior = f.records.get(owner);
+  const next = { ...prior, generation: prior.generation + 1, ...(change === "mode" ? { mode: "test" } : { pending: { write: { fileId: f.remoteA.file.id, key: f.remoteA.file.appProperties.mtpKey, baseEtag: null, envelope: f.remoteA.envelope }, digest: "a".repeat(64) } }) };
+  f.records.set(owner, next); pause.release(); await receiving;
+  assert.equal(f.applies(), 0);
+  assert.deepEqual(f.records.get(owner), next);
+  assert.notEqual(f.device.getSnapshot().choiceAction?.state, "confirmed");
+  assert.equal(f.calls.every((method) => method === "GET"), true);
+});
+
+test("disable from a receive outcome listener cannot resurrect the old confirmed receipt", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true); await f.connect(f.device); await f.device.inspect();
+  let disabling;
+  const stop = f.device.subscribe(() => {
+    const state = f.device.getSnapshot();
+    if (!disabling && state.phase === "idle" && state.comparison && state.choiceAction?.state === "confirmed") disabling = f.device.setEnabled(false);
+  });
+  t.after(stop);
+  await f.device.receive(revisionId); await disabling;
+  assert.equal(f.applies(), 1);
+  assert.equal(f.device.getSnapshot().phase, "disabled");
+  assert.equal(f.device.getSnapshot().choiceAction, undefined);
+  assert.equal(f.device.getSnapshot().comparison, undefined);
+});
+
+test("reenabling a shipped disabled fixed alias honors the active pointer while preserving its stored record", async (t) => {
+  const f = await fixture(t, true);
+  await f.device.setEnabled(true); await f.connect(f.device);
+  await f.saveAsOriginalExplicitLink(); f.device.dispose();
+  const owner = f.explicitOwner, prior = f.records.get(owner);
+  const disabled = { ...prior, enabled: false, generation: prior.generation + 1 };
+  f.records.set(owner, disabled);
+  const next = f.makeProvider(); next.resume(); await next.prepare();
+  assert.equal(next.getSnapshot().enabled, false);
+  await next.setEnabled(true); await next.prepare();
+  assert.equal(next.getSnapshot().enabled, true);
+  assert.equal(next.getSnapshot().connected, true);
+  assert.deepEqual(f.records.get(owner), disabled, "the enable pointer must not rewrite the shipped fixed record");
+  await next.inspect();
+  assert.deepEqual(next.getSnapshot().comparison.remotes.map(({ id }) => id), [revisionId]);
+  assert.equal(next.getSnapshot().connected, true);
+  assert.equal(f.applies(), 0);
+  assert.equal(f.calls.every((method) => method === "GET"), true);
 });

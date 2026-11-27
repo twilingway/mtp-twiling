@@ -8,7 +8,7 @@ import type { Backup } from "../../model/types.js";
 import { summarize } from "./coordinator-types.js";
 import { DeviceSlotCasError } from "./device-slot-cas.js";
 import type { GoogleArchiveStatus } from "./device-slot-migration.js";
-import type { SlotSyncResult } from "./device-slot-sync.js";
+import type { SlotPreview, SlotSyncResult } from "./device-slot-sync.js";
 import type { DriveOperationTime, DriveProgress, DriveStage } from "./progress.js";
 import { DriveError } from "./types.js";
 import type { WriteCapabilityStatus } from "./write-capability.js";
@@ -28,6 +28,7 @@ export type GoogleTransientStatusKey =
   | "error"
   | "pauseReason"
   | "conflict"
+  | "comparison"
   | "archive"
   | "progress"
   | "driveProgress"
@@ -39,6 +40,7 @@ export type GoogleTransientStatusKey =
 
 export const replacedGoogleAccountStatusKeys = [
   "conflict",
+  "comparison",
   "choiceAction",
   "lastSyncedAt",
   "previousVersions",
@@ -99,8 +101,10 @@ export function operationError(error: unknown): CloudErrorCode {
 }
 
 export function googleSlotChoiceFailure(
-  error: CloudErrorCode | undefined
+  error: CloudErrorCode | undefined,
+  receipt?: GoogleStatus["choiceAction"]
 ): NonNullable<GoogleStatus["choiceAction"]>["state"] {
+  if (receipt?.state === "confirmed") return "confirmed";
   return error === "indeterminate" ? "unconfirmed" : error === "conflict" ? "review" : "blocked";
 }
 
@@ -111,6 +115,26 @@ export function deviceSlotOutcome(
   local: Backup,
   newLocalChanges: boolean
 ): Partial<GoogleStatus> {
+  if (result.state === "comparison" || result.state === "received") {
+    const { preview, checkedAt } = result;
+    const comparison = {
+      local: preview.conflict.local,
+      remotes: preview.conflict.remotes.map(({ nodeId, ...summary }) => ({
+        ...summary,
+        id: nodeId
+      })),
+      checkedAt
+    };
+    if (result.state === "comparison") return { comparison };
+    const outcome: SlotSyncResult =
+      preview.snapshot.heads.length > 1
+        ? { state: "choice", record: result.record, preview }
+        : { state: "idle", record: result.record, snapshot: preview.snapshot };
+    return {
+      ...deviceSlotOutcome(outcome, archive, archiveChoices, local, newLocalChanges),
+      comparison
+    };
+  }
   const snapshot =
     result.state === "idle"
       ? result.snapshot
@@ -150,5 +174,57 @@ export function deviceSlotOutcome(
       : {}),
     ...(legacyChoices ? { conflict: { local: summarize(local), remotes: legacyChoices } } : {}),
     ...(result.record.lastSyncedAt ? { lastSyncedAt: result.record.lastSyncedAt } : {})
+  };
+}
+
+export function googleSlotReceiveReceipt(
+  status: GoogleStatus,
+  backup: Backup,
+  id: string
+): Partial<GoogleStatus> {
+  return {
+    choiceAction: { selection: { kind: "remote", id }, state: "confirmed" },
+    ...(status.conflict ? { conflict: { ...status.conflict, local: summarize(backup) } } : {})
+  };
+}
+
+export function googleSlotPublication(
+  result: SlotSyncResult,
+  status: GoogleStatus,
+  previous: SlotPreview | undefined,
+  archive: GoogleArchiveStatus | undefined,
+  archiveChoices: readonly CloudRemoteChoice[] | undefined,
+  local: Backup,
+  localChanged: boolean
+): {
+  preview: SlotPreview | undefined;
+  comparisonPreview: SlotPreview | undefined;
+  clear: GoogleTransientStatusKey[];
+  patch: Partial<GoogleStatus>;
+} {
+  const phase = status.conflict ? "conflict" : "idle";
+  if (result.state === "legacy-inspection")
+    return {
+      preview: previous,
+      comparisonPreview: undefined,
+      clear: ["comparison"],
+      patch: { migrationRequired: true, phase }
+    };
+  if (result.state === "comparison")
+    return {
+      preview: previous,
+      comparisonPreview: result.preview,
+      clear: [],
+      patch: { ...deviceSlotOutcome(result, undefined, undefined, local, localChanged), phase }
+    };
+  return {
+    preview:
+      result.state === "choice" ||
+      (result.state === "received" && result.preview.snapshot.heads.length > 1)
+        ? result.preview
+        : undefined,
+    comparisonPreview: result.state === "received" ? result.preview : undefined,
+    clear: ["error", "pauseReason", "conflict", "archive", "comparison"],
+    patch: deviceSlotOutcome(result, archive, archiveChoices, local, localChanged)
   };
 }

@@ -221,3 +221,135 @@ test("cloud hooks ignore quote/candle commits while blockers, language and provi
     else globalThis.window = savedWindow;
   }
 });
+
+test("comparison inspection runs once per ready connection, never syncs, and a failed check remains explicitly retryable", async () => {
+  const savedWindow = globalThis.window;
+  globalThis.window = { event: undefined, HTMLIFrameElement: class {} };
+  const cloud = provider("yandex-disk");
+  cloud.update({
+    enabled: false,
+    configured: true,
+    automatic: false,
+    pendingChanges: true,
+    lastSyncedAt: "2026-11-25T08:00:00Z"
+  });
+  let inspections = 0,
+    transfers = 0,
+    fail = true,
+    inspectionGate,
+    releaseInspection,
+    latest;
+  cloud.inspect = async () => {
+    inspections++;
+    if (fail) throw new Error("synthetic inspect failure");
+    if (inspectionGate) await inspectionGate;
+    cloud.update({
+      comparison: {
+        checkedAt: "2026-11-27T10:00:00Z",
+        local: { instruments: 1, drawings: 0, images: 0 },
+        remotes: []
+      }
+    });
+  };
+  cloud.sync = async () => {
+    transfers++;
+  };
+  cloud.choose = async () => {
+    transfers++;
+  };
+  cloud.receive = async () => {
+    transfers++;
+  };
+  let state = {
+    owner: "device",
+    ready: true,
+    preferences: { locale: "en" },
+    rows: [],
+    candles: []
+  };
+  const listeners = new Set();
+  const controller = {
+    getSnapshot: () => state,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    }
+  };
+  const load = sourceModules({ react: React, "react/jsx-runtime": jsx });
+  const { TerminalContext } = load("screens/terminal/context.tsx"),
+    { CloudProviderSettings } = load("screens/terminal/CloudProviderSettings.tsx");
+  load("i18n/preferences.ts").setDisplayPreferences({ locale: "en" });
+  function Reader() {
+    latest = CloudProviderSettings({ provider: cloud });
+    return null;
+  }
+  function find(element, id) {
+    if (!React.isValidElement(element)) return undefined;
+    if (element.props.id === id) return element;
+    for (const child of React.Children.toArray(element.props.children)) {
+      const found = find(child, id);
+      if (found) return found;
+    }
+  }
+  const root = createRoot(nullContainer());
+  try {
+    flushSync(() =>
+      root.render(
+        React.createElement(TerminalContext, { value: controller }, React.createElement(Reader))
+      )
+    );
+    assert.equal(inspections, 0, "disabled provider does not inspect");
+    flushSync(() => cloud.update({ enabled: true, configured: false }));
+    assert.equal(inspections, 0, "an unconfigured provider does not inspect");
+    flushSync(() => cloud.update({ configured: true }));
+    await new Promise(setImmediate);
+    assert.equal(inspections, 1);
+    assert.match(renderToStaticMarkup(latest), /Could not compare versions/);
+    assert.doesNotMatch(renderToStaticMarkup(latest), /Could not save or remove sign-in/);
+    for (let price = 1; price <= 20; price++)
+      flushSync(() => {
+        state = {
+          ...state,
+          rows: [{ uid: "one", price }],
+          candles: [{ timestamp: price, close: price }]
+        };
+        listeners.forEach((listener) => listener());
+      });
+    assert.equal(inspections, 1, "errors and quote updates do not create an inspect loop");
+    fail = false;
+    inspectionGate = new Promise((resolve) => {
+      releaseInspection = resolve;
+    });
+    flushSync(() => find(latest, "yandex-disk-compare").props.onClick());
+    assert.equal(find(latest, "yandex-disk-compare").props.disabled, true);
+    assert.equal(cloud.getSnapshot().phase, "idle");
+    assert.equal(cloud.getSnapshot().progress, undefined);
+    assert.match(renderToStaticMarkup(latest), /<strong>Working…<\/strong>/);
+    assert.doesNotMatch(renderToStaticMarkup(latest), /<strong>Connected<\/strong>/);
+    releaseInspection();
+    inspectionGate = undefined;
+    await new Promise(setImmediate);
+    assert.equal(inspections, 2);
+    assert.doesNotMatch(
+      renderToStaticMarkup(latest),
+      /Could not compare versions|Operation confirmed/
+    );
+    assert.equal(cloud.getSnapshot().automatic, false);
+    assert.equal(cloud.getSnapshot().pendingChanges, true);
+    assert.equal(cloud.getSnapshot().lastSyncedAt, "2026-11-25T08:00:00Z");
+    assert.equal(transfers, 0);
+    flushSync(() => cloud.update({ connected: false }));
+    flushSync(() => cloud.update({ connected: true }));
+    await new Promise(setImmediate);
+    assert.equal(inspections, 3, "one fresh inspection after reconnect");
+    flushSync(() => cloud.update({ phase: "syncing", progress: { stage: "inspect" } }));
+    assert.equal(inspections, 3, "provider progress does not repeat inspection");
+    assert.equal(transfers, 0);
+  } finally {
+    releaseInspection?.();
+    flushSync(() => root.unmount());
+    await new Promise(setImmediate);
+    if (savedWindow === undefined) delete globalThis.window;
+    else globalThis.window = savedWindow;
+  }
+});

@@ -12,9 +12,7 @@ import {
 import type { GoogleSlotTarget } from "./device-slot-link.js";
 import { LegacyDeviceSlotMigration } from "./device-slot-migration.js";
 import {
-  deviceSlotOutcome,
-  googleSlotProgress,
-  googleSlotChoiceFailure,
+  googleSlotReceiveReceipt,
   initialGoogleSlotStatus,
   operationError,
   replacedGoogleAccountStatusKeys
@@ -25,8 +23,13 @@ import {
   restorePreviousDeviceSlotVersion,
   synchronizeDeviceSlots
 } from "./device-slot-sync.js";
-import type { SlotPreview, SlotSyncResult } from "./device-slot-sync.js";
-import { advanceDriveProgress, beginDriveProgress, finishDriveProgress } from "./progress.js";
+import {
+  GoogleSlotPreviews,
+  inspectDeviceSlotVersions,
+  receiveGoogleSlotSelection
+} from "./device-slot-inspection.js";
+import type { SlotSyncResult } from "./device-slot-sync.js";
+import { finishDriveProgress } from "./progress.js";
 import { DriveError } from "./types.js";
 import type { DriveAuthorization } from "./types.js";
 export type { GoogleStatus } from "./device-slot-status.js";
@@ -34,7 +37,8 @@ export type { GoogleStatus } from "./device-slot-status.js";
 export type { GoogleSlotHost } from "./device-slot-context.js";
 
 import {
-  executeGoogleSlotOperation,
+  runGoogleSlotJob,
+  guardedGoogleCapability,
   defaultGoogleSlotDependencies,
   googleCapabilityManager,
   runGoogleCapabilityDiagnostic,
@@ -49,7 +53,7 @@ export class GoogleSlotProvider implements CloudSyncProvider {
   private scope: GoogleSlotScope | undefined;
   private target: GoogleSlotTarget | undefined;
   private authorization: DriveAuthorization | undefined;
-  private preview: SlotPreview | undefined;
+  private readonly previews = new GoogleSlotPreviews();
   private readonly migration = new LegacyDeviceSlotMigration();
   private epoch = 0;
   private lifecycle = new AbortController();
@@ -80,7 +84,7 @@ export class GoogleSlotProvider implements CloudSyncProvider {
     this.timer = undefined;
     this.dependencies.auth.suspend();
     this.authorization = undefined;
-    this.preview = undefined;
+    this.previews.clear();
     this.migration.clear();
     this.operation = undefined;
     this.target = undefined;
@@ -161,7 +165,14 @@ export class GoogleSlotProvider implements CloudSyncProvider {
         if (!this.current(epoch) || this.authorization !== authorization) return;
         this.authorization = undefined;
         this.migration.clear();
-        this.omit("archive", "conflict", "writeCapability", "driveProgress", "progress");
+        this.omit(
+          "archive",
+          "conflict",
+          "comparison",
+          "writeCapability",
+          "driveProgress",
+          "progress"
+        );
         this.update({
           connected: false,
           phase: this.state.phase === "connecting" ? "connecting" : "auth-required",
@@ -214,7 +225,8 @@ export class GoogleSlotProvider implements CloudSyncProvider {
   }
   localIntent = (): void => {
     if (!this.state.enabled) return;
-    this.preview = undefined;
+    this.previews.clear();
+    this.omit("comparison");
     this.update({ pendingChanges: true });
   };
   localChanged = (): void => {
@@ -259,7 +271,7 @@ export class GoogleSlotProvider implements CloudSyncProvider {
       if (!linked || !this.current(epoch) || linked.authorization.signal.aborted) return;
       if (linked.target) {
         this.target = linked.target;
-        this.preview = undefined;
+        this.previews.clear();
         this.omit(...replacedGoogleAccountStatusKeys);
       }
       this.attach(linked.authorization, epoch);
@@ -351,14 +363,30 @@ export class GoogleSlotProvider implements CloudSyncProvider {
   };
 
   sync = async (): Promise<void> => this.run(synchronizeDeviceSlots);
+  inspect = async (): Promise<void> => this.run(inspectDeviceSlotVersions);
+  receive = async (id: string): Promise<void> => {
+    const preview = this.previews.comparison ?? this.previews.choice;
+    if (!preview) {
+      await this.inspect();
+      return;
+    }
+    await this.run(
+      receiveGoogleSlotSelection(preview, this.previews, id, (backup) => {
+        this.omit("comparison");
+        this.update(googleSlotReceiveReceipt(this.state, backup, id));
+      }),
+      { kind: "remote", id }
+    );
+  };
   choose = async (selection: CloudSelection): Promise<void> => {
     if (this.state.migrationRequired) return this.migrateLegacy(selection);
-    const preview = this.preview;
+    const preview =
+      selection.kind === "local"
+        ? (this.previews.comparison ?? this.previews.choice)
+        : this.previews.choice;
     if (!preview) {
-      if (this.state.conflict) {
-        this.update({ choiceAction: { selection, state: "review" } });
-        await this.sync();
-      }
+      await this.inspect();
+      this.update({ choiceAction: { selection, state: "review" } });
       return;
     }
     await this.run(
@@ -410,6 +438,11 @@ export class GoogleSlotProvider implements CloudSyncProvider {
       this.update({ pendingChanges: true, pauseReason: "offline" });
       return;
     }
+    const automaticPending = operation === inspectDeviceSlotVersions && this.timer !== undefined;
+    if (automaticPending) {
+      clearTimeout(this.timer);
+      this.timer = undefined;
+    }
     const epoch = this.epoch;
     const job = {};
     this.operation = job;
@@ -420,61 +453,36 @@ export class GoogleSlotProvider implements CloudSyncProvider {
       this.authorization === authorization &&
       this.operation === job &&
       this.state.enabled;
-    let progress = beginDriveProgress();
-    this.update({
-      phase: "syncing",
-      driveProgress: progress,
-      progress: { stage: "validate" },
-      ...(selection ? { choiceAction: { selection, state: "running" as const } } : {})
-    });
-    try {
-      const result = await executeGoogleSlotOperation({
-        host: this.host,
-        scope,
-        authorization,
-        dependencies: this.dependencies,
-        signal,
-        current,
-        operation,
-        reset: (enabled) => this.reset(enabled),
-        target: (target) => {
-          this.target = target;
-        },
-        outcome: (result, local, localChanged) => this.publishOutcome(result, local, localChanged),
-        capability: (writeCapability) => {
-          if (current())
-            this.update({ writeCapability, uploadProbeBytes: writeCapability.verifiedBytes });
-        },
-        report: (stage, details) => {
-          if (!current()) return;
-          progress = advanceDriveProgress(progress, stage, details);
-          this.update(googleSlotProgress(progress));
-        }
-      });
-      if (!result) return;
-      if (selection)
-        this.update({
-          choiceAction: { selection, state: result.state === "idle" ? "confirmed" : "review" }
-        });
-    } catch (error) {
-      if (current()) {
-        this.fail(error, epoch);
-        if (selection)
-          this.update({
-            choiceAction: {
-              selection,
-              state: googleSlotChoiceFailure(this.state.error)
-            }
-          });
-      }
-    } finally {
-      if (this.operation === job) {
+    await runGoogleSlotJob({
+      host: this.host,
+      scope,
+      authorization,
+      dependencies: this.dependencies,
+      signal,
+      current,
+      operation,
+      ...(selection ? { selection } : {}),
+      reset: (enabled) => this.reset(enabled),
+      target: (target) => (this.target = target),
+      outcome: (result, local, localChanged) => this.publishOutcome(result, local, localChanged),
+      capability: guardedGoogleCapability(current, (patch) => this.update(patch)),
+      update: (patch) => this.update(patch),
+      fail: (error) => this.fail(error, epoch),
+      status: () => this.state,
+      finish: (progress) => {
+        if (this.operation !== job) return;
         this.operation = undefined;
         this.omit("driveProgress", "progress");
         this.update({ lastOperation: finishDriveProgress(progress) });
-        if (this.state.phase === "idle" && this.state.pendingChanges) this.schedule();
+        if (
+          automaticPending ||
+          (operation !== inspectDeviceSlotVersions &&
+            this.state.phase === "idle" &&
+            this.state.pendingChanges)
+        )
+          this.schedule();
       }
-    }
+    });
   }
 
   private omit(...keys: GoogleTransientStatusKey[]) {
@@ -483,17 +491,9 @@ export class GoogleSlotProvider implements CloudSyncProvider {
     this.state = next;
   }
 
-  private publishOutcome(result: SlotSyncResult, local: Backup, newLocalChanges: boolean) {
-    this.preview = result.state === "choice" ? result.preview : undefined;
-    this.omit("error", "pauseReason", "conflict", "archive");
-    this.update(
-      deviceSlotOutcome(
-        result,
-        this.migration.current,
-        this.migration.choices,
-        local,
-        newLocalChanges
-      )
-    );
+  private publishOutcome(result: SlotSyncResult, local: Backup, changed: boolean) {
+    const publication = this.previews.publish(result, this.state, this.migration, local, changed);
+    this.omit(...publication.clear);
+    this.update(publication.patch);
   }
 }

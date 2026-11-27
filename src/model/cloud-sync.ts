@@ -36,6 +36,11 @@ export interface CloudRemoteChoice extends CloudSummary {
   id: string;
   deviceLabel?: string;
 }
+export interface CloudComparison {
+  local: CloudSummary;
+  remotes: readonly CloudRemoteChoice[];
+  checkedAt: string;
+}
 export interface CloudProgress {
   stage: "inspect" | "download" | "validate" | "upload" | "verify" | "apply" | "save";
   completedBytes?: number;
@@ -57,6 +62,7 @@ export interface CloudSyncStatus {
   error?: CloudErrorCode;
   pauseReason?: "offline" | "auth-required" | "network" | "configuration-required";
   conflict?: { local: CloudSummary; remotes: readonly CloudRemoteChoice[] };
+  comparison?: CloudComparison;
   choiceAction?: { selection: CloudSelection; state: CloudChoiceState };
   progress?: CloudProgress;
 }
@@ -74,6 +80,10 @@ export interface CloudSyncProvider {
   connectFromUserGesture(): Promise<void>;
   disconnect(): Promise<void>;
   sync(): Promise<void>;
+  /** Reads versions without publishing, importing, or acknowledging synchronization. */
+  inspect?(): Promise<void>;
+  /** Applies a pinned remote version locally; does not publish a cloud conflict resolution. */
+  receive?(id: string): Promise<void>;
   choose(selection: CloudSelection): Promise<void>;
   dispose(): void;
 }

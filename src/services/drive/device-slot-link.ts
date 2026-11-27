@@ -55,16 +55,18 @@ export function googleSlotFence(
     assertJob();
     const actual = await access.load(expected ? GOOGLE_SLOT_ACTIVE_OWNER : target.owner);
     assertJob();
+    const record = expected ? await access.load(target.owner) : actual;
+    assertJob();
+    const enabled = actual.enabled ?? record.enabled;
     if (
       (expected &&
         (actual.generation !== expected.generation ||
           actual.activeGoogleSlotOwner !== expected.activeGoogleSlotOwner)) ||
-      (!expected &&
-        (actual.generation !== generation ||
-          actual.explicitGoogleCredential !== target.record.explicitGoogleCredential)) ||
-      actual.enabled === false
+      record.generation !== generation ||
+      record.explicitGoogleCredential !== target.record.explicitGoogleCredential ||
+      enabled === false
     ) {
-      onStale(actual.enabled !== false);
+      onStale(enabled !== false);
       assertJob();
       throw new DOMException("The active Google account changed.", "AbortError");
     }
@@ -86,7 +88,6 @@ export function googleSlotFence(
     };
   const acknowledge = (prior: DeviceSlotRecord, next: DeviceSlotRecord) => {
     assertJob();
-    if (expected) return;
     if (prior.generation !== generation || next.generation !== prior.generation + 1)
       throw new DOMException("Google record update is stale.", "AbortError");
     generation = next.generation;

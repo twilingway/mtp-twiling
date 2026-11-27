@@ -1,4 +1,35 @@
 export const driveMessages = {
+  Сохранение: "Save",
+  Рекомендуем: "Recommended",
+  "Режим обмена": "Exchange mode",
+  Автоматически: "Automatic",
+  Вручную: "Manual",
+  "Последний подтверждённый обмен": "Last confirmed exchange",
+  "Пока не было": "None yet",
+  "Сравните версии и выберите направление обмена.":
+    "Compare versions and choose which direction to transfer.",
+  "Сравнить версии": "Compare versions",
+  "Сравнение версий": "Version comparison",
+  "Не удалось сравнить версии. Повторите проверку.":
+    "Could not compare versions. Try the check again.",
+  "На этом устройстве": "On this device",
+  "В Яндекс Диске": "In Yandex Disk",
+  "В Google Диске": "In Google Drive",
+  "Проверено состояние": "State checked",
+  "Время проверки неизвестно": "Check time unknown",
+  "Дата снимка неизвестна": "Snapshot date unknown",
+  "На устройстве ничего не заменяется.": "Nothing on this device is replaced.",
+  "Облачные версии не изменятся.": "Cloud versions will not change.",
+  "Перенести и получить": "Migrate and receive",
+  "Перенос обновит старые сохранения в Google Диске и заменит данные на этом устройстве.":
+    "Migration updates legacy saves in Google Drive and replaces data on this device.",
+  "Версия применена на устройстве; в облаке по-прежнему несколько версий.":
+    "The version was applied on this device; multiple cloud versions still remain.",
+  "Перенос старых сохранений": "Migrate older saves",
+  "Версии и резервные копии Google": "Google versions and backups",
+  "Старые сохранения Google доступны в архиве. Сначала скачайте и проверьте его.":
+    "Older Google saves are available in an archive. Download and verify it first.",
+  "Что сохраняется в облаке": "What is saved in the cloud",
   "Проверяем подключение…": "Checking connection…",
   "Диагностика Google": "Google diagnostics",
   "Проверка подключения не отправляет рабочее пространство.":

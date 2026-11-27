@@ -1,4 +1,4 @@
-import { object, sha256, YANDEX_ROOT, YandexError } from "./types.js";
+import { assertCurrent, object, sha256, YANDEX_ROOT, YandexError } from "./types.js";
 import type { YandexAuthorization, YandexFile, YandexReference } from "./types.js";
 
 const API = "https://cloud-api.yandex.net/v1/disk/resources";
@@ -95,18 +95,19 @@ export class YandexTransport {
     if (!Number.isSafeInteger(this.timeout) || this.timeout < 1 || this.timeout > 60000)
       throw new RangeError("Invalid Yandex request timeout");
   }
-  private current(): string {
-    this.auth.signal.throwIfAborted();
+  private current(valid: () => boolean = () => true): string {
+    assertCurrent(this.auth.signal, valid);
     return this.auth.getAccessToken();
   }
   private async request(
     url: string,
     init: RequestInit = {},
     authorized = true,
-    allowed: readonly number[] = []
+    allowed: readonly number[] = [],
+    valid: () => boolean = () => true
   ): Promise<Response> {
     for (let attempt = 0; attempt < 4; attempt++) {
-      const token = this.current(),
+      const token = this.current(valid),
         signal = AbortSignal.any([this.auth.signal, AbortSignal.timeout(this.timeout)]);
       let response: Response;
       try {
@@ -123,13 +124,13 @@ export class YandexTransport {
           }
         });
       } catch {
-        this.current();
+        this.current(valid);
         if (init.method === "PUT" && !authorized) throw new YandexError("indeterminate");
         if (attempt === 3) throw new YandexError("network");
         await this.sleep(250 * 2 ** attempt, this.auth.signal);
         continue;
       }
-      this.current();
+      this.current(valid);
       if (response.ok || allowed.includes(response.status)) return response;
       if (response.status === 401) {
         this.auth.invalidate();
@@ -210,12 +211,13 @@ export class YandexTransport {
   private api(path: string, params: Record<string, string>): string {
     return `${API}${path}?${new URLSearchParams(params)}`;
   }
-  async ensureRoot(): Promise<void> {
+  async ensureRoot(valid: () => boolean = () => true): Promise<void> {
     const response = await this.request(
       this.api("", { path: YANDEX_ROOT }),
       { method: "PUT" },
       true,
-      [409]
+      [409],
+      valid
     );
     await response.body?.cancel().catch(() => undefined);
   }
@@ -326,22 +328,31 @@ export class YandexTransport {
     }
     return content;
   }
-  async putImmutable(name: string, body: Blob, reference: YandexReference): Promise<YandexFile> {
+  async putImmutable(
+    name: string,
+    body: Blob,
+    reference: YandexReference,
+    valid: () => boolean = () => true
+  ): Promise<YandexFile> {
     if (body.size !== reference.size || (await sha256(body)) !== reference.sha256)
       throw new YandexError("remote-invalid");
+    this.current(valid);
     const existing = await this.metadata(name);
+    this.current(valid);
     if (existing) return this.verify(existing, reference);
-    await this.ensureRoot();
+    await this.ensureRoot(valid);
+    this.current(valid);
     try {
       const response = await this.request(
           this.api("/upload", { path: yandexFilePath(name), overwrite: "false" })
         ),
-        url = transferUrl(await this.json(response), "PUT"),
-        uploaded = await this.request(url.href, { method: "PUT", body }, false);
+        url = transferUrl(await this.json(response), "PUT");
+      this.current(valid);
+      const uploaded = await this.request(url.href, { method: "PUT", body }, false, [], valid);
       if (![201, 202].includes(uploaded.status)) throw new YandexError("indeterminate");
       await uploaded.body?.cancel().catch(() => undefined);
     } catch (error) {
-      this.current();
+      this.current(valid);
       if (
         !(error instanceof YandexError) ||
         !["indeterminate", "conflict", "network"].includes(error.code)

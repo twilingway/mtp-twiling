@@ -12,20 +12,23 @@ export function CloudSyncSettings() {
   return (
     <section id="cloud-sync-settings" className="transfer-settings cloud-sync-settings">
       <h3>{t("Облачная синхронизация")}</h3>
-      <p>
-        {t(
-          "Настройки, инструменты, индикаторы, рисунки, изображения и сохранённые виды. Расположение всех окон пока не переносится."
-        )}
-      </p>
-      <p>
-        {t(
-          "Каждое облако подключается отдельно. Ключ банка, история свечей и текущие котировки в облако не передаются."
-        )}
-      </p>
+      <CloudProviderSettings provider={terminalCloudSync(controller, "yandex-disk")} />
       <CloudProviderSettings provider={terminalCloudSync(controller, "google-drive")}>
         <GoogleDriveSettings />
       </CloudProviderSettings>
-      <CloudProviderSettings provider={terminalCloudSync(controller, "yandex-disk")} />
+      <details className="cloud-sync-scope">
+        <summary>{t("Что сохраняется в облаке")}</summary>
+        <p>
+          {t(
+            "Настройки, инструменты, индикаторы, рисунки, изображения и сохранённые виды. Расположение всех окон пока не переносится."
+          )}
+        </p>
+        <p>
+          {t(
+            "Каждое облако подключается отдельно. Ключ банка, история свечей и текущие котировки в облако не передаются."
+          )}
+        </p>
+      </details>
     </section>
   );
 }

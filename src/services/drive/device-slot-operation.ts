@@ -1,4 +1,5 @@
 import type { Backup } from "../../model/types.js";
+import type { CloudSelection } from "../../model/cloud-sync.js";
 import { DriveAuth } from "./auth.js";
 import { hasDriveHistory } from "./local.js";
 import { changed, createDeviceSlotContext, providerId } from "./device-slot-context.js";
@@ -13,6 +14,10 @@ import { loadDeviceSlotRecord, saveDeviceSlotRecord } from "./device-slot-local.
 import type { DeviceSlotRecord } from "./device-slot-local.js";
 import type { SlotSyncContext, SlotSyncResult } from "./device-slot-sync.js";
 import type { DriveReport } from "./progress.js";
+import { advanceDriveProgress, beginDriveProgress } from "./progress.js";
+import type { DriveProgress } from "./progress.js";
+import { googleSlotChoiceFailure, googleSlotProgress } from "./device-slot-status.js";
+import type { GoogleStatus } from "./device-slot-status.js";
 import type { DriveAuthorization } from "./types.js";
 import { DriveWriteCapability } from "./write-capability.js";
 import type { WriteCapabilityStatus } from "./write-capability.js";
@@ -45,6 +50,11 @@ export const sameGoogleSlotScope = (a: GoogleSlotScope | undefined, b: GoogleSlo
   a?.cloudOwner === b.cloudOwner &&
   a?.session === b.session &&
   a?.associationConflict === b.associationConflict;
+export const guardedGoogleCapability =
+  (current: () => boolean, update: (patch: Partial<GoogleStatus>) => void) =>
+  (writeCapability: WriteCapabilityStatus) => {
+    if (current()) update({ writeCapability, uploadProbeBytes: writeCapability.verifiedBytes });
+  };
 interface OperationOptions {
   host: GoogleSlotHost;
   scope: GoogleSlotScope;
@@ -63,6 +73,54 @@ interface OperationOptions {
   capability: (status: WriteCapabilityStatus) => void;
   report: DriveReport;
   operation: GoogleSlotOperation;
+}
+interface JobOptions extends Omit<OperationOptions, "report"> {
+  selection?: CloudSelection;
+  update(patch: Partial<GoogleStatus>): void;
+  fail(error: unknown): void;
+  status(): GoogleStatus;
+  finish(progress: DriveProgress): void;
+}
+/** One shared progress/error lifecycle also covers read-only comparison and explicit receive. */
+export async function runGoogleSlotJob(options: JobOptions) {
+  const { selection } = options;
+  let progress = beginDriveProgress();
+  options.update({
+    phase: "syncing",
+    driveProgress: progress,
+    progress: { stage: "validate" },
+    ...(selection ? { choiceAction: { selection, state: "running" as const } } : {})
+  });
+  try {
+    const result = await executeGoogleSlotOperation({
+      ...options,
+      report: (stage, details) => {
+        if (!options.current()) return;
+        progress = advanceDriveProgress(progress, stage, details);
+        options.update(googleSlotProgress(progress));
+      }
+    });
+    if (result && selection && options.current())
+      options.update({
+        choiceAction: {
+          selection,
+          state: result.state === "idle" || result.state === "received" ? "confirmed" : "review"
+        }
+      });
+  } catch (error) {
+    if (options.current()) {
+      options.fail(error);
+      if (selection)
+        options.update({
+          choiceAction: {
+            selection,
+            state: googleSlotChoiceFailure(options.status().error, options.status().choiceAction)
+          }
+        });
+    }
+  } finally {
+    options.finish(progress);
+  }
 }
 /** Executes one immutable credential/revision job; the provider owns scheduling and presentation. */
 export async function executeGoogleSlotOperation(

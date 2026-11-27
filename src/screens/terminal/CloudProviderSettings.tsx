@@ -13,6 +13,7 @@ import { shallowEqual } from "./snapshot-selector.js";
 import type { TerminalState } from "./state.js";
 import { cloudOperationTiming } from "./cloud-operation-clock.js";
 import type { GoogleStatus } from "../../services/drive/device-slot-provider.js";
+import { CloudVersionComparison } from "./CloudVersionComparison.js";
 const phases: Record<CloudSyncStatus["phase"], string> = {
   disabled: "Синхронизация выключена",
   disconnected: "Облако не подключено",
@@ -53,26 +54,6 @@ const errors: Record<CloudErrorCode, string> = {
 export function cloudProviderName(provider: CloudSyncProvider["id"]): string {
   return provider === "google-drive" ? "Google Диск" : "Яндекс Диск";
 }
-function Summary({
-  value,
-  dateLabel
-}: {
-  value: { instruments: number; drawings: number; images: number; date?: string };
-  dateLabel: string;
-}) {
-  return (
-    <p>
-      {t("Инструментов")}: {value.instruments} · {t("Рисунки")}: {value.drawings} ·{" "}
-      {t("Изображения")}: {value.images}
-      {value.date && (
-        <small>
-          {t(dateLabel)}:{" "}
-          <time dateTime={value.date}>{new Date(value.date).toLocaleString(intlLocale())}</time>
-        </small>
-      )}
-    </p>
-  );
-}
 const selectCloudControls = (state: TerminalState) => ({
   profileTransition: state.profileTransition,
   backupBusy: state.backupBusy,
@@ -103,6 +84,7 @@ export function CloudProviderSettings({
     (status as GoogleStatus).writeCapability?.phase === "checking";
   const timing = cloudOperationTiming(provider);
   const [actionError, setActionError] = useState(false),
+    [comparisonError, setComparisonError] = useState(false),
     [elapsed, setElapsed] = useState(0),
     [pendingActions, setPendingActions] = useState(0);
   const busy =
@@ -130,6 +112,16 @@ export function CloudProviderSettings({
       void provider.prepare().catch(() => setActionError(true));
   }, [provider, status.enabled, status.configured]);
   useEffect(() => {
+    if (!status.enabled || !status.configured || !status.connected || !provider.inspect) return;
+    let current = true;
+    void provider.inspect().catch(() => {
+      if (current) setComparisonError(true);
+    });
+    return () => {
+      current = false;
+    };
+  }, [provider, status.enabled, status.configured, status.connected]);
+  useEffect(() => {
     if (!busy) return;
     const started = cloudOperationTiming(provider).startedAt ?? Date.now();
     setElapsed(Math.floor((Date.now() - started) / 1000));
@@ -141,14 +133,31 @@ export function CloudProviderSettings({
   const activeChoice =
     status.choiceAction?.state === "running" ? status.choiceAction.selection : undefined;
   const visiblePhase = status.enabled ? status.phase : "disabled";
+  const comparison = status.comparison ?? status.conflict;
+  const migration = provider.id === "google-drive" && !!(status as GoogleStatus).migrationRequired;
+  const compare = () => {
+    if (!provider.inspect) return;
+    setComparisonError(false);
+    setPendingActions((value) => value + 1);
+    void provider
+      .inspect()
+      .catch(() => setComparisonError(true))
+      .finally(() => setPendingActions((value) => Math.max(0, value - 1)));
+  };
   return (
     <section
       className="cloud-provider-card"
       data-provider={id}
       data-phase={visiblePhase}
+      data-recommended={provider.id === "yandex-disk" || undefined}
       aria-labelledby={`${id}-title`}
     >
-      <h3 id={`${id}-title`}>{t(cloudProviderName(id))}</h3>
+      <header className="cloud-provider-heading">
+        <h3 id={`${id}-title`}>{t(cloudProviderName(id))}</h3>
+        {provider.id === "yandex-disk" && (
+          <span className="cloud-recommended">{t("Рекомендуем")}</span>
+        )}
+      </header>
       <label className="checkbox-label">
         <input
           type="checkbox"
@@ -172,6 +181,28 @@ export function CloudProviderSettings({
       )}
       {status.enabled && (
         <>
+          <dl className="cloud-connection-summary">
+            <div>
+              <dt>{t("Подключение")}</dt>
+              <dd>{t(status.connected ? "Подключено" : "Облако не подключено")}</dd>
+            </div>
+            <div>
+              <dt>{t("Режим обмена")}</dt>
+              <dd>{t(status.automatic ? "Автоматически" : "Вручную")}</dd>
+            </div>
+            <div className="cloud-last-confirmed">
+              <dt>{t("Последний подтверждённый обмен")}</dt>
+              <dd>
+                {status.lastSyncedAt ? (
+                  <time dateTime={status.lastSyncedAt}>
+                    {new Date(status.lastSyncedAt).toLocaleString(intlLocale())}
+                  </time>
+                ) : (
+                  t("Пока не было")
+                )}
+              </dd>
+            </div>
+          </dl>
           {!status.configured && <p role="status">{t("Нужна настройка OAuth приложения")}</p>}
           {status.preparing && <p role="status">{t("Готовим вход…")}</p>}
           {busy && (
@@ -182,7 +213,9 @@ export function CloudProviderSettings({
                     ? "Проверяем подключение…"
                     : progress
                       ? stages[progress.stage]
-                      : phases[status.phase]
+                      : pendingActions > 0
+                        ? "Выполняем действие…"
+                        : phases[status.phase]
                 )}
               </strong>
               <small>
@@ -207,22 +240,22 @@ export function CloudProviderSettings({
             {t(
               status.pendingChanges
                 ? "Изменения ожидают синхронизации"
-                : !googleChecking && status.lastSyncedAt && status.phase === "idle" && !status.error
-                  ? "Операция подтверждена"
-                  : status.lastSyncedAt
-                    ? "Данные сохранены на устройстве. Ожидаем проверки облака."
-                    : "Синхронизация ещё не выполнялась"
+                : googleChecking
+                  ? "Проверяем подключение…"
+                  : "Сравните версии и выберите направление обмена."
             )}
           </p>
-          {status.lastSyncedAt && (
-            <small>
-              {t("Последняя синхронизация")}:{" "}
-              <time dateTime={status.lastSyncedAt}>
-                {new Date(status.lastSyncedAt).toLocaleString(intlLocale())}
-              </time>
-            </small>
-          )}
           <div className="drive-actions">
+            {status.connected && (
+              <button
+                id={`${id}-compare`}
+                type="button"
+                disabled={busy || blocked || !status.configured || !provider.inspect}
+                onClick={compare}
+              >
+                {t("Сравнить версии")}
+              </button>
+            )}
             {!status.connected && (
               <button
                 id={`${id}-connect`}
@@ -262,6 +295,9 @@ export function CloudProviderSettings({
               </button>
             )}
           </div>
+          {comparisonError && (
+            <p role="alert">{t("Не удалось сравнить версии. Повторите проверку.")}</p>
+          )}
           <label className="checkbox-label">
             <input
               type="checkbox"
@@ -286,7 +322,9 @@ export function CloudProviderSettings({
                 status.choiceAction.state === "confirmed"
                   ? status.choiceAction.selection.kind === "local"
                     ? "Версия устройства отправлена в облако."
-                    : "Версия из облака применена на устройстве."
+                    : status.conflict && status.conflict.remotes.length > 1
+                      ? "Версия применена на устройстве; в облаке по-прежнему несколько версий."
+                      : "Версия из облака применена на устройстве."
                   : status.choiceAction.state === "review"
                     ? "Версии изменились. Повторите проверку перед выбором."
                     : status.choiceAction.state === "blocked"
@@ -305,60 +343,21 @@ export function CloudProviderSettings({
               )}
             </p>
           )}
-          {status.conflict && (
-            <div id={`${id}-conflict`} className="drive-conflict" aria-busy={busy}>
-              <h4>{t("Выберите версию")}</h4>
-              {status.conflict.remotes.length ? (
-                <p id={`${id}-receive-effect`}>
-                  {t(
-                    "Получение заменит поддерживаемые настройки, инструменты и разметку на устройстве. Снимки в облаке сохранятся."
-                  )}
-                </p>
-              ) : (
-                <p>{t("В облаке пока нет доступных снимков.")}</p>
-              )}
-              {status.conflict.remotes.map((remote, index) => (
-                <div key={remote.id}>
-                  <h5>{remote.deviceLabel ?? `${t("Версия в облаке")} ${index + 1}`}</h5>
-                  <Summary value={remote} dateLabel="Снимок создан" />
-                  <button
-                    type="button"
-                    data-cloud-remote={index}
-                    aria-describedby={`${id}-receive-effect`}
-                    aria-busy={activeChoice?.kind === "remote" && activeChoice.id === remote.id}
-                    disabled={busy || blocked}
-                    onClick={() => run(provider.choose({ kind: "remote", id: remote.id }))}
-                  >
-                    <span aria-hidden="true">↓</span>{" "}
-                    {t(
-                      activeChoice?.kind === "remote" && activeChoice.id === remote.id
-                        ? "Получаем…"
-                        : "Получить эту версию"
-                    )}
-                  </button>
-                </div>
-              ))}
-              <div>
-                <h5>{t("Версия устройства")}</h5>
-                <Summary value={status.conflict.local} dateLabel="Версия проверена" />
-                <p id={`${id}-send-effect`}>
-                  {t("Отправка сохранит версию устройства в облаке. Предыдущие снимки сохранятся.")}
-                </p>
-                <button
-                  type="button"
-                  id={`${id}-choose-local`}
-                  aria-describedby={`${id}-send-effect`}
-                  aria-busy={activeChoice?.kind === "local"}
-                  disabled={busy || blocked}
-                  onClick={() => run(provider.choose({ kind: "local" }))}
-                >
-                  <span aria-hidden="true">↑</span>{" "}
-                  {t(
-                    activeChoice?.kind === "local" ? "Отправляем…" : "Отправить версию устройства"
-                  )}
-                </button>
-              </div>
-            </div>
+          {comparison && (
+            <CloudVersionComparison
+              id={id}
+              comparison={comparison}
+              busy={busy}
+              blocked={blocked}
+              activeChoice={activeChoice}
+              migration={migration}
+              receiveAvailable={migration || !!provider.receive}
+              onSend={() => run(provider.choose({ kind: "local" }))}
+              onReceive={(remoteId) => {
+                if (migration) run(provider.choose({ kind: "remote", id: remoteId }));
+                else if (provider.receive) run(provider.receive(remoteId));
+              }}
+            />
           )}
           <small className="drive-auth-note">
             {t(

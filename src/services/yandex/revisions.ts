@@ -88,19 +88,22 @@ export class YandexRevisions {
     digest: string,
     parents: readonly string[],
     valid: () => boolean,
-    rebindConfirmed = false
+    rebindConfirmed = false,
+    beforeEffect?: () => Promise<void>
   ): Promise<YandexRevision> {
     let pending = await this.journal.pending(this.clientId, this.auth.accountId);
     assertCurrent(this.auth.signal, valid);
     if (pending && pending.credentialGeneration !== this.auth.credentialGeneration) {
       if (!rebindConfirmed) throw new YandexError("indeterminate");
       await this.journal.archivePending(this.clientId, pending, this.auth.signal);
+      assertCurrent(this.auth.signal, valid);
       pending = undefined;
     }
     if (pending && pending.revision.digest !== digest && !rebindConfirmed)
       throw new YandexError("indeterminate");
     if (pending && pending.revision.digest !== digest) {
       await this.journal.archivePending(this.clientId, pending, this.auth.signal);
+      assertCurrent(this.auth.signal, valid);
       pending = undefined;
     }
     if (!pending) {
@@ -123,7 +126,14 @@ export class YandexRevisions {
       await this.journal.savePending(this.clientId, pending, this.auth.signal);
     }
     assertCurrent(this.auth.signal, valid);
-    const file = await this.transport.putImmutable(pending.name, pending.body, pending.reference);
+    await beforeEffect?.();
+    assertCurrent(this.auth.signal, valid);
+    const file = await this.transport.putImmutable(
+      pending.name,
+      pending.body,
+      pending.reference,
+      valid
+    );
     assertCurrent(this.auth.signal, valid);
     this.cache.set(fingerprint([file]), { file, revision: pending.revision });
     this.bodies.set(fingerprint([file]), (await decodeBundle(pending.body)).prepared);

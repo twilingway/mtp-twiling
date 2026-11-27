@@ -15,6 +15,8 @@ const { prepareDeviceSlotVersion, restoreDeviceSlotVersion, encodeDeviceSlotPack
   "services/drive/device-slot-package.ts"
 );
 const { planDeviceSlotWrite } = load("services/drive/device-slot-model.ts");
+const { inspectDeviceSlotVersions, receiveDeviceSlotVersion } = load("services/drive/device-slot-inspection.ts");
+const { googleSlotPublication } = load("services/drive/device-slot-status.ts");
 const { runDriveSlotBinaryProbe, verifiedDeviceSlotUploadBytes } = load(
   "services/drive/device-slot-binary-probe.ts"
 );
@@ -466,4 +468,155 @@ test("capacity cancellation cannot reserve or persist a user pending write", asy
   assert.equal(pending, false);
   assert.equal(reserves, 0);
   assert.equal(mock.files.size, 0);
+});
+
+test("inspection reads validated comparisons without save, apply, upload or acknowledgement", async () => {
+  const mock = transport(), store = new DeviceSlotStore(mock.io, () => 1 << 20);
+  const remote = await peerPublish(store, await store.inspect(scope, undefined, signal), "SBER", 210, deviceB);
+  const h = await syncHarness(store, remote, "GAZP");
+  h.record().lastSyncedAt = "2026-01-01T00:00:00Z";
+  const before = structuredClone(h.record()), files = [...mock.files];
+  h.context.save = () => assert.fail("inspect must never acknowledge");
+  h.context.apply = () => assert.fail("inspect must never import");
+  store.write = () => assert.fail("inspect must never probe/upload");
+  const result = await inspectDeviceSlotVersions(h.context, h.record());
+  assert.equal(result.state, "comparison");
+  assert.equal(result.preview.conflict.remotes[0].nodeId, uid(210));
+  assert.equal(result.preview.conflict.remotes[0].date, undefined);
+  assert.equal(Number.isFinite(Date.parse(result.checkedAt)), true);
+  assert.deepEqual(h.record(), before);
+  assert.deepEqual([...mock.files], files);
+  const conflict = { local: { instruments: 3, drawings: 4, images: 5 }, remotes: [] };
+  const prior = { conflict, pendingChanges: true, lastSyncedAt: before.lastSyncedAt };
+  const publication = googleSlotPublication(result, prior, undefined, undefined, undefined, h.context.capture.backup, false);
+  const status = { ...prior, ...publication.patch };
+  assert.deepEqual(status.conflict, conflict);
+  assert.equal(status.pendingChanges, true);
+  assert.equal(status.lastSyncedAt, before.lastSyncedAt);
+  assert.equal(status.comparison.remotes.length, 1);
+});
+
+test("empty inspection remains ephemeral and send repeats unscoped discovery before reserving a user ID", async () => {
+  const mock = transport(), store = new DeviceSlotStore(mock.io, () => 1 << 20);
+  const h = await syncHarness(store, undefined, "SBER");
+  h.record().scope = undefined;
+  const result = await inspectDeviceSlotVersions(h.context, h.record());
+  assert.equal(result.state, "comparison");
+  assert.equal(result.preview.discoveryEmpty, true);
+  assert.equal(result.preview.conflict.remotes.length, 0);
+  assert.equal(h.record().scope, undefined);
+  assert.equal(h.record().generation, 0);
+  let discoveries = 0;
+  const inspect = store.inspect.bind(store), write = store.write.bind(store);
+  h.context.store = {
+    inspect: async (selected, checkpoint, scopedSignal, report) => {
+      if (!selected) { discoveries++; return { heads: [{ revisionId: uid(211) }] }; }
+      return result.preview.snapshot;
+    },
+    write: () => assert.fail("new workspace must block send"),
+    download: store.download.bind(store)
+  };
+  await assert.rejects(chooseDeviceSlotVersion(h.context, h.record(), result.preview, { kind: "local" }), { code: "conflict" });
+  assert.equal(discoveries, 1);
+  assert.equal(mock.files.size, 0);
+  assert.equal(h.record().pending, undefined);
+  store.inspect = inspect; store.write = write;
+});
+
+test("inspection prefers ordinary v3 heads when legacy snapshots coexist", async () => {
+  const mock = transport(), store = new DeviceSlotStore(mock.io, () => 1 << 20);
+  await peerPublish(store, await store.inspect(scope, undefined, signal), "SBER", 212, deviceB);
+  const h = await syncHarness(store, undefined, "GAZP"); h.record().scope = undefined;
+  h.context.legacyPresent = () => assert.fail("v3 heads already answer the comparison");
+  h.context.legacyAvailable = () => assert.fail("do not read old manifests");
+  const result = await inspectDeviceSlotVersions(h.context, h.record());
+  assert.equal(result.state, "comparison");
+  assert.equal(result.preview.conflict.remotes[0].nodeId, uid(212));
+});
+
+test("pending inspection is fail-closed and legacy detection never prepares or reads an archive", async () => {
+  const mock = transport(), store = new DeviceSlotStore(mock.io, () => 1 << 20);
+  const h = await syncHarness(store, undefined, "SBER"); h.record().scope = undefined;
+  h.record().pending = { write: {} };
+  await assert.rejects(inspectDeviceSlotVersions(h.context, h.record()), { code: "not-ready" });
+  assert.deepEqual(h.record().pending, { write: {} });
+  h.record().pending = undefined;
+  h.context.legacyPresent = async () => true;
+  h.context.legacyAvailable = () => assert.fail("no old manifest bodies or archive preparation");
+  const result = await inspectDeviceSlotVersions(h.context, h.record());
+  assert.equal(result.state, "legacy-inspection");
+  const prior = { pendingChanges: true, lastSyncedAt: "2026-01-01T00:00:00Z" };
+  const status = { ...prior, ...googleSlotPublication(result, prior, undefined, undefined, undefined, h.context.capture.backup, false).patch };
+  assert.equal(status.migrationRequired, true);
+  assert.equal(status.comparison, undefined);
+  assert.equal(status.pendingChanges, true);
+  assert.equal(status.lastSyncedAt, prior.lastSyncedAt);
+});
+
+test("receive from multiple heads applies only the chosen head and never resolves or uploads", async () => {
+  const mock = transport(), store = new DeviceSlotStore(mock.io, () => 1 << 20);
+  const empty = await store.inspect(scope, undefined, signal);
+  const first = await peerPublish(store, empty, "SBER", 220, deviceId);
+  await peerPublish(store, first, "GAZP", 221, deviceB);
+  // An independent branch acknowledges none of the first client's head.
+  const h = await syncHarness(store, undefined, "NVTK");
+  // Recreate a parallel second file from an empty account view.
+  const secondId = [...mock.files.keys()].find((id) => id !== first.files[0].fileId);
+  const secondPacket = await load("services/drive/device-slot-package.ts").decodeDeviceSlotPackage(mock.files.get(secondId).body);
+  // Keep the model-valid manifest shape, with only its own revision accepted.
+  const envelope = structuredClone(secondPacket.envelope);
+  const m = envelope.current;
+  m.accepted = [{ deviceId: m.deviceId, seq: m.seq, revisionId: m.revisionId }];
+  mock.files.get(secondId).body = encodeDeviceSlotPackage(envelope, secondPacket.current, secondPacket.previous);
+  const preview = await inspectDeviceSlotVersions(h.context, h.record());
+  assert.equal(preview.preview.snapshot.heads.length, 2);
+  const before = new Map([...mock.files].map(([id, file]) => [id, file.body]));
+  let receipts = 0;
+  const result = await receiveDeviceSlotVersion(h.context, h.record(), preview.preview, uid(220), () => { receipts++; });
+  assert.equal(result.state, "received");
+  assert.equal(h.context.capture.backup.layout.symbol, "SBER");
+  assert.deepEqual(result.record.baseHeads, [uid(220)]);
+  assert.equal(h.applies(), 1);
+  assert.equal(receipts, 1);
+  assert.equal(mock.patches(), 0);
+  assert.deepEqual(new Map([...mock.files].map(([id, file]) => [id, file.body])), before);
+  const status = googleSlotPublication(result, {}, undefined, undefined, undefined, h.context.capture.backup, false).patch;
+  assert.equal(status.phase, "conflict");
+  assert.equal(status.conflict.remotes.length, 2);
+  assert.equal(result.preview.revision, 42);
+  assert.equal(result.preview.generation, result.record.generation);
+});
+
+test("receive rejects stale local revision and fresh remote heads before applying", async () => {
+  for (const stale of ["local", "remote"]) {
+    const mock = transport(), store = new DeviceSlotStore(mock.io, () => 1 << 20);
+    const remote = await peerPublish(store, await store.inspect(scope, undefined, signal), "SBER", 230, deviceB);
+    const h = await syncHarness(store, remote, "GAZP");
+    const comparison = await inspectDeviceSlotVersions(h.context, h.record());
+    if (stale === "local") h.context.capture.revision++;
+    else await peerPublish(store, remote, "NVTK", 231, deviceB);
+    await assert.rejects(receiveDeviceSlotVersion(h.context, h.record(), comparison.preview, uid(230), () => assert.fail()), { code: "conflict" });
+    assert.equal(h.applies(), 0);
+    assert.equal(h.record().generation, 0);
+  }
+});
+
+test("native receive commit survives UI recovery failure and identical retry never imports twice", async () => {
+  const mock = transport(), store = new DeviceSlotStore(mock.io, () => 1 << 20);
+  const remote = await peerPublish(store, await store.inspect(scope, undefined, signal), "SBER", 240, deviceB);
+  const h = await syncHarness(store, remote, "GAZP");
+  const first = await inspectDeviceSlotVersions(h.context, h.record());
+  const apply = h.context.apply;
+  h.context.apply = async (...args) => { await apply(...args); throw new Error("UI recovery failed after native commit"); };
+  let receipts = 0;
+  await assert.rejects(receiveDeviceSlotVersion(h.context, h.record(), first.preview, uid(240), () => { receipts++; }), /UI recovery failed/);
+  assert.equal(receipts, 1);
+  assert.deepEqual(h.record().baseHeads, [uid(240)]);
+  assert.equal(h.applies(), 1);
+  const fresh = await inspectDeviceSlotVersions(h.context, h.record());
+  const retry = await receiveDeviceSlotVersion(h.context, h.record(), fresh.preview, uid(240), () => { receipts++; });
+  assert.equal(retry.state, "received");
+  assert.equal(h.applies(), 1);
+  assert.equal(receipts, 2);
+  assert.equal(mock.patches(), 0);
 });

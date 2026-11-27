@@ -1,7 +1,6 @@
 import type { CloudSelection, CloudSyncProvider, CloudSyncStatus } from "../../model/cloud-sync.js";
 import type {
   CloudOperationGuard,
-  CloudPreparedSnapshot,
   CloudSyncHost
 } from "../../screens/terminal/controller-cloud-host.js";
 import { YandexAuth } from "./auth.js";
@@ -11,11 +10,19 @@ import type { YandexRemote } from "./revisions.js";
 import { YandexTransport } from "./transport.js";
 import { hasYandexConfig, validateYandexConfig, YandexError } from "./types.js";
 import { runYandexSyntheticProbe } from "./probe.js";
-import { yandexFailureStatus } from "./coordinator-status.js";
-import { backupSummary, sameHeads, yandexTransfer } from "./coordinator-transfer.js";
+import {
+  yandexAcceptedStatus,
+  yandexFailureStatus,
+  yandexInspectionStatus,
+  yandexUnchangedStatus
+} from "./coordinator-status.js";
+import type { YandexStatusClear } from "./coordinator-status.js";
+import { yandexTransfer } from "./coordinator-transfer.js";
+import { YandexPreview } from "./coordinator-preview.js";
+import { YandexScheduler } from "./coordinator-scheduler.js";
+import { publishYandexSnapshot } from "./coordinator-publish.js";
 import type { YandexAuthorization, YandexPublicConfig } from "./types.js";
 import type { YandexAuthClient, YandexCoordinatorOptions } from "./coordinator-options.js";
-type ClearKey = "error" | "pauseReason" | "conflict" | "choiceAction" | "progress";
 export class YandexCoordinator implements CloudSyncProvider {
   readonly id = "yandex-disk" as const;
   private readonly listeners = new Set<() => void>();
@@ -34,10 +41,9 @@ export class YandexCoordinator implements CloudSyncProvider {
   private readonly remoteCache = new Map<string, YandexRemote>();
   private epoch = 0;
   private disposed = false;
-  private timer: ReturnType<typeof setTimeout> | undefined;
+  private readonly scheduler = new YandexScheduler();
   private scopeSession: unknown;
-  private previewRevision: number | undefined;
-  private previewHeads: readonly string[] = [];
+  private readonly preview = new YandexPreview();
   private appliedReceipt: { operationId: string; targetId: string; revision: number } | undefined;
   private status: CloudSyncStatus;
   constructor(
@@ -70,13 +76,20 @@ export class YandexCoordinator implements CloudSyncProvider {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   };
-  private update(patch: Partial<CloudSyncStatus>, clear: readonly ClearKey[] = []): void {
+  private update(patch: Partial<CloudSyncStatus>, clear: readonly YandexStatusClear[] = []): void {
     if (this.disposed) return;
     const next = { ...this.status, ...patch };
     for (const key of clear) delete next[key];
     if (!next.enabled) {
       next.phase = "disabled";
-      for (const key of ["error", "pauseReason", "conflict", "choiceAction", "progress"] as const)
+      for (const key of [
+        "error",
+        "pauseReason",
+        "conflict",
+        "choiceAction",
+        "progress",
+        "comparison"
+      ] as const)
         delete next[key];
     }
     this.status = Object.freeze(next);
@@ -163,7 +176,7 @@ export class YandexCoordinator implements CloudSyncProvider {
         authorizationStored: authorization.stored,
         credentialSaveError: authorization.persistenceError
       },
-      ["error", "pauseReason"]
+      ["error", "pauseReason", "comparison"]
     );
     this.resume();
   }
@@ -184,7 +197,7 @@ export class YandexCoordinator implements CloudSyncProvider {
   setAutomatic = async (automatic: boolean): Promise<void> => {
     const intent = ++this.settingsIntent;
     this.desiredAutomatic = automatic;
-    if (!automatic) clearTimeout(this.timer);
+    if (!automatic) this.scheduler.clear();
     await this.commitPreferences(intent);
   };
   private async commitPreferences(intent: number): Promise<void> {
@@ -261,13 +274,16 @@ export class YandexCoordinator implements CloudSyncProvider {
     if (this.status.enabled && !this.authorization && scope.ready && this.status.prepared)
       void this.restoreAuthorization().catch((error: unknown) => this.failure(error));
   };
-  localIntent = (): void => this.update({ pendingChanges: true });
+  localIntent = (): void => {
+    this.preview.clear();
+    this.update({ pendingChanges: true }, ["comparison"]);
+  };
   localChanged = (): void => {
     this.localIntent();
     this.resume();
   };
   resume = (): void => {
-    clearTimeout(this.timer);
+    this.scheduler.clear();
     if (!this.status.prepared) {
       void this.prepare();
       return;
@@ -276,18 +292,20 @@ export class YandexCoordinator implements CloudSyncProvider {
       !this.status.enabled ||
       !this.status.automatic ||
       !this.authorization ||
-      this.operation ||
       !this.host.scope(this.id).ready ||
       this.host.scope(this.id).blocked ||
       this.status.conflict ||
       this.status.error === "indeterminate"
     )
       return;
-    this.timer = setTimeout(() => {
-      void this.sync();
-    }, 750);
+    this.scheduler.schedule(
+      () => this.sync(),
+      () => !!this.operation
+    );
   };
   sync = (): Promise<void> => this.run();
+  inspect = (): Promise<void> => this.run(undefined, true);
+  receive = (id: string): Promise<void> => this.choose({ kind: "remote", id });
   runSyntheticProbe = async (cleanup = false) => {
     const authorization = this.authorization,
       epoch = this.epoch;
@@ -300,18 +318,8 @@ export class YandexCoordinator implements CloudSyncProvider {
     if (epoch !== this.epoch || !this.status.enabled) throw new YandexError("auth-cancelled");
     return result;
   };
-  choose = async (selection: CloudSelection): Promise<void> => {
-    if (
-      selection.kind === "remote" &&
-      this.appliedReceipt?.targetId !== selection.id &&
-      (!this.status.conflict || this.previewRevision !== this.host.scope(this.id).revision)
-    ) {
-      this.failure(new YandexError("local-changed"));
-      return;
-    }
-    await this.run(selection);
-  };
-  private async run(selection?: CloudSelection): Promise<void> {
+  choose = (selection: CloudSelection): Promise<void> => this.run(selection);
+  private async run(selection?: CloudSelection, inspectionOnly = false): Promise<void> {
     if (!this.status.enabled || this.disposed || this.operation) return;
     const auth = this.authorization;
     if (!auth || !this.config) {
@@ -341,13 +349,14 @@ export class YandexCoordinator implements CloudSyncProvider {
         this.config.clientId,
         this.remoteCache
       );
+    const previousPhase = this.status.phase;
     this.update(
       {
         phase: "syncing",
         progress: { stage: "inspect" },
         ...(selection ? { choiceAction: { selection, state: "running" as const } } : {})
       },
-      ["error", "pauseReason"]
+      inspectionOnly ? ["comparison"] : ["error", "pauseReason"]
     );
     try {
       auth.getAccessToken();
@@ -361,11 +370,28 @@ export class YandexCoordinator implements CloudSyncProvider {
           guard,
           {
             preview: () => ({
-              revision: this.previewRevision,
-              heads: this.previewHeads
+              revision:
+                selection?.kind === "remote" && this.appliedReceipt?.targetId === selection.id
+                  ? this.appliedReceipt.revision
+                  : this.preview.revision,
+              heads: this.preview.heads,
+              remoteFingerprint: this.preview.remoteFingerprint
             }),
-            publish: (captured, heads, explicit) =>
-              this.publish(revisions, captured, heads, guard, explicit),
+            publish: (captured, heads, explicit, beforeEffect) =>
+              publishYandexSnapshot(
+                revisions,
+                captured,
+                heads,
+                guard,
+                explicit,
+                this.journal,
+                this.config!.clientId,
+                auth.accountId,
+                (accepted, digest, expected) => this.accept(accepted, digest, guard, expected),
+                (stage) => this.update({ progress: { stage } }),
+                () => this.host.scope(this.id).revision,
+                beforeEffect
+              ),
             accept: (heads, digest, expected) => this.accept(heads, digest, guard, expected),
             committed: (intent, revision) => {
               this.appliedReceipt = {
@@ -382,28 +408,37 @@ export class YandexCoordinator implements CloudSyncProvider {
             applying: () => this.update({ progress: { stage: "apply" } }),
             unchanged: (association) =>
               this.update(
-                { phase: "idle", pendingChanges: false, lastSyncedAt: association.syncedAt },
-                ["conflict", "progress"]
+                yandexUnchangedStatus(association),
+                association.heads.length > 1 ? ["progress"] : ["conflict", "progress"]
               ),
+            inspected: (captured, remotes, heads, review) => {
+              const comparison = this.preview.capture(
+                captured,
+                remotes,
+                heads,
+                new Date().toISOString()
+              );
+              this.update(yandexInspectionStatus(comparison, previousPhase, review), ["progress"]);
+            },
             conflict: (captured, remotes, heads) => {
-              this.previewRevision = captured.revision;
-              this.previewHeads = heads;
+              const comparison = this.preview.capture(
+                captured,
+                remotes,
+                heads,
+                new Date().toISOString()
+              );
               this.update(
                 {
                   phase: "conflict",
-                  conflict: {
-                    local: backupSummary(captured.backup),
-                    remotes: remotes.map(({ remote, summary }) => ({
-                      id: remote.revision.revisionId,
-                      ...summary
-                    }))
-                  }
+                  comparison,
+                  conflict: { local: comparison.local, remotes: comparison.remotes }
                 },
                 ["progress", "choiceAction"]
               );
             }
           },
-          selection
+          selection,
+          inspectionOnly
         )
       );
     } catch (error) {
@@ -417,32 +452,8 @@ export class YandexCoordinator implements CloudSyncProvider {
         this.failure(error, selection);
     } finally {
       if (this.operation === operation) this.operation = undefined;
+      this.scheduler.complete(this.resume);
     }
-  }
-  private async publish(
-    revisions: YandexRevisions,
-    captured: CloudPreparedSnapshot,
-    heads: readonly string[],
-    guard: CloudOperationGuard,
-    explicit: boolean
-  ): Promise<void> {
-    this.update({ progress: { stage: "upload" } });
-    const revision = await revisions.publish(
-      captured.prepared,
-      captured.digest,
-      heads,
-      () => guard.isCurrent(),
-      explicit
-    );
-    this.update({ progress: { stage: "verify" } });
-    const after = await revisions.inspect(() => guard.isCurrent());
-    if (!sameHeads(after.heads, [revision.revisionId])) throw new YandexError("conflict");
-    await this.accept(after.heads, revision.digest, guard, captured.revision);
-    await this.journal.clearPending(
-      this.config!.clientId,
-      this.authorization!.accountId,
-      guard.signal
-    );
   }
   private async accept(
     heads: readonly string[],
@@ -462,30 +473,24 @@ export class YandexCoordinator implements CloudSyncProvider {
     guard.signal.throwIfAborted();
     if (!guard.isCurrent() || this.host.scope(this.id).revision !== expectedRevision)
       throw new YandexError("local-changed");
-    const choiceAction = this.status.choiceAction;
-    this.previewRevision = undefined;
-    this.update(
-      {
-        phase: "idle",
-        pendingChanges: false,
-        lastSyncedAt: syncedAt,
-        ...(choiceAction ? { choiceAction: { ...choiceAction, state: "confirmed" as const } } : {})
-      },
-      ["error", "pauseReason", "conflict", "progress"]
-    );
+    const accepted = yandexAcceptedStatus(this.status, heads, syncedAt);
+    this.preview.clear();
+    this.update(accepted.patch, accepted.clear);
   }
   private failure(error: unknown, selection?: CloudSelection): void {
     if (!this.status.enabled || this.disposed) return;
     this.update(yandexFailureStatus(error, selection), ["progress"]);
   }
-
   private cancel(cancelAttempt = false): void {
     this.epoch++;
-    clearTimeout(this.timer);
+    this.scheduler.clear();
     this.operation?.abort();
     this.auth.suspend(cancelAttempt);
     this.authorization = undefined;
-    this.previewRevision = undefined;
+    this.preview.clear();
+    this.appliedReceipt = undefined;
+    this.remoteCache.clear();
+    this.update({}, ["comparison"]);
   }
   dispose = (): void => {
     this.cancel();

@@ -129,3 +129,23 @@ test("disabling during the same independent proof still aborts its lifecycle and
   assert.equal(f.userFiles().length, 0);
   assert.equal(f.saved.some((patch) => patch.pending), false);
 });
+
+test("inspection preserves a preexisting automatic job and never creates an automatic job on its own", { timeout: 10000 }, async (t) => {
+  const f = fixture(t); f.provider.resume(); await f.provider.prepare();
+  await f.provider.inspect();
+  assert.equal(f.provider.getSnapshot().comparison.remotes.length, 0);
+  assert.equal(f.proofRecord(), undefined, "inspection itself must not probe");
+  await Promise.race([f.createdProbe.promise, new Promise((_, reject) => setTimeout(() => reject(new Error("inspection cancelled the earlier automatic job")), 2500))]);
+  f.releaseProbe.resolve();
+  await new Promise((resolve, reject) => {
+    const stop = f.provider.subscribe(() => {
+      if (f.provider.getSnapshot().phase === "idle" && !f.provider.getSnapshot().pendingChanges) { clearTimeout(timer); stop(); resolve(); }
+    });
+    const timer = setTimeout(() => { stop(); reject(new Error("automatic write did not finish")); }, 2500);
+  });
+  assert.equal(f.userFiles().length, 1);
+  await f.provider.inspect();
+  const requests = f.calls.length;
+  await new Promise((resolve) => setTimeout(resolve, 1200));
+  assert.equal(f.calls.length, requests, "inspection without a prior timer must not schedule sync");
+});

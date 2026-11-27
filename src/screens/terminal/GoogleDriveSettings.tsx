@@ -53,28 +53,18 @@ function RetentionDetails({ google }: { google: GoogleRetention }) {
         </small>
       )}
       <details className="cloud-google-details" open={!!status.migrationRequired}>
-        <summary>{t("Версии Google и совместимость")}</summary>
+        <summary>
+          {t(
+            status.migrationRequired
+              ? "Перенос старых сохранений"
+              : "Версии и резервные копии Google"
+          )}
+        </summary>
         {busy && <p role="status">{t("Выполняем действие…")}</p>}
-        <label>
-          {t("Режим синхронизации Google")}
-          <select
-            value={status.mode}
-            disabled={blocked}
-            onChange={(event) => {
-              const mode = event.target.value === "test" ? "test" : "normal";
-              run(() => google.setSlotMode(mode));
-            }}
-          >
-            <option value="normal">{t("Версии каждого устройства")}</option>
-            <option value="test">{t("Общий слот · тест")}</option>
-          </select>
-        </label>
         {status.migrationRequired && (
-          <div className="drive-conflict">
+          <div className="cloud-google-migration">
             <p>
-              {t(
-                "Старые снимки Google сохранены. Скачайте и проверьте архив перед выбором версии."
-              )}
+              {t("Старые сохранения Google доступны в архиве. Сначала скачайте и проверьте его.")}
             </p>
             <button type="button" disabled={blocked} onClick={() => run(downloadArchive)}>
               {t("Скачать архив старых снимков")}
@@ -125,6 +115,20 @@ function RetentionDetails({ google }: { google: GoogleRetention }) {
         )}
         <details className="cloud-google-diagnostics">
           <summary>{t("Диагностика Google")}</summary>
+          <label>
+            {t("Режим синхронизации Google")}
+            <select
+              value={status.mode}
+              disabled={blocked}
+              onChange={(event) => {
+                const mode = event.target.value === "test" ? "test" : "normal";
+                run(() => google.setSlotMode(mode));
+              }}
+            >
+              <option value="normal">{t("Версии каждого устройства")}</option>
+              <option value="test">{t("Общий слот · тест")}</option>
+            </select>
+          </label>
           <p>{t("Проверка подключения не отправляет рабочее пространство.")}</p>
           <button
             type="button"

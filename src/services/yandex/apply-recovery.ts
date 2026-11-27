@@ -28,12 +28,23 @@ export interface YandexApplyContext {
   remotes: readonly YandexRemote[];
   decode(remote: YandexRemote): Promise<Backup>;
   actions: YandexApplyActions;
+  beforeEffect?(): Promise<void>;
+}
+function assertCaptured(context: YandexApplyContext): void {
+  context.guard.signal.throwIfAborted();
+  if (
+    !context.guard.isCurrent() ||
+    context.host.scope("yandex-disk").revision !== context.captured.revision
+  )
+    throw new YandexError("local-changed");
 }
 async function checkedBackup(context: YandexApplyContext, remote: YandexRemote): Promise<Backup> {
   const backup = await context.decode(remote);
   if (backup.schemaVersion !== 2) throw new YandexError("unsupported-format");
   if ((await driveBackupDigest(backup)) !== remote.revision.digest)
     throw new YandexError("remote-invalid");
+  await context.beforeEffect?.();
+  assertCaptured(context);
   return backup;
 }
 /** A durable intent plus an exact commit receipt prevents retry from importing twice. */
@@ -44,20 +55,27 @@ export async function reconcileYandexApply(
 ): Promise<boolean> {
   const { journal, clientId, accountId, guard, captured, actions } = context;
   const intent = await journal.applyIntent(clientId, accountId);
+  assertCaptured(context);
   if (!intent) return false;
   if (chooseLocal) {
+    await context.beforeEffect?.();
+    assertCaptured(context);
     await journal.archiveApplyIntent(clientId, intent, guard.signal);
+    assertCaptured(context);
     await journal.clearApplyIntent(clientId, accountId, guard.signal);
     actions.clearCommitted(intent.operationId);
     return false;
   }
   if (intent.credentialGeneration !== context.generation) throw new YandexError("indeterminate");
   const retireForReviewedRetry = async (): Promise<false> => {
+    await context.beforeEffect?.();
+    assertCaptured(context);
     guard.signal.throwIfAborted();
     if (!guard.isCurrent() || context.host.scope("yandex-disk").revision !== captured.revision)
       throw new YandexError("local-changed");
     // Explicit direction supersedes the old outcome; it does not classify that outcome as no-commit.
     await journal.archiveApplyIntent(clientId, intent, guard.signal);
+    assertCaptured(context);
     await journal.clearApplyIntent(clientId, accountId, guard.signal);
     actions.clearCommitted(intent.operationId);
     return false;
@@ -98,9 +116,12 @@ export async function applyYandexRemote(
     return;
   }
   const pending = await journal.pending(clientId, accountId);
+  assertCaptured(context);
   if (pending) {
     await journal.archivePending(clientId, pending, guard.signal);
+    assertCaptured(context);
     await journal.clearPending(clientId, accountId, guard.signal);
+    assertCaptured(context);
   }
   const intent: YandexApplyIntent = {
     version: 1,
@@ -115,6 +136,8 @@ export async function applyYandexRemote(
   actions.applying();
   let committed: number | undefined;
   try {
+    await context.beforeEffect?.();
+    assertCaptured(context);
     await context.host.apply("yandex-disk", backup, captured.revision, guard, (revision) => {
       committed = revision;
       actions.committed(intent, revision);

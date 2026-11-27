@@ -28,6 +28,7 @@ export interface SlotSyncContext {
   check(): void;
   checkIdentity(): void;
   legacyAvailable(): Promise<boolean>;
+  legacyPresent?(): Promise<boolean>;
   apply(
     backup: Backup,
     expectedRevision: number,
@@ -40,6 +41,7 @@ export interface SlotPreview {
   readonly conflict: DriveConflict;
   readonly revision: number;
   readonly generation: number;
+  readonly discoveryEmpty?: boolean;
 }
 export type SlotSyncResult =
   | {
@@ -48,7 +50,16 @@ export type SlotSyncResult =
       readonly snapshot?: DeviceSlotInspection;
     }
   | { readonly state: "choice"; readonly record: DeviceSlotRecord; readonly preview: SlotPreview }
-  | { readonly state: "migration" | "pending"; readonly record: DeviceSlotRecord };
+  | {
+      readonly state: "comparison" | "received";
+      readonly record: DeviceSlotRecord;
+      readonly preview: SlotPreview;
+      readonly checkedAt: string;
+    }
+  | {
+      readonly state: "migration" | "pending" | "legacy-inspection";
+      readonly record: DeviceSlotRecord;
+    };
 export type SlotSelection = { kind: "local" } | { kind: "remote" | "previous"; id: string };
 
 const changed = () => new DriveError("conflict", "Версии Google Диска изменились.");
@@ -63,7 +74,7 @@ const scope = ({ workspaceId, legacyArchive }: DeviceSlotInspection) => ({
   legacyArchive
 });
 
-async function assertPinned(context: SlotSyncContext, snapshot: DeviceSlotInspection) {
+export async function assertPinned(context: SlotSyncContext, snapshot: DeviceSlotInspection) {
   context.report("confirm");
   const after = await context.store.inspect(scope(snapshot), snapshot.checkpoint, context.signal);
   context.check();
@@ -109,7 +120,7 @@ async function resolveRecord(
   ]);
 }
 
-async function previewFor(
+export async function previewFor(
   context: SlotSyncContext,
   record: DeviceSlotRecord,
   snapshot: DeviceSlotInspection
@@ -176,22 +187,28 @@ async function publish(
   return { record, snapshot: after, revisionId: common.revisionId };
 }
 
-async function applyVersion(
+export async function applyVersion(
   context: SlotSyncContext,
   record: DeviceSlotRecord,
   snapshot: DeviceSlotInspection,
   backup: Backup,
-  digest: string
+  digest: string,
+  options?: { heads: string[]; received(revision: number): void }
 ) {
-  if (context.capture.digest === digest) return accept(context, record, snapshot, digest);
+  if (context.capture.digest === digest) {
+    const accepted = await accept(context, record, snapshot, digest, options?.heads);
+    options?.received(context.capture.revision);
+    return accepted;
+  }
   let committed: Promise<DeviceSlotRecord> | undefined;
   context.report("apply");
   try {
     await context.apply(backup, context.capture.revision, (revision) => {
       context.noteApplyRevision(revision);
       // The native writer committed even if the following UI recovery fails.
-      committed = accept(context, record, snapshot, digest);
+      committed = accept(context, record, snapshot, digest, options?.heads);
       void committed.catch(() => {});
+      options?.received(revision);
     });
   } catch (error) {
     if (committed) await committed;
@@ -320,6 +337,22 @@ export async function chooseDeviceSlotVersion(
     throw changed();
   const snapshot = await assertPinned(context, preview.snapshot);
   if (selection.kind === "local") {
+    if (!record.scope || (!snapshot.heads.length && preview.discoveryEmpty)) {
+      const discovered = await context.store.inspect(
+        undefined,
+        undefined,
+        context.signal,
+        context.report
+      );
+      context.check();
+      if (
+        snapshot.heads.length
+          ? !discovered ||
+            JSON.stringify(discovered.checkpoint) !== JSON.stringify(snapshot.checkpoint)
+          : discovered?.heads.length
+      )
+        throw changed();
+    }
     if (!snapshot.heads.length && (await context.legacyAvailable())) throw changed();
     const version = await prepareDeviceSlotVersion(context.capture.prepared, context.signal);
     const written = await publish(

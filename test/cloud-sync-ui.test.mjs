@@ -29,6 +29,7 @@ function provider(id, patch = {}) {
     disconnect: async () => {},
     connectFromUserGesture: async () => {},
     sync: async () => {},
+    receive: async () => {},
     choose: async () => {}
   };
 }
@@ -46,7 +47,8 @@ function modules(providers = new Map()) {
     "screens/terminal/controller-cloud-sync.ts": {
       CLOUD_PROVIDERS: ["google-drive", "yandex-disk"],
       terminalCloudSync: (_controller, id) => providers.get(id)
-    }
+    },
+    "screens/terminal/controller-drive.ts": { terminalGoogleRetention: () => undefined }
   });
   load("i18n/preferences.ts").setDisplayPreferences({ locale: "en" });
   return load;
@@ -106,7 +108,8 @@ test("missing Yandex config is explicit and a pending readback never renders a s
   assert.match(pending, /Verifying saved data/);
   assert.match(pending, /value="40" max="100"/);
   assert.doesNotMatch(pending, /Operation confirmed/);
-  assert.match(pending, /Waiting for cloud verification/);
+  assert.match(pending, /Last confirmed exchange/);
+  assert.doesNotMatch(pending, /Operation confirmed/);
 });
 
 test("each conflict offers explicit receive/send choices and retains device data warning", () => {
@@ -159,4 +162,89 @@ test("failed local credential cleanup stays visible and retryable after disablin
   assert.match(html, /Could not save or remove sign-in/);
   assert.match(html, /Retry removing saved sign-in/);
   assert.doesNotMatch(html, /Operation confirmed/);
+});
+
+test("Yandex is visually recommended first without enabling or changing either provider", () => {
+  const google = provider("google-drive", { automatic: false }),
+    yandex = provider("yandex-disk");
+  const providers = new Map([
+    [google.id, google],
+    [yandex.id, yandex]
+  ]);
+  const load = modules(providers),
+    { CloudSyncSettings } = load("screens/terminal/CloudSyncSettings.tsx");
+  const before = [google.getSnapshot(), yandex.getSnapshot()];
+  const html = renderToStaticMarkup(jsx.jsx(CloudSyncSettings, {}));
+  assert.ok(
+    html.indexOf('data-provider="yandex-disk"') < html.indexOf('data-provider="google-drive"')
+  );
+  assert.match(html, /data-provider="yandex-disk"[^>]*data-recommended="true"/);
+  assert.doesNotMatch(html, /data-provider="google-drive"[^>]*data-recommended/);
+  assert.equal((html.match(/Recommended/g) ?? []).length, 1);
+  assert.deepEqual([google.getSnapshot(), yandex.getSnapshot()], before);
+  assert.equal(google.getSnapshot().enabled, false);
+  assert.equal(yandex.getSnapshot().enabled, false);
+  assert.equal(google.getSnapshot().automatic, false);
+  assert.equal(yandex.getSnapshot().automatic, true);
+});
+
+test("read-only comparison displays distinct checked and snapshot dates, explicit unknown dates, and no invented version number", () => {
+  const load = modules(),
+    { CloudProviderSettings } = load("screens/terminal/CloudProviderSettings.tsx");
+  const checkedAt = "2026-11-27T10:00:00Z",
+    remoteAt = "2026-11-26T08:00:00Z";
+  const html = renderToStaticMarkup(
+    jsx.jsx(CloudProviderSettings, {
+      provider: provider("yandex-disk", {
+        enabled: true,
+        connected: true,
+        phase: "idle",
+        lastSyncedAt: "2026-11-25T07:00:00Z",
+        comparison: {
+          checkedAt,
+          local: { instruments: 3, drawings: 2, images: 1, date: "2000-01-01T00:00:00Z" },
+          remotes: [
+            { id: "known", date: remoteAt, instruments: 4, drawings: 1, images: 0 },
+            { id: "unknown", instruments: 5, drawings: 0, images: 0 }
+          ]
+        }
+      })
+    })
+  );
+  assert.match(
+    html,
+    new RegExp(
+      `<p class="cloud-version-date"><span>State checked</span><time dateTime="${checkedAt}"`
+    )
+  );
+  assert.match(
+    html,
+    new RegExp(
+      `<p class="cloud-version-date"><span>Snapshot created</span><time dateTime="${remoteAt}"`
+    )
+  );
+  assert.match(html, /Snapshot date unknown/);
+  assert.match(html, /On this device/);
+  assert.match(html, /In Yandex Disk/);
+  assert.doesNotMatch(html, /2000-01-01|Cloud version 1|Cloud version 2|Operation confirmed/);
+  assert.match(html, /Last confirmed exchange/);
+  assert.match(html, /Cloud versions will not change/);
+  assert.match(html, /title="known">Save · known/);
+  assert.match(html, /title="unknown">Save · unknown/);
+});
+
+test("Google legacy metadata without a comparison is never presented as an empty cloud", () => {
+  const load = modules(),
+    { CloudProviderSettings } = load("screens/terminal/CloudProviderSettings.tsx");
+  const html = renderToStaticMarkup(
+    jsx.jsx(CloudProviderSettings, {
+      provider: provider("google-drive", {
+        enabled: true,
+        connected: true,
+        phase: "idle",
+        migrationRequired: true
+      })
+    })
+  );
+  assert.doesNotMatch(html, /No snapshots are available|cloud-comparison|data-cloud-remote/);
 });

@@ -5,7 +5,9 @@ import type { googleSlotFence } from "./device-slot-link.js";
 import { inspectLegacyDeviceSlotSources } from "./device-slot-migration.js";
 import { DeviceSlotStore } from "./device-slot-store.js";
 import type { SlotCapture, SlotSyncContext } from "./device-slot-sync.js";
+import { DRIVE_NAMESPACE, LEGACY_DRIVE_NAMESPACE } from "./types.js";
 import type { DriveAuthorization } from "./types.js";
+import { DriveTransport } from "./transport.js";
 import { DriveWriteCapability } from "./write-capability.js";
 import type { WriteCapabilityStatus } from "./write-capability.js";
 
@@ -102,6 +104,14 @@ export function createDeviceSlotContext({
       (await inspectLegacyDeviceSlotSources(authorization, fetcher)).some(
         ({ inspection }) => inspection.heads.length > 0
       ),
+    legacyPresent: async () =>
+      (
+        await Promise.all(
+          ([DRIVE_NAMESPACE, LEGACY_DRIVE_NAMESPACE] as const).map((namespace) =>
+            new DriveTransport(authorization, { fetch: fetcher, namespace }).list("snapshot")
+          )
+        )
+      ).some((files) => files.length > 0),
     apply: (backup, revision, onCommitted) =>
       fence.effect(() => host.apply(providerId, backup, revision, guard, onCommitted)),
     save: (prior, patch) => {
