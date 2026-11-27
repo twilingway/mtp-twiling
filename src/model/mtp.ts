@@ -119,6 +119,7 @@ export class MtpModel {
     this.length = data.length;
   }
   extrema(from: number, to: number) {
+    if (!this.periods.length) return null;
     let min = Infinity,
       max = -Infinity;
     for (
@@ -142,6 +143,7 @@ export class MtpModel {
     yFor: (price: number | null) => number | null,
     bitmap?: { verticalPixelRatio: number }
   ) {
+    if (!this.periods.length) return;
     const start = Math.max(0, Math.floor(from) - 1),
       end = Math.min(this.data.length - 1, Math.ceil(to) + 1);
     if (end < start) return;
@@ -304,6 +306,7 @@ export function lightweightMtp(
           renderer: () => ({
             draw() {},
             drawBackground(target) {
+              if (!model.periods.length) return;
               const timeScale = chart.timeScale();
               const range = timeScale.getVisibleLogicalRange();
               if (!range) return;
@@ -312,13 +315,17 @@ export function lightweightMtp(
                 context.save();
                 context.scale(horizontalPixelRatio, verticalPixelRatio);
                 const xFor = (index: number) => timeScale.logicalToCoordinate(index);
-                const paint = (target: CanvasRenderingContext2D) =>
+                const paint = (
+                  target: CanvasRenderingContext2D,
+                  from = range.from,
+                  to = range.to
+                ) =>
                   model.draw(
                     target,
-                    range.from,
-                    range.to,
+                    from,
+                    to,
                     xFor,
-                    lightweightPriceProjection(series, model, range.from, range.to)
+                    lightweightPriceProjection(series, model, from, to)
                   );
                 if (
                   !raster.draw({
@@ -341,6 +348,7 @@ export function lightweightMtp(
       ];
     },
     autoscaleInfo(from, to) {
+      if (!model.periods.length) return null;
       const priceRange = model.extrema(from, to);
       return priceRange ? { priceRange } : null;
     },
