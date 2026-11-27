@@ -102,6 +102,23 @@ test("Google cleanup displays verified counts, nonfatal pause, and preserved arc
   );
 });
 
+test("Google inventory checking shows real progress without confirming an archive", () => {
+  for (const checkedFiles of [0, 20, 179]) {
+    const html = render({ compaction: { phase: "checking", checkedFiles, totalFiles: 179 } });
+    assert.match(html, new RegExp(`<progress [^>]*max="179" value="${checkedFiles}">`));
+    assert.match(html, new RegExp(`Files checked</dt><dd>${checkedFiles} of 179</dd>`));
+    assert.doesNotMatch(html, /Archived<\/dt>|The archive was saved and verified/);
+  }
+  for (const counts of [{}, { checkedFiles: 20 }, { checkedFiles: 180, totalFiles: 179 }]) {
+    const unknown = render({ compaction: { phase: "checking", ...counts } });
+    assert.match(unknown, /<progress aria-label="Checking old Google Drive files…"><\/progress>/);
+    assert.doesNotMatch(unknown, /Files checked/);
+  }
+  const paused = render({ compaction: { phase: "paused", checkedFiles: 20, totalFiles: 179 } });
+  assert.match(paused, /Files checked<\/dt><dd>20 of 179<\/dd>/);
+  assert.doesNotMatch(paused, /<progress|The archive was saved and verified/);
+});
+
 test("Google history is collapsed and only displays known archive metadata", () => {
   const html = render({
     legacyArchives: [archive, { ...archive, id: "unknown-date", createdAt: "", bytes: 201 }]

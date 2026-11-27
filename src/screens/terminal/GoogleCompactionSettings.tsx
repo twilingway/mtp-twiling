@@ -56,13 +56,35 @@ function isCompacting(progress: Compaction | undefined): boolean {
 function CompactionProgress({ progress }: { progress: Compaction }) {
   const label = t(stageLabels[progress.phase]);
   const number = new Intl.NumberFormat(intlLocale());
+  const { checkedFiles, totalFiles } = progress;
+  const checking =
+    (progress.phase === "checking" || progress.phase === "paused") &&
+    checkedFiles !== undefined &&
+    totalFiles !== undefined &&
+    Number.isSafeInteger(checkedFiles) &&
+    Number.isSafeInteger(totalFiles) &&
+    totalFiles > 0 &&
+    checkedFiles >= 0 &&
+    checkedFiles <= totalFiles
+      ? { checkedFiles, totalFiles }
+      : undefined;
   return (
     <div className="cloud-retention-progress" data-phase={progress.phase}>
       <p className="cloud-retention-stage" role="status">
         {label}
       </p>
-      {isCompacting(progress) && <progress aria-label={label} />}
+      {isCompacting(progress) && (
+        <progress aria-label={label} max={checking?.totalFiles} value={checking?.checkedFiles} />
+      )}
       <dl className="cloud-retention-counts">
+        {checking && (
+          <div>
+            <dt>{t("Проверено файлов")}</dt>
+            <dd>
+              {number.format(checking.checkedFiles)} {t("из")} {number.format(checking.totalFiles)}
+            </dd>
+          </div>
+        )}
         {metrics.map(([key, name]) => {
           const count = progress[key];
           if (count === undefined || (key === "changedFiles" && count === 0)) return null;

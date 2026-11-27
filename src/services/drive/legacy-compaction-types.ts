@@ -56,6 +56,10 @@ export interface LegacyCompactionPreview {
   readonly bytes: number;
   readonly inventoryDigest: string;
 }
+export interface LegacyCompactionCaptureProgress {
+  readonly checkedFiles: number;
+  readonly totalFiles: number;
+}
 export interface LegacyCompactionJournalEntry {
   readonly metadata: RawArchiveMetadata;
   readonly binding: CompactionBinding;

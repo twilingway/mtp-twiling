@@ -6,6 +6,7 @@ export const driveMessages = {
   "После очистки старые версии приложения нужно обновить. Сохранённые архивы останутся в облаке.":
     "After cleanup, older versions of the app need to be updated. Saved archives stay in the cloud.",
   "Проверяем старые файлы Google Диска…": "Checking old Google Drive files…",
+  "Проверено файлов": "Files checked",
   "Сохраняем архив на Google Диске…": "Saving the archive to Google Drive…",
   "Проверяем сохранённый архив…": "Verifying the saved archive…",
   "Подтверждаем доступность архива…": "Confirming the archive is available…",

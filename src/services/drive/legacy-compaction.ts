@@ -18,7 +18,8 @@ import type {
   LegacyCompactionJournalEntry,
   LegacyCompactionPreview,
   LegacyCompactionProgress,
-  LegacyCompactionRemote
+  LegacyCompactionRemote,
+  LegacyCompactionCaptureProgress
 } from "./legacy-compaction-types.js";
 import { DRIVE_CLIENT_ID, DriveError } from "./types.js";
 export type * from "./legacy-compaction-types.js";
@@ -83,7 +84,8 @@ export class LegacyCompaction<Proof> {
 
   async preview(
     metadata: RawArchiveMetadata,
-    signal: AbortSignal
+    signal: AbortSignal,
+    onCapture?: (progress: LegacyCompactionCaptureProgress) => void
   ): Promise<LegacyCompactionPreview> {
     if (this.running) throw conflict();
     await this.check(signal);
@@ -100,12 +102,16 @@ export class LegacyCompaction<Proof> {
     await this.check(signal);
     const candidates = await this.remote.listLegacy(signal);
     if (!candidates.length || candidates.length > 2048) throw invalid();
+    await this.check(signal);
+    onCapture?.({ checkedFiles: 0, totalFiles: candidates.length });
     const objects: RawLegacyObject[] = [];
     for (const candidate of candidates) {
       await this.check(signal);
       const object = await this.remote.captureRaw(candidate, signal);
       if (!equal(withoutProof(object.file), candidate)) throw conflict();
+      await this.check(signal);
       objects.push(object);
+      onCapture?.({ checkedFiles: objects.length, totalFiles: candidates.length });
     }
     const archive = await encodeRawArchive(objects, metadata);
     await this.check(signal);

@@ -34,6 +34,8 @@ export interface GoogleStatus extends CloudSyncStatus {
   compaction?: Omit<Partial<LegacyCompactionProgress>, "phase"> & {
     phase: LegacyCompactionProgress["phase"] | "checking" | "paused";
     error?: CloudErrorCode;
+    checkedFiles?: number;
+    totalFiles?: number;
   };
   legacyArchives?: readonly { id: string; createdAt: string; bytes: number; fileCount?: number }[];
   legacyLateChanges?: readonly LegacyLateInspection[];

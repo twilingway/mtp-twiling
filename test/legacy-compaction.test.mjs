@@ -117,6 +117,39 @@ test("full physical coverage includes both namespaces, orphan and duplicate byte
   assert.deepEqual(deletes.slice(0, 2), ["delete:v1-snapshot", "delete:v2-snapshot"]);
 });
 
+test("preview reports checked captures from zero through the complete stable inventory", async () => {
+  const f = fixture(), progress = [];
+  const preview = await f.service().preview(metadata, signal(), (value) => progress.push(value));
+  assert.deepEqual(progress, [0, 1, 2, 3, 4].map((checkedFiles) => ({ checkedFiles, totalFiles: 4 })));
+  assert.equal(preview.fileCount, 4);
+  assert.ok(progress.every((value) => !Object.hasOwn(value, "archivedFiles")));
+  assert.equal(f.state.remote.size, 0);
+  assert.equal(f.state.journal.size, 0);
+  assert.ok(!f.state.events.some((event) => event.startsWith("delete:")));
+});
+
+for (const failure of ["changed-version", "changed-identity"]) {
+  test(`preview never advances checked captures after ${failure}`, async () => {
+    const f = fixture(), progress = [], capture = f.remote.captureRaw;
+    let captured = 0;
+    f.remote.captureRaw = async (...args) => {
+      const object = await capture(...args);
+      if (++captured !== 2) return object;
+      if (failure === "changed-identity") {
+        f.state.identity = false;
+        return object;
+      }
+      return { ...object, file: { ...object.file, version: "2" } };
+    };
+    await assert.rejects(f.service().preview(metadata, signal(), (value) => progress.push(value)));
+    assert.deepEqual(progress, [{ checkedFiles: 0, totalFiles: 4 }, { checkedFiles: 1, totalFiles: 4 }]);
+    assert.ok(progress.every((value) => !Object.hasOwn(value, "archivedFiles")));
+    assert.equal(f.state.remote.size, 0);
+    assert.equal(f.state.journal.size, 0);
+    assert.ok(!f.state.events.some((event) => event.startsWith("delete:")));
+  });
+}
+
 for (const fault of ["journal", "before-rawarchive", "after-rawarchive", "archive-readback",
   "v3", "before-compaction", "after-compaction", "reader"]) {
   test(`failure at ${fault} never deletes user files`, async () => {

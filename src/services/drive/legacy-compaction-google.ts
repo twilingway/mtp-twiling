@@ -238,7 +238,10 @@ export async function compactGoogleLegacy(job: GoogleLegacyJob, allowDelta = tru
         publicClientId,
         createdAt: new Date().toISOString()
       },
-      job.signal
+      job.signal,
+      (capture) => {
+        if (job.current()) job.update({ compaction: { phase: "checking", ...capture } });
+      }
     );
     await service.execute(preview, job.signal, report);
   }
