@@ -61,16 +61,23 @@ export const selectPanelState = (state: TerminalState) => ({
   locale: state.preferences.locale
 });
 
-export const selectDrawingToolbarState = (state: TerminalState) => ({
-  owner: state.owner,
-  authenticated: state.authenticated,
-  dialog: state.dialog,
-  activeTool: state.activeTool,
-  preferences: state.preferences,
-  drawings: state.drawings,
-  images: state.images,
-  selectedUid: selectedMarketRow(state.rows, state.preferences)?.uid
-});
+export const selectDrawingToolbarState = (state: TerminalState) => {
+  const selected =
+    state.drawings.find((item) => item.id === state.selectedObject) ??
+    state.images.find((item) => item.id === state.selectedObject);
+  return {
+    owner: state.owner,
+    authenticated: state.authenticated,
+    dialog: state.dialog,
+    activeTool: state.activeTool,
+    preferences: state.preferences,
+    objectCount: state.drawings.length + state.images.length,
+    selectedObject: state.selectedObject,
+    selectedObjectExists: !!selected,
+    selectedObjectLocked: !!selected?.lock,
+    selectedUid: selectedMarketRow(state.rows, state.preferences)?.uid
+  };
+};
 
 export const selectObjectTreeState = (state: TerminalState) => ({
   owner: state.owner,

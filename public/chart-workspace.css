@@ -286,6 +286,23 @@
   opacity: 1;
 }
 
+.chart-workspace-divider[data-resizing="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  background: currentColor;
+  pointer-events: none;
+}
+
+.chart-workspace-divider[data-axis="column"][data-resizing="true"]::after {
+  width: 2px;
+}
+
+.chart-workspace-divider[data-axis="row"][data-resizing="true"]::after {
+  height: 2px;
+}
+
 @media (pointer: coarse) {
   .chart-workspace-divider[data-axis="row"] {
     height: 20px;

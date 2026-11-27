@@ -503,6 +503,15 @@ function componentHarness(object) {
     notify: (value) => calls.push(["notify", value])
   };
   class Node {}
+  class Element extends Node {
+    constructor(ancestor = null) {
+      super();
+      this.ancestor = ancestor;
+    }
+    closest(selector) {
+      return selector.split(", ").includes(this.ancestor) ? this : null;
+    }
+  }
   const events = {
     addEventListener: (name, fn, capture) => handlers.set(name, { fn, capture }),
     removeEventListener: (name) => handlers.delete(name)
@@ -536,7 +545,7 @@ function componentHarness(object) {
       "../context.js": { useTerminal: () => ({ controller, state }) },
       "./mobile-object-widget.js": helpers
     },
-    { document: events, Node, window: { innerWidth: 392, innerHeight: 783 } }
+    { document: events, Node, Element, window: { innerWidth: 392, innerHeight: 783 } }
   );
   const tree = module.MobileObjectWidget();
   const nodes = [];
@@ -556,6 +565,7 @@ function componentHarness(object) {
     effects,
     handlers,
     Node,
+    Element,
     render: module.MobileObjectWidget
   };
 }
@@ -622,6 +632,37 @@ test("outside dismissal runs in capture phase and never consumes the canvas poin
   assert.deepEqual(harness.calls.at(-1), ["select", null]);
   for (const remove of cleanup) remove();
   assert.equal(harness.handlers.size, 0);
+});
+
+test("native toolbar/menu pointer and focus transitions retain the selected object", () => {
+  for (const object of [
+    { id: "line", name: "segment", points: [] },
+    { id: "image", name: "Photo" }
+  ]) {
+    const harness = componentHarness(object);
+    const cleanup = harness.effects.map((effect) => effect());
+    const dispatch = (type, target) =>
+      harness.handlers.get(type).fn({
+        target,
+        preventDefault: () => assert.fail("related control event consumed"),
+        stopPropagation: () => assert.fail("related control propagation stopped")
+      });
+    // Tap the left lock, focus the portalled sheet, activate its row, restore trigger focus.
+    for (const [type, ancestor] of [
+      ["pointerdown", ".drawing-toolbar"],
+      ["focusin", "#drawing-toolbar-menu"],
+      ["pointerdown", "#drawing-toolbar-menu"],
+      ["focusin", ".drawing-toolbar"]
+    ]) {
+      dispatch(type, new harness.Element(ancestor));
+      assert.equal(harness.state.selectedObject, object.id, `${type}: ${ancestor}`);
+    }
+    assert.deepEqual(harness.calls, []);
+    dispatch("pointerdown", new harness.Element());
+    assert.equal(harness.state.selectedObject, null, "blank chart still deselects");
+    for (const remove of cleanup) remove();
+    assert.equal(harness.handlers.size, 0);
+  }
 });
 
 test("Escape dismisses the selection and handle uses pointer capture without opening a menu", () => {

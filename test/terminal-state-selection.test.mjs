@@ -6,7 +6,7 @@ const load = sourceLoader();
 const { selectedSnapshot, shallowEqual } = load("screens/terminal/snapshot-selector.ts");
 const { shareMarketRows } = load("screens/terminal/market-state-sharing.ts");
 const { importWritable } = load("screens/terminal/controller-transfer-guard.ts");
-const { equalTerminalState, selectShellState, selectToolbarState, selectControlsState, selectPanelState } = load(
+const { equalTerminalState, selectShellState, selectToolbarState, selectControlsState, selectPanelState, selectDrawingToolbarState } = load(
   "screens/terminal/terminal-state-selection.ts"
 );
 const row = (uid, price = 10) => ({
@@ -103,6 +103,71 @@ test("a selector never returns a fresh object for the same snapshot", () => {
   const state = fixture();
   const read = selectedSnapshot(() => state, (snapshot) => ({ price: snapshot.rows[0].price }));
   assert.equal(read(), read());
+});
+
+test("drawing toolbar retains its subscribed snapshot through quotes and geometry changes", () => {
+  let state = {
+    ...fixture(),
+    selectedObject: "selected",
+    activeTool: null,
+    drawings: [
+      { id: "selected", lock: false, points: [{ value: 10 }] },
+      { id: "other", lock: false, points: [{ value: 20 }] }
+    ],
+    images: [{ id: "image", lock: false, point: { value: 30 } }]
+  };
+  const read = selectedSnapshot(() => state, selectDrawingToolbarState, shallowEqual);
+  let subscribed = read(),
+    invalidations = 0;
+  const publish = (patch) => {
+    state = { ...state, ...patch };
+    const next = read();
+    if (!Object.is(next, subscribed)) {
+      subscribed = next;
+      invalidations++;
+    }
+    return next;
+  };
+  const original = subscribed;
+  for (let tick = 0; tick < 20; tick++) {
+    assert.equal(publish({ rows: [row("A", 100 + tick), row("B")] }), original);
+    assert.equal(
+      publish({
+        drawings: state.drawings.map((item) => ({
+          ...item,
+          points: [{ value: tick }]
+        }))
+      }),
+      original
+    );
+    assert.equal(publish({ images: [{ ...state.images[0], point: { value: tick } }] }), original);
+  }
+  assert.equal(
+    publish({
+      drawings: state.drawings.map((item) => (item.id === "other" ? { ...item, lock: true } : item))
+    }),
+    original
+  );
+  assert.equal(invalidations, 0);
+  publish({
+    drawings: state.drawings.map((item) =>
+      item.id === "selected" ? { ...item, lock: true } : item
+    )
+  });
+  assert.equal(invalidations, 1);
+  assert.equal(subscribed.selectedObjectLocked, true);
+  publish({ selectedObject: "other" });
+  assert.equal(invalidations, 2);
+  publish({ selectedObject: null });
+  assert.equal(invalidations, 3);
+  assert.equal(subscribed.selectedObjectExists, false);
+  publish({ selectedObject: "image" });
+  assert.equal(invalidations, 4);
+  publish({ images: [{ ...state.images[0], lock: true }] });
+  assert.equal(invalidations, 5);
+  assert.equal(subscribed.selectedObjectLocked, true);
+  assert.equal(Object.hasOwn(subscribed, "drawings"), false);
+  assert.equal(Object.hasOwn(subscribed, "images"), false);
 });
 
 test("the default terminal snapshot ignores only crosshair, including clear", () => {

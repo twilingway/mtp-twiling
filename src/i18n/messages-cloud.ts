@@ -1,4 +1,5 @@
 export const cloudMessages = {
+  Браузер: "Browser",
   "В облаке пока нет доступных снимков.": "No snapshots are available in this cloud yet.",
   "Версия устройства отправлена в облако.": "The device version was sent to cloud storage.",
   "Версия из облака применена на устройстве.": "The cloud version was applied on this device.",

@@ -40,6 +40,7 @@ interface SplitProps {
   icon: DrawingIconName;
   active: boolean;
   disabled?: boolean;
+  disabledLabel?: string;
   expanded: boolean;
   mobileMenu?: boolean;
   onChoose: () => void;
@@ -53,6 +54,7 @@ export function DrawingToolbarSplit({
   icon,
   active,
   disabled,
+  disabledLabel,
   expanded,
   mobileMenu = false,
   onChoose,
@@ -61,7 +63,7 @@ export function DrawingToolbarSplit({
   const tooltip = mobileMenu
     ? t(menuLabel)
     : disabled
-      ? t(label) + t(" — Пока не реализовано")
+      ? (disabledLabel ?? t(label) + t(" — Пока не реализовано"))
       : t(label);
   return (
     <div

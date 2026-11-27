@@ -127,6 +127,388 @@ async function seedRemote(f) {
   f.disk.files.set(revisionName(encoded.revision), encoded.body);
   return encoded.revision;
 }
+async function advancePeerSlots(f, intervals) {
+  const backend = await localBackend(),
+    journal = new YandexJournal(async () => backend),
+    transport = new (load("services/yandex/transport.ts").YandexTransport)(f.disk.auth, {
+      fetch: f.disk.fetcher,
+      sleep: async () => {},
+      timeoutMs: 5000
+    }),
+    revisions = new (load("services/yandex/revisions.ts").YandexRevisions)(
+      transport, journal, f.disk.auth, config.clientId
+    );
+  await journal.saveSettings(
+    { enabled: true, automatic: false, clientMode: "test" }, new AbortController().signal
+  );
+  for (const timeframe of intervals) {
+    const value = {
+      application: "personal-terminal", schemaVersion: 2, drawings: [], images: [], layout: { timeframe }
+    };
+    const before = await revisions.inspect(() => true);
+    await revisions.publish(
+      await prepareDriveBackup(value), await driveBackupDigest(value), before.heads, () => true, true
+    );
+    await journal.clearPending(config.clientId, f.disk.auth.accountId, f.disk.auth.signal);
+  }
+  return revisions.inspect(() => true);
+}
+
+async function committedPendingDraft(f) {
+  await f.coordinator.prepare();
+  await f.coordinator.sync();
+  await f.coordinator.choose({ kind: "local" });
+  for (const timeframe of ["5m", "15m", "30m"]) {
+    f.edit(timeframe); f.coordinator.localIntent(); await f.coordinator.sync();
+  }
+  const base = await f.journal.association(config.clientId, f.disk.auth.accountId),
+    fetcher = f.disk.fetcher;
+  let fenced = false;
+  f.disk.fetcher = async (target, init) => {
+    const response = await fetcher(target, init), url = new URL(target);
+    if (!fenced && url.pathname.endsWith("/move") && url.searchParams.get("path")?.includes("/slot_")) {
+      fenced = true;
+      f.edit("4h"); f.coordinator.localIntent();
+    }
+    return response;
+  };
+  try { f.edit("1h"); f.coordinator.localIntent(); await f.coordinator.sync(); }
+  finally { f.disk.fetcher = fetcher; }
+  const pending = await f.journal.pending(config.clientId, f.disk.auth.accountId);
+  assert.equal(fenced, true);
+  assert.ok(pending);
+  assert.equal(f.disk.puts(), 5);
+  assert.deepEqual((await f.journal.association(config.clientId, f.disk.auth.accountId)).heads, base.heads);
+  assert.notEqual((await f.host.capture()).digest, pending.revision.digest);
+  return { base, pending, fetcher };
+}
+
+test("a committed pending fifth snapshot becomes only a baseline while the sixth local draft publishes once", async () => {
+  const f = await fixture();
+  try {
+    const { pending } = await committedPendingDraft(f);
+    const observed = [];
+    const stop = f.coordinator.subscribe(() => {
+      const value = f.coordinator.getSnapshot();
+      observed.push({ ...value });
+    });
+    await f.coordinator.sync(); stop();
+    assert.equal(f.disk.puts(), 6);
+    assert.equal(f.applies(), 0);
+    assert.equal(f.coordinator.getSnapshot().phase, "idle");
+    assert.equal(f.coordinator.getSnapshot().pendingChanges, false);
+    assert.equal((await f.host.capture()).backup.layout.timeframe, "4h");
+    const association = await f.journal.association(config.clientId, f.disk.auth.accountId);
+    assert.notEqual(association.heads[0], pending.revision.revisionId);
+    assert.equal(association.digest, (await f.host.capture()).digest);
+    assert.equal(await f.journal.pending(config.clientId, f.disk.auth.accountId), undefined);
+    assert.ok(observed.some(({ phase, pendingChanges, choiceAction }) =>
+      phase === "syncing" && pendingChanges === true && choiceAction === undefined));
+    await f.coordinator.sync();
+    assert.equal(f.disk.puts(), 6);
+    assert.equal(f.coordinator.getSnapshot().conflict, undefined);
+  } finally { f.coordinator.dispose(); }
+});
+
+for (const failure of ["baseline", "clear", "publish-six"]) {
+  test(`confirmed pending recovery remains retryable after ${failure} failure and never marks draft six synced`, async () => {
+    const f = await fixture();
+    try {
+      const { base, pending, fetcher } = await committedPendingDraft(f),
+        accept = f.journal.accept.bind(f.journal), clear = f.journal.clearPending.bind(f.journal),
+        previousChoice = f.coordinator.getSnapshot().choiceAction;
+      if (failure === "baseline") f.journal.accept = async () => { throw new Error("local-save"); };
+      if (failure === "clear") f.journal.clearPending = async () => { throw new Error("local-save"); };
+      if (failure === "publish-six") f.disk.fetcher = async (target, init) =>
+        new URL(target).hostname.startsWith("uploader") && !new URL(target).searchParams.get("name")?.startsWith("probe_")
+          ? new Response(null, { status: 503 }) : fetcher(target, init);
+      await f.coordinator.sync();
+      assert.equal(f.coordinator.getSnapshot().pendingChanges, true);
+      if (failure === "baseline") assert.equal(f.coordinator.getSnapshot().choiceAction, previousChoice);
+      else assert.notEqual(f.coordinator.getSnapshot().choiceAction?.state, "confirmed");
+      assert.equal(f.applies(), 0);
+      assert.equal((await f.host.capture()).backup.layout.timeframe, "4h");
+      const association = await f.journal.association(config.clientId, f.disk.auth.accountId);
+      assert.deepEqual(association.heads, failure === "baseline" ? base.heads : [pending.revision.revisionId]);
+      assert.notEqual(association.digest, (await f.host.capture()).digest);
+      f.journal.accept = accept; f.journal.clearPending = clear; f.disk.fetcher = fetcher;
+      await f.coordinator.sync();
+      assert.equal(f.disk.puts(), 6);
+      assert.equal(f.coordinator.getSnapshot().phase, "idle");
+      assert.equal(f.coordinator.getSnapshot().pendingChanges, false);
+    } finally { f.coordinator.dispose(); }
+  });
+}
+
+for (const mismatch of ["generation", "device", "mode", "account", "body", "head", "local-edit"]) {
+  test(`pending recovery refuses ${mismatch} mismatch without retiring the old journal or importing`, async () => {
+    const f = await fixture();
+    try {
+      const { base, pending } = await committedPendingDraft(f);
+      if (mismatch === "generation") await f.journal.savePending(config.clientId,
+        { ...pending, credentialGeneration: "different-generation" }, f.disk.auth.signal);
+      if (mismatch === "device") f.backend.records.set("mtp:yandex:device:device-id", crypto.randomUUID());
+      if (mismatch === "mode") await f.journal.saveSettings(
+        { enabled: true, automatic: false, clientMode: "test" }, f.disk.auth.signal);
+      if (mismatch === "account") {
+        const key = `mtp:yandex:device:${config.clientId}:${f.disk.auth.accountId}:pending`;
+        f.backend.records.set(key, { ...pending, accountId: "456" });
+      }
+      if (mismatch === "head") await seedRemote(f);
+      if (mismatch === "body") {
+        const [name, body] = [...f.disk.files].find(([name]) => name.endsWith("_5.mtp"));
+        const bytes = new Uint8Array(await body.arrayBuffer());
+        bytes[await load("services/yandex/slot-codec.ts").slotHeaderSize(body)] ^= 1;
+        f.disk.files.set(name, new Blob([bytes]));
+      }
+      if (mismatch === "local-edit") {
+        const fetcher = f.disk.fetcher;
+        f.disk.fetcher = async (target, init) => {
+          const response = await fetcher(target, init);
+          if (new URL(target).hostname.startsWith("downloader") && !new Headers(init.headers).has("Range"))
+            f.edit("1w");
+          return response;
+        };
+      }
+      const puts = f.disk.puts(), before = new Map(f.backend.records);
+      await f.coordinator.sync();
+      assert.equal(f.disk.puts(), puts);
+      assert.equal(f.applies(), 0);
+      assert.deepEqual(await f.journal.association(config.clientId, f.disk.auth.accountId), base);
+      assert.deepEqual([...f.backend.records], [...before]);
+    } finally { f.coordinator.dispose(); }
+  });
+}
+
+test("inspection and a stale explicit selection never consume an exactly committed pending publication", async () => {
+  const f = await fixture();
+  try {
+    const { base, pending } = await committedPendingDraft(f), before = new Map(f.backend.records);
+    await f.coordinator.inspect();
+    f.edit("1w"); f.coordinator.localIntent();
+    await f.coordinator.choose({ kind: "local" });
+    assert.equal(f.disk.puts(), 5);
+    assert.equal(f.applies(), 0);
+    assert.deepEqual([...f.backend.records], [...before]);
+    assert.deepEqual(await f.journal.association(config.clientId, f.disk.auth.accountId), base);
+    assert.equal((await f.journal.pending(config.clientId, f.disk.auth.accountId)).revision.revisionId, pending.revision.revisionId);
+  } finally { f.coordinator.dispose(); }
+});
+
+for (const sameContent of [true, false]) {
+  test(`verified slot ancestry advances a stale association after pruning (${sameContent ? "same" : "changed"} content) without repeated conflict or upload`, async () => {
+    const f = await fixture();
+    try {
+      await f.coordinator.prepare();
+      await f.coordinator.sync();
+      await f.coordinator.choose({ kind: "local" });
+      const base = await f.journal.association(config.clientId, f.disk.auth.accountId);
+      const remote = await advancePeerSlots(f, ["5m", "15m", "30m", sameContent ? "1d" : "1h"]);
+      const head = remote.remotes.find(({ revision }) => revision.revisionId === remote.heads[0]);
+      assert.equal(remote.heads.length, 1);
+      assert.ok(head.slot.accepted.some(({ revisionId }) => revisionId === base.heads[0]));
+      const puts = f.disk.puts();
+      f.coordinator.localIntent();
+      await f.coordinator.sync();
+      await f.coordinator.sync();
+      assert.equal(f.coordinator.getSnapshot().phase, "idle");
+      assert.equal(f.coordinator.getSnapshot().conflict, undefined);
+      assert.equal(f.coordinator.getSnapshot().pendingChanges, false);
+      assert.equal(f.disk.puts(), puts);
+      assert.equal(f.applies(), sameContent ? 0 : 1);
+      assert.deepEqual((await f.journal.association(config.clientId, f.disk.auth.accountId)).heads, remote.heads);
+    } finally { f.coordinator.dispose(); }
+  });
+}
+
+test("slot ancestry never replaces local edits", async () => {
+  const f = await fixture();
+  try {
+    await f.coordinator.prepare();
+    await f.coordinator.sync();
+    await f.coordinator.choose({ kind: "local" });
+    const base = await f.journal.association(config.clientId, f.disk.auth.accountId);
+    await advancePeerSlots(f, ["5m", "15m", "30m", "1d"]);
+    f.edit("4h");
+    f.coordinator.localIntent();
+    const puts = f.disk.puts();
+    await f.coordinator.sync();
+    assert.equal(f.coordinator.getSnapshot().phase, "conflict");
+    assert.equal(f.coordinator.getSnapshot().pendingChanges, true);
+    assert.equal(f.applies(), 0);
+    assert.equal(f.disk.puts(), puts);
+    assert.deepEqual((await f.journal.association(config.clientId, f.disk.auth.accountId)).heads, base.heads);
+  } finally { f.coordinator.dispose(); }
+});
+
+for (const change of ["local", "cloud", "body"]) {
+  test(`same-content slot ancestry revalidates ${change} before accepting an association`, async () => {
+    const f = await fixture();
+    try {
+      await f.coordinator.prepare();
+      await f.coordinator.sync();
+      await f.coordinator.choose({ kind: "local" });
+      const base = await f.journal.association(config.clientId, f.disk.auth.accountId);
+      await advancePeerSlots(f, ["5m", "15m", "30m", "1d"]);
+      const decode = f.host.decode;
+      f.host.decode = async (prepared) => {
+        const backup = await decode(prepared);
+        if (change === "local") f.edit("4h");
+        else if (change === "cloud") await seedRemote(f);
+        else backup.layout.timeframe = "4h";
+        return backup;
+      };
+      const puts = f.disk.puts();
+      await f.coordinator.sync();
+      assert.equal(f.coordinator.getSnapshot().error, change === "body" ? "remote-invalid" : "local-changed");
+      assert.equal(f.disk.puts(), puts);
+      assert.equal(f.applies(), 0);
+      assert.deepEqual(await f.journal.association(config.clientId, f.disk.auth.accountId), base);
+    } finally { f.coordinator.dispose(); }
+  });
+}
+
+test("matching inspected head content repairs a stale association digest by readback without upload", async () => {
+  const f = await fixture();
+  try {
+    await f.coordinator.prepare();
+    await f.coordinator.sync();
+    await f.coordinator.choose({ kind: "local" });
+    const base = await f.journal.association(config.clientId, f.disk.auth.accountId);
+    await f.journal.accept(config.clientId, { ...base, digest: "a".repeat(64) }, f.disk.auth.signal);
+    const puts = f.disk.puts();
+    await f.coordinator.sync();
+    assert.equal(f.coordinator.getSnapshot().phase, "idle");
+    assert.equal(f.disk.puts(), puts);
+    assert.equal(f.applies(), 0);
+    assert.equal((await f.journal.association(config.clientId, f.disk.auth.accountId)).digest, base.digest);
+  } finally { f.coordinator.dispose(); }
+});
+
+test("an unknown same-content head still requires direction and inspection creates no browser identity", async () => {
+  const f = await fixture();
+  try {
+    await seedRemote(f);
+    f.edit("5m");
+    await f.coordinator.prepare();
+    await f.coordinator.inspect();
+    assert.equal(f.backend.records.has("mtp:yandex:device:device-id"), false);
+    await f.coordinator.sync();
+    assert.equal(f.coordinator.getSnapshot().phase, "conflict");
+    assert.equal(await f.journal.association(config.clientId, f.disk.auth.accountId), undefined);
+    assert.equal(f.applies(), 0);
+    assert.equal(f.disk.puts(), 0);
+  } finally { f.coordinator.dispose(); }
+});
+
+test("a disabled preference from another tab fences a stale enabled writer inside its lock", async () => {
+  const f = await fixture(), other = f.make();
+  try {
+    await f.coordinator.prepare();
+    await other.prepare();
+    await f.coordinator.sync();
+    await f.coordinator.choose({ kind: "local" });
+    await f.coordinator.setEnabled(false);
+    assert.equal(other.getSnapshot().enabled, true);
+    f.edit("5m");
+    other.localIntent();
+    const calls = f.disk.calls.length, puts = f.disk.puts();
+    await other.sync();
+    assert.equal(other.getSnapshot().enabled, false);
+    assert.equal(other.getSnapshot().phase, "disabled");
+    assert.equal(f.disk.calls.length, calls);
+    assert.equal(f.disk.puts(), puts);
+    assert.equal((await f.journal.settings()).enabled, false);
+  } finally { f.coordinator.dispose(); other.dispose(); }
+});
+
+for (const change of ["disabled", "mode"]) {
+  for (const cleanup of [false, true]) {
+    test(`a stale synthetic probe (${change}, cleanup=${cleanup}) reads settings under the writer lock before any transport`, async () => {
+      const f = await fixture(), other = f.make(), fetch = globalThis.fetch;
+      let calls = 0;
+      globalThis.fetch = async () => { calls++; throw new Error("Unexpected synthetic transport"); };
+      try {
+        await f.coordinator.prepare();
+        await other.prepare();
+        const queued = deferred(), release = deferred();
+        other.lock = async (_authorization, run) => {
+          queued.resolve();
+          await release.promise;
+          return run();
+        };
+        const rejected = assert.rejects(other.runSyntheticProbe(cleanup), { code: "local-changed" });
+        await queued.promise;
+        if (change === "disabled") await f.coordinator.setEnabled(false);
+        else await f.coordinator.setClientMode("test");
+        assert.equal(other.getSnapshot().enabled, true);
+        assert.equal(other.getSnapshot().clientMode, "normal");
+        release.resolve();
+        await rejected;
+        assert.equal(calls, 0);
+        assert.equal(f.disk.calls.length, 0);
+        assert.equal(f.disk.files.size, 0);
+      } finally {
+        f.coordinator.dispose(); other.dispose(); globalThis.fetch = fetch;
+      }
+    });
+  }
+}
+
+test("unrelated preference writes preserve another tab's disabled and automatic choices", async () => {
+  const f = await fixture(), other = f.make();
+  try {
+    await f.coordinator.prepare();
+    await other.prepare();
+    await other.setEnabled(true);
+    await f.coordinator.setEnabled(false);
+    await other.setAutomatic(true);
+    assert.deepEqual(await f.journal.settings(), { enabled: false, automatic: true, clientMode: "normal" });
+    assert.equal(other.getSnapshot().enabled, false);
+    await f.coordinator.setAutomatic(false);
+    await other.setEnabled(true);
+    assert.deepEqual(await f.journal.settings(), { enabled: true, automatic: false, clientMode: "normal" });
+  } finally { f.coordinator.dispose(); other.dispose(); }
+});
+
+test("a stale automatic job adopts the other tab's opt-out while explicit manual sync remains available", async () => {
+  const f = await fixture(), other = f.make(),
+    jobs = new Map(), timeout = globalThis.setTimeout, clear = globalThis.clearTimeout;
+  let sequence = 0;
+  globalThis.setTimeout = (run, delay, ...args) => {
+    if (delay !== 750) return timeout(run, delay, ...args);
+    const id = { job: ++sequence };
+    jobs.set(id, () => run(...args));
+    return id;
+  };
+  globalThis.clearTimeout = (id) => { if (!jobs.delete(id)) clear(id); };
+  try {
+    await f.coordinator.prepare();
+    await other.prepare();
+    await f.coordinator.sync();
+    await f.coordinator.choose({ kind: "local" });
+    await other.setAutomatic(true);
+    await f.coordinator.setAutomatic(false);
+    f.edit("5m");
+    other.localIntent();
+    const calls = f.disk.calls.length, puts = f.disk.puts();
+    const pending = [...jobs.values()]; jobs.clear();
+    assert.equal(pending.length, 1);
+    for (const run of pending) run();
+    for (let i = 0; i < 10; i++) await new Promise(setImmediate);
+    assert.equal(other.getSnapshot().automatic, false);
+    assert.equal(other.getSnapshot().phase, "idle");
+    assert.equal(f.disk.calls.length, calls);
+    assert.equal(f.disk.puts(), puts);
+    await other.sync();
+    assert.equal(other.getSnapshot().phase, "idle");
+    assert.equal(f.disk.puts(), puts + 1);
+  } finally {
+    f.coordinator.dispose(); other.dispose();
+    globalThis.setTimeout = timeout; globalThis.clearTimeout = clear;
+  }
+});
+
 test("client mode persists across reload, clears only previews and preserves OAuth and automatic preferences", async () => {
   const f = await fixture();
   try {
@@ -1205,8 +1587,10 @@ for (const existing of [true, false]) {
     };
     try {
       await f.coordinator.prepare();
-      f.coordinator.sync = async () => {
-        runs++;
+      const run = f.coordinator.run.bind(f.coordinator);
+      f.coordinator.run = async (...args) => {
+        if (args[2] === true) runs++;
+        else return run(...args);
       };
       await f.coordinator.setAutomatic(true);
       assert.equal(jobs.size, 1);
@@ -1268,7 +1652,7 @@ test("verified cloud save stays confirmed when cleanup fails; only generic sync 
   assert.ok(status.lastSyncedAt);
   assert.ok(await f.journal.association(config.clientId, f.disk.auth.accountId));
   assert.equal(await f.journal.pending(config.clientId, f.disk.auth.accountId), undefined);
-  assert.equal([...f.disk.files.keys()].filter((name) => name.startsWith("slot_")).length, 3);
+  assert.equal([...f.disk.files.keys()].filter((name) => name.startsWith("slot_")).length, 2);
   let calls = f.disk.calls.length;
   await f.coordinator.inspect();
   assert.equal(
@@ -1290,8 +1674,8 @@ test("verified cloud save stays confirmed when cleanup fails; only generic sync 
   await f.coordinator.sync();
   status = f.coordinator.getSnapshot();
   assert.equal(status.retention.phase, "complete");
-  assert.equal(status.retention.keptFiles, 2);
-  assert.equal([...f.disk.files.keys()].filter((name) => name.startsWith("slot_")).length, 2);
+  assert.equal(status.retention.keptFiles, 1);
+  assert.equal([...f.disk.files.keys()].filter((name) => name.startsWith("slot_")).length, 1);
   assert.equal(f.disk.puts(), 3);
   f.coordinator.dispose();
 });

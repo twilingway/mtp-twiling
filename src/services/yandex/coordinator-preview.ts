@@ -69,6 +69,7 @@ export class YandexPreview {
       local: backupSummary(captured.backup),
       remotes: remotes.map(({ remote, summary }) => ({
         id: remote.revision.revisionId,
+        deviceId: remote.revision.deviceId,
         ...summary
       })),
       checkedAt

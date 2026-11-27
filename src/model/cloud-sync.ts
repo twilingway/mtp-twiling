@@ -36,6 +36,7 @@ export interface CloudSummary {
 export interface CloudRemoteChoice extends CloudSummary {
   id: string;
   deviceLabel?: string;
+  readonly deviceId?: string;
 }
 export interface CloudComparison {
   local: CloudSummary;

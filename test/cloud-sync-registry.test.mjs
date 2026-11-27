@@ -182,7 +182,8 @@ test("one shared lifecycle creates exactly one provider instance each and disabl
     await f.providers.get("yandex-disk").setEnabled(true);
     f.document.dispatchEvent(new Event("visibilitychange"));
     assert.equal(f.providers.get("google-drive").calls.sync, 0);
-    assert.equal(f.providers.get("yandex-disk").calls.sync, 1);
+    assert.equal(f.providers.get("yandex-disk").calls.sync, 0);
+    assert.equal(f.providers.get("yandex-disk").calls.resume, 2);
   } finally {
     second();
     f.restore();

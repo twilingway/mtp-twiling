@@ -1,6 +1,12 @@
 export const drawingMessages = {
   "Заблокировать объект": "Lock object",
+  "Закрепить объект": "Pin object",
+  "Выделенный объект": "Selected object",
   "Разблокировать объект": "Unlock object",
+  "Выберите объект для блокировки": "Select an object to lock",
+  "Объекты заблокированы глобально. Разблокируйте их в меню.":
+    "Objects are locked globally. Unlock them in the menu.",
+  "Для всех объектов: блокировка": "For all objects: locking",
   "Цены объектов на шкале": "Drawing prices on the scale",
   "Включить уровень": "Enable level",
   "Значение уровня": "Level value",

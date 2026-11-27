@@ -187,6 +187,11 @@ export function DrawingToolSheet({
                         {item.checked && <DrawingToolIcon name="check" />}
                       </span>
                     )}
+                    {item.kind === "radio" && item.checked && (
+                      <span className="drawing-menu-check" aria-hidden="true">
+                        <DrawingToolIcon name="check" />
+                      </span>
+                    )}
                     {item.children && <ChevronIcon direction="right" />}
                   </button>
                   {item.onFavorite && (

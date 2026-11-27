@@ -7,9 +7,9 @@ import {
   revisionName
 } from "./bundle.js";
 import type { YandexRevision } from "./bundle.js";
-import { assertCurrent, YandexError } from "./types.js";
+import { assertCurrent, sha256, YandexError } from "./types.js";
 import type { YandexAuthorization, YandexFile, YandexPreparedBackup } from "./types.js";
-import type { YandexJournal } from "./journal.js";
+import type { YandexJournal, YandexPending } from "./journal.js";
 import type { YandexTransport } from "./transport.js";
 import { YandexSlotStore, slotFingerprint, slotRemotes } from "./slot-store.js";
 import type { SlotRemoteMetadata } from "./slot-store.js";
@@ -137,6 +137,38 @@ export class YandexRevisions {
     this.downloadedBytes += file.size;
     if (this.downloadedBytes > MAX_BUNDLE_BYTES * 2) throw new YandexError("limit");
     return decodeBundle(await this.transport.read(file, MAX_BUNDLE_BYTES));
+  }
+  /** Confirm only this live identity's exact committed CURRENT bundle, never a historical copy. */
+  async verifiedPending(pending: YandexPending, valid: () => boolean): Promise<boolean> {
+    assertCurrent(this.auth.signal, valid);
+    if (
+      pending.accountId !== this.auth.accountId ||
+      pending.credentialGeneration !== this.auth.credentialGeneration ||
+      !(await this.journal.matchesCurrentDevice(pending.revision.deviceId))
+    )
+      return false;
+    assertCurrent(this.auth.signal, valid);
+    const snapshot = this.slots.snapshot;
+    if (
+      !snapshot ||
+      snapshot.uncertain.length ||
+      snapshot.heads.length !== 1 ||
+      snapshot.heads[0] !== pending.revision.revisionId
+    )
+      return false;
+    const physical = snapshot.latest.find(
+      ({ envelope }) => envelope.current.revision.revisionId === pending.revision.revisionId
+    );
+    if (!physical) return false;
+    const decoded = await this.slots.body(physical.file, valid);
+    assertCurrent(this.auth.signal, valid);
+    return (
+      JSON.stringify(decoded.envelope.current.revision) === JSON.stringify(pending.revision) &&
+      decoded.current.size === pending.reference.size &&
+      pending.body.size === pending.reference.size &&
+      (await sha256(decoded.current)) === pending.reference.sha256 &&
+      (await sha256(pending.body)) === pending.reference.sha256
+    );
   }
   async publish(
     prepared: YandexPreparedBackup,

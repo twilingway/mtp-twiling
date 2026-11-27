@@ -1,0 +1,35 @@
+/* Dynamic CSS units remain the primary size; the visual viewport only caps its bottom edge. */
+@media (max-width: 800px), (pointer: coarse) {
+  :root {
+    --terminal-css-height: 100vh;
+  }
+
+  @supports (height: 100dvh) {
+    :root {
+      --terminal-css-height: 100dvh;
+    }
+  }
+
+  body {
+    height: min(
+      var(--terminal-css-height),
+      var(--terminal-viewport-bottom-edge, var(--terminal-css-height))
+    );
+  }
+
+  #root,
+  #root:has(> .drive-pause-banner[data-active="true"]) {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+      env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  }
+
+  #root > .workspace {
+    flex: 1 1 0;
+    height: auto;
+    min-height: 0;
+  }
+}

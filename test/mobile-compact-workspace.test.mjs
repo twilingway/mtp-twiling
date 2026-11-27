@@ -59,7 +59,7 @@ function setup({ open = true, mobile = true } = {}) {
   return { actions, controller, load };
 }
 
-test("account workspace content routes panel modes without a duplicate layout trigger", () => {
+test("account menu destinations open watchlist and objects in one action", () => {
   const { actions, controller, load } = setup();
   const { MobileChartTools } = load("screens/terminal/MobileChartTools.js");
   const tree = MobileChartTools({
@@ -75,45 +75,49 @@ test("account workspace content routes panel modes without a duplicate layout tr
   const watchlist = find(tree, (node) => node.props?.["aria-controls"] === "watchlist-view");
   assert.equal(watchlist.props["aria-pressed"], false);
   watchlist.props.onClick();
-  const chart = find(
-    tree,
-    (node) => node.type === "button" && node.props?.["aria-controls"] === "chart-workspace"
-  );
-  chart.props.onClick();
+  objects.props.onClick();
   assert.deepEqual(actions, [
     ["close account"],
     ["panel", "watchlist", false, true],
     ["close account"],
-    ["chart"]
+    ["panel", "objects", false, true]
   ]);
+  assert.equal(tree.type, "nav");
+  assert.equal(tree.props.children.length, 2);
 });
 
 test("mobile history uses the active chart and does not duplicate its original input id", () => {
   const { actions, controller, load } = setup();
-  const { MobileChartTools } = load("screens/terminal/MobileChartTools.js");
   const { ChartRangeControl } = load("screens/terminal/intervals/ChartRangeControl.js");
-  const tree = MobileChartTools({ controller, panelOpen: false, objectsOpen: false });
-  const compact = find(tree, (node) => node.type === ChartRangeControl);
-  const select = find(ChartRangeControl(compact.props), (node) => node.type === "select");
+  const select = find(
+    ChartRangeControl({ placement: "toolbar" }),
+    (node) => node.type === "select"
+  );
   assert.equal(select.props.value, 180);
   assert.equal(select.props.id, "mobile-chart-range");
   assert.equal(
     find(ChartRangeControl({ slot: 2 }), (node) => node.type === "select").props.id,
     "range-plot-2"
   );
-  select.props.onChange({ target: { value: "30" } });
+  select.props.onChange({ target: { value: "30" }, currentTarget: { value: "30" } });
   assert.deepEqual(actions, [["active preferences", { rangeDays: 30 }]]);
 });
 
-test("workspace actions remain available inside the account menu and honor recovery locks", () => {
+test("primary destinations honor recovery locks and do not contain chart settings duplicates", () => {
   const { actions, controller, load } = setup();
   const { MobileChartTools } = load("screens/terminal/MobileChartTools.js");
   const { ClockZoneControl } = load("screens/terminal/ClockZoneControl.js");
   const { ChartRangeControl } = load("screens/terminal/intervals/ChartRangeControl.js");
   const tree = MobileChartTools({ controller, panelOpen: false, objectsOpen: false });
   assert.ok(find(tree, (node) => node.type === "nav"));
-  assert.ok(find(tree, (node) => node.type === ClockZoneControl));
-  assert.ok(find(tree, (node) => node.type === ChartRangeControl));
+  assert.equal(
+    find(tree, (node) => node.type === ClockZoneControl),
+    null
+  );
+  assert.equal(
+    find(tree, (node) => node.type === ChartRangeControl),
+    null
+  );
   assert.equal(
     find(tree, (node) => node.props?.className === "mobile-workspace-trigger"),
     null
@@ -128,8 +132,33 @@ test("workspace actions remain available inside the account menu and honor recov
     objectsOpen: false,
     disabled: true
   });
-  assert.equal(blocked.props.disabled, true);
+  assert.equal(
+    find(blocked, (node) => node.props?.["aria-controls"] === "watchlist-view").props.disabled,
+    true
+  );
   find(blocked, (node) => node.props?.["aria-controls"] === "watchlist-view").props.onClick();
+  assert.deepEqual(actions, []);
+});
+
+test("desktop destinations use the existing right panel without mobile routing", () => {
+  const { actions, controller, load } = setup({ mobile: false });
+  const { MobileChartTools } = load("screens/terminal/MobileChartTools.js");
+  const tree = MobileChartTools({
+    controller,
+    panelOpen: false,
+    objectsOpen: false,
+    mobile: false
+  });
+  find(tree, (node) => node.props?.["aria-controls"] === "watchlist-view").props.onClick();
+  assert.deepEqual(actions, [["panel", "watchlist", false, false]]);
+});
+
+test("a stale menu destination cannot navigate a different account", () => {
+  const { actions, controller, load } = setup();
+  const { MobileChartTools } = load("screens/terminal/MobileChartTools.js");
+  const tree = MobileChartTools({ controller, panelOpen: false, objectsOpen: false });
+  controller.getSnapshot = () => ({ owner: "changed" });
+  find(tree, (node) => node.props?.["aria-controls"] === "watchlist-view").props.onClick();
   assert.deepEqual(actions, []);
 });
 

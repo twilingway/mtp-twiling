@@ -9,26 +9,31 @@ export function SelectedDrawingLock() {
   const { controller, state } = useTerminal();
   const [saving, setSaving] = useState(false);
   const drawing = state.drawings.find((item) => item.id === state.selectedObject);
+  const tools = drawingToolbarSettings(state.preferences.chartSettings);
   if (
     !drawing ||
     drawing.visible === false ||
-    drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden ||
+    tools.drawingsHidden ||
     !drawingVisibleOnInterval(drawing.visibility, state.preferences.timeframe)
   )
     return null;
-  const label = drawing.lock ? t("Разблокировать объект") : t("Заблокировать объект");
+  const label = tools.drawingsLocked
+    ? t("Объекты заблокированы глобально. Разблокируйте их в меню.")
+    : drawing.lock
+      ? t("Разблокировать объект")
+      : t("Заблокировать объект");
   return (
     <button
       className="selected-drawing-lock"
       type="button"
       aria-label={label}
       title={label}
-      aria-pressed={!!drawing.lock}
-      disabled={saving}
+      aria-pressed={!!drawing.lock || tools.drawingsLocked}
+      disabled={saving || tools.drawingsLocked}
       onClick={() => {
         setSaving(true);
-        void controller
-          .updateDrawing({ ...drawing, lock: !drawing.lock })
+        void controller.tools
+          .toggleSelectedLock()
           .catch((error: unknown) =>
             controller.notify(
               error instanceof Error ? error.message : t("Не удалось сохранить объект.")
@@ -37,7 +42,7 @@ export function SelectedDrawingLock() {
           .finally(() => setSaving(false));
       }}
     >
-      <LockIcon locked={!!drawing.lock} />
+      <LockIcon locked={!!drawing.lock || tools.drawingsLocked} />
     </button>
   );
 }

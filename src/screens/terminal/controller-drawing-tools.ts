@@ -94,6 +94,35 @@ export class TerminalDrawingTools {
         }
       });
     });
+  toggleSelectedLock = (): Promise<void> => {
+    const selected = this.controller.getSnapshot().selectedObject;
+    const scope = this.scopeKey();
+    if (!selected) return Promise.resolve();
+    return this.enqueue(async () => {
+      if (this.scopeKey() !== scope || this.controller.getSnapshot().selectedObject !== selected)
+        return;
+      this.controller.editing.cancelGesture();
+      const state = this.controller.getSnapshot();
+      if (
+        state.selectedObject !== selected ||
+        drawingToolbarSettings(state.preferences.chartSettings).drawingsLocked
+      )
+        return;
+      const drawing = state.drawings.find((item) => item.id === selected);
+      if (drawing)
+        await this.controller.editing.change({
+          drawings: state.drawings.map((item) =>
+            item.id === selected ? { ...item, lock: !item.lock } : item
+          )
+        });
+      else if (state.images.some((item) => item.id === selected))
+        await this.controller.editing.change({
+          images: state.images.map((item) =>
+            item.id === selected ? { ...item, lock: !item.lock } : item
+          )
+        });
+    });
+  };
   toggleLock = (target?: DrawingTarget): Promise<void> =>
     this.enqueue(async () => {
       this.controller.editing.cancelGesture();
