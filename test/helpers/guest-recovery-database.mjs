@@ -81,7 +81,14 @@ class GuestTransaction {
     if (!this.names.includes(name)) throw new Error("store outside transaction");
     const query = (range, keys, index) => {
       const records = [...this.copy[name]].filter(([key, value]) =>
-        matches(index ? [value.owner, value.symbol] : key, range)
+        matches(
+          index === "seriesDay"
+            ? [value.owner, value.uid, value.timeframe, value.day]
+            : index
+              ? [value.owner, value.symbol]
+              : key,
+          range
+        )
       );
       if (!keys)
         this.database.reads.push(
@@ -101,7 +108,7 @@ class GuestTransaction {
       getAll: (range) => this.request(name, "getAll", () => query(range, false)),
       getAllKeys: (range) => this.request(name, "getAllKeys", () => query(range, true)),
       index: (index) => {
-        if (index !== "ownerSymbol") throw new Error("unsupported index");
+        if (index !== "ownerSymbol" && index !== "seriesDay") throw new Error("unsupported index");
         return {
           getAll: (range) => this.request(name, "getAll", () => query(range, false, index)),
           getAllKeys: (range) => this.request(name, "getAllKeys", () => query(range, true, index))

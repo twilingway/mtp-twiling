@@ -1,0 +1,70 @@
+.cloud-sync-settings {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.cloud-sync-settings > p {
+  margin: 0;
+  color: var(--muted, #9ca9ba);
+}
+.cloud-provider-card {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border, #334155);
+  border-radius: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cloud-provider-card h3,
+.cloud-provider-card p {
+  margin: 0;
+}
+.cloud-provider-card small,
+.cloud-operation-progress,
+.cloud-google-details label {
+  display: block;
+}
+.cloud-provider-card button,
+.cloud-provider-card select {
+  min-height: 44px;
+}
+.cloud-provider-card .drive-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.cloud-provider-card .drive-actions > button {
+  flex: 1 1 150px;
+  white-space: normal;
+}
+.cloud-provider-card .checkbox-label {
+  min-height: 44px;
+  align-items: center;
+}
+.cloud-operation-progress progress {
+  width: 100%;
+}
+.cloud-google-details {
+  border-top: 1px solid var(--border, #334155);
+  padding-top: 10px;
+}
+.cloud-google-details summary {
+  min-height: 44px;
+  cursor: pointer;
+}
+.cloud-google-details[open] > * + * {
+  margin-top: 10px;
+}
+.cloud-google-details input[type="file"],
+.cloud-google-details select {
+  max-width: 100%;
+}
+@media (max-width: 600px) {
+  .cloud-provider-card {
+    padding: 12px;
+  }
+  .cloud-provider-card .drive-actions > button {
+    flex-basis: 100%;
+  }
+}

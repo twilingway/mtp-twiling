@@ -5,6 +5,7 @@ import { errorMessages } from "./messages-errors.js";
 import { intervalMessages } from "./messages-intervals.js";
 import { driveMessages } from "./messages-drive.js";
 import { accountMessages } from "./messages-account.js";
+import { cloudMessages } from "./messages-cloud.js";
 import { cameraMessages } from "./messages-camera.js";
 import { marketMessages } from "./messages-markets.js";
 import { chartWorkspaceMessages } from "./messages-chart-workspace.js";
@@ -20,6 +21,7 @@ export const english = {
   ...intervalMessages,
   ...driveMessages,
   ...accountMessages,
+  ...cloudMessages,
   ...cameraMessages,
   ...marketMessages,
   ...chartWorkspaceMessages,

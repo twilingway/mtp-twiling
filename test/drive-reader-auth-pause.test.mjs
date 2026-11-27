@@ -202,17 +202,17 @@ test("old owner format failure cannot suspend the new owner's actual restored ha
 
 test("unsupported pause has accurate saved-credential RU/EN copy", () => {
   const source = readFileSync(
-    new URL("../src/screens/terminal/GoogleDriveSettings.tsx", import.meta.url),
+    new URL("../src/screens/terminal/CloudProviderSettings.tsx", import.meta.url),
     "utf8"
   );
   assert.match(
     source,
-    /status.error === "unsupported-format"[\s\S]*?Сохранённый вход Google не удаляется/
+    /status.error === "unsupported-format"[\s\S]*?Сохранённый вход не удаляется/
   );
-  const messages = sourceLoader(root)("i18n/messages-drive.ts").driveMessages;
+  const messages = sourceLoader(root)("i18n/messages-cloud.ts").cloudMessages;
   assert.ok(
     Object.values(messages).includes(
-      "Sync is paused. Saved Google sign-in is retained and its expiry stays unchanged."
+      "Saved sign-in is retained and its original expiry stays unchanged."
     )
   );
 });

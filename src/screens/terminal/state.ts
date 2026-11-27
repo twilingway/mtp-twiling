@@ -137,7 +137,7 @@ export interface TerminalState {
   preview: DrawingDraft | null;
   selectedObject: string | null;
   dialog: TerminalDialog;
-  initialAccountSection?: "drive" | undefined;
+  initialAccountSection?: "drive" | "cloud" | undefined;
   contextMenu: ContextMenu | null;
   objectPanel: boolean;
   toast: string;

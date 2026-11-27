@@ -37,7 +37,7 @@
     <nav><a href="./">mtp.twiling.ru</a> · <a href="#english" lang="en">English</a></nav>
     <h1>Конфиденциальность личного терминала</h1>
     <p>
-      Обновлено: <time datetime="2026-11-26">26 ноября 2026</time>. Эта страница описывает работу
+      Обновлено: <time datetime="2026-11-27">27 ноября 2026</time>. Эта страница описывает работу
       mtp.twiling.ru и его тестового экземпляра mtp-test.twiling.ru.
     </p>
     <section>
@@ -81,16 +81,16 @@
         Данные Google используются для видимой функции переноса и синхронизации. Приложение не
         продаёт их, не использует для рекламы и не отправляет разработчику или другим пользователям.
         К Google применяются его собственные правила обработки данных. Вход Google загружается при
-        открытии раздела аккаунта; соединение с сервисом Google раскрывает Google обычные сетевые
+        включённой синхронизации; соединение с сервисом Google раскрывает Google обычные сетевые
         сведения.
       </p>
       <p>
         Access token Google сохраняется на этом устройстве в зашифрованном локальном vault вместе с
-        исходным сроком действия и разрешениями. Он связан с банковским владельцем и OAuth Client
-        ID; ключ шифрования не экспортируется. После перезагрузки или повторного открытия тот же
-        банковский профиль может восстановить ещё действующий вход без нового окна Google. Срок
-        токена при этом не продлевается: после истечения или отказа Google нужен новый вход по
-        вашему действию. Если сохранить вход не удалось, приложение сообщает об этом.
+        исходным сроком действия и разрешениями. Он связан с выбранным подключением Google и OAuth
+        Client ID; ключ шифрования не экспортируется. После перезагрузки или повторного открытия
+        приложение может восстановить ещё действующий вход без нового окна Google. Срок токена при
+        этом не продлевается: после истечения или отказа Google нужен новый вход по вашему действию.
+        Если сохранить вход не удалось, приложение сообщает об этом.
       </p>
       <p>
         Автоматическая синхронизация работает, пока приложение открыто, вход действителен и Google
@@ -99,11 +99,29 @@
       </p>
     </section>
     <section>
+      <h2>Необязательная синхронизация Яндекс Диска</h2>
+      <p>
+        Яндекс подключается отдельно от Google и банковского ключа. По вашему действию приложение
+        запрашивает только <code>cloud_api:disk.app_folder</code>, доступ к собственной папке
+        приложения. В неё передаются те же поддерживаемые настройки, инструменты, рисунки,
+        изображения и сохранённые виды. Полное расположение всех окон пока не переносится.
+        Банковский ключ, история свечей, текущие цены и токены в снимки не включаются.
+      </p>
+      <p>
+        Вход использует PKCE и публичный Client ID без client secret. Токен хранится зашифрованным
+        на устройстве с исходным сроком действия. Идентификатор подключённого аккаунта используется
+        локально для проверки привязки данных к нужному входу. Истечение или отказ в доступе требует
+        вашего повторного входа; банковский вход и другое облако сохраняются. HTTPS-запросы идут
+        напрямую в сервисы Яндекса, которым доступны обычные сведения о соединении. Облачные снимки
+        не шифруются дополнительно приложением. Снимки версий и неразрешённые ветви сохраняются;
+        приложение не обещает ровно два физических файла и не удаляет их автоматически.
+      </p>
       <h2>Управление и удаление</h2>
       <p>
-        Кнопка «Отключить Google Диск» останавливает обмен и удаляет токен из памяти и локального
-        vault, сохраняя локальные и облачные данные. Выход из банковского профиля также удаляет
-        сохранённый вход Google этого владельца. Отозвать разрешение можно в
+        Переключатель синхронизации каждого облака останавливает только его обмен, сохраняя вход и
+        снимки. Кнопка «Отключить и удалить вход» удаляет токен выбранного облака из памяти и
+        локального vault, сохраняя локальные и облачные данные. Выход из банка удаляет только
+        банковский ключ и не отключает Google или Яндекс. Отозвать разрешение Google можно в
         <a href="https://myaccount.google.com/connections">подключениях аккаунта Google</a>. Для
         удаления скрытых данных откройте Google Drive → Настройки → Управление приложениями →
         mtp.twiling.ru → параметры удаления скрытых данных. Названия могут зависеть от языка Google;
@@ -154,27 +172,45 @@
       <p>
         Google data is used for the visible transfer and sync feature. The app does not sell it, use
         it for advertising, or send it to the developer or other users. Google's own policies apply
-        to its services. Google sign-in loads when you open account settings; Google receives
-        ordinary connection information.
+        to its services. Google sign-in loads only while sync is enabled; Google receives ordinary
+        connection information.
       </p>
       <p>
         The Google access token is encrypted in this device's local vault together with its original
-        expiry and granted scopes, bound to the bank owner and OAuth Client ID. The encryption key
-        is non-extractable. Reloading or reopening can restore a still-valid token after the same
-        bank profile authenticates, without another Google window. Restoration does not extend its
-        lifetime. Expiry or Google's rejection requires a new sign-in initiated by you. If saving
-        sign-in fails, the app reports it.
+        expiry and granted scopes, bound to the selected Google connection and OAuth Client ID. The
+        encryption key is non-extractable. Reloading or reopening can restore a still-valid token
+        without another Google window. Restoration does not extend its lifetime. Expiry or Google's
+        rejection requires a new sign-in initiated by you. If saving sign-in fails, the app reports
+        it.
       </p>
       <p>
         Automatic sync runs while the app is open, authorized and able to reach Google. During a
         pause, edits stay local and are not marked as synchronized. Conflicts require your choice.
         Old cloud snapshots remain and consume storage.
       </p>
+      <h2>Optional Yandex Disk sync</h2>
+      <p>
+        Yandex connects separately from Google and the bank. At your request, the app asks only for
+        <code>cloud_api:disk.app_folder</code>, access to its own application folder. It sends the
+        same supported settings, instruments, drawings, images and saved chart views. The full
+        multiwindow layout is not transferred yet. Bank keys, candle history, live prices and
+        authorization tokens are excluded from snapshots.
+      </p>
+      <p>
+        Sign-in uses PKCE and a public Client ID without a client secret. The token is encrypted
+        locally with its original expiry. The account identifier is used locally to bind data to the
+        correct connection. Expiry or rejected access requires a new sign-in initiated by you; the
+        bank and other cloud stay connected. HTTPS requests go directly to Yandex, which receives
+        normal connection information. The app adds no cloud snapshot encryption. Version snapshots
+        and unresolved branches are retained. The app does not promise exactly two physical files
+        and does not delete them automatically.
+      </p>
       <h2>Control and deletion</h2>
       <p>
-        “Disconnect Google Drive” stops sync and deletes the memory and local vault token, retaining
-        local/cloud data. Bank logout also removes that owner's saved Google sign-in. Revoke
-        permission in
+        Each cloud's sync switch stops its own transfers while retaining sign-in and snapshots.
+        “Disconnect and remove saved sign-in” removes only that cloud's token from memory and the
+        local vault, retaining local/cloud data. Bank logout deletes only the bank key and does not
+        disconnect Google or Yandex. Revoke Google permission in
         <a href="https://myaccount.google.com/connections">Google Account connections</a>. Delete
         hidden data in Google Drive → Settings → Manage apps → mtp.twiling.ru → hidden app data
         options; see

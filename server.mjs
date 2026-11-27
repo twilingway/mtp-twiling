@@ -33,7 +33,7 @@ const server = createServer(async (req, res) => {
   res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
   res.setHeader(
     "Content-Security-Policy",
-    "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; frame-src https://accounts.google.com/gsi/; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://invest-brands.cdn-tinkoff.ru; connect-src 'self' https://api.bybit.com wss://stream.bybit.com https://openapi.okx.com wss://ws.okx.com https://invest-public-api.tbank.ru wss://invest-public-api.tbank.ru https://accounts.google.com/gsi/ https://www.googleapis.com; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+    "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; frame-src https://accounts.google.com/gsi/; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://invest-brands.cdn-tinkoff.ru; connect-src 'self' https://api.bybit.com wss://stream.bybit.com https://openapi.okx.com wss://ws.okx.com https://invest-public-api.tbank.ru wss://invest-public-api.tbank.ru https://accounts.google.com/gsi/ https://www.googleapis.com https://oauth.yandex.ru https://login.yandex.ru https://cloud-api.yandex.net https://*.dst.yandex.net https://*.disk.yandex.net https://downloader.dst.yandex.ru https://downloader.disk.yandex.ru https://*.storage.yandex.net; worker-src 'self'; manifest-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
   );
   res.setHeader("Cache-Control", "no-cache");
   if (!["GET", "HEAD"].includes(req.method)) {

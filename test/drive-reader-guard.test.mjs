@@ -555,12 +555,12 @@ test("format-only guard leaves image byte integrity to actual download", async (
 });
 test("actionable unsupported RU/EN copy uses the existing error UI and disables automatic control", () => {
   const ui = readFileSync(
-    new URL("../src/screens/terminal/GoogleDriveSettings.tsx", import.meta.url),
+    new URL("../src/screens/terminal/CloudProviderSettings.tsx", import.meta.url),
     "utf8"
   );
   assert.match(ui, /"unsupported-format":/);
   assert.match(ui, /status.error === "unsupported-format"/);
-  const messages = load("i18n/messages-drive.ts").driveMessages;
+  const messages = load("i18n/messages-cloud.ts").cloudMessages;
   assert.ok(
     Object.values(messages).some(
       (message) => message.includes("Update the app") && message.includes("Data is retained")

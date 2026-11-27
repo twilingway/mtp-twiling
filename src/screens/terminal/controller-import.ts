@@ -142,7 +142,20 @@ export async function importTerminalBackup(
       }
       throw error;
     }
-    if (!valid()) return;
+    try {
+      options.onCommitted?.();
+    } catch (error) {
+      bridge.editing.reset();
+      invalidateImportedView(bridge, true);
+      throw error;
+    }
+    if (!valid()) {
+      if (owner === bridge.getState().owner) {
+        bridge.editing.reset();
+        invalidateImportedView(bridge, true);
+      }
+      return;
+    }
     try {
       assertImportCurrent(options.valid);
     } catch (error) {
@@ -150,7 +163,6 @@ export async function importTerminalBackup(
       invalidateImportedView(bridge, true);
       throw error;
     }
-    options.onCommitted?.();
     // Commit succeeded: invalidate all old/newborn canvas work before any next await.
     bridge.editing.reset();
     invalidateImportedView(bridge, false);

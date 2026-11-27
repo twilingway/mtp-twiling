@@ -91,7 +91,8 @@ export async function loadStatic(publicDir, outdir) {
   const files = new Map();
   for (const name of inputs.keys()) {
     let contents = await readFile(join(publicDir, name));
-    if (name === "index.html") contents = Buffer.from(devHtml(contents.toString("utf8")));
+    if (name === "index.html" || name === "yandex-callback.html")
+      contents = Buffer.from(devHtml(contents.toString("utf8")));
     files.set(name, contents);
     const output = join(outdir, name);
     await mkdir(dirname(output), { recursive: true });

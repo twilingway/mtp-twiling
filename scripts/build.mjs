@@ -3,6 +3,7 @@ import { join, dirname, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import { prepareVersion } from "./prepare-version.mjs";
+import { cloudPublicDefines } from "./cloud-public-env.mjs";
 import {
   browserBuildOptions,
   browserEntryPoints,
@@ -71,7 +72,7 @@ const result = await build({
   splitting: true,
   format: "esm",
   chunkNames: "assets/[name]-[hash]",
-  define: { "process.env.NODE_ENV": '"production"' }
+  define: { ...cloudPublicDefines(root), "process.env.NODE_ENV": '"production"' }
 });
 const outputs = [
   ...Object.keys(installCapture.metafile.outputs),

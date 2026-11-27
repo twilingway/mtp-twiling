@@ -3,7 +3,8 @@ import { useState } from "react";
 import { useTerminal } from "./context.js";
 import { Modal } from "./Modal.js";
 import { ApplicationInfo } from "./ApplicationInfo.js";
-import { GoogleDriveSettings } from "./GoogleDriveSettings.js";
+import { CloudSyncSettings } from "./CloudSyncSettings.js";
+import { ServiceLinks } from "./ServiceLinks.js";
 import { StoragePanel } from "./StoragePanel.js";
 import { BackupTransferSettings } from "./BackupTransferSettings.js";
 export function AccountDialog() {
@@ -14,8 +15,8 @@ export function AccountDialog() {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [editingKey, setEditingKey] = useState(false),
-    [section, setSection] = useState<"account" | "drive" | "storage" | "transfer">(
-      state.initialAccountSection ?? "account"
+    [section, setSection] = useState<"account" | "cloud" | "storage" | "transfer">(
+      state.initialAccountSection === "drive" ? "cloud" : (state.initialAccountSection ?? "account")
     );
   return (
     <Modal
@@ -27,7 +28,7 @@ export function AccountDialog() {
         {(
           [
             ["account", "Подключение"],
-            ["drive", "Google Диск"],
+            ["cloud", "Облако"],
             ["storage", "История"],
             ["transfer", "Импорт и экспорт"]
           ] as const
@@ -179,8 +180,8 @@ export function AccountDialog() {
         )}
         <ApplicationInfo />
       </div>
-      <div className="account-section" id="account-section-drive" hidden={section !== "drive"}>
-        <GoogleDriveSettings />
+      <div className="account-section" id="account-section-cloud" hidden={section !== "cloud"}>
+        {section === "cloud" && <CloudSyncSettings />}
       </div>
       <div className="account-section" id="account-section-storage" hidden={section !== "storage"}>
         {section === "storage" && <StoragePanel key={state.owner} />}
@@ -192,24 +193,8 @@ export function AccountDialog() {
       >
         <BackupTransferSettings active={section === "transfer"} />
       </div>
-      <div className="account-help-links">
-        <button type="button" id="open-welcome" onClick={() => controller.setDialog("welcome")}>
-          {t("Помощь и первый запуск")}
-        </button>
-        <a
-          href="https://github.com/twilingway/mtp-twiling"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          GitHub
-        </a>
-        <a href="./privacy.html" target="_blank" rel="noopener">
-          {t("Политика конфиденциальности")}
-        </a>
-      </div>
-      <span className="dialog-footer">
-        {t("Локальные данные — на устройстве; синхронизация — на личном Google Диске.")}
-      </span>
+      <ServiceLinks onHelp={() => controller.setDialog("welcome")} />
+      <span className="dialog-footer">{t("Ключ банка — на устройстве. Облако — по желанию.")}</span>
     </Modal>
   );
 }

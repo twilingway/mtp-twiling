@@ -17,10 +17,59 @@ interface CameraState {
 const cameras = new WeakMap<object, CameraState>();
 const workspaceCameras = new Set<WeakRef<TerminalController>>();
 const registeredCameras = new WeakSet<TerminalController>();
+const cameraControllers = new WeakMap<object, TerminalController>();
+const workspaceListeners = new Set<{
+  root: TerminalController;
+  listener: (kind: Change) => void;
+}>();
 function registerCamera(controller: TerminalController): void {
   if (registeredCameras.has(controller)) return;
   registeredCameras.add(controller);
+  cameraControllers.set(controller, controller);
   workspaceCameras.add(new WeakRef(controller));
+}
+function sameWorkspace(root: TerminalController, source: TerminalController): boolean {
+  return (
+    root.getSnapshot().owner === source.getSnapshot().owner &&
+    root.sessionKey() === source.sessionKey()
+  );
+}
+function emitCamera(controller: object, kind: Change): void {
+  cameraState(controller).listeners.forEach((listener) => listener(kind));
+  emitWorkspaceCamera(controller, kind);
+}
+function emitWorkspaceCamera(controller: object, kind: Change): void {
+  const source = cameraControllers.get(controller);
+  if (source)
+    workspaceListeners.forEach(({ root, listener }) => {
+      if (sameWorkspace(root, source)) listener(kind);
+    });
+}
+export function subscribeWorkspaceCamera(
+  root: TerminalController,
+  listener: (kind: Change) => void
+): () => void {
+  registerCamera(root);
+  const entry = { root, listener };
+  workspaceListeners.add(entry);
+  return () => {
+    workspaceListeners.delete(entry);
+  };
+}
+export function workspaceCameraPending(root: TerminalController): boolean {
+  for (const reference of workspaceCameras) {
+    const candidate = reference.deref();
+    if (candidate && sameWorkspace(root, candidate) && cameraPending(candidate)) return true;
+  }
+  return false;
+}
+export async function flushWorkspaceCamera(root: TerminalController): Promise<void> {
+  const writes: Promise<void>[] = [];
+  for (const reference of workspaceCameras) {
+    const candidate = reference.deref();
+    if (candidate && sameWorkspace(root, candidate)) writes.push(flushCamera(candidate));
+  }
+  await Promise.all(writes);
 }
 
 /** Capture every visible slot synchronously before a market transition can retire its canvas. */
@@ -55,11 +104,47 @@ function cameraState(controller: object): CameraState {
 export function fenceCameraWrites(controller: object): () => void {
   const state = cameraState(controller),
     revision = ++state.writeRevision,
-    pending = state.pending;
+    pending = state.pending,
+    source = cameraControllers.get(controller),
+    snapshot = source?.getSnapshot(),
+    owner = snapshot?.owner,
+    client = source?.sessionKey(),
+    cloudSession = source?.cloudSessionKey(),
+    document = snapshot && selectedMarketRow(snapshot.rows, snapshot.preferences),
+    key = snapshot && viewKey(snapshot.preferences),
+    chartRevision = snapshot?.chartRevision;
+  let completed = false;
   return () => {
-    if (state.writeRevision !== revision || !pending || state.pending !== pending) return;
-    state.pending = undefined;
-    if (pending.current()) state.listeners.forEach((listener) => listener("change"));
+    if (completed) return;
+    completed = true;
+    if (state.writeRevision !== revision || !pending || state.sequence !== pending.sequence) return;
+    const retained = state.pending === pending;
+    if (retained) state.pending = undefined;
+    if (retained && pending.current()) {
+      emitCamera(controller, "change");
+      return;
+    }
+    const current = source?.getSnapshot(),
+      selected = current && selectedMarketRow(current.rows, current.preferences);
+    // A bank transition can retire callbacks while this exact camera write commits.
+    if (
+      source &&
+      client &&
+      cloudSession &&
+      current?.profileTransition &&
+      !state.pending &&
+      !current.importingBackup &&
+      !current.importRecoveryRequired &&
+      !current.workspaceMigrationIncomplete &&
+      current.owner === owner &&
+      source.sessionKey() === client &&
+      source.cloudSessionKey() === cloudSession &&
+      current.chartRevision === chartRevision &&
+      viewKey(current.preferences) === key &&
+      selected?.uid === document?.uid &&
+      selected?.symbol === document?.symbol
+    )
+      emitWorkspaceCamera(controller, "change");
   };
 }
 export function cameraPending(controller: TerminalController): boolean {
@@ -117,7 +202,7 @@ export function cameraCallbacks(
       controller.sessionKey() === session &&
       controller.getSnapshot().chartRevision === revision &&
       cameraCurrent(controller, chart()),
-    emit = (kind: Change) => state.listeners.forEach((listener) => listener(kind));
+    emit = (kind: Change) => emitCamera(controller, kind);
   let failed = false;
   const scope = Symbol("camera");
   return {

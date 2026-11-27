@@ -200,7 +200,7 @@ export class TerminalController {
     await flushWorkspaceAnnotations(this.state.owner);
     await flushCamera(this);
     if (options.captureView !== false) await this.saveView();
-    if (client) await this.savePreferences();
+    if (client && !this.state.importRecoveryRequired) await this.savePreferences();
     await client?.flush();
     await storage.flush();
   };

@@ -268,8 +268,9 @@ export class TerminalSession {
       const target = binding.owner;
       await candidate.start();
       if (!attempt()) throw cancelled();
+      const recoveringImport = !!this.bridge.getState().importRecoveryRequired;
       const preferences =
-        this.bridge.getState().owner === target
+        this.bridge.getState().owner === target && !recoveringImport
           ? this.bridge.getState().preferences
           : await this.readProfilePreferences(target, name, attempt);
       if (!attempt()) throw cancelled();
@@ -290,6 +291,7 @@ export class TerminalSession {
         name,
         loading: false,
         workspaceMigrationIncomplete: false,
+        ...(recoveringImport ? { importRecoveryRequired: false, historyViewReady: false } : {}),
         pendingPublicSource: null
       });
       if (!valid()) throw cancelled();

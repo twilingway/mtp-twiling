@@ -116,6 +116,7 @@ function fixture(restored = null) {
     saved,
     binding,
     rows,
+    storage,
     state: () => state
   };
 }
@@ -503,4 +504,37 @@ test("superseded API activation cannot adopt its client or re-pause the survivin
     gate.resolve();
     f.session.dispose();
   }
+});
+
+test("bank adoption after a committed cloud import reloads canonical preferences before clearing recovery", async () => {
+  const f = fixture();
+  try {
+    await f.session.start();
+    const committed = { ...f.state().preferences, engine: "tradingview", rangeDays: 90, chartSettings: { grid: true } };
+    f.session.bridge.settleTransfers = async () => {
+      f.storage.loadPreferences = async () => committed;
+      f.session.bridge.update({ importRecoveryRequired: true });
+    };
+    await f.session.login(token, "Bank", false);
+    assert.equal(f.state().preferences.engine, "tradingview");
+    assert.equal(f.state().preferences.rangeDays, 90);
+    assert.equal(f.state().preferences.chartSettings.grid, true);
+    assert.equal(f.state().importRecoveryRequired, false);
+    assert.equal(f.session.workspaceBinding.cloudOwner, "legacy-google");
+  } finally { f.session.dispose(); }
+});
+
+test("a recovery flush never writes old visible preferences over a committed import", async () => {
+  const writes = [];
+  const load = flowModules({
+    "services/storage-v2.ts": { savePreferences: async (...args) => writes.push(args), flush: async () => {} },
+    "services/storage-db.ts": {},
+    "screens/terminal/workspace-annotations.ts": { flushWorkspaceAnnotations: async () => {} }
+  });
+  const { TerminalController } = load("screens/terminal/controller.ts");
+  const controller = new TerminalController();
+  controller.session.client = { flush: async () => {}, close: async () => {} };
+  controller.update({ owner: "device", importRecoveryRequired: true });
+  try { await controller.flush(); assert.deepEqual(writes, []); }
+  finally { controller.dispose(); }
 });
