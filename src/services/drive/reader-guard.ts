@@ -97,6 +97,42 @@ export function assertReadableDrivePayload(value: unknown): Backup {
   assertNoDiscardedFields(value, projected);
   return projected;
 }
+
+const localQuoteFields = new Set([
+  "price",
+  "previousClose",
+  "previousCloseDay",
+  "previousCloseSource",
+  "closeTime",
+  "time",
+  "change",
+  "changePercent",
+  "availability",
+  "note"
+]);
+
+function omitLocalFields(value: object, fields: ReadonlySet<string>) {
+  return Object.fromEntries(
+    Object.keys(value)
+      .filter((key) => !fields.has(key))
+      .map((key) => [key, ownData(value, key)])
+  );
+}
+
+/** Only storage metadata and transient quote fields may be stripped from a local capture. */
+export function sanitizeLocalDriveBackup(value: unknown): Backup {
+  if (!isRecord(value)) return assertReadableDrivePayload(value);
+  const history = ownData(value, "history");
+  if (history !== undefined && (!Array.isArray(history) || history.length !== 0))
+    throw unsupportedDriveFormat();
+  const local = omitLocalFields(value, new Set(["owner", "history"]));
+  if (Array.isArray(local.watchlist))
+    local.watchlist = local.watchlist.map((row: unknown) =>
+      isRecord(row) ? omitLocalFields(row, localQuoteFields) : row
+    );
+  return assertReadableDrivePayload(local);
+}
+
 function assertNoDiscardedFields(raw: unknown, projected: unknown): void {
   if (Array.isArray(raw) && Array.isArray(projected)) {
     raw.forEach((item, index) => assertNoDiscardedFields(item, projected[index]));

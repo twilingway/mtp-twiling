@@ -1,12 +1,12 @@
-import { get, put } from "../storage-db.js";
+import { get, put, transaction } from "../storage-db.js";
 import { isRecord } from "../../model/backup-format.js";
 import { uuidPattern, shaPattern } from "./backup.js";
 import type { DriveRecord } from "./coordinator-types.js";
 import { unsupportedDriveFormat } from "./reader-guard.js";
 import { DriveError } from "./types.js";
+import { readOrCreateDriveDeviceId } from "./device-slot-identity.js";
 
-export async function loadDriveRecord(owner: string): Promise<DriveRecord> {
-  const value = await get("preferences", `drive-v2:${owner}`);
+function readDriveRecord(value: unknown): DriveRecord {
   if (isRecord(value) && isRecord(value.value)) {
     const record = value.value;
     const fields = [
@@ -50,24 +50,43 @@ export async function loadDriveRecord(owner: string): Promise<DriveRecord> {
       };
     }
   }
-  if (value !== undefined)
-    throw new DriveError("remote-invalid", "Invalid local Drive association; data is retained.");
-  const device = await get("preferences", "drive-device"),
-    deviceId =
-      isRecord(device) && typeof device.value === "string" && uuidPattern.test(device.value)
-        ? device.value
-        : crypto.randomUUID();
-  await put("preferences", { id: "drive-device", value: deviceId });
-  const record: DriveRecord = {
-    schemaVersion: 1,
-    markerId: crypto.randomUUID(),
-    deviceId,
-    baseHeads: [],
-    automatic: true
-  };
-  await saveDriveRecord(owner, record);
-  return record;
+  throw new DriveError("remote-invalid", "Invalid local Drive association; data is retained.");
+}
+
+export async function loadDriveRecord(owner: string): Promise<DriveRecord> {
+  const id = `drive-v2:${owner}`;
+  const existing = await get("preferences", id);
+  if (existing !== undefined) return readDriveRecord(existing);
+
+  let current: unknown;
+  let created: DriveRecord | undefined;
+  await transaction(["preferences"], (tx) => {
+    const store = tx.objectStore("preferences");
+    const association = store.get(id);
+    association.onsuccess = () => {
+      current = association.result;
+      if (current !== undefined) return;
+      readOrCreateDriveDeviceId(store, (deviceId) => {
+        created = {
+          schemaVersion: 1,
+          markerId: crypto.randomUUID(),
+          deviceId,
+          baseHeads: [],
+          automatic: true
+        };
+        store.put({ id, owner, value: created });
+      });
+    };
+  });
+  return created ?? readDriveRecord(current);
 }
 export function saveDriveRecord(owner: string, record: DriveRecord): Promise<void> {
   return put("preferences", { id: `drive-v2:${owner}`, owner, value: record });
+}
+
+export async function hasDriveHistory(owner: string): Promise<boolean> {
+  const stored = await get("preferences", `drive-v2:${owner}`);
+  if (stored === undefined) return false;
+  const record = readDriveRecord(stored);
+  return record.baseHeads.length > 0 || !!(record.lastSyncedAt || record.lastSyncedDigest);
 }

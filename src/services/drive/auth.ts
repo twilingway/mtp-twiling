@@ -231,6 +231,12 @@ export class DriveAuth {
     pending?.reject(new DriveError("auth-cancelled", "Google Диск приостановлен."));
   }
 
+  /** Stop this lease and forget only its owner's saved credential. */
+  async forgetOwner(owner: string): Promise<void> {
+    this.suspend();
+    await this.vault.remove(owner, DRIVE_CLIENT_ID);
+  }
+
   /** revoke=true is reserved for a separate explicit user action. */
   async disconnect(revoke = false): Promise<void> {
     const token = this.credential?.token,
