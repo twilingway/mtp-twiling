@@ -394,7 +394,7 @@ header.topbar {
   .topbar .toolbar-scroll .terminal-brand-menu {
     flex-basis: var(--mobile-toolbar-hit);
     width: var(--mobile-toolbar-hit);
-    inset-inline-start: var(--mobile-avatar-inset);
+    inset-inline-start: 0;
     box-shadow: calc(0px - var(--mobile-avatar-inset)) 0 0 var(--surface, #131722);
   }
   .topbar .toolbar-scroll :is(.brand.account-button, .account-button .avatar) {
