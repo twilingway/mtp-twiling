@@ -18,7 +18,7 @@ import { calendarAxisDisplay } from "../i18n/calendar-axis.js";
 import { lightweightNavigation } from "./lightweight-navigation.js";
 import { UserCameraEvents } from "./camera-events.js";
 import { lightweightLegacy } from "./lightweight-legacy.js";
-import { observeWorkspaceTouchScroll } from "./workspace-touch.js";
+import { observeLightweightTouchScroll } from "./workspace-touch.js";
 import { lightweightTechnical } from "./lightweight-technical.js";
 import { lightweightDrawingX } from "./lightweight-drawing-projection.js";
 import { lightweightBarTime as time, lightweightMainSeries } from "./lightweight-main-series.js";
@@ -97,9 +97,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       timeFormatter: dateFormatters.timeFormatter
     }
   });
-  const stopTouchScroll = observeWorkspaceTouchScroll(container, (vertTouchDrag) =>
-    chart.applyOptions({ handleScroll: { vertTouchDrag } })
-  );
+  const stopTouchScroll = observeLightweightTouchScroll(container, chart);
   const main = lightweightMainSeries(chart, settings, priceFormat);
   const { series } = main;
   const axisLabels = lightweightAxisLabels(

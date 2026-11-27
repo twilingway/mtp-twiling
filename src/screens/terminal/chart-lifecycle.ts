@@ -189,7 +189,11 @@ export function useChartCanvas(
             project,
             width,
             height,
-            current.selectedObject
+            current.selectedObject,
+            container.closest<HTMLElement>(".chart-body")?.dataset.drawingTouch === "true" ||
+              window.matchMedia?.("(pointer: coarse)").matches
+              ? 13
+              : 5
           );
           if (layer === "front") drawingProjection?.dispatchEvent(new Event("change"));
         }

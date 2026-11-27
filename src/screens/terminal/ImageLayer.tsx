@@ -1,10 +1,11 @@
 import { t } from "../../i18n/messages.js";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { ImageAsset, PixelPoint } from "../../model/types.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { useTerminal } from "./context.js";
 import { bindImageProjection } from "./drawing-projection.js";
+import { createDrawingContextSource } from "./chart-drawing-touch.js";
 function ImageAnnotation({
   asset,
   drawingProjection
@@ -15,6 +16,7 @@ function ImageAnnotation({
   const { controller } = useTerminal(),
     [url, setUrl] = useState(""),
     root = useRef<HTMLDivElement>(null),
+    contextSource = useMemo(createDrawingContextSource, []),
     point = useRef<PixelPoint | null>(null),
     drag = useRef<{
       x: number;
@@ -29,6 +31,7 @@ function ImageAnnotation({
     } | null>(null);
   const value = asset;
   const cancel = (event: ReactPointerEvent<HTMLDivElement>) => {
+    contextSource.up(event);
     if (!drag.current) return;
     drag.current = null;
     controller.editing.cancelGesture();
@@ -66,6 +69,7 @@ function ImageAnnotation({
       onContextMenu={(event) => {
         event.preventDefault();
         event.stopPropagation();
+        if (contextSource.suppress(event.nativeEvent)) return;
         controller.selectObject(asset.id);
         controller.setContext({
           x: event.clientX,
@@ -74,6 +78,7 @@ function ImageAnnotation({
         });
       }}
       onPointerDown={(event) => {
+        contextSource.down(event, true);
         if (
           event.button !== 0 ||
           (event.target instanceof Element && event.target.closest("button"))
@@ -144,6 +149,7 @@ function ImageAnnotation({
         });
       }}
       onPointerUp={(event) => {
+        contextSource.up(event);
         const active = drag.current;
         if (!active) return;
         event.preventDefault();
