@@ -11,6 +11,7 @@ import {
 import type { DeviceSlotCheckpoint, DeviceSlotScope } from "./device-slot-model.js";
 import type { DeviceSlotPendingWrite } from "./device-slot-store.js";
 import { DriveError } from "./types.js";
+import { GOOGLE_SLOT_EXPLICIT_OWNER } from "./workspace-binding.js";
 
 export interface PendingSlotRecord {
   readonly write: DeviceSlotPendingWrite;
@@ -21,6 +22,7 @@ export interface DeviceSlotRecord {
   readonly generation: number;
   readonly enabled?: boolean | undefined;
   readonly explicitGoogleCredential?: string | undefined;
+  readonly activeGoogleSlotOwner?: string | undefined;
   readonly automatic: boolean;
   readonly mode: DriveSlotMode;
   readonly scope?: DeviceSlotScope | undefined;
@@ -102,6 +104,12 @@ function parse(value: unknown, fallback: DriveSlotMode): DeviceSlotRecord {
     (record.explicitGoogleCredential !== undefined &&
       (typeof record.explicitGoogleCredential !== "string" ||
         !uuidPattern.test(record.explicitGoogleCredential))) ||
+    (record.activeGoogleSlotOwner !== undefined &&
+      (typeof record.activeGoogleSlotOwner !== "string" ||
+        !record.activeGoogleSlotOwner.startsWith(`${GOOGLE_SLOT_EXPLICIT_OWNER}:`) ||
+        !uuidPattern.test(
+          record.activeGoogleSlotOwner.slice(GOOGLE_SLOT_EXPLICIT_OWNER.length + 1)
+        ))) ||
     (record.mode !== "normal" && record.mode !== "test") ||
     !Array.isArray(record.baseHeads) ||
     record.baseHeads.length > 256 ||
@@ -127,6 +135,7 @@ function parse(value: unknown, fallback: DriveSlotMode): DeviceSlotRecord {
     generation: Number(record.generation),
     enabled: record.enabled,
     explicitGoogleCredential: record.explicitGoogleCredential,
+    activeGoogleSlotOwner: record.activeGoogleSlotOwner,
     automatic: record.automatic,
     mode: record.mode,
     scope,

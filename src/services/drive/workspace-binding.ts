@@ -44,9 +44,12 @@ export function driveWorkspaceBinding(binding: DeviceWorkspaceBinding | undefine
 }
 
 /** The explicit namespace uses separators excluded by the legacy owner grammar. */
+export const GOOGLE_SLOT_EXPLICIT_OWNER = "device:drive-slot:explicit";
+export const GOOGLE_SLOT_ACTIVE_OWNER = `${GOOGLE_SLOT_EXPLICIT_OWNER}:active`;
+
 export function googleSlotStorageOwner(scope: {
   cloudOwner: string;
   associationConflict: boolean;
 }) {
-  return scope.associationConflict ? "device:drive-slot:explicit" : scope.cloudOwner;
+  return scope.associationConflict ? GOOGLE_SLOT_EXPLICIT_OWNER : scope.cloudOwner;
 }

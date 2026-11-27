@@ -22,6 +22,26 @@ export interface GoogleStatus extends CloudSyncStatus {
   archive?: GoogleArchiveStatus;
 }
 
+export type GoogleTransientStatusKey =
+  | "error"
+  | "pauseReason"
+  | "conflict"
+  | "archive"
+  | "progress"
+  | "driveProgress"
+  | "choiceAction"
+  | "lastSyncedAt"
+  | "previousVersions"
+  | "migrationRequired";
+
+export const replacedGoogleAccountStatusKeys = [
+  "conflict",
+  "choiceAction",
+  "lastSyncedAt",
+  "previousVersions",
+  "migrationRequired"
+] satisfies GoogleTransientStatusKey[];
+
 export const stageNames: Record<DriveStage, CloudProgress["stage"]> = {
   "collect-local": "validate",
   "read-versions": "inspect",
