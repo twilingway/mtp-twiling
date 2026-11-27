@@ -113,6 +113,14 @@ function fixture(t, mobile) {
 
 test("mobile timeframe tap opens a full-width modal sheet and preserves interval/favorite actions", (t) => {
   const f = fixture(t, true);
+  const trigger = find(f.tree, (node) => node.props?.className === "interval-menu-trigger");
+  assert.equal(trigger.props.children.type, "svg");
+  assert.equal(trigger.props.children.props.width, "20");
+  assert.match(trigger.props["aria-label"], /День$/);
+  assert.equal(
+    find(f.tree, (node) => node.props?.["data-interval-favorite"] === "1d").props["aria-pressed"],
+    true
+  );
   const dialog = find(f.tree, (node) => node.props?.role === "dialog");
   assert.equal(dialog.props["aria-modal"], true);
   assert.equal(dialog.props["data-mobile-sheet"], true);

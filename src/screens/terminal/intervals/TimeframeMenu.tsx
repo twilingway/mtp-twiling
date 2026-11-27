@@ -211,12 +211,20 @@ export function TimeframeMenu({
           }
         }}
       >
-        <span>
-          <IntervalBadgeLabel item={selected} />
-        </span>
-        <span className="interval-menu-chevron" aria-hidden="true">
-          ⌄
-        </span>
+        <svg
+          className="interval-menu-chevron"
+          viewBox="0 0 20 20"
+          aria-hidden="true"
+          width="20"
+          height="20"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.75"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="m4 7 6 6 6-6" />
+        </svg>
       </button>
       {open
         ? createPortal(

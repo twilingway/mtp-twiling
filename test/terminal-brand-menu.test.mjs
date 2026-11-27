@@ -149,7 +149,13 @@ test("toolbar keeps ticker search and installation inside the single account men
   const logo = find(toolbar, (node) => node.type === f.TerminalBrandMenu);
   assert.equal(logo.props.account, f.account);
   assert.equal(logo.props.editor, f.controller);
-  assert.equal(logo.props.children.props.id, "install-actions");
+  for (const open of [false, true]) {
+    const content = logo.props.children(() => {}, open);
+    assert.equal(
+      find(content, (node) => node.props.id === "install-actions").props.id,
+      "install-actions"
+    );
+  }
   assert.equal(
     find(toolbar, (node) => node.props.id === "engine"),
     null

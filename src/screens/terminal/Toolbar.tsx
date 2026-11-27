@@ -1,5 +1,4 @@
 import { ToolbarScroll } from "./ToolbarScroll.js";
-import { chartLayout } from "../../model/chart-workspace-layout.js";
 import { t } from "../../i18n/messages.js";
 import { useTerminal, useTerminalState } from "./context.js";
 import { selectControlsState, selectToolbarState } from "./terminal-state-selection.js";
@@ -41,20 +40,42 @@ export function Toolbar({
     <header className="topbar">
       <ToolbarScroll>
         <TerminalBrandMenu account={account} accountState={accountState} editor={controller}>
-          <div id="install-actions" className="install-actions" hidden>
-            <button type="button" id="install-app" className="install-button">
-              {t("Установить приложение")}
-            </button>
-            <a
-              className="install-certificate-link"
-              href="./android-certificate.html"
-              target="_blank"
-              rel="noopener"
-              aria-label={t("Сертификат Т‑Банка на Android")}
-            >
-              {t("Сертификат Т‑Банка")}
-            </a>
-          </div>
+          {(close, open) => (
+            <>
+              {open && (
+                <MobileChartTools
+                  controller={account}
+                  panelOpen={
+                    !!accountState.mobilePanelOpen && !accountState.preferences.rightPanelCollapsed
+                  }
+                  objectsOpen={accountState.objectPanel}
+                  disabled={
+                    !!(
+                      accountState.profileTransition ||
+                      accountState.importingBackup ||
+                      accountState.importRecoveryRequired ||
+                      accountState.backupBusy
+                    )
+                  }
+                  onAction={close}
+                />
+              )}
+              <div id="install-actions" className="install-actions" hidden>
+                <button type="button" id="install-app" className="install-button">
+                  {t("Установить приложение")}
+                </button>
+                <a
+                  className="install-certificate-link"
+                  href="./android-certificate.html"
+                  target="_blank"
+                  rel="noopener"
+                  aria-label={t("Сертификат Т‑Банка на Android")}
+                >
+                  {t("Сертификат Т‑Банка")}
+                </a>
+              </div>
+            </>
+          )}
         </TerminalBrandMenu>
         <div className="divider" />
         <div className="chart-symbol-controls">
@@ -115,17 +136,7 @@ export function Toolbar({
         <div className="divider" />
         <TerminalIndicatorControls />
         {layout && <ChartLayoutPicker {...layout} />}
-        <MobileChartTools
-          controller={account}
-          panelOpen={
-            !!accountState.mobilePanelOpen && !accountState.preferences.rightPanelCollapsed
-          }
-          objectsOpen={accountState.objectPanel}
-          count={chartLayout(layout?.layoutId)?.count ?? 1}
-          layout={layout}
-        >
-          <TerminalFullscreenControl />
-        </MobileChartTools>
+        <TerminalFullscreenControl />
       </ToolbarScroll>
     </header>
   );

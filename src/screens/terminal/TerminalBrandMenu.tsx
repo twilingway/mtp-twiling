@@ -33,7 +33,7 @@ export function TerminalBrandMenu({
   account: TerminalController;
   accountState: TerminalControlsState;
   editor: TerminalController;
-  children?: ReactNode;
+  children?: ReactNode | ((close: () => void, open: boolean) => ReactNode);
 }) {
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -188,7 +188,7 @@ export function TerminalBrandMenu({
               </div>
             </>
           )}
-          {children}
+          {typeof children === "function" ? children(close, open) : children}
         </div>
       </ToolbarPopover>
     </div>

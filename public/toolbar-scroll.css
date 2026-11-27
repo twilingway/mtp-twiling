@@ -23,6 +23,7 @@ header.topbar {
   overscroll-behavior-x: contain;
   touch-action: pan-x;
   scrollbar-width: none;
+  scroll-padding-inline-start: 44px;
   white-space: nowrap;
 }
 .toolbar-scroll::-webkit-scrollbar {
@@ -110,14 +111,20 @@ header.topbar {
   font-size: 12px;
 }
 .topbar .toolbar-scroll .interval-menu-trigger {
-  flex: 0 0 52px;
-  inline-size: 52px;
-  min-width: 52px;
-  height: 32px;
-  min-height: 32px;
+  flex: 0 0 40px;
+  inline-size: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
   margin: 0;
   padding-inline: 4px;
   font-size: 12px;
+}
+.topbar .toolbar-scroll .interval-menu-chevron {
+  display: block;
+  flex: none;
+  width: 20px;
+  height: 20px;
 }
 .topbar .toolbar-scroll .indicator-control {
   display: inline-flex;
@@ -154,8 +161,18 @@ header.topbar {
   font-variant-numeric: tabular-nums;
 }
 .topbar .toolbar-scroll .terminal-brand-menu {
+  position: sticky;
+  inset-inline-start: 6px;
+  z-index: 110;
+  display: grid;
+  align-self: stretch;
+  align-items: center;
   flex: 0 0 32px;
   width: 32px;
+  background: var(--surface, #131722);
+  box-shadow:
+    -6px 0 0 var(--surface, #131722),
+    6px 0 0 var(--surface, #131722);
 }
 .topbar .toolbar-scroll .brand.account-button {
   position: relative;
@@ -263,6 +280,55 @@ header.topbar {
 }
 .toolbar-popover .mobile-workspace-zone {
   flex-wrap: wrap;
+}
+.toolbar-popover .mobile-workspace-options {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 10px 0 0;
+  padding: 8px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.toolbar-popover .mobile-workspace-options legend {
+  padding: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.toolbar-popover .mobile-workspace-options nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.toolbar-popover .mobile-workspace-options nav button {
+  flex: 1 1 auto;
+  min-height: 36px;
+  padding: 4px 8px;
+  border: 1px solid var(--control-line);
+  border-radius: 5px;
+  background: var(--surface-input);
+  font-size: 12px;
+}
+.toolbar-popover .mobile-workspace-options nav button[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-surface);
+}
+.toolbar-popover .mobile-workspace-zone .clock-zone-control {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.toolbar-popover .mobile-workspace-zone .clock-zone-trigger {
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 36px;
+  white-space: normal;
+}
+.toolbar-popover .mobile-workspace-zone .clock-zone-popover {
+  position: static;
+  width: 100%;
+  margin-bottom: 6px;
+  box-shadow: none;
 }
 .interval-menu-backdrop {
   position: fixed;
