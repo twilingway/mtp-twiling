@@ -41,6 +41,282 @@ const load = (name, imports = {}, globals = {}) => {
 };
 const helpers = load("mobile-object-widget.ts");
 
+function menuDismissHarness({ mobile = true, kind = "drawing" } = {}) {
+  class Node {
+    constructor(inside = false) {
+      this.inside = inside;
+    }
+    closest() {
+      return null;
+    }
+  }
+  const listeners = [];
+  const document = {
+    addEventListener(type, listener, options) {
+      listeners.push({ type, listener, capture: options === true || options?.capture === true });
+    },
+    removeEventListener(type, listener) {
+      const index = listeners.findIndex((item) => item.type === type && item.listener === listener);
+      if (index >= 0) listeners.splice(index, 1);
+    },
+    querySelector: () => ({
+      focus: () => {
+        focused = "widget";
+      }
+    })
+  };
+  let focused = null;
+  const state = {
+    selectedObject: "selected",
+    contextMenu: {
+      x: 128,
+      y: 226,
+      target:
+        kind === "chart"
+          ? { kind }
+          : kind === "indicator"
+            ? { kind, key: "ma" }
+            : { kind, id: "selected" }
+    },
+    drawings: kind === "image" ? [] : [{ id: "selected", name: "segment", points: [] }],
+    images: kind === "image" ? [{ id: "selected", name: "Photo", width: 100 }] : [],
+    preferences: { chartSettings: {}, indicators: {} }
+  };
+  const controller = {
+    getSnapshot: () => state,
+    setContext: (contextMenu) => {
+      state.contextMenu = contextMenu;
+    },
+    selectObject: (selectedObject) => {
+      state.selectedObject = selectedObject;
+    }
+  };
+  const hooks = [];
+  let cursor = 0;
+  let pending = [];
+  const Widget = () => {};
+  const { ContextMenu } = load(
+    "ContextMenu.tsx",
+    {
+      react: {
+        useCallback: (fn) => fn,
+        useRef(initial) {
+          const index = cursor++;
+          return (hooks[index] ??= { current: initial });
+        },
+        useState(initial) {
+          const index = cursor++;
+          const cell = (hooks[index] ??= { value: initial });
+          return [
+            cell.value,
+            (value) => {
+              cell.value = value;
+            }
+          ];
+        },
+        useEffect(effect, deps) {
+          const index = cursor++;
+          const previous = hooks[index];
+          if (previous && deps.every((value, i) => Object.is(value, previous.deps[i]))) return;
+          pending.push(() => {
+            previous?.cleanup?.();
+            hooks[index] = { deps, cleanup: effect() };
+          });
+        }
+      },
+      "react/jsx-runtime": {
+        jsx: (type, props) => ({ type, props }),
+        jsxs: (type, props) => ({ type, props }),
+        Fragment: "fragment"
+      },
+      "../../../i18n/messages.js": { t: (value) => value },
+      "../../../model/drawing-model.js": { TOOL_NAMES: { segment: "Line" } },
+      "../../../model/indicator-legend.js": { indicatorShown: () => true },
+      "../state.js": { INDICATOR_NAMES: { ma: "MA" } },
+      "../context.js": { useTerminal: () => ({ controller, state }) },
+      "./controls/ChevronIcon.js": { ChevronIcon: "chevron" },
+      "./MobileObjectWidget.js": {
+        useMobileObjectWidget: () => mobile,
+        MobileObjectWidget: Widget
+      },
+      "./mobile-object-widget.js": helpers,
+      "./mobile-object-menu-dismiss.js": load("mobile-object-menu-dismiss.ts", {}, { Node })
+    },
+    {
+      document,
+      Node,
+      HTMLElement: Node,
+      window: { innerWidth: 392, innerHeight: 783, getSelection: () => null }
+    }
+  );
+  function render() {
+    cursor = 0;
+    pending = [];
+    const tree = ContextMenu();
+    hooks[0].current = state.contextMenu
+      ? {
+          contains: (target) => target.inside,
+          querySelector: () => ({
+            focus: () => {
+              focused = "menu";
+            }
+          })
+        }
+      : null;
+    for (const effect of pending) effect();
+    return tree;
+  }
+  function dispatch(type, { inside = false, native = () => {}, ...values } = {}) {
+    const event = {
+      type,
+      target: new Node(inside),
+      pointerId: 7,
+      isPrimary: true,
+      pointerType: "touch",
+      detail: 1,
+      cancelable: true,
+      stopped: false,
+      defaultPrevented: false,
+      preventDefault() {
+        this.defaultPrevented = true;
+      },
+      stopImmediatePropagation() {
+        this.stopped = true;
+      },
+      ...values
+    };
+    for (const entry of [...listeners]) {
+      if (entry.type === type && entry.capture) entry.listener(event);
+      if (event.stopped) return event;
+    }
+    native(event);
+    for (const entry of [...listeners]) {
+      if (entry.type === type && !entry.capture) entry.listener(event);
+      if (event.stopped) break;
+    }
+    return event;
+  }
+  render();
+  return {
+    state,
+    dispatch,
+    render,
+    Widget,
+    focused: () => focused,
+    dispose: () => hooks.forEach((hook) => hook?.cleanup?.()),
+    listeners
+  };
+}
+
+test("first mobile object-menu outside gesture preserves selection through pointer, native touch and click phases", () => {
+  for (const kind of ["drawing", "image"]) {
+    const harness = menuDismissHarness({ kind });
+    const received = [];
+    const canvas = (event) => {
+      received.push(event.type);
+      if (event.type === "pointerdown") harness.state.selectedObject = null;
+    };
+    assert.ok(harness.dispatch("pointerdown", { native: canvas }).defaultPrevented);
+    assert.equal(harness.state.contextMenu, null);
+    assert.equal(harness.state.selectedObject, "selected");
+    // Rerender removes the menu while the rest of this same gesture is still pending.
+    assert.equal(harness.render().type, harness.Widget);
+    for (const type of [
+      "touchstart",
+      "pointermove",
+      "touchmove",
+      "pointerup",
+      "touchend",
+      "mousedown",
+      "mouseup",
+      "click"
+    ])
+      assert.ok(harness.dispatch(type, { native: canvas }).defaultPrevented, type);
+    assert.deepEqual(received, [], "no slot activation, SDK pan or outside button click");
+    assert.equal(harness.state.selectedObject, "selected");
+    harness.dispatch("pointerdown", { pointerId: 8, native: canvas });
+    harness.dispatch("pointerup", { pointerId: 8, native: canvas });
+    harness.dispatch("click", { pointerId: 8, native: canvas });
+    assert.equal(harness.state.selectedObject, null);
+    assert.equal(harness.render(), null);
+    assert.deepEqual(received, ["pointerdown", "pointerup", "click"]);
+    harness.dispose();
+    assert.equal(harness.listeners.length, 0);
+  }
+});
+
+test("mobile shield does not swallow menu actions, keyboard Escape or focus restoration", () => {
+  const harness = menuDismissHarness();
+  let action = false;
+  assert.equal(harness.dispatch("pointerdown", { inside: true }).defaultPrevented, false);
+  harness.dispatch("click", {
+    inside: true,
+    native: () => {
+      action = true;
+    }
+  });
+  assert.ok(action);
+  assert.ok(harness.state.contextMenu);
+  assert.equal(harness.focused(), "menu");
+  harness.dispatch("keydown", { key: "Escape" });
+  assert.equal(harness.state.contextMenu, null);
+  assert.equal(harness.state.selectedObject, "selected");
+  assert.equal(harness.render().type, harness.Widget);
+  assert.equal(harness.focused(), "widget");
+  harness.dispose();
+});
+
+test("desktop object menus and mobile chart/indicator menus retain ordinary outside actions", () => {
+  for (const options of [{ mobile: false }, { kind: "chart" }, { kind: "indicator" }]) {
+    const harness = menuDismissHarness(options);
+    let clicked = false;
+    harness.dispatch("pointerdown", {
+      native: () => {
+        harness.state.selectedObject = null;
+      }
+    });
+    harness.dispatch("pointerup");
+    harness.dispatch("click", {
+      native: () => {
+        clicked = true;
+      }
+    });
+    assert.equal(harness.state.contextMenu, null);
+    assert.equal(harness.state.selectedObject, null);
+    assert.ok(clicked);
+    harness.dispose();
+  }
+});
+
+test("cancelled dismiss gesture cannot block the next pointer or keyboard activation", () => {
+  const harness = menuDismissHarness();
+  harness.dispatch("pointerdown");
+  harness.render();
+  harness.dispatch("pointercancel");
+  let activations = 0;
+  harness.dispatch("click", {
+    detail: 0,
+    pointerId: -1,
+    native: () => {
+      activations++;
+    }
+  });
+  harness.dispatch("pointerdown", {
+    pointerId: 9,
+    native: () => {
+      activations++;
+    }
+  });
+  harness.dispatch("click", {
+    pointerId: 9,
+    native: () => {
+      activations++;
+    }
+  });
+  assert.equal(activations, 3);
+  harness.dispose();
+});
+
 function renderContextMenu({ width, height, mobile, kind = "drawing" }) {
   const state = {
     selectedObject: "selected",
@@ -69,7 +345,8 @@ function renderContextMenu({ width, height, mobile, kind = "drawing" }) {
       "../context.js": { useTerminal: () => ({ state, controller: {} }) },
       "./controls/ChevronIcon.js": { ChevronIcon: "chevron" },
       "./MobileObjectWidget.js": { useMobileObjectWidget: () => mobile },
-      "./mobile-object-widget.js": helpers
+      "./mobile-object-widget.js": helpers,
+      "./mobile-object-menu-dismiss.js": load("mobile-object-menu-dismiss.ts")
     },
     { window: { innerWidth: width, innerHeight: height } }
   );
