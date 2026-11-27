@@ -315,7 +315,7 @@
 .chart-context-menu {
   min-width: 250px;
 }
-@media (max-width: 650px) {
+@media (max-width: 650px), (pointer: coarse) {
   .context-submenu > div {
     position: static;
     margin: 0 8px 5px;
