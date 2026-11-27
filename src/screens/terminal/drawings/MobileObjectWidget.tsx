@@ -79,7 +79,14 @@ export function MobileObjectWidget() {
   }, [controller, place]);
   useEffect(() => {
     const outside = (event: Event) => {
-      if (event.target instanceof Node && !root.current?.contains(event.target))
+      if (
+        event.target instanceof Node &&
+        !root.current?.contains(event.target) &&
+        !(
+          event.target instanceof Element &&
+          event.target.closest(".drawing-toolbar, #drawing-toolbar-menu")
+        )
+      )
         controller.selectObject(null);
     };
     const key = (event: KeyboardEvent) => {

@@ -8,7 +8,7 @@ function nodes(element) {
   return [element, ...[element.props?.children].flat(Infinity).flatMap(nodes)];
 }
 
-function searchFixture(t, results, rows, query = "CNY") {
+function searchFixture(t, results, rows, query = "CNY", fallbackPrices = new Map()) {
   const calls = [];
   const state = { owner: "owner", rows, preferences: { symbol: "GAZP" } };
   const editor = {
@@ -60,6 +60,9 @@ function searchFixture(t, results, rows, query = "CNY") {
     },
     "react/jsx-runtime": jsx,
     "screens/terminal/context.tsx": { useTerminal: () => ({ controller: editor, state }) },
+    "screens/terminal/use-instrument-search-prices.ts": {
+      useInstrumentSearchPrices: () => ({ list: { current: null }, prices: fallbackPrices })
+    },
     "screens/terminal/workspace-sync-controller.ts": {
       publishWorkspaceInstrument: (controller, uid) => {
         assert.equal(controller, editor);
@@ -192,5 +195,33 @@ test("the result displays only the exact cached price and uses the instrument's 
   assert.deepEqual(
     order.props.children.map((item) => item.props.value),
     ["relevance", "ticker", "source"]
+  );
+});
+
+test("a search-only futures quote preserves precision without copying the watchlist or another venue price", (t) => {
+  const vtb = { ticker: "VTBR", uid: "vtbr", name: "ВТБ", kind: "share", currency: "rub" };
+  const future = {
+    ticker: "VBZ6",
+    uid: "vbz6",
+    name: "ВТБ декабрь",
+    kind: "future",
+    currency: "rub",
+    minPriceIncrement: { units: "0", nano: 1000000 }
+  };
+  const otherVenue = { ...future, uid: "vbz6-other-venue" };
+  const f = searchFixture(
+    t,
+    [vtb, future, otherVenue],
+    [{ ...row("VTBR", vtb.uid), price: 82.11, step: 0.01 }],
+    "ВТБ",
+    new Map([
+      [future.uid, 83.125],
+      [vtb.uid, 999]
+    ])
+  );
+  const prices = f.render().filter((item) => item.props.className === "instrument-result-price");
+  assert.deepEqual(
+    prices.map((item) => item.props.children),
+    ["82,11 RUB", "83,125 RUB", "— RUB"]
   );
 });

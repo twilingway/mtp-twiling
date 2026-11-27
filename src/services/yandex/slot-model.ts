@@ -228,7 +228,9 @@ export async function inspectSlots(files: readonly SlotPhysical[]): Promise<Slot
         uncertain.push(item);
         continue;
       }
-      if (version.seq < top.envelope.current.seq - 1 || retired) obsolete.push(item);
+      // The latest envelope already carries its previous version's complete body.
+      // Keeping that previous container would also retain a third, older payload.
+      obsolete.push(item);
       const prior = item.envelope.previous;
       if (prior) {
         known.set(prior.seq, hashes.get(prior)!);

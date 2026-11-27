@@ -23,12 +23,17 @@ async function saveYandexClientSettings(
   previous: Promise<void>,
   journal: YandexJournal,
   settings: ClientSettings,
-  desiredMode: CloudClientMode | undefined
+  changes: Partial<ClientSettings>
 ): Promise<void> {
   try {
     await previous.catch(() => undefined);
-    settings.clientMode =
-      desiredMode ?? (await journal.settings()).clientMode ?? settings.clientMode;
+    const current = await journal.settings();
+    Object.assign(
+      settings,
+      current,
+      { clientMode: current.clientMode ?? settings.clientMode },
+      changes
+    );
     await journal.saveSettings(settings, new AbortController().signal);
   } catch {
     throw new YandexError("local-save");
@@ -95,6 +100,8 @@ export function yandexIdentityOperation(options: {
   clientId: string;
   cache: Map<string, YandexRemote>;
   clientMode: CloudClientMode;
+  automatic: boolean;
+  refresh(settings: YandexSettings): void;
 }) {
   const { host, auth, operation } = options,
     session = host.scope("yandex-disk").session;
@@ -115,10 +122,13 @@ export function yandexIdentityOperation(options: {
   );
   const checkClientMode = async () => {
     guard.signal.throwIfAborted();
-    if (!guard.isCurrent() || (await options.journal.settings()).clientMode !== options.clientMode)
+    const settings = await options.journal.settings();
+    if (!guard.isCurrent() || settings.clientMode !== options.clientMode)
       throw new YandexError("local-changed");
     guard.signal.throwIfAborted();
     if (!guard.isCurrent()) throw new YandexError("local-changed");
+    options.refresh(settings);
+    return settings.enabled && (!options.automatic || settings.automatic);
   };
   return { guard, session, scopedAuth, revisions, checkClientMode };
 }
@@ -142,13 +152,17 @@ export class YandexClientIdentity {
   changing = false;
   desiredMode: CloudClientMode | undefined;
   private settingsQueue = Promise.resolve();
-  save(journal: YandexJournal, settings: ClientSettings): Promise<void> {
-    this.settingsQueue = saveYandexClientSettings(
-      this.settingsQueue,
-      journal,
-      settings,
-      this.desiredMode
-    );
+  save(
+    journal: YandexJournal,
+    settings: ClientSettings,
+    enabled?: boolean,
+    automatic?: boolean
+  ): Promise<void> {
+    this.settingsQueue = saveYandexClientSettings(this.settingsQueue, journal, settings, {
+      ...(enabled === undefined ? {} : { enabled }),
+      ...(automatic === undefined ? {} : { automatic }),
+      ...(this.desiredMode === undefined ? {} : { clientMode: this.desiredMode })
+    });
     return this.settingsQueue;
   }
   async change(mode: CloudClientMode, options: ModeChange): Promise<void> {

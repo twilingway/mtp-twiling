@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CatalogInstrument, MarketRow } from "../../model/types.js";
 import { searchWatchlistRow } from "../../model/instrument-search-identity.js";
 import {
-  bankSearchQuoteUid,
+  instrumentSearchQuoteId,
   INSTRUMENT_SEARCH_PRICE_LIMIT,
   loadInstrumentSearchPrices
 } from "../../services/instrument-search-prices.js";
@@ -26,9 +26,10 @@ export function useInstrumentSearchPrices(
 ) {
   const list = useRef<HTMLDivElement>(null);
   const scope = useMemo(() => ({ client, owner, revision }), [client, owner, revision]);
+  const cacheScope = useMemo(() => ({ client, owner }), [client, owner]);
   const [seen, setSeen] = useState<{ scope: object; ids: string[] }>();
   const [saved, setSaved] = useState<Results>();
-  const current = saved?.scope === scope ? saved : undefined;
+  const current = saved?.scope === cacheScope ? saved : undefined;
   useEffect(() => {
     const root = list.current;
     if (!client || !root || typeof IntersectionObserver !== "function") return;
@@ -56,7 +57,7 @@ export function useInstrumentSearchPrices(
 
   const visible = new Set(seen?.scope === scope ? seen.ids : []);
   const needed = items.flatMap((item) => {
-    const uid = bankSearchQuoteUid(item);
+    const uid = instrumentSearchQuoteId(item);
     if (!uid || !visible.has(uid) || current?.checked.has(uid)) return [];
     const price = searchWatchlistRow(rows, item)?.price;
     return price != null && Number.isFinite(price) && price > 0 ? [] : [uid];
@@ -70,9 +71,9 @@ export function useInstrumentSearchPrices(
     const complete = (prices: ReadonlyMap<string, number>) => {
       if (abort.signal.aborted) return;
       setSaved((previous) => {
-        const active = previous?.scope === scope ? previous : undefined;
+        const active = previous?.scope === cacheScope ? previous : undefined;
         return {
-          scope,
+          scope: cacheScope,
           prices: new Map([...(active?.prices ?? []), ...prices]),
           checked: new Set([...(active?.checked ?? []), ...ids])
         };
@@ -87,6 +88,6 @@ export function useInstrumentSearchPrices(
       clearTimeout(timer);
       abort.abort();
     };
-  }, [batch, client, scope]);
+  }, [batch, client, scope, cacheScope]);
   return { list, prices: current?.prices ?? emptyPrices };
 }

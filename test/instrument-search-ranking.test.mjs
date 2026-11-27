@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { sourceModules } from "./helpers/watchlist-sections.mjs";
 
-const load = sourceModules();
+const load = sourceModules({
+  "services/instrument-search-public-prices.ts": { loadPublicSearchPrices: async () => new Map() }
+});
 const {
   instrumentSearchHighlight,
   instrumentSearchSource,
@@ -101,7 +103,7 @@ test("highlighting keeps literal punctuation and original character case", () =>
 
 test("the search quote batch deduplicates and limits IDs, accepting only exact returned UID and price", async () => {
   assert.equal(bankSearchQuoteUid(main), main.uid);
-  assert.equal(bankSearchQuoteUid({ ...main, kind: "future" }), undefined);
+  assert.equal(bankSearchQuoteUid({ ...main, kind: "future" }), main.uid);
   assert.equal(
     bankSearchQuoteUid({ ...main, providerRef: crypto("okx", "BTC-USDT").providerRef }),
     undefined
@@ -143,7 +145,7 @@ test("the search quote batch deduplicates and limits IDs, accepting only exact r
   assert.equal(service, "MarketDataService");
   assert.equal(method, "GetLastPrices");
   assert.equal(body.lastPriceType, "LAST_PRICE_EXCHANGE");
-  assert.equal(body.instrumentId.length, INSTRUMENT_SEARCH_PRICE_LIMIT);
+  assert.equal(body.instrumentId.length, INSTRUMENT_SEARCH_PRICE_LIMIT - 1);
   assert.ok(!body.instrumentId.includes("bybit:spot:BTCUSDT"));
   assert.equal(new Set(body.instrumentId).size, body.instrumentId.length);
   assert.equal(signal, abort.signal);

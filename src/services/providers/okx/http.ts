@@ -8,11 +8,12 @@ export interface OkxHttpOptions {
 const publicPaths = new Set([
   "/api/v5/public/instruments",
   "/api/v5/market/tickers",
+  "/api/v5/market/ticker",
   "/api/v5/market/history-candles",
   "/api/v5/market/history-trades"
 ]);
 
-// Both public history paths have an IP limit of 20 requests per two seconds.
+// History and single ticker paths have an IP limit of 20 requests per two seconds.
 const historyRequestInterval = 110;
 
 function wait(ms: number, signal?: AbortSignal): Promise<void> {
@@ -64,7 +65,11 @@ export class OkxHttp {
   ): Promise<readonly unknown[]> {
     if (!publicPaths.has(path)) throw new OkxError("protocol", "Only public OKX data is allowed");
     signal?.throwIfAborted();
-    if (path === "/api/v5/market/history-candles" || path === "/api/v5/market/history-trades")
+    if (
+      path === "/api/v5/market/history-candles" ||
+      path === "/api/v5/market/history-trades" ||
+      path === "/api/v5/market/ticker"
+    )
       await this.waitForHistorySlot(signal);
     signal?.throwIfAborted();
     const url = new URL(path, "https://openapi.okx.com");

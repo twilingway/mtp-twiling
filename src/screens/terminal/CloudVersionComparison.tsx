@@ -6,6 +6,7 @@ import type {
 } from "../../model/cloud-sync.js";
 import { t } from "../../i18n/messages.js";
 import { intlLocale } from "../../i18n/preferences.js";
+import { CLOUD_TEST_CLIENT_ID } from "../../model/cloud-client-identity.js";
 
 interface Props {
   id: CloudProviderId;
@@ -98,10 +99,17 @@ export function CloudVersionComparison({
           const selected = activeChoice?.kind === "remote" && activeChoice.id === remote.id;
           const description =
             index === 0 ? `${id}-receive-effect` : `${id}-receive-effect-${index}`;
+          const deviceLabel =
+            remote.deviceLabel ??
+            (remote.deviceId === CLOUD_TEST_CLIENT_ID
+              ? t("Тестирование")
+              : remote.deviceId
+                ? `${t("Браузер")} · ${remote.deviceId.slice(0, 8)}`
+                : undefined);
           return (
             <article key={remote.id} className="cloud-version-card cloud-version-remote">
               <h5>{t(cloudTitle)}</h5>
-              {remote.deviceLabel && <p className="cloud-version-device">{remote.deviceLabel}</p>}
+              {deviceLabel && <p className="cloud-version-device">{deviceLabel}</p>}
               <p className="cloud-version-device" title={remote.id}>
                 {t("Сохранение")} · {remote.id.slice(0, 8)}
               </p>

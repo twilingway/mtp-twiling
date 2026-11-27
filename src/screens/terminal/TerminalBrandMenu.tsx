@@ -6,6 +6,10 @@ import { terminalTheme, withTheme } from "../../model/theme.js";
 import type { TerminalController } from "./controller.js";
 import type { TerminalPreferences } from "./state.js";
 import type { TerminalControlsState } from "./terminal-state-selection.js";
+import { MobileChartTools } from "./MobileChartTools.js";
+import { ChartRangeControl } from "./intervals/ChartRangeControl.js";
+import { ClockZoneControl } from "./ClockZoneControl.js";
+import { useMobileLayout } from "./use-mobile-layout.js";
 
 const brand = "МТП Twiling";
 
@@ -45,6 +49,8 @@ export function TerminalBrandMenu({
   const { owner, preferences } = accountState;
   const locale = preferences.locale ?? "ru";
   const label = (text: string) => t(text, locale);
+  const mobile = useMobileLayout();
+  const panelOpen = !preferences.rightPanelCollapsed && (!mobile || !!accountState.mobilePanelOpen);
   useEffect(() => setRequested(false), [account, owner]);
 
   useEffect(() => {
@@ -128,7 +134,13 @@ export function TerminalBrandMenu({
           }
         />
       </button>
-      <ToolbarPopover anchor={trigger} open={open} keepMounted onClose={() => setRequested(false)}>
+      <ToolbarPopover
+        anchor={trigger}
+        open={open}
+        keepMounted
+        resizeBehavior="reposition"
+        onClose={() => setRequested(false)}
+      >
         <div
           ref={panel}
           id={id}
@@ -137,58 +149,116 @@ export function TerminalBrandMenu({
           aria-labelledby={`${id}-heading`}
           hidden={!open}
         >
-          <h2 id={`${id}-heading`}>{brand}</h2>
+          <div className="terminal-brand-identity">
+            <h2 id={`${id}-heading`}>{brand}</h2>
+            <span id="account-name">{accountState.name || label("Личное пространство")}</span>
+          </div>
           {open && (
             <>
-              <div className="terminal-brand-links">
-                <button type="button" onClick={() => show(account, "account")}>
-                  {label("Аккаунт и источники")}
-                </button>
-                {accountState.name && <span id="account-name">{accountState.name}</span>}
-              </div>
-              <label className="terminal-brand-field">
-                <span>{label("Тема интерфейса")}</span>
-                <select
-                  disabled={disabled}
-                  value={terminalTheme(preferences.chartSettings)}
-                  onChange={(event) => {
-                    const theme = event.currentTarget.value === "light" ? "light" : "dark";
-                    apply((latest) => ({ chartSettings: withTheme(latest.chartSettings, theme) }));
-                  }}
-                >
-                  <option value="dark">{label("Тёмная")}</option>
-                  <option value="light">{label("Светлая")}</option>
-                </select>
-              </label>
-              <label className="terminal-brand-field">
-                <span>{label("Язык")}</span>
-                <select
-                  disabled={disabled}
-                  value={locale}
-                  onChange={(event) => {
-                    const next = event.currentTarget.value === "en" ? "en" : "ru";
-                    apply(() => ({ locale: next }));
-                  }}
-                >
-                  <option value="ru">{label("Русский")}</option>
-                  <option value="en">English</option>
-                </select>
-              </label>
-              <div className="terminal-brand-links">
+              <MobileChartTools
+                controller={account}
+                panelOpen={panelOpen}
+                objectsOpen={accountState.objectPanel}
+                mobile={mobile}
+                disabled={disabled}
+                onAction={close}
+              />
+              <section className="terminal-brand-section" aria-labelledby={`${id}-workspace`}>
+                <h3 id={`${id}-workspace`}>{label("График и рабочая область")}</h3>
+                {mobile && panelOpen && (
+                  <button
+                    type="button"
+                    className="terminal-brand-action"
+                    disabled={disabled}
+                    onClick={() => {
+                      if (!current()) return;
+                      close();
+                      account.panel.closeMobile();
+                    }}
+                  >
+                    <span aria-hidden="true">←</span> {label("Вернуться к графику")}
+                  </button>
+                )}
                 <button
                   type="button"
+                  className="terminal-brand-action"
                   disabled={disabled}
                   onClick={() => show(editor, "chart-settings")}
                 >
                   {label("Настройки графика")}
                 </button>
-                <button type="button" disabled={disabled} onClick={() => show(account, "welcome")}>
-                  {label("Помощь и первый запуск")}
+                <fieldset
+                  className="terminal-brand-workspace-controls"
+                  disabled={disabled}
+                  aria-label={label("График и рабочая область")}
+                >
+                  <ChartRangeControl placement="toolbar" />
+                  <div className="terminal-brand-zone">
+                    <span>{label("Часовой пояс")}</span>
+                    <ClockZoneControl />
+                  </div>
+                </fieldset>
+              </section>
+              <section className="terminal-brand-section" aria-labelledby={`${id}-appearance`}>
+                <h3 id={`${id}-appearance`}>{label("Оформление")}</h3>
+                <label className="terminal-brand-field">
+                  <span>{label("Тема интерфейса")}</span>
+                  <select
+                    disabled={disabled}
+                    value={terminalTheme(preferences.chartSettings)}
+                    onChange={(event) => {
+                      const theme = event.currentTarget.value === "light" ? "light" : "dark";
+                      apply((latest) => ({
+                        chartSettings: withTheme(latest.chartSettings, theme)
+                      }));
+                    }}
+                  >
+                    <option value="dark">{label("Тёмная")}</option>
+                    <option value="light">{label("Светлая")}</option>
+                  </select>
+                </label>
+                <label className="terminal-brand-field">
+                  <span>{label("Язык")}</span>
+                  <select
+                    disabled={disabled}
+                    value={locale}
+                    onChange={(event) => {
+                      const next = event.currentTarget.value === "en" ? "en" : "ru";
+                      apply(() => ({ locale: next }));
+                    }}
+                  >
+                    <option value="ru">{label("Русский")}</option>
+                    <option value="en">English</option>
+                  </select>
+                </label>
+              </section>
+              <section className="terminal-brand-section" aria-labelledby={`${id}-account`}>
+                <h3 id={`${id}-account`}>{label("Аккаунт и данные")}</h3>
+                <button
+                  type="button"
+                  className="terminal-brand-action terminal-brand-account"
+                  onClick={() => show(account, "account")}
+                >
+                  <span>{label("Аккаунт и источники")}</span>
+                  <small>{label("Подключение, облако, импорт и экспорт")}</small>
                 </button>
-              </div>
+              </section>
             </>
           )}
-          {typeof children === "function" ? children(close, open) : children}
+          <section className="terminal-brand-section" aria-labelledby={`${id}-help`} hidden={!open}>
+            <h3 id={`${id}-help`}>{label("Помощь и установка")}</h3>
+            {open && (
+              <button
+                type="button"
+                className="terminal-brand-action"
+                disabled={disabled}
+                onClick={() => show(account, "welcome")}
+              >
+                {label("Помощь и первый запуск")}
+              </button>
+            )}
+            {typeof children === "function" ? children(close, open) : children}
+          </section>
         </div>
       </ToolbarPopover>
     </div>

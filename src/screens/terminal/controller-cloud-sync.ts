@@ -156,7 +156,8 @@ export function startTerminalCloudSync(controller: TerminalController): () => vo
       observe(value, (provider) => {
         const status = provider.getSnapshot();
         if (status.enabled && status.automatic && status.phase !== "conflict")
-          void provider.sync().catch(() => {});
+          if (provider.id === "yandex-disk") provider.resume();
+          else void provider.sync().catch(() => {});
       });
     };
     const timer = setInterval(wake, 60_000);

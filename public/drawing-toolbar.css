@@ -428,6 +428,12 @@
   color: #131313;
   background: #dbdbdb;
 }
+.drawing-tool-sheet
+  .drawing-menu-row[data-selected]
+  .drawing-menu-action:is(:hover, :focus-visible) {
+  color: #131313;
+  background: #dbdbdb;
+}
 .drawing-tool-sheet .drawing-menu-action {
   min-height: 40px;
   gap: 12px;

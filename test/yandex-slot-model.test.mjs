@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { sourceLoader } from "./helpers/yandex-source.mjs";
 const load = sourceLoader(),
   { encodeBundle } = load("services/yandex/bundle.ts"),
-  { parseSlotEnvelope, inspectSlots, slotName } = load("services/yandex/slot-model.ts"),
+  { parseSlotEnvelope, inspectSlots, slotName, slotVersionHash } = load(
+    "services/yandex/slot-model.ts"
+  ),
   { encodeSlot, decodeSlot } = load("services/yandex/slot-codec.ts"),
   { sha256 } = load("services/yandex/types.ts");
 async function first(deviceId = crypto.randomUUID()) {
@@ -67,4 +69,36 @@ test("an accepted claim cannot hide a missing client or a rollback", async () =>
     inspectSlots([{ file: { name: slotName(a.current.revision.deviceId, 1) }, envelope }]),
     (e) => e.code === "conflict"
   );
+});
+
+test("the embedded previous makes its exact physical carrier obsolete but never an unknown fork", async () => {
+  const previous = await first(),
+    next = await first(previous.current.revision.deviceId);
+  previous.envelope = await parseSlotEnvelope(previous.envelope);
+  previous.current = previous.envelope.current;
+  next.current.seq = 2;
+  next.current.priorVersionHash = await slotVersionHash(previous.current);
+  next.current.accepted = [
+    {
+      deviceId: next.current.revision.deviceId,
+      seq: 2,
+      revisionId: next.current.revision.revisionId
+    }
+  ];
+  next.envelope.previous = previous.current;
+  const physical = async (f) => ({
+    file: { name: slotName(f.current.revision.deviceId, f.current.seq) },
+    envelope: await parseSlotEnvelope(f.envelope)
+  });
+  const latest = await physical(next),
+    old = await physical(previous),
+    known = await inspectSlots([old, latest]);
+  assert.deepEqual(known.latest, [latest]);
+  assert.deepEqual(known.obsolete, [old]);
+  assert.deepEqual(known.uncertain, []);
+  const fork = await physical(await first(previous.current.revision.deviceId)),
+    unknown = await inspectSlots([fork, latest]);
+  assert.deepEqual(unknown.obsolete, []);
+  assert.deepEqual(unknown.uncertain, [fork]);
+  assert.equal(unknown.heads.length, 2);
 });

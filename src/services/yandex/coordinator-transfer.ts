@@ -11,6 +11,8 @@ import { applyYandexRemote, reconcileYandexApply } from "./apply-recovery.js";
 import type { YandexApplyActions, YandexApplyContext } from "./apply-recovery.js";
 import type { YandexPreviewRemote } from "./coordinator-preview.js";
 import { yandexRemoteFingerprint, yandexVisibleChoices } from "./coordinator-preview.js";
+import { yandexAssociationPrecedes } from "./association-ancestry.js";
+import { recoverYandexPending } from "./pending-recovery.js";
 
 export const sameHeads = (a: readonly string[], b: readonly string[]) =>
   JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
@@ -27,6 +29,11 @@ interface TransferActions extends YandexApplyActions {
     beforeEffect: () => Promise<void>
   ): Promise<void>;
   accept(heads: readonly string[], digest: string, expectedRevision: number): Promise<void>;
+  confirmedBaseline(
+    heads: readonly string[],
+    digest: string,
+    expectedRevision: number
+  ): Promise<void>;
   conflict(
     captured: CloudPreparedSnapshot,
     remotes: readonly { remote: YandexRemote; summary: CloudSummary }[],
@@ -61,7 +68,7 @@ export async function yandexTransfer(
   const remotes = new Map(
       yandexVisibleChoices(inspected).map((item) => [item.remote.revision.revisionId, item])
     ),
-    all = inspected.remotes.map(({ revision }) => revision);
+    all = inspected.remotes;
   if (!valid() || host.scope("yandex-disk").revision !== captured.revision)
     throw new YandexError("local-changed");
   const selected = selection?.kind === "remote" ? remotes.get(selection.id) : undefined,
@@ -92,7 +99,7 @@ export async function yandexTransfer(
       throw new YandexError("local-changed");
     }
   };
-  const association = await journal.association(clientId, accountId);
+  let association = await journal.association(clientId, accountId);
   if (!valid() || host.scope("yandex-disk").revision !== captured.revision)
     throw new YandexError("local-changed");
   const context: YandexApplyContext = {
@@ -145,9 +152,26 @@ export async function yandexTransfer(
     await actions.publish(captured, inspected.heads, true, assertFresh);
     return;
   }
+  association = await recoverYandexPending({
+    association,
+    heads: inspected.heads,
+    journal,
+    revisions,
+    clientId,
+    accountId,
+    signal: guard.signal,
+    valid: () => valid() && host.scope("yandex-disk").revision === captured.revision,
+    beforeEffect: assertFresh,
+    confirm: (heads, digest) => actions.confirmedBaseline(heads, digest, captured.revision)
+  });
   if (association && sameHeads(association.heads, inspected.heads)) {
     if (captured.digest === association.digest) {
       await actions.unchanged(association, captured.revision);
+      return;
+    }
+    const current = inspected.heads.length === 1 ? remotes.get(inspected.heads[0]!) : undefined;
+    if (current?.remote.revision.digest === captured.digest) {
+      await apply(current.remote);
       return;
     }
     for (const id of inspected.heads) {
@@ -161,16 +185,7 @@ export async function yandexTransfer(
     return;
   }
   if (association && captured.digest === association.digest && inspected.heads.length === 1) {
-    const map = new Map(all.map((revision) => [revision.revisionId, revision])),
-      ancestors = new Set<string>(),
-      pending = [...inspected.heads];
-    while (pending.length) {
-      const id = pending.pop()!;
-      if (ancestors.has(id)) continue;
-      ancestors.add(id);
-      pending.push(...(map.get(id)?.parents ?? []));
-    }
-    if (association.heads.every((id) => ancestors.has(id))) {
+    if (yandexAssociationPrecedes(inspected.heads, association.heads, all)) {
       await apply(remotes.get(inspected.heads[0]!)!.remote);
       return;
     }

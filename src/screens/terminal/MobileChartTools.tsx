@@ -1,69 +1,68 @@
 import { t } from "../../i18n/messages.js";
-import { ClockZoneControl } from "./ClockZoneControl.js";
 import type { TerminalController } from "./controller.js";
-import { ChartRangeControl } from "./intervals/ChartRangeControl.js";
 
-/** Workspace actions live in the account menu; layout has one header picker. */
+/** Primary destinations are single actions on desktop and mobile. */
 export function MobileChartTools({
   controller,
   panelOpen,
   objectsOpen,
+  mobile = true,
   disabled = false,
   onAction
 }: {
   controller: TerminalController;
   panelOpen: boolean;
   objectsOpen: boolean;
+  mobile?: boolean;
   disabled?: boolean;
   onAction?: () => void;
 }) {
-  const select = (tab: "chart" | "watchlist" | "objects") => {
-    if (disabled) return;
+  const owner = controller.getSnapshot().owner;
+  const select = (tab: "watchlist" | "objects") => {
+    if (disabled || controller.getSnapshot().owner !== owner) return;
     onAction?.();
-    if (tab === "chart") {
-      controller.panel.closeMobile();
-      return;
-    }
-    const owner = controller.getSnapshot().owner;
-    void controller.panel.select(tab, false, true).catch((error: unknown) => {
+    void controller.panel.select(tab, false, mobile).catch((error: unknown) => {
       if (controller.getSnapshot().owner !== owner) return;
       controller.notify(error instanceof Error ? error.message : t("Не удалось изменить панель."));
     });
   };
   return (
-    <fieldset className="mobile-workspace-options" disabled={disabled}>
-      <legend>{t("Управление графиками")}</legend>
-      <nav aria-label={t("Разделы правой панели")}>
-        <button
-          type="button"
-          aria-controls="chart-workspace"
-          aria-pressed={!panelOpen}
-          onClick={() => select("chart")}
-        >
-          {t("График")}
-        </button>
-        <button
-          type="button"
-          aria-controls="watchlist-view"
-          aria-pressed={panelOpen && !objectsOpen}
-          onClick={() => select("watchlist")}
-        >
-          {t("Список котировок")}
-        </button>
-        <button
-          type="button"
-          aria-controls="objects-view"
-          aria-pressed={panelOpen && objectsOpen}
-          onClick={() => select("objects")}
-        >
-          {t("Дерево объектов")}
-        </button>
-      </nav>
-      <ChartRangeControl placement="toolbar" />
-      <div className="mobile-workspace-zone">
-        <span>{t("Часовой пояс")}</span>
-        <ClockZoneControl />
-      </div>
-    </fieldset>
+    <nav className="terminal-brand-destinations" aria-label={t("Разделы правой панели")}>
+      <button
+        type="button"
+        disabled={disabled}
+        aria-controls="watchlist-view"
+        aria-pressed={panelOpen && !objectsOpen}
+        onClick={() => select("watchlist")}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M6 3h12v18l-6-4-6 4V3Z" />
+          <path d="M9 7h6M9 10h6" />
+        </svg>
+        <span>{t("Список котировок")}</span>
+        {panelOpen && !objectsOpen && (
+          <span className="terminal-brand-current" aria-hidden="true">
+            ✓
+          </span>
+        )}
+      </button>
+      <button
+        type="button"
+        disabled={disabled}
+        aria-controls="objects-view"
+        aria-pressed={panelOpen && objectsOpen}
+        onClick={() => select("objects")}
+      >
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5" />
+        </svg>
+        <span>{t("Дерево объектов")}</span>
+        {panelOpen && objectsOpen && (
+          <span className="terminal-brand-current" aria-hidden="true">
+            ✓
+          </span>
+        )}
+      </button>
+    </nav>
   );
 }

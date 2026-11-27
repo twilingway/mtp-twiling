@@ -1,4 +1,8 @@
 export const uiMessages = {
+  "График и рабочая область": "Chart and workspace",
+  "Аккаунт и данные": "Account and data",
+  "Подключение, облако, импорт и экспорт": "Connection, cloud, import and export",
+  "Помощь и установка": "Help and installation",
   "Установить приложение": "Install app",
   "Т‑Банк подключён": "T-Bank is connected",
   "Аккаунт Т‑Банка настроен": "T-Bank account is configured",

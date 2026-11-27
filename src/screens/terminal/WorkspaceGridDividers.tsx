@@ -18,6 +18,7 @@ import {
   writeWorkspaceGridSizes
 } from "./workspace-grid-storage.js";
 import type { LayoutSizes } from "./workspace-grid-storage.js";
+import { gridPaneMinimum, gridTrackTotal } from "./workspace-grid-geometry.js";
 
 type Axis = ChartGridDivider["axis"];
 
@@ -27,6 +28,11 @@ interface Drag {
   handle: HTMLDivElement;
   sizes: readonly number[];
   minimum: number;
+  divider: ChartGridDivider;
+  range: readonly [number, number];
+  position: number;
+  total: number;
+  movement: number;
 }
 
 const breakpoint = "(max-width: 1050px)";
@@ -53,32 +59,6 @@ function trackSizes(grid: HTMLElement, axis: Axis): number[] {
     : [];
 }
 
-function sum(sizes: readonly number[]): number {
-  return sizes.reduce((total, size) => total + size, 0);
-}
-
-function paneMinimum(
-  sizes: readonly number[],
-  definition: ChartLayoutDefinition,
-  axis: Axis,
-  narrow: boolean
-): number {
-  if (axis === "row" && narrow) return 240;
-  if (axis === "row" && definition.id.endsWith("-stack")) return 160;
-  const cells =
-    axis === "column"
-      ? Math.max(
-          ...Array.from(
-            { length: definition.rows },
-            (_, index) =>
-              definition.panes.filter((pane) => pane.rowStart <= index && index < pane.rowEnd)
-                .length
-          )
-        )
-      : sizes.length;
-  return Math.min(axis === "column" ? 128 : 112, (0.8 * sum(sizes)) / cells);
-}
-
 function applySizes(
   grid: HTMLElement,
   axis: Axis,
@@ -101,13 +81,13 @@ function updateHandleValues(
   sizes: readonly number[],
   minimum: number
 ) {
-  const total = sum(sizes);
+  const total = gridTrackTotal(sizes);
   if (total <= 0) return;
   const percent = (pixels: number) => String(Math.round((100 * pixels) / total));
   for (const [index, divider] of dividers.entries()) {
     const handle = layer.children[index];
     if (divider.axis !== axis || !handle) continue;
-    const position = sum(sizes.slice(0, divider.boundary));
+    const position = gridTrackTotal(sizes.slice(0, divider.boundary));
     const [from, to] = chartGridResizeRange(sizes, divider, minimum);
     handle.setAttribute("aria-valuemin", percent(position + from));
     handle.setAttribute("aria-valuemax", percent(position + to));
@@ -130,7 +110,18 @@ function placement({ axis, boundary, cross }: ChartGridDivider) {
 
 function clearDrag(drag: Drag) {
   delete drag.handle.dataset.resizing;
+  drag.handle.style.removeProperty("translate");
   if (drag.handle.hasPointerCapture(drag.id)) drag.handle.releasePointerCapture(drag.id);
+}
+
+function previewDrag(drag: Drag, position: number) {
+  drag.movement = Math.max(drag.range[0], Math.min(position - drag.start, drag.range[1]));
+  drag.handle.style.translate =
+    drag.divider.axis === "column" ? `${drag.movement}px 0` : `0 ${drag.movement}px`;
+  drag.handle.setAttribute(
+    "aria-valuenow",
+    String(Math.round((100 * (drag.position + drag.movement)) / drag.total))
+  );
 }
 
 export function WorkspaceGridDividers({
@@ -167,7 +158,7 @@ export function WorkspaceGridDividers({
         dividers,
         axis,
         current,
-        paneMinimum(current, definition, axis, narrow)
+        gridPaneMinimum(current, definition, axis, narrow)
       );
     }
     return () => {
@@ -175,8 +166,19 @@ export function WorkspaceGridDividers({
       drag.current = null;
       if (current) {
         clearDrag(current);
-        const pending = measurements.get(key);
-        if (owner && pending) writeWorkspaceGridSizes(key, pending);
+        if (current.movement) {
+          const pending = {
+            ...measurements.get(key),
+            [current.divider.axis]: resizeChartGridTracks(
+              current.sizes,
+              current.divider,
+              current.movement,
+              current.minimum
+            )
+          };
+          measurements.set(key, pending);
+          if (owner) writeWorkspaceGridSizes(key, pending);
+        }
       }
       grid.style.removeProperty(columnProperty);
       grid.style.removeProperty(rowProperty);
@@ -210,6 +212,10 @@ export function WorkspaceGridDividers({
     if (!grid || event.button !== 0 || drag.current) return;
     const sizes = trackSizes(grid, divider.axis);
     if (sizes.length < divider.adjacentTracks.end || sizes.some((size) => size <= 0)) return;
+    const minimum = gridPaneMinimum(sizes, definition, divider.axis, narrow);
+    const range = chartGridResizeRange(sizes, divider, minimum);
+    const total = gridTrackTotal(sizes);
+    const position = gridTrackTotal(sizes.slice(0, divider.boundary));
     event.preventDefault();
     const handle = event.currentTarget;
     handle.focus({ preventScroll: true });
@@ -220,21 +226,33 @@ export function WorkspaceGridDividers({
       start: coordinate(event, divider.axis),
       handle,
       sizes,
-      minimum: paneMinimum(sizes, definition, divider.axis, narrow)
+      minimum,
+      divider,
+      range,
+      position,
+      total,
+      movement: 0
     };
+    const percent = (pixels: number) => String(Math.round((100 * pixels) / total));
+    handle.setAttribute("aria-valuemin", percent(position + range[0]));
+    handle.setAttribute("aria-valuemax", percent(position + range[1]));
+    handle.setAttribute("aria-valuenow", percent(position));
   };
 
-  const endDrag = ({ pointerId }: PointerEvent<HTMLDivElement>) => {
+  const endDrag = (event: PointerEvent<HTMLDivElement>) => {
     const current = drag.current;
-    if (current?.id !== pointerId) return;
+    if (current?.id !== event.pointerId) return;
+    if (event.type === "pointerup") previewDrag(current, coordinate(event, current.divider.axis));
     drag.current = null;
     clearDrag(current);
+    if (!current.movement) return;
+    resize(current.divider, current.sizes, current.minimum, current.movement);
     persistSizes();
   };
 
   const keyboardResize = (event: KeyboardEvent<HTMLDivElement>, divider: ChartGridDivider) => {
     const grid = layout.current?.parentElement;
-    if (!grid) return;
+    if (!grid || drag.current) return;
     const forward = divider.axis === "column" ? "ArrowRight" : "ArrowDown";
     const back = divider.axis === "column" ? "ArrowLeft" : "ArrowUp";
     const step = event.shiftKey ? 32 : 12;
@@ -252,7 +270,7 @@ export function WorkspaceGridDividers({
     event.preventDefault();
     const sizes = trackSizes(grid, divider.axis);
     if (sizes.length < divider.adjacentTracks.end || sizes.some((size) => size <= 0)) return;
-    resize(divider, sizes, paneMinimum(sizes, definition, divider.axis, narrow), delta);
+    resize(divider, sizes, gridPaneMinimum(sizes, definition, divider.axis, narrow), delta);
     persistSizes();
   };
 
@@ -276,12 +294,7 @@ export function WorkspaceGridDividers({
             onPointerMove={(event) => {
               const current = drag.current;
               if (current?.id !== event.pointerId) return;
-              resize(
-                divider,
-                current.sizes,
-                current.minimum,
-                coordinate(event, divider.axis) - current.start
-              );
+              previewDrag(current, coordinate(event, current.divider.axis));
             }}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}

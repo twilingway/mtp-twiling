@@ -10,6 +10,11 @@ import { ChartRangeZoomButton, ChartZoomOutButton } from "./ChartRangeZoom.js";
 import { useMobileLayout } from "./use-mobile-layout.js";
 import { magnetMenuSections } from "./drawing-toolbar-magnet-menu.js";
 import {
+  DrawingToolbarLock,
+  selectedToolbarLock,
+  toolbarLockSections
+} from "./drawing-toolbar-lock.js";
+import {
   DrawingToolbarMenu,
   DrawingToolbarSplit,
   type ToolbarMenuItem,
@@ -38,6 +43,7 @@ export function DrawingToolbar() {
   const { controller, state } = useTerminal(selectDrawingToolbarState, shallowEqual);
   const mobile = useMobileLayout();
   const settings = drawingToolbarSettings(state.preferences.chartSettings);
+  const selectedLock = selectedToolbarLock(state);
   const showValuesOnHold = state.preferences.chartSettings.ohlcOnHold === true;
   const [menu, setMenu] = useState<OpenMenu | null>(null);
   const [confirmation, setConfirmation] = useState<{
@@ -143,7 +149,12 @@ export function DrawingToolbar() {
   const scopeRows = (kind: "lock" | "hide"): ToolbarMenuItem[] =>
     targets.map((target) => ({
       id: `${kind}-${target}`,
-      label: t(kind === "lock" ? "Закрепить" : "Скрыть") + " " + t(targetNames[target]),
+      label:
+        t(
+          kind === "lock" ? (scopeActive(kind, target) ? "Разблокировать" : "Закрепить") : "Скрыть"
+        ) +
+        " " +
+        t(targetNames[target]),
       icon: kind === "lock" ? "lock" : "show",
       kind: "radio",
       checked: scopeActive(kind, target),
@@ -206,8 +217,10 @@ export function DrawingToolbar() {
       () => run(() => controller.tools.toggleOption("snapIndicators"), false)
     );
   } else if (menu?.key === "lock") {
-    title = t("Блокировка объектов");
-    sections = [{ title: null, items: scopeRows("lock") }];
+    title = t("Для всех объектов: блокировка");
+    sections = toolbarLockSections(selectedLock, scopeRows("lock"), mobile, () =>
+      run(() => controller.tools.toggleSelectedLock())
+    );
   } else if (menu?.key === "hide") {
     title = t("Видимость объектов");
     const rows = scopeRows("hide");
@@ -220,7 +233,7 @@ export function DrawingToolbar() {
     sections = [{ title: null, items: rows }];
   } else if (menu?.key === "trash") {
     const counts = {
-      drawings: state.drawings.length + state.images.length,
+      drawings: state.objectCount,
       indicators: Object.values(state.preferences.indicators).filter(Boolean).length
     };
     title = t("Удалить объекты");
@@ -402,15 +415,13 @@ export function DrawingToolbar() {
         () => run(() => controller.tools.toggleOption("stayInDrawingMode")),
         settings.stayInDrawingMode
       )}
-      {utility(
-        "lock",
-        t(scopeActive("lock", settings.lockTarget) ? "Открепить" : "Закрепить") +
-          " " +
-          t(targetNames[settings.lockTarget]),
-        "lock",
-        () => run(() => controller.tools.toggleLock()),
-        scopeActive("lock", settings.lockTarget)
-      )}
+      <DrawingToolbarLock
+        status={selectedLock}
+        mobile={mobile}
+        expanded={menu?.key === "lock"}
+        onChoose={() => run(() => controller.tools.toggleSelectedLock())}
+        onMenu={(anchor) => openMenu("lock", anchor)}
+      />
       {utility(
         "hide",
         t(scopeActive("hide", settings.hideTarget) ? "Показать" : "Скрыть") +

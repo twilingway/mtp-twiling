@@ -8,7 +8,7 @@ const load = sourceLoader(),
   { YandexTransport } = load("services/yandex/transport.ts"),
   { prepareDriveBackup, driveBackupDigest } = load("services/drive/backup.ts"),
   { encodeBundle, revisionName } = load("services/yandex/bundle.ts"),
-  { decodeSlot } = load("services/yandex/slot-codec.ts");
+  { decodeSlot, encodeSlot } = load("services/yandex/slot-codec.ts");
 async function fixture() {
   const backend = await localBackend(),
     journal = new YandexJournal(async () => backend),
@@ -45,18 +45,29 @@ async function write(f, timeframe, explicit = true) {
   await f.journal.clearPending(config.clientId, f.auth.accountId, f.auth.signal);
   return revision;
 }
-test("new writes retain two physical files and expose readable current/previous without old DAG parents", async () => {
+test("new writes retain one container with exactly the latest two physical payloads", async () => {
   const f = await fixture();
   const intervals = ["1m", "5m", "15m", "30m", "1h", "1d"];
-  let first;
+  const revisions = [];
   for (let i = 0; i < 6; i++) {
     const revision = await write(f, intervals[i]);
-    if (!first) first = revision;
+    revisions.push(revision);
     const files = [...f.files.keys()].filter((name) => name.startsWith("slot_")),
       inspected = await f.revisions.inspect(() => true);
-    assert.equal(files.length, Math.min(i + 1, 2));
+    assert.equal(files.length, 1);
     assert.deepEqual(inspected.heads, [revision.revisionId]);
     assert.equal(inspected.remotes.length, Math.min(i + 1, 2));
+    const physicalIds = new Set();
+    for (const name of files) {
+      const decoded = await decodeSlot(f.files.get(name));
+      for (const version of [decoded.envelope.current, decoded.envelope.previous])
+        if (version) physicalIds.add(version.revision.revisionId);
+    }
+    assert.deepEqual(
+      physicalIds,
+      new Set(revisions.slice(-2).map(({ revisionId }) => revisionId)),
+      "decode every retained container: no older payload may hide in a fallback previous body"
+    );
     for (const remote of inspected.remotes) {
       const content = await f.revisions.read(remote, () => true),
         value = JSON.parse(await content.payload.text());
@@ -67,8 +78,72 @@ test("new writes retain two physical files and expose readable current/previous 
       false
     );
   }
+});
+
+test("cold prune verifies both latest payloads before deleting any fallback or probing", async () => {
+  for (const damaged of ["current", "previous"]) {
+    const f = await fixture();
+    await write(f, "1m");
+    f.hooks.before = async (url, init) => {
+      if (init.method === "DELETE") throw new TypeError("retain fallback for cold retry");
+    };
+    await write(f, "5m");
+    f.hooks.before = undefined;
+    const [name, body] = [...f.files].find(([key]) => key.endsWith("_2.mtp")),
+      bytes = new Uint8Array(await body.arrayBuffer()),
+      offset = new DataView(bytes.buffer).getUint32(8, false) + 12;
+    bytes[damaged === "current" ? offset : bytes.length - 1] ^= 1;
+    f.files.set(name, new Blob([bytes]));
+    const before = [...f.files],
+      calls = f.calls.length,
+      cold = new YandexRevisions(f.transport, f.journal, f.auth, config.clientId);
+    await cold.retryPrune(() => true);
+    assert.equal(cold.retention.phase, "pending");
+    assert.equal(cold.retention.error, "remote-invalid");
+    assert.deepEqual([...f.files], before);
+    assert.equal(
+      f.calls.slice(calls).some(({ init }) => ["PUT", "POST", "DELETE"].includes(init.method)),
+      false,
+      `${damaged} corruption must stop before proof I/O and fallback deletion`
+    );
+  }
+});
+
+test("cold prune rejects a valid replacement body that differs from its pinned header", async () => {
+  const f = await fixture();
+  await write(f, "1m");
+  f.hooks.before = async (url, init) => {
+    if (init.method === "DELETE") throw new TypeError("retain fallback for cold retry");
+  };
+  await write(f, "5m");
+  f.hooks.before = undefined;
+  const [name, body] = [...f.files].find(([key]) => key.endsWith("_2.mtp")),
+    decoded = await decodeSlot(body),
+    old = decoded.envelope.current,
+    revisionId = crypto.randomUUID(),
+    replacement = await encodeBundle(decoded.prepared.get(old.revision.revisionId), {
+      revisionId,
+      deviceId: old.revision.deviceId,
+      parents: old.revision.parents,
+      digest: old.revision.digest,
+      createdAt: old.revision.createdAt
+    });
+  old.revision = replacement.revision;
+  old.bundle = replacement.reference;
+  old.accepted.find(({ deviceId }) => deviceId === old.revision.deviceId).revisionId = revisionId;
+  const substituted = await encodeSlot(decoded.envelope, replacement.body, decoded.previous),
+    read = f.transport.read.bind(f.transport),
+    calls = f.calls.length;
+  assert.equal(substituted.body.size, body.size);
+  f.transport.read = (file, limit) =>
+    file.name === name ? Promise.resolve(substituted.body) : read(file, limit);
+  const cold = new YandexRevisions(f.transport, f.journal, f.auth, config.clientId);
+  await cold.retryPrune(() => true);
+  assert.equal(cold.retention.phase, "pending");
+  assert.equal(cold.retention.error, "conflict");
+  assert.equal(f.files.size, 2);
   assert.equal(
-    [...f.files.keys()].some((name) => name.includes(first.revisionId)),
+    f.calls.slice(calls).some(({ init }) => ["PUT", "POST", "DELETE"].includes(init.method)),
     false
   );
 });
@@ -81,7 +156,7 @@ test("a very late lower sequence is preserved as an uncertain branch until expli
   f.files.set(oldName, oldBody);
   const before = await f.revisions.inspect(() => true);
   assert.equal(before.heads.length, 2);
-  assert.equal(f.files.size, 3);
+  assert.equal(f.files.size, 2);
   const current = backup("4h"),
     prepared = await prepareDriveBackup(current);
   await assert.rejects(
@@ -97,7 +172,7 @@ test("a very late lower sequence is preserved as an uncertain branch until expli
   assert.ok(f.files.has(oldName));
   await f.journal.clearPending(config.clientId, f.auth.accountId, f.auth.signal);
   await write(f, "4h", true);
-  assert.equal(f.files.size, 2);
+  assert.equal(f.files.size, 1);
   assert.equal((await f.revisions.inspect(() => true)).heads.length, 1);
 });
 
@@ -194,7 +269,7 @@ test("an unknown move result retains staged bytes and pending intent; exact read
   await f.journal.clearPending(config.clientId, f.auth.accountId, f.auth.signal);
   const inspected = await f.revisions.inspect(() => true);
   assert.deepEqual(inspected.heads, [revision.revisionId]);
-  assert.equal(f.files.size, 2);
+  assert.equal(f.files.size, 1);
   for (const body of f.files.values()) assert.ok((await decodeSlot(body)).current.size > 0);
 });
 
@@ -214,7 +289,7 @@ test("a lost response after committed MOVE is reconciled by exact readback witho
   assert.equal(f.puts(), 2);
   const inspected = await f.revisions.inspect(() => true);
   assert.deepEqual(inspected.heads, [revision.revisionId]);
-  assert.equal(f.files.size, 2);
+  assert.equal(f.files.size, 1);
   for (const body of f.files.values()) assert.ok((await decodeSlot(body)).current.size > 0);
 });
 
@@ -228,7 +303,7 @@ test("read-only inspection never prunes a provably obsolete returned file", asyn
   const count = f.calls.length;
   const inspected = await f.revisions.inspect(() => true);
   assert.equal(inspected.heads.length, 1);
-  assert.equal(f.files.size, 3);
+  assert.equal(f.files.size, 2);
   assert.equal(
     f.calls.slice(count).some(({ init }) => ["PUT", "POST", "DELETE"].includes(init.method)),
     false
@@ -266,13 +341,13 @@ test("retention on one ordinary client leaves the other client's physical files 
       journal,
       revisions: new YandexRevisions(f.transport, journal, f.auth, config.clientId)
     };
-  await write(other, "1m");
+  for (const interval of ["1m", "5m", "15m"]) await write(other, interval);
   const device = await journal.deviceId(),
-    foreign = [...f.files.keys()];
+    foreign = new Map(f.files);
   for (const interval of ["5m", "15m", "30m", "1h"]) await write(f, interval);
-  assert.ok(foreign.every((name) => f.files.has(name)));
+  for (const [name, body] of foreign) assert.equal(f.files.get(name), body);
   assert.equal([...f.files.keys()].filter((name) => name.includes(device)).length, 1);
-  assert.equal(f.files.size, 3);
+  assert.equal(f.files.size, 2);
 });
 
 test("a new peer after the pinned inspection cannot be silently accepted by a direct adapter publish", async () => {
@@ -368,7 +443,7 @@ test("same-digest pending intent cannot silently acquire a new causal baseline",
   );
 });
 
-test("cleanup removes the oldest backlog first so its ancestry evidence survives until only two files remain", async () => {
+test("cleanup removes the oldest backlog first until one latest-two carrier remains", async () => {
   const f = await fixture();
   f.hooks.before = async (url, init) => {
     if (
@@ -383,22 +458,22 @@ test("cleanup removes the oldest backlog first so its ancestry evidence survives
   f.hooks.before = undefined;
   const calls = f.calls.length;
   await f.revisions.retryPrune(() => true);
-  assert.equal(f.files.size, 2);
+  assert.equal(f.files.size, 1);
   assert.equal(f.revisions.retention.phase, "complete");
   const removed = f.calls
     .slice(calls)
     .filter(({ init }) => init.method === "DELETE")
     .map(({ url }) => Number(/_(\d+)\.mtp$/.exec(url.searchParams.get("path"))[1]));
-  assert.deepEqual(removed, [1, 2, 3]);
+  assert.deepEqual(removed, [1, 2, 3, 4]);
 });
 
-test("a compatible third file arriving after prune preflight still requires proof before deletion", async () => {
+test("a compatible second file arriving after prune preflight still requires proof before deletion", async () => {
   const f = await fixture();
   await write(f, "1m");
   const [oldName, oldBody] = [...f.files].find(([name]) => name.startsWith("slot_"));
   await write(f, "5m");
   await write(f, "15m");
-  assert.equal(f.files.size, 2);
+  assert.equal(f.files.size, 1);
   const proof = load("services/yandex/slot-proof.ts"),
     ensure = proof.ensureYandexRetentionProof,
     inspect = f.revisions.slots.inspect.bind(f.revisions.slots),
@@ -414,7 +489,7 @@ test("a compatible third file arriving after prune preflight still requires proo
     const result = await inspect(...args);
     if (preflight) {
       preflight = false;
-      assert.equal(result.files.length, 2);
+      assert.equal(result.files.length, 1);
       f.files.set(oldName, oldBody);
     }
     return result;
@@ -432,7 +507,7 @@ test("a compatible third file arriving after prune preflight still requires proo
     await f.revisions.retryPrune(() => true);
     assert.equal(proofCalls, 1);
     assert.deepEqual(events, ["proof", "delete"]);
-    assert.equal(f.files.size, 2);
+    assert.equal(f.files.size, 1);
     assert.equal(f.revisions.retention.phase, "complete");
     assert.equal(f.revisions.retention.deletedFiles, 1);
   } finally {

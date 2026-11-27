@@ -59,12 +59,12 @@ export function TimeZonePicker({
     trigger.current?.focus();
   };
   const keyboard = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (!open) return;
     if (event.key === "Escape") {
       event.preventDefault();
       setOpen(false);
       trigger.current?.focus();
     }
-    if (!open) return;
     if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
       event.preventDefault();
       setActive((previous) =>
@@ -93,7 +93,7 @@ export function TimeZonePicker({
       onClick={(event) => event.stopPropagation()}
       onWheel={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
-        event.stopPropagation();
+        if (event.key !== "Escape" || open) event.stopPropagation();
         keyboard(event);
       }}
     >

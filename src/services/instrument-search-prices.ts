@@ -1,16 +1,29 @@
-import { isBankIdentity, isReservedProviderId } from "../model/market-provider.js";
+import {
+  isBankIdentity,
+  isReservedProviderId,
+  isProviderRef,
+  providerSeriesId
+} from "../model/market-provider.js";
 import { quotation } from "../model/market-model.js";
 import type { CatalogInstrument } from "../model/types.js";
 import { list, object, text } from "./types.js";
+import { loadPublicSearchPrices } from "./instrument-search-public-prices.js";
 
 export const INSTRUMENT_SEARCH_PRICE_LIMIT = 24;
 
 export function bankSearchQuoteUid(item: CatalogInstrument): string | undefined {
   const uid = item.uid ?? item.instrumentUid;
-  return item.kind === "share" && uid && isBankIdentity({ ...item, uid }) ? uid : undefined;
+  return uid && isBankIdentity({ ...item, uid }) ? uid : undefined;
+}
+
+export function instrumentSearchQuoteId(item: CatalogInstrument): string | undefined {
+  if (item.providerRef)
+    return isProviderRef(item.providerRef) ? providerSeriesId(item.providerRef) : undefined;
+  return bankSearchQuoteUid(item);
 }
 
 interface Requester {
+  readonly authenticated?: boolean;
   request(
     service: string,
     method: string,
@@ -19,7 +32,7 @@ interface Requester {
   ): Promise<Record<string, unknown>>;
 }
 
-export async function loadInstrumentSearchPrices(
+async function loadBankSearchPrices(
   client: Requester,
   ids: readonly string[],
   signal: AbortSignal
@@ -48,4 +61,24 @@ export async function loadInstrumentSearchPrices(
       prices.set(uid, value);
   }
   return prices;
+}
+
+/** One bounded batch of visible identities; partial provider failures leave missing prices empty. */
+export async function loadInstrumentSearchPrices(
+  client: Requester,
+  ids: readonly string[],
+  signal: AbortSignal
+): Promise<Map<string, number>> {
+  signal.throwIfAborted();
+  const batch = [...new Set(ids.filter(Boolean))].slice(0, INSTRUMENT_SEARCH_PRICE_LIMIT);
+  const results = await Promise.allSettled([
+    client.authenticated === false
+      ? Promise.resolve(new Map<string, number>())
+      : loadBankSearchPrices(client, batch, signal),
+    loadPublicSearchPrices(batch, signal)
+  ]);
+  signal.throwIfAborted();
+  return new Map(
+    results.flatMap((result) => (result.status === "fulfilled" ? [...result.value] : []))
+  );
 }

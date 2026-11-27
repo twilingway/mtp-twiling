@@ -52,8 +52,12 @@ export async function localBackend() {
       if (!records.has(id)) records.set(id, create());
       return structuredClone(records.get(id));
     },
-    remove: async (id, signal, generation) => {
+    remove: async (id, signal, generation, pending) => {
       signal?.throwIfAborted();
+      const value = records.get(id);
+      if (pending && (value?.revision?.revisionId !== pending.revisionId ||
+        value?.accountId !== pending.accountId || value?.credentialGeneration !== pending.credentialGeneration ||
+        value?.reference?.sha256 !== pending.sha256 || value?.reference?.size !== pending.size)) return;
       if (!generation || records.get(id)?.generation === generation) records.delete(id);
     }
   };

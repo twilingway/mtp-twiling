@@ -23,7 +23,7 @@ export async function retainYandexSlots(
       own = snapshot.files.filter(
         ({ envelope }) => envelope.current.revision.deviceId === deviceId
       );
-    if (own.length <= 2) return { phase: "complete", keptFiles: own.length, deletedFiles };
+    if (own.length <= 1) return { phase: "complete", keptFiles: own.length, deletedFiles };
     if (snapshot.uncertain.length)
       return { phase: "pending", keptFiles: own.length, deletedFiles, error: "conflict" };
     const candidate = snapshot.obsolete
@@ -31,6 +31,15 @@ export async function retainYandexSlots(
       .sort((a, b) => a.envelope.current.seq - b.envelope.current.seq)[0];
     if (!candidate)
       return { phase: "pending", keptFiles: own.length, deletedFiles, error: "conflict" };
+    const latest = snapshot.latest.find(
+      ({ envelope }) => envelope.current.revision.deviceId === deviceId
+    );
+    if (!latest) throw new YandexError("conflict");
+    // Headers prove ancestry, not recoverability. Validate both complete payloads before
+    // removing any fallback, including a cold retry with no previously decoded bodies.
+    const decoded = await store.body(latest.file, valid);
+    if (JSON.stringify(decoded.envelope) !== JSON.stringify(latest.envelope))
+      throw new YandexError("conflict");
     const after = await transport.list();
     assertCurrent(signal, valid);
     if (slotFingerprint(before) !== slotFingerprint(after)) throw new YandexError("conflict");

@@ -83,6 +83,18 @@ export class YandexJournal {
       throw new YandexError("local-save");
     return value;
   }
+  async matchesCurrentDevice(id: string): Promise<boolean> {
+    const settings = await this.settings();
+    if (!settings.enabled) return false;
+    if (settings.clientMode === "test") return id === CLOUD_TEST_CLIENT_ID;
+    const value = await (await this.backend()).read("mtp:yandex:device:device-id");
+    return (
+      typeof value === "string" &&
+      uuidPattern.test(value) &&
+      value !== CLOUD_TEST_CLIENT_ID &&
+      value === id
+    );
+  }
   async association(clientId: string, accountId: string): Promise<YandexAssociation | undefined> {
     const value = await (
         await this.backend()
@@ -158,8 +170,28 @@ export class YandexJournal {
       signal
     );
   }
-  async clearPending(clientId: string, accountId: string, signal: AbortSignal): Promise<void> {
-    await (await this.backend()).remove(this.prefix(clientId, accountId) + "pending", signal);
+  async clearPending(
+    clientId: string,
+    accountId: string,
+    signal: AbortSignal,
+    expected?: YandexPending
+  ): Promise<void> {
+    await (
+      await this.backend()
+    ).remove(
+      this.prefix(clientId, accountId) + "pending",
+      signal,
+      undefined,
+      expected
+        ? {
+            accountId: expected.accountId,
+            credentialGeneration: expected.credentialGeneration,
+            revisionId: expected.revision.revisionId,
+            sha256: expected.reference.sha256,
+            size: expected.reference.size
+          }
+        : undefined
+    );
   }
   async applyIntent(clientId: string, accountId: string): Promise<YandexApplyIntent | undefined> {
     const value = await (

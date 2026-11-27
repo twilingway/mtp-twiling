@@ -11,7 +11,6 @@ import type { TerminalController } from "./controller.js";
 import { TerminalBrandMenu } from "./TerminalBrandMenu.js";
 import { TerminalFullscreenControl } from "./TerminalFullscreenControl.js";
 import { TerminalIndicatorControls } from "./TerminalIndicatorControls.js";
-import { MobileChartTools } from "./MobileChartTools.js";
 import { TimeframeMenu } from "./intervals/TimeframeMenu.js";
 import { isNativeIntervalId } from "../../model/intervals/registry.js";
 import { DERIVED_INTERVAL_UNAVAILABLE } from "../../model/intervals/native-timeframes.js";
@@ -40,26 +39,8 @@ export function Toolbar({
     <header className="topbar">
       <ToolbarScroll>
         <TerminalBrandMenu account={account} accountState={accountState} editor={controller}>
-          {(close, open) => (
+          {() => (
             <>
-              {open && (
-                <MobileChartTools
-                  controller={account}
-                  panelOpen={
-                    !!accountState.mobilePanelOpen && !accountState.preferences.rightPanelCollapsed
-                  }
-                  objectsOpen={accountState.objectPanel}
-                  disabled={
-                    !!(
-                      accountState.profileTransition ||
-                      accountState.importingBackup ||
-                      accountState.importRecoveryRequired ||
-                      accountState.backupBusy
-                    )
-                  }
-                  onAction={close}
-                />
-              )}
               <div id="install-actions" className="install-actions" hidden>
                 <button type="button" id="install-app" className="install-button">
                   {t("Установить приложение")}

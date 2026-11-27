@@ -16,7 +16,7 @@ import {
   sortInstrumentSearch
 } from "../../model/instrument-search-sort.js";
 import type { InstrumentSearchOrder } from "../../model/instrument-search-sort.js";
-import { bankSearchQuoteUid } from "../../services/instrument-search-prices.js";
+import { instrumentSearchQuoteId } from "../../services/instrument-search-prices.js";
 import { catalogInstrumentKind } from "../../model/currency-search.js";
 import { chartPriceFormat } from "../../charts/price-format.js";
 import { quotation } from "../../model/market-model.js";
@@ -185,7 +185,8 @@ export function InstrumentSearch({
     [current, cleanQuery, response.items, order, locale]
   );
   const results = cleanQuery ? matched : displayed.map(watchlistInstrument);
-  const priceClient = cleanQuery && state.authenticated ? controller.sessionKey() : null;
+  const priceClient =
+    cleanQuery && (state.authenticated || state.marketReady) ? controller.sessionKey() : null;
   const { list, prices } = useInstrumentSearchPrices(
     priceClient,
     state.owner,
@@ -346,7 +347,7 @@ export function InstrumentSearch({
             const row = cleanQuery ? searchWatchlistRow(state.rows, item) : displayed[index];
             const details = metadata(item);
             const action = t(row ? "Удалить из списка котировок" : "Добавить в список котировок");
-            const quoteUid = bankSearchQuoteUid(item);
+            const quoteUid = instrumentSearchQuoteId(item);
             const price = priceLabel(item, row, quoteUid ? prices.get(quoteUid) : undefined);
             return (
               <div key={key} className="instrument-result" data-search-quote-uid={quoteUid}>

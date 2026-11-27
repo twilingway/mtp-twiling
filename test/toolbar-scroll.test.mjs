@@ -137,9 +137,12 @@ test("toolbar popover escapes the strip, clamps its anchor and dismisses on stri
   assert.equal(closed, 1);
   scroll.dispatchEvent(new Event("scroll"));
   assert.equal(closed, 2);
+  window.dispatchEvent(new Event("resize"));
+  window.visualViewport.dispatchEvent(new Event("resize"));
+  assert.equal(closed, 4);
   cleanup();
   scroll.dispatchEvent(new Event("scroll"));
-  assert.equal(closed, 2);
+  assert.equal(closed, 4);
   const retained = ToolbarPopover({
     anchor,
     open: false,
@@ -151,6 +154,131 @@ test("toolbar popover escapes the strip, clamps its anchor and dismisses on stri
   assert.equal(retained.node.props.children, "install-ids");
   detach();
   assert.equal(host.parent, null);
+});
+
+test("account popover follows keyboard viewport changes without dismissing or refocusing", (t) => {
+  const saved = { window: globalThis.window, document: globalThis.document };
+  t.after(() => Object.assign(globalThis, saved));
+  const effects = [],
+    positions = [],
+    frames = new Map();
+  let focused = 0,
+    closed = 0,
+    reads = 0,
+    frameId = 0;
+  const visibilityScrolls = [];
+  let searchBounds = { top: 435, bottom: 455 };
+  const search = {
+    getBoundingClientRect: () => searchBounds,
+    scrollIntoView: (options) => visibilityScrolls.push(options)
+  };
+  const panel = {
+    getBoundingClientRect: () => {
+      reads++;
+      return { width: 328, height: 700, top: 50.5, bottom: 422 };
+    },
+    contains: (node) => node === search,
+    querySelector: () => ({ focus: () => focused++ })
+  };
+  const strip = new EventTarget();
+  const anchor = {
+    current: {
+      getBoundingClientRect: () => {
+        reads++;
+        return { left: 8, top: 4, bottom: 44 };
+      },
+      closest: () => strip
+    }
+  };
+  const window = new EventTarget();
+  window.visualViewport = Object.assign(new EventTarget(), {
+    offsetLeft: 0,
+    offsetTop: 0,
+    width: 392,
+    height: 800
+  });
+  window.requestAnimationFrame = (callback) => {
+    frames.set(++frameId, callback);
+    return frameId;
+  };
+  window.cancelAnimationFrame = (id) => frames.delete(id);
+  globalThis.window = window;
+  globalThis.document = Object.assign(new EventTarget(), {
+    activeElement: search,
+    body: { append() {} },
+    createElement: () => ({ remove() {} })
+  });
+  const load = createSourceLoader({
+    react: {
+      useEffectEvent: (callback) => callback,
+      useRef: () => ({ current: panel }),
+      useState: (initial) => [
+        initial ? initial() : positions.at(-1),
+        (value) => positions.push(value)
+      ],
+      useLayoutEffect: (callback) => effects.push(callback)
+    },
+    "react-dom": { createPortal: (node) => node },
+    "react/jsx-runtime": { jsx, jsxs: jsx }
+  });
+  const { ToolbarPopover } = load("screens/terminal/ToolbarPopover.js");
+  ToolbarPopover({
+    anchor,
+    open: true,
+    resizeBehavior: "reposition",
+    onClose: () => closed++,
+    children: "zone search"
+  });
+  const detach = effects[0]();
+  const cleanup = effects[1]();
+  assert.equal(positions.at(-1).maxHeight, 742);
+  window.visualViewport.height = 380;
+  window.visualViewport.dispatchEvent(new Event("resize"));
+  window.dispatchEvent(new Event("resize"));
+  window.visualViewport.dispatchEvent(new Event("scroll"));
+  assert.equal(frames.size, 1);
+  assert.equal(reads, 2);
+  const flush = () => {
+    const [id, callback] = frames.entries().next().value;
+    frames.delete(id);
+    callback();
+  };
+  flush();
+  assert.equal(reads, 4);
+  assert.equal(positions.at(-1).maxHeight, 322);
+  assert.equal(positions.at(-1)["--toolbar-popover-height"], "322px");
+  assert.equal(focused, 1);
+  assert.equal(closed, 0);
+  const recheckVisibility = () => {
+    ToolbarPopover({
+      anchor,
+      open: true,
+      resizeBehavior: "reposition",
+      onClose: () => closed++,
+      children: "zone search"
+    });
+    effects.at(-1)();
+  };
+  recheckVisibility();
+  assert.deepEqual(visibilityScrolls, [{ block: "nearest", inline: "nearest" }]);
+  assert.equal(focused, 1);
+  searchBounds = { top: 350, bottom: 370 };
+  recheckVisibility();
+  assert.equal(visibilityScrolls.length, 1);
+  window.visualViewport.offsetTop = 70;
+  window.visualViewport.dispatchEvent(new Event("scroll"));
+  flush();
+  assert.equal(positions.at(-1).top, 78);
+  assert.equal(positions.at(-1).maxHeight, 364);
+  window.visualViewport.dispatchEvent(new Event("resize"));
+  assert.equal(frames.size, 1);
+  cleanup();
+  assert.equal(frames.size, 0);
+  window.dispatchEvent(new Event("resize"));
+  window.visualViewport.dispatchEvent(new Event("scroll"));
+  assert.equal(frames.size, 0);
+  assert.equal(closed, 0);
+  detach();
 });
 
 test("calendar badges use D/W/M in English without changing interval IDs or durations", () => {
