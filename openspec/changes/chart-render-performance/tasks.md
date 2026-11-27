@@ -27,3 +27,5 @@
 - [x] 6.5 Добавить отдельный сигнал adapter ready после initial data/view и cleanup, сохранив
       quote/candle gates; проверить настоящий async useChartCanvas без parent/store render тестом
       `terminal-quote-react.test.mjs`.
+- [x] 6.6 Дождаться фактического native view ограниченной initial-only RAF-проверкой; проверить
+      позднюю готовность, 120-frame cap, guards и cleanup в `terminal-quote-react.test.mjs`.

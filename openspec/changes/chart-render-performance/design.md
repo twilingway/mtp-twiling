@@ -69,6 +69,12 @@ measure/zoom/zoom-out на 20 котировок либо 20 live-candle соб�
   обновления сигнал не публикуют; chartRevision и portable state не изменяются. Тест настоящего
   useChartCanvas проверяет attach без повторного render родителя, неизменный snapshot/revision,
   отключение при cleanup, независимость controller и отсутствие уведомлений на 20 live ticks.
+- Нативный view может отсутствовать сразу после setData и появиться в последующих кадрах SDK.
+  Проверка готовности ограничена 120 RAF-повторами на attach/firstdata/persist boundary и проверяет
+  matches/owned/session/route перед чтением view. null→null не публикуется; переход к настоящему
+  view публикуется один раз, после чего цикл прекращается. Cleanup отменяет ожидающий RAF. Тест SDK
+  оставляет getView равным null до управляемых поздних кадров и проверяет автоматическое включение
+  кнопки без parent/store update, предел повторов, guards и отсутствие событий после отмены.
 - Watchlist, его таблица и фильтр сохраняют реальные rows/quotes и состояния импорта, исключая
   candles. Вложенные ApplicationInfo, BackupTransferSettings, DetailsDivider, внешний
   InstrumentDetails и TechnicalObjectTree также имеют самостоятельные селекторы. TechnicalRows

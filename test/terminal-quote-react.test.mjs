@@ -23,7 +23,8 @@ const text = (node) => typeof node === "string" ? node : node && typeof node ===
 function environment() {
   const keys = ["window", "document", "requestAnimationFrame", "cancelAnimationFrame", "ResizeObserver"];
   const saved = Object.fromEntries(keys.map((key) => [key, globalThis[key]]));
-  const frames = [];
+  const frames = new Map();
+  let frameId = 0;
   class Element {}
   const doc = { nodeType: 9, addEventListener: noop, removeEventListener: noop, activeElement: null,
     documentElement: { classList: { add: noop, remove: noop } },
@@ -33,12 +34,18 @@ function environment() {
     matchMedia: () => ({ matches: false, addEventListener: noop, removeEventListener: noop }) };
   globalThis.document = doc;
   globalThis.ResizeObserver = class { observe() {} disconnect() {} };
-  globalThis.requestAnimationFrame = (run) => { frames.push(run); return frames.length; };
-  globalThis.cancelAnimationFrame = noop;
+  globalThis.requestAnimationFrame = (run) => { frames.set(++frameId, run); return frameId; };
+  globalThis.cancelAnimationFrame = (id) => frames.delete(id);
+  const advanceFrame = () => {
+    const entry = frames.entries().next().value;
+    if (entry) { frames.delete(entry[0]); entry[1](); }
+  };
   return {
     container: { nodeType: 1, tagName: "DIV", nodeName: "DIV", namespaceURI: "http://www.w3.org/1999/xhtml",
       ownerDocument: doc, addEventListener: noop, removeEventListener: noop },
-    flushFrames: () => { while (frames.length) frames.shift()(); },
+    advanceFrame,
+    pendingFrames: () => frames.size,
+    flushFrames: () => { while (frames.size) advanceFrame(); },
     restore: () => { for (const key of keys) {
       if (saved[key] === undefined) delete globalThis[key]; else globalThis[key] = saved[key];
     } }
@@ -166,7 +173,7 @@ test("real controller quote/candle events leave static component hooks idle and 
   }
 });
 
-test("actual async canvas lifecycle enables ZoomOut after setData without parent/store updates", async () => {
+test("actual async canvas lifecycle waits for a later native view frame without parent/store updates", async () => {
   const env = environment();
   let releaseView;
   const viewGate = new Promise((resolve) => { releaseView = resolve; });
@@ -177,9 +184,12 @@ test("actual async canvas lifecycle enables ZoomOut after setData without parent
       saveChartView: async () => {} },
     "screens/terminal/chart-price-metadata.ts": { watchChartPriceMetadata: () => noop },
     "charts/lightweight.ts": { makeLightweight: () => {
-      let hasData = false;
-      return { getView: () => hasData ? { camera: { barSpace: 8 } } : null, zoom: noop,
-        setView: () => calls.push("view"), setData: () => { calls.push("data"); hasData = true; },
+      let nativeViewReady = false;
+      return { getView: () => nativeViewReady ? { camera: { barSpace: 8 } } : null, zoom: noop,
+        setView: () => calls.push("view"), setData: () => {
+          calls.push("data");
+          requestAnimationFrame(() => requestAnimationFrame(() => { nativeViewReady = true; }));
+        },
         updateBar: () => calls.push("tick"), redrawDrawings: noop,
         destroy: () => calls.push("destroy") };
     } }
@@ -197,6 +207,7 @@ test("actual async canvas lifecycle enables ZoomOut after setData without parent
   const signal = chartAdapterReadySignal(c), otherSignal = chartAdapterReadySignal({});
   const stop = signal.subscribe(() => {
     assert.ok(c.chart === null || calls.includes("data"), "ready must follow initial setData");
+    assert.ok(c.chart === null || c.chart.getView(), "notification must wait for an actual native view");
     assert.equal(otherSignal.getSnapshot(), 0, "controllers have independent signals");
   });
   let button, commits = 0;
@@ -224,8 +235,19 @@ test("actual async canvas lifecycle enables ZoomOut after setData without parent
     assert.equal(c.getSnapshot(), before);
     assert.equal(c.getSnapshot().chartRevision, revision);
     assert.deepEqual(calls.slice(0, 2), ["view", "data"]);
+    assert.equal(c.chart.getView(), null);
+    assert.equal(button.props.disabled, true);
+    assert.equal(signal.getSnapshot(), 0, "pending native layout must not publish readiness");
+    env.advanceFrame();
+    env.advanceFrame();
+    sync(noop);
+    assert.equal(c.chart.getView(), null);
+    assert.equal(signal.getSnapshot(), 0, "null-to-null probes must remain silent");
+    env.flushFrames();
+    sync(noop);
     assert.equal(button.props.disabled, false);
     assert.equal(signal.getSnapshot(), 1);
+    assert.equal(env.pendingFrames(), 0, "the ready transition must stop the retry loop");
     const readyCommits = commits;
     for (let index = 0; index < 20; index++) sync(() => c.update({ candles: [bar(1000, 101 + index)] }));
     assert.equal(commits, readyCommits, "live candle content must not publish readiness");
@@ -238,10 +260,46 @@ test("actual async canvas lifecycle enables ZoomOut after setData without parent
     assert.equal(c.getSnapshot(), beforeCleanup);
     assert.equal(button.props.disabled, true);
     assert.equal(signal.getSnapshot(), 2);
+    assert.equal(env.pendingFrames(), 0);
   } finally {
     stop();
     sync(() => root.unmount());
     await new Promise(setImmediate);
+    env.restore();
+  }
+});
+
+test("adapter readiness retries are bounded, guard route changes and cancel on cleanup", () => {
+  const env = environment();
+  const { chartAdapterReadySignal, observeChartAdapterReady } = sourceModules()("screens/terminal/chart-adapter-ready.js");
+  const controller = {};
+  const signal = chartAdapterReadySignal(controller);
+  let reads = 0, valid = true, current = null;
+  const chart = { getView: () => { reads++; return null; } };
+  const observer = observeChartAdapterReady(controller, () => current, () => valid);
+  try {
+    observer.check();
+    assert.equal(env.pendingFrames(), 0, "empty initial history must not poll");
+    current = chart;
+    observer.check();
+    env.flushFrames();
+    assert.equal(reads, 121, "one immediate probe and at most 120 frame retries");
+    assert.equal(env.pendingFrames(), 0);
+    assert.equal(signal.getSnapshot(), 0);
+    observer.check();
+    valid = false;
+    const before = reads;
+    env.advanceFrame();
+    assert.equal(reads, before, "stale owner/session/route guards must run before reading the adapter");
+    assert.equal(env.pendingFrames(), 0);
+    valid = true;
+    observer.check();
+    observer.stop();
+    assert.equal(env.pendingFrames(), 0);
+    env.flushFrames();
+    assert.equal(signal.getSnapshot(), 0, "pending cleanup must not publish a false ready transition");
+  } finally {
+    observer.stop();
     env.restore();
   }
 });
