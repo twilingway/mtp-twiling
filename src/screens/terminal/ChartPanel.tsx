@@ -35,12 +35,10 @@ const Version = memo(function Version() {
 export function ChartPanel({
   slot = 1,
   active = true,
-  gridDepth = false,
   activate
 }: {
   slot?: number;
   active?: boolean;
-  gridDepth?: boolean;
   activate?: () => void;
 } = {}) {
   const [scrollTop, setScrollTop] = useState(0);
@@ -125,11 +123,11 @@ export function ChartPanel({
     >
       <div
         className="chart-heading"
-        data-grid-depth={gridDepth || undefined}
+        data-grid-depth="true"
         style={{
           maxHeight: headingHeight,
           visibility: headingHeight === 0 ? "hidden" : undefined,
-          ...(gridDepth && price?.width && { width: price.width, right: "auto" })
+          ...(price?.width && { width: price.width, right: "auto" })
         }}
       >
         <div className="chart-instrument-heading">
@@ -186,7 +184,7 @@ export function ChartPanel({
               />
             )}
           </div>
-          {gridDepth && <ChartRangeControl slot={slot} placement="plot" />}
+          <ChartRangeControl slot={slot} placement="plot" />
         </div>
         {ohlcMode === "corner" && (
           <OhlcLegend
@@ -309,7 +307,6 @@ export function ChartPanel({
         </ChartGestures>
       </div>
       {slot === 1 && <ChartNavigation />}
-      {!gridDepth && <ChartRangeControl slot={slot} />}
       {slot === 1 && <Version />}
     </section>
   );

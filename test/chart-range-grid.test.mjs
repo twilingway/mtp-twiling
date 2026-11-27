@@ -3,9 +3,9 @@ import test from "node:test";
 import { find } from "./controller-preference-routing-fixture.mjs";
 import { createSourceLoader } from "./technical-volume-registration-fixture.mjs";
 
-function fixture(rangeDays, historyViewReady) {
+function fixture(rangeDays, historyViewReady, flags = {}) {
   const actions = [];
-  const state = { owner: "fixture", historyViewReady, preferences: { rangeDays } };
+  const state = { owner: "fixture", historyViewReady, preferences: { rangeDays }, ...flags };
   const controller = {
     getSnapshot: () => state,
     setPreferences: async (patch) => actions.push(patch)
@@ -49,13 +49,35 @@ test("each compact plot select is labelled and changes only the scoped panel's h
   assert.deepEqual(first.actions, []);
 });
 
-test("single-chart footer and mobile entry retain the existing control and identifiers", () => {
+test("single chart defaults to the plot selector and retains its mobile menu entry", () => {
   const { ChartRangeControl, Clock } = fixture(1825, false);
-  const footer = ChartRangeControl();
+  const plot = ChartRangeControl();
   const toolbar = ChartRangeControl({ placement: "toolbar" });
-  assert.equal(footer.props["data-placement"], "footer");
-  assert.equal(find(footer, (node) => node.type === "select").props.id, "range");
-  assert.equal(find(footer, (node) => node.type === Clock).type, Clock);
+  assert.equal(plot.props["data-placement"], "plot");
+  assert.equal(find(plot, (node) => node.type === "select").props.id, "range-plot-1");
+  assert.equal(
+    find(plot, (node) => node.type === Clock),
+    null
+  );
   assert.equal(find(toolbar, (node) => node.type === "select").props.id, "mobile-chart-range");
   assert.equal(find(toolbar, (node) => node.type === "select").props.disabled, true);
+});
+
+test("plot history control preserves loading, import and recovery guards and custom depth values", () => {
+  for (const flag of ["loading", "backupBusy", "importingBackup", "importRecoveryRequired"]) {
+    const { ChartRangeControl } = fixture(1080, true, { [flag]: true });
+    const tree = ChartRangeControl({ slot: 12 });
+    const select = find(tree, (node) => node.type === "select");
+    assert.equal(select.props.disabled, true, flag);
+    assert.equal(select.props.id, "range-plot-12");
+    assert.equal(select.props.value, 1080);
+    assert.equal(
+      find(tree, (node) => node.type === "option" && node.props.value === 1080).props.value,
+      1080
+    );
+    assert.equal(
+      find(tree, (node) => node.props?.className === "chart-depth-days").props.children[0],
+      1080
+    );
+  }
 });

@@ -99,7 +99,7 @@ test("mobile history uses the active chart and does not duplicate its original i
   assert.equal(select.props.id, "mobile-chart-range");
   assert.equal(
     find(ChartRangeControl({ slot: 2 }), (node) => node.type === "select").props.id,
-    "range-2"
+    "range-plot-2"
   );
   select.props.onChange({ target: { value: "30" } });
   assert.deepEqual(actions, [["active preferences", { rangeDays: 30 }]]);
