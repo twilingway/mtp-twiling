@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { sourceLoader } from "./helpers/market-source-loader.mjs";
 
@@ -138,10 +139,10 @@ function transport() {
     async patch(id, etag, body) {
       ++patches;
       const file = files.get(id);
-      if (etag !== `"v${file.seq}"`) return new Response(null, { status: 412 });
+      if (etag !== `"v${file.seq}"`) return { response: new Response(null, { status: 412 }) };
       files.set(id, { key: file.key, body, seq: file.seq + 1 });
       if (lost) throw new TypeError("Transport response unavailable");
-      return new Response(null, { status: 204 });
+      return { response: new Response(null, { status: 204 }) };
     }
   };
   return {
@@ -155,7 +156,7 @@ function transport() {
   };
 }
 
-test("one physical file retains the two latest complete versions, including a lost PATCH response", async () => {
+test("one physical file retains the two latest complete versions after a lost replacement response", async () => {
   const mock = transport();
   const store = new DeviceSlotStore(mock.io, () => 1 << 20);
   let captured;
@@ -346,6 +347,15 @@ test("binary browser probe uses identical upload media framing and enables only 
   let media;
   let seq = 1;
   let conditionalWrites = 0;
+  const metadata = async (version = seq) => ({
+    id,
+    version: String(version),
+    etag: `"sequence-${seq}"`,
+    fileSize: String(media.size),
+    sha256Checksum: createHash("sha256")
+      .update(Buffer.from(await media.arrayBuffer()))
+      .digest("hex")
+  });
   const authorization = {
     signal,
     getAccessToken: () => "synthetic-token",
@@ -374,16 +384,23 @@ test("binary browser probe uses identical upload media framing and enables only 
       media = new Blob([multipart.subarray(data, close)]);
       return Response.json({ ...metadata, id, size: String(media.size) });
     }
-    if (init.method === "PATCH") {
+    if (init.method === "PUT") {
+      assert.equal(url.pathname, `/upload/drive/v2/files/${id}`);
+      assert.equal(url.searchParams.get("uploadType"), "media");
       assert.equal(headers.get("Content-Type"), "application/octet-stream");
       conditionalWrites++;
       if (headers.get("If-Match") !== etag()) return new Response(null, { status: 412 });
       media = init.body;
       seq++;
-      return new Response(null, { status: 204 });
+      // Drive's receipt version can lag the stable metadata while the strong ETag agrees.
+      return Response.json(await metadata(seq - 1), { headers: { ETag: etag() } });
+    }
+    if (url.pathname === `/drive/v2/files/${id}`) {
+      assert.ok(url.searchParams.get("fields").includes("sha256Checksum"));
+      return Response.json(await metadata(), { headers: { ETag: etag() } });
     }
     assert.equal(url.searchParams.get("alt"), "media");
-    return new Response(media, { headers: { "Content-Length": String(media.size), ETag: etag() } });
+    return new Response(media, { headers: { "Content-Length": String(media.size) } });
   };
   assert.equal(verifiedDeviceSlotUploadBytes(authorization), 0);
   const result = await runDriveSlotBinaryProbe(authorization, fetcher, signal, 32);

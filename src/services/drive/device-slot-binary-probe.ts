@@ -114,10 +114,13 @@ export async function runDriveSlotBinaryProbe(
   );
   const winner = outcomes.find((result) => result !== 412);
   if (!winner || !outcomes.includes(412)) throw new DeviceSlotCasError("probe");
-  const after = await io.read(fileId, scope);
+  const after = await io.read(fileId, scope, false, winner.metadata);
   const final = await decodeDeviceSlotPackage(after.body, scope);
   const envelopeHash = await sha256(encodeDeviceSlotEnvelope(final.envelope));
   if (
+    !before.metadata ||
+    !after.metadata ||
+    BigInt(after.metadata.version) <= BigInt(before.metadata.version) ||
     strongDeviceSlotTag(after.etag) !== winner.etag ||
     envelopeHash !== (await sha256(encodeDeviceSlotEnvelope(winner.package.envelope)))
   )

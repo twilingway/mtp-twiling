@@ -12,7 +12,7 @@ const { googleSlotStorageOwner, GOOGLE_SLOT_ACTIVE_OWNER } = load(
   "services/drive/workspace-binding.ts"
 );
 const { DRIVE_SCOPE, DRIVE_CLIENT_ID } = load("services/drive/types.ts");
-const { prepareDriveBackup, driveBackupDigest } = load("services/drive/backup.ts");
+const { prepareDriveBackup, driveBackupDigest, sha256 } = load("services/drive/backup.ts");
 const { DEVICE_SLOT_NAMESPACE, deviceSlotKey } = load("services/drive/device-slot-model.ts");
 const { prepareDeviceSlotVersion, encodeDeviceSlotPackage } = load(
   "services/drive/device-slot-package.ts"
@@ -137,6 +137,7 @@ async function fixture(t, hasRemote, hasRemoteB = false) {
     return {
       envelope,
       media,
+      checksum: await sha256(media),
       file: {
         id,
         size: String(media.size),
@@ -223,13 +224,23 @@ async function fixture(t, hasRemote, hasRemoteB = false) {
           assert.equal(method, "GET", "This selected-history fixture never writes cloud data");
           reads++;
           const selected = remote[account];
+          if (url.pathname.startsWith("/drive/v2/files/")) {
+            assert.equal(url.pathname, `/drive/v2/files/${selected?.file.id}`);
+            return Response.json({
+              id: selected.file.id,
+              etag: '"v1"',
+              version: "1",
+              fileSize: String(selected.media.size),
+              sha256Checksum: selected.checksum
+            });
+          }
           if (url.searchParams.get("alt") === "media") {
             assert.equal(
               url.pathname,
               `/drive/v3/files/${selected?.file.id}`,
               "No account may read the other account's pinned file"
             );
-            return new Response(selected.media, { headers: { ETag: '"v1"' } });
+            return new Response(selected.media);
           }
           const v3 = url.searchParams.get("q").includes(DEVICE_SLOT_NAMESPACE);
           return Response.json({ files: selected && v3 ? [selected.file] : [] });
@@ -596,33 +607,44 @@ test("disabling waits for an entered local effect but does not wait for a dispat
     release();
   }
   await applying;
-  const disabled = await disabling;
+  let disabled = await disabling;
   assert.equal(disabled.enabled, false);
   await assert.rejects(fence.check(), { name: "AbortError" });
   assert.equal(stale, true);
 
-  const enabled = await updateGoogleSlotTarget(disabled, { enabled: true }, access, signal);
-  const next = googleSlotFence(enabled, access, signal, () => true, assert.fail);
-  let dispatch, respond;
-  const dispatched = new Promise((resolve) => {
-    dispatch = resolve;
-  });
-  const waitForResponse = new Promise((resolve) => {
-    respond = resolve;
-  });
-  const fetcher = next.guardFetch(() => {
-    dispatch();
-    return waitForResponse;
-  });
-  const request = fetcher("https://example.test", { method: "PATCH" });
-  await dispatched;
-  try {
-    assert.equal(
-      (await updateGoogleSlotTarget(enabled, { enabled: false }, access, signal)).enabled,
-      false
+  for (const method of ["POST", "PATCH", "PUT"]) {
+    const enabled = await updateGoogleSlotTarget(disabled, { enabled: true }, access, signal);
+    const next = googleSlotFence(
+      enabled,
+      access,
+      signal,
+      () => true,
+      (state) => assert.equal(state, false)
     );
-  } finally {
-    respond(new Response(null, { status: 204 }));
+    let dispatch, respond;
+    let requests = 0;
+    const dispatched = new Promise((resolve) => {
+      dispatch = resolve;
+    });
+    const waitForResponse = new Promise((resolve) => {
+      respond = resolve;
+    });
+    const fetcher = next.guardFetch(() => {
+      requests++;
+      dispatch();
+      return waitForResponse;
+    });
+    const request = fetcher("https://example.test", { method });
+    await dispatched;
+    try {
+      assert.equal(lastMode, "shared", `Dispatch for ${method} must hold the account lock`);
+      disabled = await updateGoogleSlotTarget(enabled, { enabled: false }, access, signal);
+      assert.equal(disabled.enabled, false);
+    } finally {
+      respond(new Response(null, { status: 204 }));
+    }
+    assert.equal((await request).status, 204);
+    await assert.rejects(fetcher("https://example.test", { method }), { name: "AbortError" });
+    assert.equal(requests, 1);
   }
-  assert.equal((await request).status, 204);
 });

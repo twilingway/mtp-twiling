@@ -78,7 +78,7 @@ export function googleSlotFence(
   const guardFetch =
     (fetcher: typeof fetch): typeof fetch =>
     async (input, init) => {
-      if (!expected || (init?.method !== "POST" && init?.method !== "PATCH"))
+      if (!expected || !["POST", "PATCH", "PUT"].includes(init?.method ?? "GET"))
         return fetcher(input, init);
       // The lock covers dispatch only. A later disable need not wait for Google to answer.
       const { response } = await effect(() => ({ response: fetcher(input, init) }));

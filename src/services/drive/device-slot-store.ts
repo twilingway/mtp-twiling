@@ -4,8 +4,8 @@ import {
   encodeDeviceSlotEnvelope,
   strongDeviceSlotTag
 } from "./device-slot-cas.js";
-import { assertSlotHttp } from "./device-slot-http.js";
-import type { DeviceSlotHttp, SlotLocation } from "./device-slot-http.js";
+import { assertSlotHttp, matchesSlotMediaReceipt } from "./device-slot-http.js";
+import type { DeviceSlotHttp, SlotLocation, SlotMediaMetadata } from "./device-slot-http.js";
 import { deviceSlotKey, inspectDeviceSlots, parseDeviceSlotEnvelope } from "./device-slot-model.js";
 import type {
   DeviceSlotCheckpoint,
@@ -25,7 +25,11 @@ import type { DriveReport } from "./progress.js";
 import { DriveError } from "./types.js";
 
 type SlotIo = Pick<DeviceSlotHttp, "read" | "list" | "reserve" | "create" | "patch">;
-type Loaded = { readonly package: DeviceSlotPackage; readonly etag: string | null };
+type Loaded = {
+  readonly package: DeviceSlotPackage;
+  readonly etag: string | null;
+  readonly metadata: SlotMediaMetadata | undefined;
+};
 export interface DeviceSlotPendingWrite {
   readonly fileId: string;
   readonly key: string;
@@ -47,14 +51,25 @@ function unique(locations: readonly SlotLocation[]): void {
     throw conflict();
 }
 
-async function load(io: SlotIo, id: string, signal: AbortSignal): Promise<Loaded> {
-  const { body, etag } = await io.read(id, signal);
-  return { package: await decodeDeviceSlotPackage(body, signal), etag };
+async function load(
+  io: SlotIo,
+  id: string,
+  signal: AbortSignal,
+  receipt?: SlotMediaMetadata
+): Promise<Loaded> {
+  const { body, etag, metadata } = await io.read(id, signal, false, receipt);
+  return { package: await decodeDeviceSlotPackage(body, signal), etag, metadata };
 }
 
-async function confirmed(io: SlotIo, pending: DeviceSlotPendingWrite, signal: AbortSignal) {
-  const fresh = await load(io, pending.fileId, signal);
+async function confirmed(
+  io: SlotIo,
+  pending: DeviceSlotPendingWrite,
+  signal: AbortSignal,
+  receipt?: SlotMediaMetadata
+) {
+  const fresh = await load(io, pending.fileId, signal, receipt);
   if (
+    (receipt && (!fresh.metadata || !matchesSlotMediaReceipt(fresh.metadata, receipt))) ||
     (await envelopeDigest(fresh.package.envelope)) !== (await envelopeDigest(pending.envelope)) ||
     keyFor(fresh.package.envelope) !== pending.key ||
     (pending.baseEtag !== null && strongDeviceSlotTag(fresh.etag) === pending.baseEtag)
@@ -74,10 +89,12 @@ export async function replacePackedDeviceSlot(
   const etag = strongDeviceSlotTag(pending.baseEtag);
   signal.throwIfAborted();
   let response: Response | undefined;
+  let receipt: SlotMediaMetadata | undefined;
   try {
-    response = await io.patch(pending.fileId, etag, body, signal);
+    ({ response, receipt } = await io.patch(pending.fileId, etag, body, signal));
   } catch (error) {
     signal.throwIfAborted();
+    if (error instanceof DeviceSlotCasError) throw error;
     if (error instanceof DriveError && error.code !== "network") throw error;
   }
   signal.throwIfAborted();
@@ -86,7 +103,7 @@ export async function replacePackedDeviceSlot(
   if (response && response.status !== 0 && response.status !== 408 && response.status < 500)
     assertSlotHttp(response);
   try {
-    return await confirmed(io, pending, signal);
+    return await confirmed(io, pending, signal, receipt);
   } catch {
     signal.throwIfAborted();
     throw new DeviceSlotCasError("unconfirmed");

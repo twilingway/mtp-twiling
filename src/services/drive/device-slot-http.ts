@@ -1,5 +1,6 @@
 import { isRecord } from "../../model/backup-format.js";
-import { strongDeviceSlotTag } from "./device-slot-cas.js";
+import { sha256 } from "./backup.js";
+import { DeviceSlotCasError, strongDeviceSlotTag } from "./device-slot-cas.js";
 import { DEVICE_SLOT_NAMESPACE, MAX_DEVICE_SLOTS } from "./device-slot-model.js";
 import {
   MAX_DEVICE_SLOT_PACKAGE_BYTES,
@@ -10,7 +11,12 @@ import type { DriveAuthorization } from "./types.js";
 
 const FILES = "https://www.googleapis.com/drive/v3/files";
 const UPLOAD = "https://www.googleapis.com/upload/drive/v3/files";
+const V2_FILES = "https://www.googleapis.com/drive/v2/files";
+const V2_UPLOAD = "https://www.googleapis.com/upload/drive/v2/files";
 const FIELDS = "id,name,size,appProperties";
+const VALIDATOR_FIELDS = "id,etag,version,fileSize,md5Checksum,sha256Checksum";
+const REQUEST_TIMEOUT_MS = 120_000;
+const READ_DELAYS_MS = [100, 400] as const;
 export const PROBE_NAMESPACE = "mtp-drive-cas-probe";
 export type SlotNamespace = typeof DEVICE_SLOT_NAMESPACE | typeof PROBE_NAMESPACE;
 export interface SlotLocation {
@@ -19,6 +25,19 @@ export interface SlotLocation {
   readonly size: number;
   readonly namespace: SlotNamespace;
 }
+export interface SlotMediaMetadata {
+  readonly id: string;
+  readonly etag: string;
+  readonly version: string;
+  readonly size: number;
+  readonly md5Checksum: string | undefined;
+  readonly sha256Checksum: string | undefined;
+}
+type MediaReceipt = Pick<SlotMediaMetadata, "id" | "etag" | "size">;
+export interface SlotReplacementResponse {
+  readonly response: Response;
+  readonly receipt?: SlotMediaMetadata;
+}
 
 const idPattern = /^[\w-]{1,200}$/;
 const keyPattern = /^[0-9a-f-]{36}_[0-9a-f-]{36}$/;
@@ -26,6 +45,69 @@ const invalid = () => new DriveError("remote-invalid", "Некорректный
 const limit = () => new DriveError("limit", "Превышен допустимый размер Google Диска.");
 const endpoint = (url: string, params: Record<string, string>) =>
   `${url}?${new URLSearchParams(params)}`;
+
+function digestField(input: unknown, pattern: RegExp): string | undefined {
+  if (input === undefined) return;
+  if (typeof input !== "string" || !pattern.test(input)) throw invalid();
+  return input.toLowerCase();
+}
+
+function mediaMetadata(
+  input: unknown,
+  id: string,
+  header: string | null,
+  requireBodyTag: boolean
+): SlotMediaMetadata {
+  if (
+    !isRecord(input) ||
+    input.id !== id ||
+    typeof input.version !== "string" ||
+    !/^\d{1,20}$/.test(input.version) ||
+    typeof input.fileSize !== "string" ||
+    !/^\d{1,20}$/.test(input.fileSize)
+  )
+    throw invalid();
+  const size = Number(input.fileSize);
+  if (!Number.isSafeInteger(size) || size <= 0 || size > MAX_DEVICE_SLOT_PACKAGE_BYTES)
+    throw limit();
+  if (input.etag !== undefined && typeof input.etag !== "string")
+    throw new DeviceSlotCasError("validator");
+  const bodyTag = typeof input.etag === "string" ? input.etag : null;
+  const etag = strongDeviceSlotTag(requireBodyTag ? bodyTag : (bodyTag ?? header));
+  if (header !== null && strongDeviceSlotTag(header) !== etag)
+    throw new DeviceSlotCasError("validator");
+  return {
+    id,
+    etag,
+    version: input.version,
+    size,
+    md5Checksum: digestField(input.md5Checksum, /^[a-f\d]{32}$/i),
+    sha256Checksum: digestField(input.sha256Checksum, /^[a-f\d]{64}$/i)
+  };
+}
+
+export const matchesSlotMediaReceipt = (actual: MediaReceipt, expected: MediaReceipt): boolean =>
+  actual.id === expected.id && actual.etag === expected.etag && actual.size === expected.size;
+
+const sameMediaVersion = (before: SlotMediaMetadata, after: SlotMediaMetadata): boolean =>
+  matchesSlotMediaReceipt(before, after) &&
+  before.version === after.version &&
+  before.md5Checksum === after.md5Checksum &&
+  before.sha256Checksum === after.sha256Checksum;
+
+const pause = (ms: number, signal: AbortSignal): Promise<void> =>
+  new Promise((resolve, reject) => {
+    signal.throwIfAborted();
+    const cancel = () => {
+      clearTimeout(timer);
+      reject(new DOMException("Drive file read cancelled.", "AbortError"));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", cancel);
+      resolve();
+    }, ms);
+    signal.addEventListener("abort", cancel, { once: true });
+  });
 
 export function assertSlotHttp(response: Response): void {
   if (response.ok) return;
@@ -121,7 +203,7 @@ export class DeviceSlotHttp {
     try {
       const response = await this.fetcher(url, {
         ...init,
-        signal: AbortSignal.any([scope, AbortSignal.timeout(120_000)]),
+        signal: AbortSignal.any([scope, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]),
         headers,
         credentials: "omit",
         cache: "no-store",
@@ -140,6 +222,10 @@ export class DeviceSlotHttp {
   private async json(url: string, signal: AbortSignal, init?: RequestInit): Promise<unknown> {
     const response = await this.request(url, signal, init);
     assertSlotHttp(response);
+    return this.parseJson(response, signal);
+  }
+
+  private async parseJson(response: Response, signal: AbortSignal): Promise<unknown> {
     const body = await bodyOf(response, 1024 * 1024, AbortSignal.any([signal, this.auth.signal]));
     try {
       return JSON.parse(await body.text()) as unknown;
@@ -179,18 +265,78 @@ export class DeviceSlotHttp {
     return files;
   }
 
-  async read(id: string, signal: AbortSignal, prefix = false) {
-    if (!idPattern.test(id)) throw invalid();
+  private async readMedia(id: string, signal: AbortSignal, limitBytes: number, prefix = false) {
     const response = await this.request(endpoint(`${FILES}/${id}`, { alt: "media" }), signal);
     assertSlotHttp(response);
-    if (response.status !== 200) throw invalid();
-    const body = await bodyOf(
-      response,
-      prefix ? MAX_DEVICE_SLOT_PACKAGE_HEADER_BYTES : MAX_DEVICE_SLOT_PACKAGE_BYTES,
-      AbortSignal.any([signal, this.auth.signal]),
-      prefix
+    if (response.status !== 200) {
+      void response.body?.cancel().catch(() => {});
+      throw invalid();
+    }
+    return bodyOf(response, limitBytes, AbortSignal.any([signal, this.auth.signal]), prefix);
+  }
+
+  private async readMetadata(id: string, signal: AbortSignal) {
+    const response = await this.request(
+      endpoint(`${V2_FILES}/${id}`, { fields: VALIDATOR_FIELDS }),
+      signal
     );
-    return { body, etag: response.headers.get("ETag") };
+    assertSlotHttp(response);
+    return mediaMetadata(
+      await this.parseJson(response, signal),
+      id,
+      response.headers.get("ETag"),
+      true
+    );
+  }
+
+  async read(id: string, signal: AbortSignal, prefix = false, expected?: MediaReceipt) {
+    if (!idPattern.test(id)) throw invalid();
+    if (prefix)
+      return {
+        body: await this.readMedia(id, signal, MAX_DEVICE_SLOT_PACKAGE_HEADER_BYTES, true),
+        etag: null
+      };
+    const deadline = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+    const scope = AbortSignal.any([signal, this.auth.signal, deadline]);
+    let checksumUnverified = false;
+    try {
+      for (const delay of [0, ...READ_DELAYS_MS]) {
+        if (delay) await pause(delay, scope);
+        const before = await this.readMetadata(id, scope);
+        if (!before.sha256Checksum) {
+          checksumUnverified = true;
+          continue;
+        }
+        const body = await this.readMedia(id, scope, before.size).catch((error: unknown) => {
+          if (error instanceof DriveError && error.code === "limit") return undefined;
+          throw error instanceof Error ? error : invalid();
+        });
+        const after = await this.readMetadata(id, scope);
+        if (!after.sha256Checksum) {
+          checksumUnverified = true;
+          continue;
+        }
+        if (
+          !body ||
+          body.size !== after.size ||
+          !sameMediaVersion(before, after) ||
+          (expected && !matchesSlotMediaReceipt(after, expected))
+        )
+          continue;
+        if ((await sha256(body)) !== after.sha256Checksum) {
+          checksumUnverified = true;
+          continue;
+        }
+        scope.throwIfAborted();
+        return { body, etag: after.etag, metadata: after };
+      }
+    } catch (error) {
+      if (deadline.aborted && !signal.aborted && !this.auth.signal.aborted)
+        throw new DriveError("network", "Истекло время чтения версии Google Диска.");
+      throw error instanceof Error ? error : invalid();
+    }
+    if (checksumUnverified) throw new DeviceSlotCasError("validator");
+    throw new DriveError("conflict", "Не удалось прочитать согласованную версию Google Диска.");
   }
 
   async reserve(signal: AbortSignal): Promise<string> {
@@ -239,16 +385,45 @@ export class DeviceSlotHttp {
     return result;
   }
 
-  patch(id: string, etag: string, body: Blob, signal: AbortSignal): Promise<Response> {
-    if (!idPattern.test(id)) return Promise.reject(invalid());
-    if (!body.size || body.size > MAX_DEVICE_SLOT_PACKAGE_BYTES) return Promise.reject(limit());
-    return this.request(endpoint(`${UPLOAD}/${id}`, { uploadType: "media" }), signal, {
-      method: "PATCH",
-      headers: {
-        "If-Match": strongDeviceSlotTag(etag),
-        "Content-Type": "application/octet-stream"
-      },
-      body
-    });
+  async patch(
+    id: string,
+    etag: string,
+    body: Blob,
+    signal: AbortSignal
+  ): Promise<SlotReplacementResponse> {
+    if (!idPattern.test(id)) throw invalid();
+    if (!body.size || body.size > MAX_DEVICE_SLOT_PACKAGE_BYTES) throw limit();
+    const scope = AbortSignal.any([signal, this.auth.signal]);
+    const response = await this.request(
+      endpoint(`${V2_UPLOAD}/${id}`, {
+        uploadType: "media",
+        fields: VALIDATOR_FIELDS
+      }),
+      scope,
+      {
+        method: "PUT",
+        headers: {
+          "If-Match": strongDeviceSlotTag(etag),
+          "Content-Type": "application/octet-stream"
+        },
+        body
+      }
+    );
+    if (!response.ok) return { response };
+    try {
+      const receipt = mediaMetadata(
+        await this.parseJson(response, scope),
+        id,
+        response.headers.get("ETag"),
+        false
+      );
+      scope.throwIfAborted();
+      if (receipt.size !== body.size || receipt.etag === etag)
+        throw new DeviceSlotCasError("unconfirmed");
+      return { response, receipt };
+    } catch {
+      scope.throwIfAborted();
+      throw new DeviceSlotCasError("unconfirmed");
+    }
   }
 }
