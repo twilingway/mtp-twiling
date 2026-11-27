@@ -207,7 +207,7 @@ export async function startDev({ port = 5210, projectRoot = root, outputDirector
         ...common,
         entryPoints: installEntryPoints,
         format: "iife",
-        plugins: [devPlugin("install")]
+        plugins: [...common.plugins, devPlugin("install")]
       })
     );
     contexts.push(
@@ -218,7 +218,7 @@ export async function startDev({ port = 5210, projectRoot = root, outputDirector
         format: "esm",
         chunkNames: "assets/[name]-[hash]",
         define: { ...cloudPublicDefines(projectRoot), "process.env.NODE_ENV": '"development"' },
-        plugins: [devPlugin("app")]
+        plugins: [...common.plugins, devPlugin("app")]
       })
     );
     await Promise.all(contexts.map((buildContext) => buildContext.rebuild()));

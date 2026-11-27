@@ -39,7 +39,10 @@
    Core и flow проверены отдельно (160 dependent cases); общая база облачных задач —
    `artifacts/mtp-cloud-sync-workbench`, ветка `feat/cloud-sync-workbench`. Общая проверка:
    `pnpm check` — 2147 pass, 4 optional benchmark skip, 0 fail; OpenSpec — 120 pass. Работающий DEV
-   5290 пока не переключён на миграцию; отдельный визуальный стенд — 5291.
+   5290 переключён на `70a2c6e`; временный 5291 остановлен. Физический телефон подтвердил COW
+   миграцию и реальный вход/выход Т-Банка без смены device owner: инструмент, настройки,
+   единственный рисунок и timestamp-якорь камеры сохранены. Загружены 15094 реальные свечи;
+   remember=false не сохранил банковский credential (проверены только количества записей vault).
 2. Google v3: интеграция current+previous в одном файле клиента, реальные CAS/CORS проверки,
    проверяемый архив и закрытый план очистки legacy. Живые файлы пока не удалялись.
 3. Яндекс: интеграция PKCE/app-folder transport и immutable ревизий, реальные вход/upload/readback.
@@ -67,11 +70,14 @@ host: `artifacts/mtp-cloud-provider-controls`. Контракт —
 8. Оставшаяся оптимизация холодного Fit и acceptance уже реализованных crypto/history/precision,
    ruler/magnet/indicator/search/settings/timezone возможностей.
 
-Эксперимент точного native renderer находится только в ignored
-`artifacts/mtp-native-raster-experiment`: вариант RGBA/upload не дал убедительного выигрыша.
-Обратное отсечение полностью перекрытых непрозрачных прямоугольников сохранило пиксели в 10 cases и
-сократило desktop microbenchmark примерно вдвое. Это не приложение и не FPS; физический телефон
-проверяется отдельно. Зависимость Lightweight Charts пока не менялась.
+Эксперимент точного native renderer находится в ignored `artifacts/mtp-native-raster-experiment`:
+вариант RGBA/upload не дал убедительного выигрыша. Обратное отсечение полностью перекрытых
+непрозрачных прямоугольников сохранило пиксели в 10 cases и сократило desktop microbenchmark
+примерно вдвое. На физическом телефоне медиана отдельного renderer 18,5→7,5 мс, с симметричным
+readback 44,8→20,4 мс; это не FPS приложения. Production интеграция идёт отдельно в
+`artifacts/mtp-native-candle-raster`, ветка `perf/native-candle-raster`. OpenSpec
+`native-candle-raster`: чистое ядро, Canvas bridge и проверяемый build transform SDK. Установленные
+файлы Lightweight Charts не меняются. Общая проверка и замер приложения впереди.
 
 Подробный аудит исходников находится в ignored artifacts/remaining-task-audit.md/json. Написанный
 код, просмотр в браузере и публикация учитываются отдельно. Ключи не экспортируются и не логируются.

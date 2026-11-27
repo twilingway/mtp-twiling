@@ -479,6 +479,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
     },
     redrawDrawings: () => updateDrawings(),
     destroy() {
+      main.dispose();
       stopTouchScroll();
       link.dispose();
       loadedFit.dispose();

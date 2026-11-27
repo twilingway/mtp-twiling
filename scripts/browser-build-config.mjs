@@ -1,5 +1,6 @@
 import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { lightweightNativeRectPlugin } from "./lightweight-native-rect-plugin.mjs";
 
 export const installEntryPoints = { "pwa-install-entry": "src/pwa-install-entry.ts" };
 export const browserEntryPoints = {
@@ -20,7 +21,8 @@ export function browserBuildOptions(root, outdir) {
     outdir,
     metafile: true,
     minify: true,
-    legalComments: "eof"
+    legalComments: "eof",
+    plugins: [lightweightNativeRectPlugin(root)]
   };
 }
 
