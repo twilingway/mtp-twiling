@@ -5,7 +5,14 @@ import type { Chart } from "klinecharts";
 export function attachKlineAxisTouch(container: HTMLElement, chart: Pick<Chart, "getDom">) {
   const host = container.ownerDocument?.defaultView;
   if (!host) return () => {};
-  let active: { id: number; axis: HTMLElement; x: number; y: number } | null = null;
+  let active: {
+    id: number;
+    axis: HTMLElement;
+    x: number;
+    y: number;
+    startY: number;
+    started: boolean;
+  } | null = null;
   const send = (type: string, x: number, y: number, axis: HTMLElement) => {
     const event = new MouseEvent(type, {
       bubbles: true,
@@ -19,13 +26,11 @@ export function attachKlineAxisTouch(container: HTMLElement, chart: Pick<Chart, 
     Object.defineProperty(event, "sourceCapabilities", { value: { firesTouchEvents: false } });
     axis.dispatchEvent(event);
   };
-  const finish = (cancelled = false) => {
+  const finish = () => {
     const owned = active;
     if (!owned) return;
     active = null;
-    // Mark cancellation as a drag so two cancelled taps cannot reset native autoscale.
-    if (cancelled) send("mousemove", owned.x + 6, owned.y, owned.axis);
-    send("mouseup", owned.x, owned.y, owned.axis);
+    if (owned.started) send("mouseup", owned.x, owned.y, owned.axis);
   };
   const consume = (event: TouchEvent) => {
     if (event.cancelable) event.preventDefault();
@@ -33,7 +38,7 @@ export function attachKlineAxisTouch(container: HTMLElement, chart: Pick<Chart, 
   };
   const start = (event: TouchEvent) => {
     if (event.touches.length !== 1) {
-      finish(true);
+      finish();
       return;
     }
     if (active) return;
@@ -48,20 +53,32 @@ export function attachKlineAxisTouch(container: HTMLElement, chart: Pick<Chart, 
       touch.clientY >= rect.bottom
     )
       return;
-    active = { id: touch.identifier, axis, x: touch.clientX, y: touch.clientY };
+    active = {
+      id: touch.identifier,
+      axis,
+      x: touch.clientX,
+      y: touch.clientY,
+      startY: touch.clientY,
+      started: false
+    };
     consume(event);
-    send("mousedown", touch.clientX, touch.clientY, axis);
   };
   const move = (event: TouchEvent) => {
     const owned = active;
     if (!owned) return;
     if (event.touches.length !== 1) {
-      finish(true);
+      finish();
       return;
     }
     const touch = Array.from(event.changedTouches).find((item) => item.identifier === owned.id);
     if (!touch) return;
     consume(event);
+    // Match SDK CancelClick: a stationary cancelled press must never enter manual scale mode.
+    if (!owned.started) {
+      if (Math.abs(touch.clientY - owned.startY) < 5) return;
+      send("mousedown", owned.x, owned.startY, owned.axis);
+      owned.started = true;
+    }
     owned.y = touch.clientY;
     // Keep the gesture in its original axis lane if the finger drifts horizontally.
     send("mousemove", owned.x, owned.y, owned.axis);
@@ -73,16 +90,16 @@ export function attachKlineAxisTouch(container: HTMLElement, chart: Pick<Chart, 
     )
       return;
     consume(event);
-    finish(event.type === "touchcancel");
+    finish();
   };
-  const blur = () => finish(true);
+  const blur = () => finish();
   container.addEventListener("touchstart", start, { capture: true, passive: false });
   host.addEventListener("touchmove", move, { capture: true, passive: false });
   host.addEventListener("touchend", end, { capture: true, passive: false });
   host.addEventListener("touchcancel", end, { capture: true, passive: false });
   host.addEventListener("blur", blur);
   return () => {
-    finish(true);
+    finish();
     container.removeEventListener("touchstart", start, true);
     host.removeEventListener("touchmove", move, true);
     host.removeEventListener("touchend", end, true);

@@ -46,21 +46,25 @@ function eventHost() {
     }
   };
 }
-function fixture() {
+function fixture(autoScale = true) {
   const host = eventHost(),
     root = eventHost(),
     container = eventHost();
   container.ownerDocument = { defaultView: host, documentElement: root };
   container.getBoundingClientRect = () => ({ left: 0, top: 0 });
-  let range = { from: 100, to: 200, range: 100 },
-    writes = 0,
+  let writes = 0,
     paints = 0;
+  const nativeSetRange = nativeMethod("AxisImp", "setRange");
   const axisComponent = {
-    getRange: () => range,
+    _range: { from: 100, to: 200, range: 100 },
+    _autoCalcTickFlag: autoScale,
+    getRange: nativeMethod("AxisImp", "getRange"),
+    getAutoCalcTickFlag: nativeMethod("AxisImp", "getAutoCalcTickFlag"),
+    setAutoCalcTickFlag: nativeMethod("AxisImp", "setAutoCalcTickFlag"),
     getScrollZoomEnabled: () => true,
     convertToRealValue: (value) => value,
-    setRange: (value) => {
-      range = value;
+    setRange(value) {
+      nativeSetRange.call(this, value);
       writes++;
     }
   };
@@ -85,6 +89,8 @@ function fixture() {
     "mouseDownEvent",
     "pressedMouseMoveEvent",
     "mouseUpEvent",
+    "mouseClickEvent",
+    "mouseDoubleClickEvent",
     "touchStartEvent",
     "touchMoveEvent",
     "_makeWidgetEvent"
@@ -164,7 +170,8 @@ function fixture() {
     touch,
     emit,
     stop,
-    range: () => range,
+    range: () => axisComponent.getRange(),
+    autoScale: () => axisComponent.getAutoCalcTickFlag(),
     writes: () => writes,
     paints: () => paints
   };
@@ -244,8 +251,10 @@ test("second finger finishes owned axis drag and returns events to SDK; foreign 
   withMouse(() => {
     const f = fixture();
     f.emit("touchstart", [f.touch()]);
+    f.emit("touchmove", [f.touch(330, 250)]);
     f.emit("touchend", [f.touch()], [f.touch(340, 250, 2)]);
-    assert.equal(f.sent.length, 1);
+    f.emit("touchcancel", [f.touch()], [f.touch(340, 250, 2)]);
+    assert.equal(f.sent.length, 2);
     const second = f.emit("touchstart", [f.touch(), f.touch(340, 250, 2)], [f.touch(340, 250, 2)]);
     assert.equal(second.defaultPrevented, false);
     assert.equal(second.stopped, false);
@@ -257,22 +266,83 @@ test("second finger finishes owned axis drag and returns events to SDK; foreign 
 
 test("cancel, blur and dispose release native drag, remove listeners, and never consume later plot touches", () =>
   withMouse(() => {
-    for (const finish of ["touchcancel", "blur", "dispose"]) {
-      const f = fixture();
-      assert.deepEqual(f.container.options.get("touchstart"), { capture: true, passive: false });
-      assert.deepEqual(f.host.options.get("touchmove"), { capture: true, passive: false });
-      f.emit("touchstart", [f.touch()]);
-      if (finish === "touchcancel") f.emit(finish, [], [f.touch()]);
-      else if (finish === "blur") f.host.listeners.get("blur")();
-      else f.stop();
-      assert.equal(f.sent.at(-1).type, "mouseup");
-      assert.equal(f.synthetic._mousePressed, false);
-      assert.equal(f.native._mouseDownWidget, null);
-      assert.equal(f.emit("touchmove", [f.touch(330, 300)]).defaultPrevented, false);
-      f.stop();
-      f.stop();
-      assert.equal(f.container.listeners.size, 0);
-      assert.equal(f.host.listeners.size, 0);
-      assert.equal(f.root.listeners.size, 0);
+    for (const autoScale of [true, false])
+      for (const finish of ["touchcancel", "second-finger", "blur", "dispose"]) {
+        const f = fixture(autoScale);
+        assert.deepEqual(f.container.options.get("touchstart"), { capture: true, passive: false });
+        assert.deepEqual(f.host.options.get("touchmove"), { capture: true, passive: false });
+        f.emit("touchstart", [f.touch()]);
+        f.emit("touchmove", [f.touch(330, 250)]);
+        const intended = f.range();
+        assert.equal(f.autoScale(), false);
+        assert.equal(f.writes(), 1);
+        if (finish === "touchcancel") f.emit(finish, [], [f.touch()]);
+        else if (finish === "second-finger")
+          f.emit("touchstart", [f.touch(), f.touch(340, 220, 2)]);
+        else if (finish === "blur") f.host.listeners.get("blur")();
+        else f.stop();
+        assert.equal(f.sent.at(-1).type, "mouseup");
+        assert.equal(f.synthetic._mousePressed, false);
+        assert.equal(f.native._mouseDownWidget, null);
+        assert.equal(f.writes(), 1, "cancellation must not write another price range");
+        assert.equal(f.range(), intended);
+        assert.equal(f.autoScale(), false);
+        assert.equal(f.emit("touchmove", [f.touch(330, 300)]).defaultPrevented, false);
+        f.stop();
+        f.stop();
+        assert.equal(f.container.listeners.size, 0);
+        assert.equal(f.host.listeners.size, 0);
+        assert.equal(f.root.listeners.size, 0);
+      }
+  }));
+
+test("stationary and sub-threshold cancellation preserve native autoscale and write no range", () =>
+  withMouse(() => {
+    for (const autoScale of [true, false]) {
+      for (const finish of ["touchcancel", "second-finger", "blur", "dispose"]) {
+        const f = fixture(autoScale),
+          original = f.range();
+        for (let attempt = 0; attempt < (finish === "dispose" ? 1 : 2); attempt++) {
+          f.emit("touchstart", [f.touch()]);
+          if (attempt > 0) f.emit("touchmove", [f.touch(330, 204)]);
+          assert.equal(f.sent.length, 0, "pending touch must not open an SDK mouse gesture");
+          if (finish === "touchcancel") f.emit(finish, [], [f.touch()]);
+          else if (finish === "second-finger")
+            f.emit("touchstart", [f.touch(), f.touch(340, 220, 2)]);
+          else if (finish === "blur") f.host.listeners.get("blur")();
+          else f.stop();
+          assert.equal(f.writes(), 0, `${finish} must not call native AxisImp.setRange`);
+          assert.equal(f.range(), original);
+          assert.equal(f.autoScale(), autoScale);
+          assert.equal(f.native._mouseDownWidget, null);
+          assert.notEqual(f.synthetic._mousePressed, true);
+        }
+        f.stop();
+        assert.equal(f.root.listeners.size, 0);
+      }
     }
+  }));
+
+test("bridge starts exactly at installed SDK CancelClick boundary with the original down coordinate", () =>
+  withMouse(() => {
+    const f = fixture();
+    f.emit("touchstart", [f.touch()]);
+    f.emit("touchmove", [f.touch(330, 204.999)]);
+    assert.equal(f.sent.length, 0);
+    assert.equal(f.writes(), 0);
+    assert.equal(f.autoScale(), true);
+    f.emit("touchmove", [f.touch(330, 205)]);
+    assert.equal(f.sent.length, 2);
+    assert.equal(f.sent[0].type, "mousedown");
+    assert.equal(f.sent[0].clientY, 200);
+    assert.equal(
+      f.synthetic._cancelClick,
+      true,
+      "installed SyntheticEvent accepts the exact 5px threshold"
+    );
+    assert.equal(f.writes(), 1);
+    assert.equal(f.range().range, (100 * 325) / 320);
+    f.stop();
+    assert.equal(f.writes(), 1);
+    assert.equal(f.synthetic._mousePressed, false);
   }));
