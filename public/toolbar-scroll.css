@@ -32,8 +32,9 @@ header.topbar {
 .toolbar-scroll :is(button, a, select):focus-visible {
   outline-offset: -2px;
 }
-.toolbar-scroll > * {
+.topbar > .toolbar-scroll > * {
   flex-shrink: 0;
+  order: 0;
 }
 .topbar .toolbar-scroll .divider {
   display: block;
@@ -53,6 +54,7 @@ header.topbar {
   background: var(--surface-input);
 }
 .topbar .toolbar-scroll .chart-symbol-controls .symbol-button {
+  order: 0;
   display: flex;
   justify-content: flex-start;
   flex: 1 1 0;
@@ -68,6 +70,7 @@ header.topbar {
   font-size: 13px;
 }
 .topbar .toolbar-scroll .native-chart-type-trigger {
+  order: 1;
   display: grid;
   flex: 0 0 24px;
   width: 24px;
