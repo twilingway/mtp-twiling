@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync, rmdirSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { cloudPublicDefines } from "../scripts/cloud-public-env.mjs";
 import { devHtml } from "../scripts/dev-files.mjs";
 import { flowModules } from "./helpers/workspace-identity-flow.mjs";
@@ -11,6 +13,78 @@ const redirects = [
   "https://mtp-test.twiling.ru/yandex-callback.html",
   "https://mtp.twiling.ru/yandex-callback.html"
 ];
+function envFixture(t, files) {
+  const root = mkdtempSync(join(tmpdir(), "mtp-cloud-public-env-"));
+  t.after(() => {
+    for (const name of [".env", ".env.local"]) rmSync(join(root, name), { force: true });
+    rmdirSync(root);
+  });
+  for (const [name, contents] of Object.entries(files))
+    writeFileSync(join(root, name), contents, "utf8");
+  return root;
+}
+
+test("a base .env alone supplies only allowlisted public values", (t) => {
+  const root = envFixture(t, {
+    ".env": `MTP_PUBLIC_YANDEX_CLIENT_ID="${clientId}"\nMTP_PUBLIC_YANDEX_REDIRECT_URI=${redirects[0]}\nSYNTHETIC_PRIVATE=fixture-never-export\n`
+  });
+  assert.deepEqual(cloudPublicDefines(root, { environment: {} }), {
+    __MTP_YANDEX_CLIENT_ID__: JSON.stringify(clientId),
+    __MTP_YANDEX_REDIRECT_URI__: JSON.stringify(redirects[0])
+  });
+  assert.deepEqual(cloudPublicDefines(root, { environment: {}, loadLocal: false }), {});
+});
+
+test("local file overrides base per key, including explicit empty values", (t) => {
+  const root = envFixture(t, {
+    ".env": `MTP_PUBLIC_YANDEX_CLIENT_ID=${clientId}\nMTP_PUBLIC_YANDEX_REDIRECT_URI=${redirects[0]}\n`,
+    ".env.local": 'MTP_PUBLIC_YANDEX_CLIENT_ID=""\nSYNTHETIC_PRIVATE=local-fixture\n'
+  });
+  assert.deepEqual(cloudPublicDefines(root, { environment: {} }), {
+    __MTP_YANDEX_CLIENT_ID__: '""',
+    __MTP_YANDEX_REDIRECT_URI__: JSON.stringify(redirects[0])
+  });
+  writeFileSync(
+    join(root, ".env.local"),
+    `MTP_PUBLIC_YANDEX_REDIRECT_URI=${redirects[1]}\n`,
+    "utf8"
+  );
+  assert.deepEqual(cloudPublicDefines(root, { environment: {} }), {
+    __MTP_YANDEX_CLIENT_ID__: JSON.stringify(clientId),
+    __MTP_YANDEX_REDIRECT_URI__: JSON.stringify(redirects[1])
+  });
+});
+
+test("external process ENV wins over both files and the loader leaves ENV intact", (t) => {
+  const root = envFixture(t, {
+    ".env": `MTP_PUBLIC_YANDEX_CLIENT_ID=${"a".repeat(32)}\nMTP_PUBLIC_YANDEX_REDIRECT_URI=${redirects[0]}\n`,
+    ".env.local": `MTP_PUBLIC_YANDEX_CLIENT_ID=${"b".repeat(32)}\nMTP_PUBLIC_YANDEX_REDIRECT_URI=${redirects[1]}\n`
+  });
+  const keys = ["MTP_PUBLIC_YANDEX_CLIENT_ID", "MTP_PUBLIC_YANDEX_REDIRECT_URI"];
+  const saved = keys.map((key) => process.env[key]);
+  try {
+    process.env[keys[0]] = clientId;
+    process.env[keys[1]] = redirects[3];
+    assert.deepEqual(cloudPublicDefines(root), {
+      __MTP_YANDEX_CLIENT_ID__: JSON.stringify(clientId),
+      __MTP_YANDEX_REDIRECT_URI__: JSON.stringify(redirects[3])
+    });
+    process.env[keys[0]] = "";
+    assert.equal(cloudPublicDefines(root).__MTP_YANDEX_CLIENT_ID__, '""');
+    assert.equal(process.env[keys[0]], "");
+    assert.equal(process.env[keys[1]], redirects[3]);
+    delete process.env[keys[0]];
+    delete process.env[keys[1]];
+    cloudPublicDefines(root);
+    assert.equal(process.env[keys[0]], undefined);
+    assert.equal(process.env[keys[1]], undefined);
+  } finally {
+    keys.forEach((key, index) => {
+      if (saved[index] === undefined) delete process.env[key];
+      else process.env[key] = saved[index];
+    });
+  }
+});
 
 test("only the two allowlisted public values enter browser defines", () => {
   const define = cloudPublicDefines(".", {
