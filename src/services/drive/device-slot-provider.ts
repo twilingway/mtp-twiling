@@ -8,6 +8,7 @@ import { loadDeviceSlotRecord, saveDeviceSlotRecord } from "./device-slot-local.
 import type { DeviceSlotRecord } from "./device-slot-local.js";
 import {
   connectGoogleSlotTarget,
+  googleSlotFence,
   loadGoogleSlotTarget,
   matchesGoogleSlotCredential,
   restoreGoogleSlotTarget,
@@ -17,10 +18,10 @@ import type { GoogleSlotTarget } from "./device-slot-link.js";
 import { LegacyDeviceSlotMigration } from "./device-slot-migration.js";
 import {
   deviceSlotOutcome,
+  googleSlotProgress,
   initialGoogleSlotStatus,
   operationError,
-  replacedGoogleAccountStatusKeys,
-  stageNames
+  replacedGoogleAccountStatusKeys
 } from "./device-slot-status.js";
 import type { GoogleStatus, GoogleTransientStatusKey } from "./device-slot-status.js";
 import {
@@ -302,16 +303,10 @@ export class GoogleSlotProvider implements CloudSyncProvider {
     this.update({ mode });
   };
   disconnect = async (): Promise<void> => {
-    const scope = this.host.scope(providerId);
     const disabling = this.setEnabled(false);
     const epoch = this.epoch;
     await disabling;
-    if (
-      this.target &&
-      this.current(epoch) &&
-      !this.state.enabled &&
-      sameScope(scope, this.host.scope(providerId))
-    )
+    if (this.target && this.current(epoch) && !this.state.enabled)
       await this.dependencies.auth.forgetOwner(this.target.owner);
   };
   dispose = (): void => {
@@ -322,19 +317,26 @@ export class GoogleSlotProvider implements CloudSyncProvider {
 
   runUploadProbe = async (imageBytes?: number) => {
     const authorization = this.authorization;
-    if (!authorization || !this.state.enabled || this.operation)
+    const target = this.target;
+    if (!authorization || !target || !this.state.enabled || this.operation)
       throw new DriveError("not-ready", "Подключите Google Диск для пробы записи.");
     const epoch = this.epoch;
     const job = {};
     this.operation = job;
+    const signal = this.lifecycle.signal;
+    const current = () => this.current(epoch) && authorization === this.authorization;
+    const fence = googleSlotFence(target, this.dependencies, signal, current, (enabled) =>
+      this.reset(enabled)
+    );
     try {
+      await fence.check();
       const result = await runDriveSlotBinaryProbe(
         authorization,
-        this.dependencies.fetch,
-        this.lifecycle.signal,
+        fence.guardFetch(this.dependencies.fetch),
+        signal,
         imageBytes
       );
-      if (!this.current(epoch) || authorization !== this.authorization) throw changed();
+      await fence.check();
       this.omit("error", "pauseReason");
       this.update({ uploadProbeBytes: result.maxBytes, phase: "idle" });
       return result;
@@ -413,9 +415,6 @@ export class GoogleSlotProvider implements CloudSyncProvider {
       this.authorization === authorization &&
       this.operation === job &&
       this.state.enabled;
-    const checkIdentity = () => {
-      if (!current()) throw changed();
-    };
     let progress = beginDriveProgress();
     this.update({
       phase: "syncing",
@@ -426,7 +425,7 @@ export class GoogleSlotProvider implements CloudSyncProvider {
     try {
       const target = await loadGoogleSlotTarget(scope, this.dependencies);
       const { owner, record } = target;
-      checkIdentity();
+      if (!current()) throw changed();
       if (target.enabled === false) {
         this.reset();
         return;
@@ -436,12 +435,16 @@ export class GoogleSlotProvider implements CloudSyncProvider {
         return;
       }
       const captured = await this.host.capture(providerId, { signal, isCurrent: current });
-      checkIdentity();
+      const fence = googleSlotFence(target, this.dependencies, signal, current, (enabled) =>
+        this.reset(enabled)
+      );
+      await fence.check();
       const context = createDeviceSlotContext({
         host: this.host,
         capture: captured,
         guard: { signal, isCurrent: current },
         authorization,
+        fence,
         fetcher: this.dependencies.fetch,
         save: async (prior, patch) => {
           const next = await this.dependencies.save(owner, prior, patch, signal);
@@ -451,19 +454,12 @@ export class GoogleSlotProvider implements CloudSyncProvider {
         report: (stage, details) => {
           if (!current()) return;
           progress = advanceDriveProgress(progress, stage, details);
-          const amount = details?.transfer;
-          this.update({
-            driveProgress: progress,
-            progress: {
-              stage: stageNames[stage],
-              ...(amount ? { completedBytes: amount.transferredBytes } : {})
-            }
-          });
+          this.update(googleSlotProgress(progress));
         }
       });
       context.check();
       const result = await operation(context, record);
-      checkIdentity();
+      await fence.check();
       this.target = { ...target, record: result.record };
       this.publishOutcome(result, captured.backup, context.localChanged());
       if (selection)

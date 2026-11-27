@@ -1,6 +1,7 @@
 import type { Backup } from "../../model/types.js";
 import { verifiedDeviceSlotUploadBytes } from "./device-slot-binary-probe.js";
 import { DeviceSlotHttp } from "./device-slot-http.js";
+import type { googleSlotFence } from "./device-slot-link.js";
 import { inspectLegacyDeviceSlotSources } from "./device-slot-migration.js";
 import { DeviceSlotStore } from "./device-slot-store.js";
 import type { SlotCapture, SlotSyncContext } from "./device-slot-sync.js";
@@ -39,6 +40,7 @@ interface ContextOptions extends Pick<SlotSyncContext, "capture" | "save" | "rep
   guard: Guard;
   authorization: DriveAuthorization;
   fetcher: typeof fetch;
+  fence: ReturnType<typeof googleSlotFence>;
 }
 
 /** One runtime job pins its authorization, portable revision, and guarded local writer. */
@@ -47,6 +49,7 @@ export function createDeviceSlotContext({
   guard,
   authorization,
   fetcher,
+  fence,
   capture,
   save,
   report
@@ -56,7 +59,7 @@ export function createDeviceSlotContext({
     if (!guard.isCurrent()) throw changed();
   };
   return {
-    store: new DeviceSlotStore(new DeviceSlotHttp(authorization, fetcher), () =>
+    store: new DeviceSlotStore(new DeviceSlotHttp(authorization, fence.guardFetch(fetcher)), () =>
       verifiedDeviceSlotUploadBytes(authorization)
     ),
     signal: guard.signal,
@@ -75,10 +78,10 @@ export function createDeviceSlotContext({
         ({ inspection }) => inspection.heads.length > 0
       ),
     apply: (backup, revision, onCommitted) =>
-      host.apply(providerId, backup, revision, guard, onCommitted),
+      fence.effect(() => host.apply(providerId, backup, revision, guard, onCommitted)),
     save: (prior, patch) => {
       checkIdentity();
-      return save(prior, patch);
+      return fence.effect(() => save(prior, patch));
     },
     report,
     localChanged: () => host.scope(providerId).revision !== acceptedRevision

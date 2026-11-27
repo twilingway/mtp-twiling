@@ -23,6 +23,70 @@ export interface GoogleSlotTarget {
   readonly enabled: boolean | undefined;
 }
 
+function pointerLock<T>(mode: LockMode, signal: AbortSignal, action: () => Promise<T>): Promise<T> {
+  signal.throwIfAborted();
+  const locks = globalThis.navigator?.locks;
+  if (locks) return locks.request(GOOGLE_SLOT_ACTIVE_OWNER, { mode, signal }, action);
+  if (mode === "shared" && typeof window !== "undefined")
+    return Promise.reject(
+      new DriveError(
+        "not-ready",
+        "Откройте приложение в защищённом браузере для синхронизации Google."
+      )
+    );
+  return action();
+}
+
+/** A job can finish only while the same account pointer and enable generation remain active. */
+export function googleSlotFence(
+  target: GoogleSlotTarget,
+  access: Pick<Access, "load">,
+  signal: AbortSignal,
+  isCurrent: () => boolean,
+  onStale: (enabled: boolean) => void
+) {
+  const expected = target.pointer;
+  const assertJob = () => {
+    signal.throwIfAborted();
+    if (!isCurrent()) throw new DOMException("Google sync operation ended.", "AbortError");
+  };
+  const check = async () => {
+    assertJob();
+    if (!expected) return;
+    const actual = await access.load(GOOGLE_SLOT_ACTIVE_OWNER);
+    assertJob();
+    if (
+      actual.generation !== expected.generation ||
+      actual.activeGoogleSlotOwner !== expected.activeGoogleSlotOwner ||
+      actual.enabled === false
+    ) {
+      onStale(actual.enabled !== false);
+      assertJob();
+      throw new DOMException("The active Google account changed.", "AbortError");
+    }
+  };
+  const effect = async <T>(action: () => T | Promise<T>): Promise<T> => {
+    if (!expected) {
+      assertJob();
+      return action();
+    }
+    return pointerLock("shared", signal, async () => {
+      await check();
+      return action();
+    });
+  };
+  const guardFetch =
+    (fetcher: typeof fetch): typeof fetch =>
+    async (input, init) => {
+      if (!expected || (init?.method !== "POST" && init?.method !== "PATCH"))
+        return fetcher(input, init);
+      // The lock covers dispatch only. A later disable need not wait for Google to answer.
+      const { response } = await effect(() => ({ response: fetcher(input, init) }));
+      return response;
+    };
+  return { check, effect, guardFetch };
+}
+
 export const matchesGoogleSlotCredential = (
   scope: GoogleSlotScope,
   record: DeviceSlotRecord,
@@ -103,14 +167,14 @@ async function activateExplicitGoogleSlot(
     signal
   );
   signal.throwIfAborted();
-  const pointer = await access.save(
-    GOOGLE_SLOT_ACTIVE_OWNER,
-    prior.pointer,
-    {
-      activeGoogleSlotOwner: owner,
-      enabled: true
-    },
-    signal
+  const previous = prior.pointer;
+  const pointer = await pointerLock("exclusive", signal, () =>
+    access.save(
+      GOOGLE_SLOT_ACTIVE_OWNER,
+      previous,
+      { activeGoogleSlotOwner: owner, enabled: true },
+      signal
+    )
   );
   return { owner, record, pointer, enabled: pointer.enabled ?? prior.enabled };
 }
@@ -153,11 +217,9 @@ export async function updateGoogleSlotTarget(
   signal: AbortSignal
 ): Promise<GoogleSlotTarget> {
   if (target.pointer && patch.enabled !== undefined) {
-    const pointer = await access.save(
-      GOOGLE_SLOT_ACTIVE_OWNER,
-      target.pointer,
-      { enabled: patch.enabled },
-      signal
+    const { pointer: previous } = target;
+    const pointer = await pointerLock("exclusive", signal, () =>
+      access.save(GOOGLE_SLOT_ACTIVE_OWNER, previous, { enabled: patch.enabled }, signal)
     );
     return { ...target, pointer, enabled: pointer.enabled };
   }

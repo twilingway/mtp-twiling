@@ -42,7 +42,7 @@ export const replacedGoogleAccountStatusKeys = [
   "migrationRequired"
 ] satisfies GoogleTransientStatusKey[];
 
-export const stageNames: Record<DriveStage, CloudProgress["stage"]> = {
+const stageNames: Record<DriveStage, CloudProgress["stage"]> = {
   "collect-local": "validate",
   "read-versions": "inspect",
   "check-versions": "validate",
@@ -53,6 +53,17 @@ export const stageNames: Record<DriveStage, CloudProgress["stage"]> = {
   apply: "apply",
   "save-status": "save"
 };
+export function googleSlotProgress(driveProgress: DriveProgress): Partial<GoogleStatus> {
+  const transfer = driveProgress.transfer;
+  return {
+    driveProgress,
+    progress: {
+      stage: stageNames[driveProgress.stage],
+      ...(transfer ? { completedBytes: transfer.transferredBytes } : {})
+    }
+  };
+}
+
 export const initialGoogleSlotStatus = (enabled = false): GoogleStatus => ({
   provider: "google-drive",
   enabled,

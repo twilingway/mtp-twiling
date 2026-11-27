@@ -7,6 +7,7 @@ const { DriveAuth } = load("services/drive/auth.ts");
 const { EncryptedDriveAuthVault } = load("services/drive/auth-vault.ts");
 const { driveCredentialId } = load("services/drive/auth-credential-id.ts");
 const { GoogleSlotProvider } = load("services/drive/device-slot-provider.ts");
+const { googleSlotFence, updateGoogleSlotTarget } = load("services/drive/device-slot-link.ts");
 const { googleSlotStorageOwner, GOOGLE_SLOT_ACTIVE_OWNER } = load(
   "services/drive/workspace-binding.ts"
 );
@@ -114,6 +115,7 @@ async function fixture(t, hasRemote, hasRemoteB = false) {
   let popup;
   let reads = 0;
   let applies = 0;
+  let captureBarrier;
   let failPointer = false;
   const remoteFile = async (id, workspaceId, revisionId, symbol) => {
     const version = await prepareDeviceSlotVersion(await prepareDriveBackup(backup(symbol)));
@@ -170,12 +172,20 @@ async function fixture(t, hasRemote, hasRemoteB = false) {
     const provider = new GoogleSlotProvider(
       {
         scope: () => scope,
-        capture: async () => ({
-          backup: local,
-          digest: await driveBackupDigest(local),
-          prepared: await prepareDriveBackup(local),
-          revision: scope.revision
-        }),
+        capture: async () => {
+          const barrier = captureBarrier;
+          captureBarrier = undefined;
+          if (barrier) {
+            barrier.enter();
+            await barrier.wait;
+          }
+          return {
+            backup: local,
+            digest: await driveBackupDigest(local),
+            prepared: await prepareDriveBackup(local),
+            revision: scope.revision
+          };
+        },
         apply: async (id, data, expectedRevision, guard, committed) => {
           assert.equal(id, "google-drive");
           assert.equal(scope.revision, expectedRevision);
@@ -271,6 +281,17 @@ async function fixture(t, hasRemote, hasRemoteB = false) {
       records.delete(GOOGLE_SLOT_ACTIVE_OWNER);
     },
     remoteA,
+    pauseCapture() {
+      let enter, release;
+      const entered = new Promise((done) => {
+        enter = done;
+      });
+      const wait = new Promise((done) => {
+        release = done;
+      });
+      captureBarrier = { enter, wait };
+      return { entered, release };
+    },
     sealed,
     records,
     assertLegacyUnchanged,
@@ -482,4 +503,126 @@ test("a stale credential generation is rejected both in a live tab and after rel
   assert.equal(reloaded.getSnapshot().connected, false);
   assert.deepEqual(f.calls, []);
   await f.assertLegacyUnchanged();
+});
+
+for (const change of ["disable", "change account"]) {
+  test(`another tab can ${change} before a paused capture and block the old import`, async (t) => {
+    const f = await fixture(t, true, true);
+    await f.device.setEnabled(true);
+    await f.connect(f.device);
+    await f.device.sync();
+    const ownerA = f.explicitOwner;
+    const recordA = structuredClone(f.records.get(ownerA));
+    const other = f.makeProvider();
+    other.resume();
+    await other.prepare();
+
+    const pause = f.pauseCapture();
+    const applying = f.device.choose({ kind: "remote", id: revisionId });
+    await pause.entered;
+    if (change === "disable") await other.setEnabled(false);
+    else await f.connect(other, false, "B");
+    assert.equal(f.applies(), 0);
+    pause.release();
+    await applying;
+    assert.equal(f.applies(), 0);
+    assert.notEqual(f.device.getSnapshot().phase, "idle");
+    assert.equal(f.device.getSnapshot().connected, false);
+    assert.deepEqual(f.records.get(ownerA), recordA);
+    await f.assertLegacyUnchanged();
+  });
+}
+
+test("disabling waits for an entered local effect but does not wait for a dispatched Google request", async (t) => {
+  const original = Object.getOwnPropertyDescriptor(navigator, "locks");
+  let tail = Promise.resolve();
+  let lastMode;
+  Object.defineProperty(navigator, "locks", {
+    configurable: true,
+    value: {
+      request(name, { mode }, action) {
+        assert.equal(name, GOOGLE_SLOT_ACTIVE_OWNER);
+        lastMode = mode;
+        const queued = tail.then(action);
+        tail = queued.catch(() => {});
+        return queued;
+      }
+    }
+  });
+  t.after(() => {
+    if (original) Object.defineProperty(navigator, "locks", original);
+    else delete navigator.locks;
+  });
+  const signal = new AbortController().signal;
+  const record = { generation: 1, enabled: true, activeGoogleSlotOwner: "explicit-test-owner" };
+  let pointer = record;
+  const access = {
+    load: async () => pointer,
+    save: async (_owner, prior, patch) => {
+      assert.equal(prior.generation, pointer.generation);
+      pointer = { ...pointer, ...patch, generation: pointer.generation + 1 };
+      return pointer;
+    }
+  };
+  const target = { owner: record.activeGoogleSlotOwner, record, pointer, enabled: true };
+  let stale = false;
+  const fence = googleSlotFence(
+    target,
+    access,
+    signal,
+    () => true,
+    () => {
+      stale = true;
+    }
+  );
+  let enter, release;
+  const entered = new Promise((resolve) => {
+    enter = resolve;
+  });
+  const work = new Promise((resolve) => {
+    release = resolve;
+  });
+  const applying = fence.effect(() => {
+    enter();
+    return work;
+  });
+  await entered;
+  assert.equal(lastMode, "shared");
+  const disabling = updateGoogleSlotTarget(target, { enabled: false }, access, signal);
+  assert.equal(lastMode, "exclusive");
+  try {
+    assert.equal(pointer.enabled, true);
+  } finally {
+    release();
+  }
+  await applying;
+  const disabled = await disabling;
+  assert.equal(disabled.enabled, false);
+  await assert.rejects(fence.check(), { name: "AbortError" });
+  assert.equal(stale, true);
+
+  const enabled = await updateGoogleSlotTarget(disabled, { enabled: true }, access, signal);
+  const next = googleSlotFence(enabled, access, signal, () => true, assert.fail);
+  let dispatch, respond;
+  const dispatched = new Promise((resolve) => {
+    dispatch = resolve;
+  });
+  const waitForResponse = new Promise((resolve) => {
+    respond = resolve;
+  });
+  const fetcher = next.guardFetch(() => {
+    dispatch();
+    return waitForResponse;
+  });
+  const request = fetcher("https://example.test", { method: "PATCH" });
+  await dispatched;
+  try {
+    assert.equal(
+      (await updateGoogleSlotTarget(enabled, { enabled: false }, access, signal)).enabled,
+      false
+    );
+  } finally {
+    respond(new Response(null, { status: 204 }));
+  }
+  assert.equal((await request).status, 204);
 });
