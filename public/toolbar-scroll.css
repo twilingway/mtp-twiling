@@ -170,9 +170,7 @@ header.topbar {
   flex: 0 0 32px;
   width: 32px;
   background: var(--surface, #131722);
-  box-shadow:
-    -6px 0 0 var(--surface, #131722),
-    6px 0 0 var(--surface, #131722);
+  box-shadow: -6px 0 0 var(--surface, #131722);
 }
 .topbar .toolbar-scroll .brand.account-button {
   position: relative;
