@@ -39,6 +39,7 @@ export function TimeframeMenu({
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState<Partial<Record<IntervalGroupId, boolean>>>({});
   const [position, setPosition] = useState<CSSProperties>();
+  const [mobile, setMobile] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
@@ -55,6 +56,19 @@ export function TimeframeMenu({
     const viewportTop = viewport?.offsetTop ?? 0;
     const viewportWidth = viewport?.width ?? document.documentElement.clientWidth;
     const viewportHeight = viewport?.height ?? document.documentElement.clientHeight;
+    const sheet = window.matchMedia("(max-width: 800px)").matches;
+    setMobile(sheet);
+    if (sheet) {
+      setPosition({
+        left: viewportLeft,
+        bottom: Math.max(0, window.innerHeight - viewportTop - viewportHeight),
+        width: viewportWidth,
+        maxWidth: viewportWidth,
+        maxHeight: Math.max(0, viewportHeight - 100)
+      });
+      setOpen(true);
+      return;
+    }
     const inset = 8;
     const anchorGap = 6;
     const viewportBottom = viewportTop + viewportHeight;
@@ -79,6 +93,8 @@ export function TimeframeMenu({
   useEffect(() => {
     if (!open) return;
     const panel = panelRef.current;
+    const previousOverflow = document.body.style.overflow;
+    if (mobile) document.body.style.overflow = "hidden";
     const selectedButton = panel?.querySelector<HTMLButtonElement>(
       "[data-selected=true]:not(:disabled)"
     );
@@ -100,12 +116,13 @@ export function TimeframeMenu({
     window.addEventListener("resize", moved);
     viewport?.addEventListener("resize", moved);
     return () => {
+      if (mobile) document.body.style.overflow = previousOverflow;
       document.removeEventListener("pointerdown", outside);
       scroller?.removeEventListener("scroll", moved);
       window.removeEventListener("resize", moved);
       viewport?.removeEventListener("resize", moved);
     };
-  }, [open]);
+  }, [open, mobile]);
   const row = (item: IntervalDefinition, prefix: string) => {
     const reason = availability[item.id];
     const favorite = favorites.includes(item.id);
@@ -203,104 +220,147 @@ export function TimeframeMenu({
       </button>
       {open
         ? createPortal(
-            <div
-              id={panelId}
-              ref={panelRef}
-              className="interval-menu-panel"
-              role="dialog"
-              aria-label={t("Интервал свечей")}
-              style={position}
-              onBlur={(event) => {
-                if (
-                  event.relatedTarget instanceof Node &&
-                  !event.currentTarget.contains(event.relatedTarget) &&
-                  !triggerRef.current?.contains(event.relatedTarget)
-                )
-                  close(false);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  close(true);
-                  return;
-                }
-                if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
-                event.preventDefault();
-                const buttons = [
-                  ...event.currentTarget.querySelectorAll<HTMLButtonElement>(
-                    "button:not(:disabled)"
+            <>
+              {mobile && (
+                <button
+                  type="button"
+                  className="interval-menu-backdrop"
+                  aria-label={`${t("Закрыть")} · ${t("Интервал свечей")}`}
+                  tabIndex={-1}
+                  onPointerDown={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }}
+                  onClick={() => close(true)}
+                />
+              )}
+              <div
+                id={panelId}
+                ref={panelRef}
+                className="interval-menu-panel"
+                data-mobile-sheet={mobile || undefined}
+                role="dialog"
+                aria-modal={mobile || undefined}
+                aria-label={t("Интервал свечей")}
+                style={position}
+                onBlur={(event) => {
+                  if (
+                    !mobile &&
+                    event.relatedTarget instanceof Node &&
+                    !event.currentTarget.contains(event.relatedTarget) &&
+                    !triggerRef.current?.contains(event.relatedTarget)
                   )
-                ];
-                const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
-                const next =
-                  event.key === "Home"
-                    ? 0
-                    : event.key === "End"
-                      ? buttons.length - 1
-                      : (current + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) %
-                        buttons.length;
-                buttons[next]?.focus();
-              }}
-            >
-              <div className="interval-menu-heading">{t("Интервал свечей")}</div>
-              <button
-                type="button"
-                className="interval-menu-add"
-                disabled
-                title={t(
-                  "Произвольные интервалы пока недоступны: нужны источник и правила агрегации."
-                )}
-              >
-                {t("＋ Добавить интервал…")}
-                <small>{t("Пока недоступно")}</small>
-              </button>
-              {favoriteItems.length ? (
-                <section className="interval-menu-section" aria-label={t("Избранное")}>
-                  <div className="interval-menu-caption">{t("Избранное")}</div>
-                  {favoriteItems.map((item) => row(item, "favorite"))}
-                </section>
-              ) : null}
-              {UNAVAILABLE_INTERVAL_GROUPS.slice(0, 2).map((group) => (
-                <div key={group.id} className="interval-menu-unavailable" title={t(group.reason)}>
-                  <span>{t(group.label)}</span>
-                  <small>{t(group.reason)}</small>
-                </div>
-              ))}
-              {INTERVAL_GROUPS.map((group) => (
-                <section
-                  key={group.id}
-                  className="interval-menu-section"
-                  aria-label={t(group.label)}
-                >
-                  <button
-                    type="button"
-                    className="interval-menu-category"
-                    aria-expanded={!collapsed[group.id]}
-                    aria-controls={`${panelId}-${group.id}`}
-                    onClick={() =>
-                      setCollapsed((current) => ({ ...current, [group.id]: !current[group.id] }))
+                    close(false);
+                }}
+                onKeyDown={(event) => {
+                  if (mobile && event.key === "Tab") {
+                    const buttons = [
+                      ...event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                        "button:not(:disabled)"
+                      )
+                    ];
+                    const boundary = event.shiftKey ? buttons[0] : buttons.at(-1);
+                    if (document.activeElement === boundary) {
+                      event.preventDefault();
+                      (event.shiftKey ? buttons.at(-1) : buttons[0])?.focus();
                     }
-                  >
-                    <span>{t(group.label)}</span>
-                    <span aria-hidden="true">{collapsed[group.id] ? "›" : "⌄"}</span>
-                  </button>
-                  <div id={`${panelId}-${group.id}`} hidden={Boolean(collapsed[group.id])}>
-                    {!collapsed[group.id]
-                      ? INTERVALS.filter((item) => item.group === group.id).map((item) =>
-                          row(item, group.id)
-                        )
-                      : null}
-                  </div>
-                </section>
-              ))}
-              {UNAVAILABLE_INTERVAL_GROUPS.slice(2).map((group) => (
-                <div key={group.id} className="interval-menu-unavailable" title={t(group.reason)}>
-                  <span>{t(group.label)}</span>
-                  <small>{t(group.reason)}</small>
+                    return;
+                  }
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    close(true);
+                    return;
+                  }
+                  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+                  event.preventDefault();
+                  const buttons = [
+                    ...event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                      "button:not(:disabled)"
+                    )
+                  ];
+                  const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+                  const next =
+                    event.key === "Home"
+                      ? 0
+                      : event.key === "End"
+                        ? buttons.length - 1
+                        : (current + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) %
+                          buttons.length;
+                  buttons[next]?.focus();
+                }}
+              >
+                <div className="interval-menu-heading">
+                  {t("Интервал свечей")}
+                  {mobile && (
+                    <button
+                      type="button"
+                      className="interval-menu-close"
+                      aria-label={t("Закрыть")}
+                      onClick={() => close(true)}
+                    >
+                      ×
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>,
+                <button
+                  type="button"
+                  className="interval-menu-add"
+                  disabled
+                  title={t(
+                    "Произвольные интервалы пока недоступны: нужны источник и правила агрегации."
+                  )}
+                >
+                  {t("＋ Добавить интервал…")}
+                  <small>{t("Пока недоступно")}</small>
+                </button>
+                {favoriteItems.length ? (
+                  <section className="interval-menu-section" aria-label={t("Избранное")}>
+                    <div className="interval-menu-caption">{t("Избранное")}</div>
+                    {favoriteItems.map((item) => row(item, "favorite"))}
+                  </section>
+                ) : null}
+                {UNAVAILABLE_INTERVAL_GROUPS.slice(0, 2).map((group) => (
+                  <div key={group.id} className="interval-menu-unavailable" title={t(group.reason)}>
+                    <span>{t(group.label)}</span>
+                    <small>{t(group.reason)}</small>
+                  </div>
+                ))}
+                {INTERVAL_GROUPS.map((group) => (
+                  <section
+                    key={group.id}
+                    className="interval-menu-section"
+                    aria-label={t(group.label)}
+                  >
+                    <button
+                      type="button"
+                      className="interval-menu-category"
+                      aria-expanded={!collapsed[group.id]}
+                      aria-controls={`${panelId}-${group.id}`}
+                      onClick={() =>
+                        setCollapsed((current) => ({ ...current, [group.id]: !current[group.id] }))
+                      }
+                    >
+                      <span>{t(group.label)}</span>
+                      <span aria-hidden="true">{collapsed[group.id] ? "›" : "⌄"}</span>
+                    </button>
+                    <div id={`${panelId}-${group.id}`} hidden={Boolean(collapsed[group.id])}>
+                      {!collapsed[group.id]
+                        ? INTERVALS.filter((item) => item.group === group.id).map((item) =>
+                            row(item, group.id)
+                          )
+                        : null}
+                    </div>
+                  </section>
+                ))}
+                {UNAVAILABLE_INTERVAL_GROUPS.slice(2).map((group) => (
+                  <div key={group.id} className="interval-menu-unavailable" title={t(group.reason)}>
+                    <span>{t(group.label)}</span>
+                    <small>{t(group.reason)}</small>
+                  </div>
+                ))}
+              </div>
+            </>,
             document.fullscreenElement ?? document.body
           )
         : null}

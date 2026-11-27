@@ -261,3 +261,61 @@ header.topbar {
 .toolbar-popover .mobile-workspace-zone {
   flex-wrap: wrap;
 }
+.interval-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1199;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #0006;
+  touch-action: none;
+}
+.interval-menu-backdrop:hover {
+  background: #0006;
+}
+.interval-menu-panel[data-mobile-sheet="true"] {
+  top: auto;
+  right: auto;
+  margin: 0;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  border-radius: 14px 14px 0 0;
+  overscroll-behavior: contain;
+}
+.interval-menu-panel[data-mobile-sheet="true"]::before {
+  content: "";
+  display: block;
+  width: 32px;
+  height: 4px;
+  margin: 2px auto 4px;
+  border-radius: 2px;
+  background: var(--interval-muted);
+}
+.interval-menu-panel[data-mobile-sheet="true"] .interval-menu-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 0;
+  min-height: 44px;
+}
+.interval-menu-panel[data-mobile-sheet="true"] .interval-menu-close {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-size: 24px;
+}
+@media (max-width: 800px) {
+  .topbar .toolbar-scroll .interval-menu-trigger {
+    height: 40px;
+    min-height: 40px;
+    font-size: 14px;
+  }
+  .interval-menu-panel[data-mobile-sheet="true"]
+    :is(.interval-menu-row, .interval-menu-choice, .interval-menu-category, .interval-menu-star) {
+    min-height: 44px;
+  }
+}

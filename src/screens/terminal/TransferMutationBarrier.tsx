@@ -10,7 +10,7 @@ export function TransferMutationBarrier() {
     if (!blocked) return;
     const nodes = [
         ...document.querySelectorAll<HTMLElement>(
-          ".topbar > :not(#account-button):not(.brand), .drawing-toolbar, .right-panel, .chart-workspace > [data-chart-slot]"
+          ".topbar .toolbar-scroll > :not(.terminal-brand-menu), .drawing-toolbar, .right-panel, .chart-workspace > [data-chart-slot]"
         )
       ],
       previous = nodes.map((node) => node.inert);
