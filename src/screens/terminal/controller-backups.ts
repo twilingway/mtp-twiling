@@ -16,11 +16,16 @@ type Bridge = Parameters<typeof importTerminalBackup>[1] & {
 export class TerminalBackups {
   private readonly pending = new Map<string, Promise<unknown>>();
   constructor(private readonly bridge: Bridge) {}
+  async settle(): Promise<void> {
+    await Promise.allSettled(this.pending.values());
+  }
   private enqueue<T>(operation: () => Promise<T>): Promise<T> {
     const { owner } = this.bridge.getState(),
       client = this.bridge.getClient();
     const valid = () =>
       this.bridge.isAlive() &&
+      !this.bridge.getState().profileTransition &&
+      !this.bridge.getState().workspaceMigrationIncomplete &&
       this.bridge.getState().owner === owner &&
       this.bridge.getClient() === client;
     const task = (this.pending.get(owner) ?? Promise.resolve())
@@ -101,6 +106,7 @@ export class TerminalBackups {
         if (
           !this.bridge.isAlive() ||
           this.bridge.getState().owner !== owner ||
+          this.bridge.getState().profileTransition ||
           this.bridge.getClient() !== client
         )
           throw new DOMException("Профиль изменился. Повторите перенос.", "AbortError");

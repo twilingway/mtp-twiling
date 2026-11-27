@@ -124,7 +124,7 @@ test("late restore from previous owner never authorizes the new profile", async 
   gate.resolve(); assert.equal(await old, undefined); assert.equal(f.prompts.length, 1);
 });
 
-test("bank logout deletes one owner's Google credential and remembered bank entry in one transaction", async () => {
+test("bank logout deletes only remembered bank entry and preserves every Google credential", async () => {
   const deleted = [], transactions = [], vault = new Map([
     ["remembered", {}], [driveCredentialId("owner-A"), {}], [driveCredentialId("owner-B"), {}], ["device-key", {}]
   ]);
@@ -134,7 +134,7 @@ test("bank logout deletes one owner's Google credential and remembered bank entr
   const previous = globalThis.sessionStorage; globalThis.sessionStorage = { removeItem: () => {} };
   try {
     await storage.clearSession("owner-A"); assert.equal(transactions.length, 1);
-    assert.deepEqual(deleted, ["remembered", driveCredentialId("owner-A")]); assert.ok(vault.has(driveCredentialId("owner-B"))); assert.ok(vault.has("device-key"));
+    assert.deepEqual(deleted, ["remembered"]); assert.ok(vault.has(driveCredentialId("owner-A"))); assert.ok(vault.has(driveCredentialId("owner-B"))); assert.ok(vault.has("device-key"));
     await storage.clearSession(); assert.equal(deleted.at(-1), "remembered");
   } finally { if (previous === undefined) delete globalThis.sessionStorage; else globalThis.sessionStorage = previous; }
 });

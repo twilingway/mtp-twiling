@@ -2,8 +2,18 @@ import type { Locale } from "../../i18n/preferences.js";
 import type { TerminalState } from "./state.js";
 
 const messages = {
-  ru: { loading: "Загрузка списка котировок…", error: "Не удалось загрузить список котировок." },
-  en: { loading: "Loading watchlist…", error: "Could not load the watchlist." }
+  ru: {
+    loading: "Загрузка списка котировок…",
+    error: "Не удалось загрузить список котировок.",
+    recovery: "Не удалось открыть рабочее пространство. Сохранённые данные не изменены.",
+    retry: "Повторить"
+  },
+  en: {
+    loading: "Loading watchlist…",
+    error: "Could not load the watchlist.",
+    recovery: "Could not open the workspace. Your saved data is unchanged.",
+    retry: "Retry"
+  }
 };
 
 export function watchlistStartupNotice({
@@ -19,10 +29,14 @@ export function watchlistStartupNotice({
 
 export function WatchlistStartupStatus({
   phase,
-  locale = "ru"
+  locale = "ru",
+  migrationIncomplete = false,
+  onRetry
 }: {
   phase: "loading" | "error";
   locale?: Locale | undefined;
+  migrationIncomplete?: boolean;
+  onRetry?: () => void;
 }) {
   return (
     <div className="watchlist-startup-status" role="status">
@@ -38,7 +52,16 @@ export function WatchlistStartupStatus({
           </div>
         </div>
       )}
-      <span>{messages[locale][phase]}</span>
+      <span>
+        {phase === "error" && migrationIncomplete
+          ? messages[locale].recovery
+          : messages[locale][phase]}
+      </span>
+      {phase === "error" && onRetry && (
+        <button type="button" onClick={onRetry}>
+          {messages[locale].retry}
+        </button>
+      )}
     </div>
   );
 }

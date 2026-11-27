@@ -47,7 +47,10 @@ export async function restoreImportedProfile(
 ): Promise<void> {
   const { owner, name } = bridge.getState(),
     client = bridge.getClient(),
-    sessionValid = () => bridge.session.matches(client) && owner === bridge.getState().owner,
+    sessionValid = () =>
+      bridge.session.matches(client) &&
+      !bridge.getState().profileTransition &&
+      owner === bridge.getState().owner,
     valid = () => {
       if (!sessionValid()) return false;
       assertImportCurrent(guard);
@@ -102,7 +105,10 @@ export async function importTerminalBackup(
     summary = onProgress ? summarizeBackupFile(data) : undefined,
     { owner } = bridge.getState(),
     client = bridge.getClient(),
-    valid = () => bridge.session.matches(client) && owner === bridge.getState().owner;
+    valid = () =>
+      bridge.session.matches(client) &&
+      !bridge.getState().profileTransition &&
+      owner === bridge.getState().owner;
   await bridge.editing.flush();
   if (!valid()) return;
   assertImportCurrent(options.valid);

@@ -405,7 +405,20 @@ export function WatchlistSectionsTable({
         </tbody>
       </table>
       {startup ? (
-        <WatchlistStartupStatus phase={startup} locale={state.preferences.locale} />
+        <WatchlistStartupStatus
+          phase={startup}
+          locale={state.preferences.locale}
+          migrationIncomplete={!!state.workspaceMigrationIncomplete}
+          onRetry={() => {
+            void controller
+              .start()
+              .catch(() =>
+                controller.notify(
+                  "Не удалось открыть рабочее пространство. Сохранённые данные не изменены."
+                )
+              );
+          }}
+        />
       ) : !groups.some((group) => group.rows.length) && !sections.length ? (
         <p id="empty-search">
           {state.rows.length

@@ -15,6 +15,34 @@ interface CameraState {
   pending?: { scope: symbol; sequence: number; current: () => boolean } | undefined;
 }
 const cameras = new WeakMap<object, CameraState>();
+const workspaceCameras = new Set<WeakRef<TerminalController>>();
+const registeredCameras = new WeakSet<TerminalController>();
+function registerCamera(controller: TerminalController): void {
+  if (registeredCameras.has(controller)) return;
+  registeredCameras.add(controller);
+  workspaceCameras.add(new WeakRef(controller));
+}
+
+/** Capture every visible slot synchronously before a market transition can retire its canvas. */
+export function captureWorkspaceCameraViews(controller: TerminalController): Promise<void> {
+  registerCamera(controller);
+  const owner = controller.getSnapshot().owner;
+  const writes: Promise<void>[] = [];
+  for (const reference of workspaceCameras) {
+    const candidate = reference.deref();
+    if (!candidate) {
+      workspaceCameras.delete(reference);
+      continue;
+    }
+    if (
+      candidate.getSnapshot().owner !== owner ||
+      candidate.sessionKey() !== controller.sessionKey()
+    )
+      continue;
+    writes.push(candidate.saveView(), flushCamera(candidate));
+  }
+  return Promise.all(writes).then(() => {});
+}
 function cameraState(controller: object): CameraState {
   let state = cameras.get(controller);
   if (!state) {
@@ -46,6 +74,7 @@ export function subscribeCamera(
   controller: TerminalController,
   listener: (kind: Change) => void
 ): () => void {
+  registerCamera(controller);
   const state = cameraState(controller);
   state.listeners.add(listener);
   return () => state.listeners.delete(listener);
@@ -79,6 +108,7 @@ export function cameraCallbacks(
   alive: () => boolean,
   save: (owner: string, key: string, view: ChartView) => Promise<void>
 ): Pick<ChartOptions, "onCameraIntent" | "onCameraChange" | "onCameraIdle"> {
+  registerCamera(controller);
   const session = controller.sessionKey(),
     revision = controller.getSnapshot().chartRevision,
     state = cameraState(controller),

@@ -55,7 +55,15 @@ export interface DriveStatus {
   lastOperation?: DriveOperationTime | undefined;
 }
 export interface DriveBridge {
-  profile(): { owner: string; session: unknown; authenticated: boolean; blocked: boolean };
+  profile(): {
+    owner: string;
+    cloudOwner?: string | undefined;
+    associationConflict?: boolean;
+    transition?: boolean;
+    session: unknown;
+    authenticated: boolean;
+    blocked: boolean;
+  };
   exportBackup(): Promise<Backup>;
   importBackup(backup: Backup, options: BackupImportOptions): Promise<void>;
 }

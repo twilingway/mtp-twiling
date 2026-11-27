@@ -8,7 +8,7 @@ import type { TerminalController } from "./controller.js";
 import type { TerminalState } from "./state.js";
 import { cameraPending, flushCamera, subscribeCamera } from "./controller-camera-sync.js";
 import { optionalDriveObserver } from "./controller-drive-observer.js";
-import { marketAvailable } from "./market-readiness.js";
+import { driveWorkspaceBinding } from "../../services/drive/workspace-binding.js";
 import { LEGACY_DRIVE_NAMESPACE } from "../../services/drive/types.js";
 import { activeWorkspaceChart } from "./workspace-active-chart.js";
 import { subscribeWorkspaceAnnotations } from "./workspace-annotations.js";
@@ -24,8 +24,10 @@ export function terminalDrive(controller: TerminalController): DriveCoordinator 
           const chart = activeWorkspaceChart(controller).getSnapshot();
           return {
             owner: state.owner,
-            session: controller.sessionKey(),
-            authenticated: marketAvailable(state),
+            session: controller.cloudSessionKey(),
+            authenticated: !!controller.workspaceBinding(),
+            ...driveWorkspaceBinding(controller.workspaceBinding()),
+            transition: !!state.profileTransition,
             blocked: !!(
               state.profileTransition ||
               cameraPending(controller) ||

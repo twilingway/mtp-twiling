@@ -6,7 +6,6 @@ import { publicMarketRow, applyPublicQuote } from "./market-public-mapping.js";
 import { MutationQueue } from "./mutation-queue.js";
 import { persistWatchlistMove } from "./watchlist-order.js";
 import type { WatchlistMove } from "./watchlist-order.js";
-import { profileKey } from "./profile-key.js";
 import { isBankIdentity, validProviderIdentity } from "../model/market-provider.js";
 import { selectedMarketRow } from "../model/selected-instrument.js";
 import { sortInstrumentSearch } from "../model/instrument-search-sort.js";
@@ -48,7 +47,7 @@ export class MarketClient extends EventTarget {
   private offline = false;
   private readonly online: () => boolean;
   constructor(
-    private readonly token: string | null,
+    token: string | null,
     name: string,
     private readonly cache: Cache,
     options: MarketClientOptions = {}
@@ -69,8 +68,17 @@ export class MarketClient extends EventTarget {
       }
     };
     this.bank = token
-      ? (options.bankFactory?.(token, name, bankCacheView(providerCache)) ??
-        new TBankClient(token, name, bankCacheView(providerCache)))
+      ? (options.bankFactory?.(
+          token,
+          name,
+          bankCacheView(providerCache, () => this.owner)
+        ) ??
+        new TBankClient(
+          token,
+          name,
+          bankCacheView(providerCache, () => this.owner),
+          this.owner
+        ))
       : null;
     this.publicMarket = new PublicMarket(
       () => this.owner,
@@ -133,9 +141,8 @@ export class MarketClient extends EventTarget {
     if (value) this.backgroundHistory.abort();
     else if (this.backgroundHistory.signal.aborted) this.backgroundHistory = new AbortController();
   }
-  async prepareOwner(): Promise<string> {
-    if (this.token) this.owner = await profileKey(this.token);
-    return this.owner;
+  prepareOwner(): Promise<string> {
+    return Promise.resolve(this.owner);
   }
   serverNow(): number {
     return this.bank?.serverNow() ?? Date.now();
@@ -292,8 +299,9 @@ export class MarketClient extends EventTarget {
     this.rows = rows;
     this.notify();
   }
-  settleMutations(): Promise<void> {
-    return this.mutations.run(async () => {});
+  async settleMutations(): Promise<void> {
+    await this.starting?.catch(() => undefined);
+    await this.mutations.run(async () => {});
   }
   loadSpotTradeHistory(uid: string, range: HistoryRange, signal: AbortSignal) {
     if (this.closed || signal.aborted) return Promise.resolve(null);

@@ -5,14 +5,19 @@ import {
   isReservedProviderId
 } from "../model/market-provider.js";
 /** Bank transport owns no mixed persistence: the facade commits the authoritative ordered list. */
-export function bankCacheView(cache: Cache): Cache {
+export function bankCacheView(cache: Cache, workspace?: () => string): Cache {
+  const ownerFor = (owner: string) => workspace?.() ?? owner;
   return {
     ...cache,
-    loadWatchlist: async (owner) => (await cache.loadWatchlist(owner))?.filter(isBankIdentity),
+    loadWatchlist: async (owner) =>
+      (await cache.loadWatchlist(ownerFor(owner)))?.filter(isBankIdentity),
     loadMarket: async (owner) => {
-      const value = await cache.loadMarket(owner);
+      const value = await cache.loadMarket(ownerFor(owner));
       return value ? { ...value, rows: value.rows.filter(isBankIdentity) } : undefined;
     },
+    loadHistory: (owner, ...args) => cache.loadHistory(ownerFor(owner), ...args),
+    saveHistory: (owner, ...args) => cache.saveHistory(ownerFor(owner), ...args),
+    loadCoverage: (owner, ...args) => cache.loadCoverage(ownerFor(owner), ...args),
     saveWatchlist: async () => {},
     saveWatchlistSnapshot: async () => {},
     saveMarket: async () => {}
