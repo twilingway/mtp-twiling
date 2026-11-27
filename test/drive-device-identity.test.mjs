@@ -22,6 +22,7 @@ async function browserTabs() {
     second,
     identity: browser.load("services/drive/device-slot-identity.ts"),
     otherIdentity: otherTab("services/drive/device-slot-identity.ts"),
+    slots: browser.load("services/drive/device-slot-local.ts"),
     model: browser.load("services/drive/device-slot-model.ts")
   };
 }
@@ -155,4 +156,62 @@ test("mode selection is isolated per workspace and invalid state never falls bac
   });
   await assert.rejects(identity.loadDriveDeviceId("profile-A", "test"), { code: "remote-invalid" });
   assert.equal(database.stores.preferences.has(deviceKey), false);
+});
+
+test("fresh DEV contexts select the same testing slot before persisting anything", async () => {
+  const left = await browserTabs();
+  const right = await browserTabs();
+  const a = left.identity.defaultDriveSlotMode({ pathname: "/", search: "" }, true);
+  const b = right.identity.defaultDriveSlotMode({ pathname: "/__dev/app/", search: "" }, false);
+  const records = await Promise.all([
+    left.slots.loadDeviceSlotRecord("device", a),
+    right.slots.loadDeviceSlotRecord("device", b)
+  ]);
+  assert.deepEqual(
+    records.map(({ mode }) => mode),
+    ["test", "test"]
+  );
+  const leftId = await left.identity.loadDriveDeviceId(workspace, records[0].mode);
+  const rightId = await right.identity.loadDriveDeviceId(workspace, records[1].mode);
+  assert.equal(leftId, left.model.DEVICE_SLOT_TEST_DEVICE_ID);
+  assert.equal(rightId, leftId);
+  assert.equal(left.database.stores.preferences.size, 0);
+  assert.equal(right.database.stores.preferences.size, 0);
+});
+
+test("the production opt-in applies to fresh sessions and preserves a saved normal choice", async () => {
+  const { database, identity, slots } = await browserTabs();
+  const optIn = identity.defaultDriveSlotMode(
+    { pathname: "/", search: "?sync-client=testing" },
+    false
+  );
+  assert.equal(optIn, "test");
+  const fresh = await slots.loadDeviceSlotRecord("device", optIn);
+  assert.equal(fresh.mode, "test");
+  const enabled = await slots.saveDeviceSlotRecord("device", fresh, { enabled: true });
+  assert.equal(enabled.mode, "test", "first write persists the chosen launch mode");
+  await slots.saveDeviceSlotRecord("device", enabled, { mode: "normal" });
+  for (const fallback of [
+    optIn,
+    identity.defaultDriveSlotMode({ pathname: "/", search: "" }, true)
+  ]) {
+    const stored = await slots.loadDeviceSlotRecord("device", fallback);
+    assert.equal(stored.mode, "normal");
+    assert.equal(stored.generation, 2);
+  }
+  assert.equal(database.stores.preferences.has(deviceKey), false);
+});
+
+test("fresh public clients without a test launch retain a stable normal browser UUID", async () => {
+  const { database, identity, slots, otherIdentity } = await browserTabs();
+  const fallback = identity.defaultDriveSlotMode(
+    { pathname: "/__dev/application", search: "?sync-client=test" },
+    false
+  );
+  assert.equal(fallback, "normal");
+  const { mode } = await slots.loadDeviceSlotRecord("device", fallback);
+  const normal = await identity.loadDriveDeviceId(workspace, mode);
+  assert.equal(await otherIdentity.loadDriveDeviceId(workspace, mode), normal);
+  assert.equal(database.stores.preferences.get(deviceKey).value, normal);
+  assert.notEqual(normal, identity.DEVICE_SLOT_TEST_DEVICE_ID);
 });

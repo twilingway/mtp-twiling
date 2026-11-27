@@ -35,6 +35,13 @@ export function installTerminalGoogleSync(
   retentionProviders.set(controller, provider);
 }
 
+export function uninstallTerminalGoogleSync(
+  controller: TerminalController,
+  provider: CloudSyncProvider
+): void {
+  if (retentionProviders.get(controller) === provider) retentionProviders.delete(controller);
+}
+
 export function terminalGoogleRetention(
   controller: TerminalController
 ): GoogleSlotProvider | undefined {

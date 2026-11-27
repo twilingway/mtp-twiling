@@ -9,6 +9,19 @@ export type DriveSlotMode = "normal" | "test";
 
 const DEVICE_KEY = "drive-device";
 
+export function defaultDriveSlotMode(
+  address: Pick<Location, "pathname" | "search"> | undefined = globalThis.location,
+  devLoader = !!globalThis.document?.querySelector('script[type="module"][src="/__dev/client.js"]')
+): DriveSlotMode {
+  if (
+    devLoader ||
+    address?.pathname === "/__dev/app" ||
+    address?.pathname.startsWith("/__dev/app/")
+  )
+    return "test";
+  return new URLSearchParams(address?.search).get("sync-client") === "testing" ? "test" : "normal";
+}
+
 function modeKey(workspaceId: string): string {
   if (
     typeof workspaceId !== "string" ||
@@ -24,10 +37,13 @@ function validateMode(value: unknown): DriveSlotMode {
   throw new DriveError("remote-invalid", "Invalid Drive slot mode.");
 }
 
-export async function loadDriveSlotMode(workspaceId: string): Promise<DriveSlotMode> {
+export async function loadDriveSlotMode(
+  workspaceId: string,
+  fallback = defaultDriveSlotMode()
+): Promise<DriveSlotMode> {
   const stored = await get("preferences", modeKey(workspaceId));
   return stored === undefined
-    ? "normal"
+    ? fallback
     : validateMode(isRecord(stored) ? stored.value : undefined);
 }
 

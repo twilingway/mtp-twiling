@@ -95,6 +95,36 @@ test("a legacy inert record remains off and preference changes do not start Goog
   provider.dispose();
 });
 
+test("disposing a Google binding permits remount and stale uninstall cannot remove the new instance", () => {
+  const {
+    createTerminalGoogleSync,
+    installTerminalGoogleSync,
+    terminalGoogleRetention,
+    uninstallTerminalGoogleSync
+  } = load("screens/terminal/controller-drive.ts");
+  const controller = {};
+  const host = {
+    scope: () => ({ ...device, ready: false }),
+    capture: unreachableStorage,
+    apply: unreachableStorage
+  };
+  const first = createTerminalGoogleSync(host);
+  const replacement = createTerminalGoogleSync(host);
+  installTerminalGoogleSync(controller, first);
+  uninstallTerminalGoogleSync(controller, replacement);
+  assert.equal(terminalGoogleRetention(controller), first);
+  assert.throws(() => installTerminalGoogleSync(controller, replacement), /already installed/);
+
+  first.dispose();
+  uninstallTerminalGoogleSync(controller, first);
+  assert.equal(terminalGoogleRetention(controller), undefined);
+  installTerminalGoogleSync(controller, replacement);
+  uninstallTerminalGoogleSync(controller, first);
+  assert.equal(terminalGoogleRetention(controller), replacement);
+  replacement.dispose();
+  uninstallTerminalGoogleSync(controller, replacement);
+});
+
 test("disable invalidates a late saved connection, keeps the credential and hides warnings", async () => {
   let complete;
   const waiting = new Promise((resolve) => {

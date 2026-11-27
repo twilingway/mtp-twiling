@@ -2,6 +2,7 @@ import { isRecord } from "../../model/backup-format.js";
 import { get, transaction } from "../storage-db.js";
 import { shaPattern, uuidPattern } from "./backup.js";
 import { strongDeviceSlotTag } from "./device-slot-cas.js";
+import { defaultDriveSlotMode, type DriveSlotMode } from "./device-slot-identity.js";
 import {
   deviceSlotKey,
   parseDeviceSlotCheckpoint,
@@ -20,7 +21,7 @@ export interface DeviceSlotRecord {
   readonly generation: number;
   readonly enabled?: boolean | undefined;
   readonly automatic: boolean;
-  readonly mode: "normal" | "test";
+  readonly mode: DriveSlotMode;
   readonly scope?: DeviceSlotScope | undefined;
   readonly checkpoint?: DeviceSlotCheckpoint | undefined;
   readonly baseHeads: readonly string[];
@@ -32,11 +33,11 @@ const namespace = (owner: string) => `drive-v3:${owner}`;
 const invalid = () => new DriveError("remote-invalid", "Локальная привязка слотов повреждена.");
 const sameScope = (a: DeviceSlotScope, b: DeviceSlotScope) =>
   a.workspaceId === b.workspaceId && a.legacyArchive === b.legacyArchive;
-const initial = (): DeviceSlotRecord => ({
+const initial = (mode: DriveSlotMode): DeviceSlotRecord => ({
   schemaVersion: 3,
   generation: 0,
   automatic: true,
-  mode: "normal",
+  mode,
   baseHeads: []
 });
 
@@ -86,8 +87,8 @@ function readPending(value: unknown, scope: DeviceSlotScope | undefined): Pendin
   };
 }
 
-function parse(value: unknown): DeviceSlotRecord {
-  if (value === undefined) return initial();
+function parse(value: unknown, fallback: DriveSlotMode): DeviceSlotRecord {
+  if (value === undefined) return initial(fallback);
   if (!isRecord(value) || !isRecord(value.value)) throw invalid();
   const record = value.value;
   if (record.schemaVersion !== 3)
@@ -132,8 +133,11 @@ function parse(value: unknown): DeviceSlotRecord {
   };
 }
 
-export async function loadDeviceSlotRecord(owner: string): Promise<DeviceSlotRecord> {
-  return parse(await get("preferences", namespace(owner)));
+export async function loadDeviceSlotRecord(
+  owner: string,
+  fallback = defaultDriveSlotMode()
+): Promise<DeviceSlotRecord> {
+  return parse(await get("preferences", namespace(owner)), fallback);
 }
 
 /** Cross-tab checkpoint/journal update must use the record that was actually read. */
@@ -153,10 +157,13 @@ export async function saveDeviceSlotRecord(
       const request = store.get(id);
       request.onsuccess = () => {
         try {
-          const current = parse(request.result);
+          const current = parse(request.result, prior.mode);
           if (current.generation !== prior.generation)
             throw new DriveError("conflict", "Другой сеанс изменил привязку Google Диска.");
-          result = parse({ value: { ...current, ...patch, generation: current.generation + 1 } });
+          result = parse(
+            { value: { ...current, ...patch, generation: current.generation + 1 } },
+            prior.mode
+          );
           store.put({ id, owner, value: result });
         } catch (error) {
           failure = error instanceof Error ? error : invalid();
