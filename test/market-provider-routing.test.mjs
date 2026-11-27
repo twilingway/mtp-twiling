@@ -140,6 +140,7 @@ function fixture({ token = null, holdCatalog, holdHistory, holdHistoryWrite } = 
   };
   const { MarketClient } = load("services/market-client.ts");
   const client = new MarketClient(token, "profile", cache, {
+    owner: "device",
     http,
     okx: {
       http: {
@@ -259,7 +260,7 @@ test("anonymous crypto search/add/history uses public provider identity and neve
 test("mixed watchlist keeps order; bank cache and requests receive only bank identities", async () => {
   const f = fixture({ token: "test-token" });
   await f.client.prepareOwner();
-  f.stored.set("bank-owner", [f.bankRow]);
+  f.stored.set("device", [f.bankRow]);
   await f.client.start();
   try {
     const instrument = (await f.client.searchInstruments("BTC", "crypto"))[0];
@@ -273,7 +274,8 @@ test("mixed watchlist keeps order; bank cache and requests receive only bank ide
       ["bank-uid"]
     );
     await f.bank.cache.saveWatchlistSnapshot("bank-owner", []);
-    assert.equal(f.stored.get("bank-owner").length, 2);
+    assert.equal(f.stored.get("device").length, 2);
+    assert.equal(f.stored.has("bank-owner"), false);
     await f.client.candles("SBER", "1m", { from: start, to: start + 60_000 }, { uid: "bank-uid" });
     assert.ok(f.calls.some((x) => x.bankCandles));
     const deselects = f.calls.filter((x) => x.bankUnsubscribe).length;

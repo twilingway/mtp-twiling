@@ -257,8 +257,9 @@ export class TerminalSession {
       await this.bridge.flush();
       if (!attempt()) throw cancelled();
       if (previous) previous.cachePaused = true;
+      const preferredOwner = previous ? this.bridge.getState().owner : owner;
       const binding = await prepareDeviceWorkspace({
-        preferredOwner: previous ? this.bridge.getState().owner : owner,
+        ...(preferredOwner === undefined ? {} : { preferredOwner }),
         valid: attempt,
         signal: transition.signal
       });

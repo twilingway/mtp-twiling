@@ -151,7 +151,12 @@ export class WorkspacePanelController extends TerminalController {
     this.configuredOwner = parent.owner;
     this.row = row;
     const route =
-      row && market && ready
+      row &&
+      market &&
+      ready &&
+      !parent.importingBackup &&
+      !parent.importRecoveryRequired &&
+      !parent.workspaceMigrationIncomplete
         ? {
             owner: parent.owner,
             row,

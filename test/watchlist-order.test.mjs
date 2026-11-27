@@ -20,6 +20,8 @@ function load(relative) {
   const filename = path.resolve(sourceRoot, relative).replace(/\.js$/, ".ts");
   assert.ok(filename.startsWith(sourceRoot));
   if (/services[\\/]storage(?:-v2)?\.ts$/.test(filename)) return storageBoundary;
+  // Ordering does not start migration or access IndexedDB.
+  if (/services[\\/]storage-db\.ts$/.test(filename)) return {};
   if (/services[\\/]chart-camera\.ts$/.test(filename))
     return new Proxy(
       {},
