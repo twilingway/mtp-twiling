@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { t } from "../../i18n/messages.js";
 import { chartMeasurement } from "./chart-measurement-session.js";
 import {
@@ -7,10 +7,14 @@ import {
   chartRangeZoomSession,
   type ZoomRectangle
 } from "./chart-range-zoom-input.js";
-import { useTerminal, useTerminalController, useTerminalState } from "./context.js";
+import { useTerminal, useTerminalController } from "./context.js";
 import { shallowEqual } from "./snapshot-selector.js";
 import type { TerminalState } from "./state.js";
-import { chartNavigationReady } from "./chart-navigation-state.js";
+import {
+  chartNavigationReady,
+  chartNavigationSelectionReady,
+  selectChartNavigationState
+} from "./chart-navigation-state.js";
 import { userCameraAction } from "./controller-camera-sync.js";
 import { DrawingToolIcon } from "./DrawingToolIcon.js";
 
@@ -50,15 +54,10 @@ export function ChartRangeZoomButton({ onChoose }: { onChoose?: () => void } = {
 }
 
 export function ChartZoomOutButton({ onChoose }: { onChoose: () => void }) {
-  const controller = useTerminalController();
-  const select = useCallback(
-    (state: TerminalState) => ({
-      locale: state.preferences.locale,
-      ready: chartNavigationReady(state, controller.chart) && !!controller.chart?.zoom
-    }),
-    [controller]
-  );
-  const state = useTerminalState(controller, select, shallowEqual);
+  const { controller, state } = useTerminal(selectChartNavigationState, shallowEqual);
+  const chart = controller.chart;
+  // Adapter attachment and capabilities can change without a new store snapshot.
+  const ready = chartNavigationSelectionReady(state, chart) && !!chart.zoom;
   const label = t("Уменьшить масштаб", state.locale);
   return (
     <button
@@ -67,7 +66,7 @@ export function ChartZoomOutButton({ onChoose }: { onChoose: () => void }) {
       className="tool"
       title={label}
       aria-label={label}
-      disabled={!state.ready}
+      disabled={!ready}
       onClick={() => {
         const activeChart = controller.chart;
         if (!chartNavigationReady(controller.getSnapshot(), activeChart) || !activeChart.zoom)

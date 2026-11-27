@@ -59,6 +59,10 @@ measure/zoom/zoom-out на 20 котировок либо 20 live-candle соб�
 - Кнопки выбирают локаль, активный инструмент и доступность как boolean. Изменение цены или
   содержимого существующей свечи не меняет доступность. Подписки на measurement/zoom sessions
   сохраняются; ZoomOut проверяет source/camera и текущие возможности chart.
+- Срез ZoomOut содержит только неизменяемые поля store. Текущий adapter и его возможности
+  проверяются на каждом render: асинхронный attach без нового snapshot не должен оставлять кнопку
+  недоступной после следующего родительского render. Тест сохраняет identity snapshot, назначает
+  chart и повторяет render; отдельно проверяется исчезновение zoom capability без обновления store.
 - Watchlist, его таблица и фильтр сохраняют реальные rows/quotes и состояния импорта, исключая
   candles. Вложенные ApplicationInfo, BackupTransferSettings, DetailsDivider, внешний
   InstrumentDetails и TechnicalObjectTree также имеют самостоятельные селекторы. TechnicalRows

@@ -81,6 +81,10 @@ test("real controller quote/candle events leave static component hooks idle and 
     }])) };
   const root = createRoot(env.container);
   const sync = (run) => ReactDOM.flushSync(run);
+  const render = () => root.render(React.createElement(TerminalContext, { value: c },
+    Object.entries(readers).map(([id, Component]) => React.createElement(React.Profiler, {
+      id, key: id, onRender: () => { counts[id] = (counts[id] ?? 0) + 1; }
+    }, React.createElement(Component)))));
   const change = (patch) => sync(() => c.update(patch));
   const snapshot = () => ({ rows, marketReady: true, authenticated: false, status: "connected", error: null });
   const measure = (name, run, quote) => {
@@ -93,10 +97,7 @@ test("real controller quote/candle events leave static component hooks idle and 
     t.diagnostic(JSON.stringify({ name, events: 20, commits }));
   };
   try {
-    sync(() => root.render(React.createElement(TerminalContext, { value: c },
-      Object.entries(readers).map(([id, Component]) => React.createElement(React.Profiler, {
-        id, key: id, onRender: () => { counts[id] = (counts[id] ?? 0) + 1; }
-      }, React.createElement(Component))))));
+    sync(render);
     measure("selected quote", (index) => { rows[0].price = 101 + index;
       client.dispatchEvent(new CustomEvent("state", { detail: snapshot() })); }, true);
     assert.match(text(find(latest.Watchlist, (node) => node.props?.id === "detail-price")), /120/);
@@ -108,6 +109,19 @@ test("real controller quote/candle events leave static component hooks idle and 
       env.flushFrames();
     }, false);
     assert.equal(c.getSnapshot().candles[0].close, 120);
+
+    const beforeAttachment = c.getSnapshot();
+    assert.equal(latest.ChartZoomOutButton.props.disabled, true);
+    c.chart = { source: { owner: beforeAttachment.owner, uid: "uid-A", viewKey: viewKey(beforeAttachment.preferences) },
+      getView: () => ({}), zoom: noop };
+    sync(render); // A parent/menu render after asynchronous attachment, with no store update.
+    assert.equal(c.getSnapshot(), beforeAttachment);
+    assert.equal(latest.ChartZoomOutButton.props.disabled, false);
+    delete c.chart.zoom;
+    sync(render);
+    assert.equal(c.getSnapshot(), beforeAttachment);
+    assert.equal(latest.ChartZoomOutButton.props.disabled, true);
+    c.chart = null;
 
     change({ authenticated: true, status: "disconnected", error: "API connection failed", name: "Account name" });
     assert.match(text(latest.AccountDialog), /API connection failed/);
