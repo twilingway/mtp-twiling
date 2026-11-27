@@ -5,6 +5,7 @@ import { sourceLoader } from "./helpers/market-source-loader.mjs";
 const load = sourceLoader();
 const { selectedSnapshot, shallowEqual } = load("screens/terminal/snapshot-selector.ts");
 const { shareMarketRows } = load("screens/terminal/market-state-sharing.ts");
+const { importWritable } = load("screens/terminal/controller-transfer-guard.ts");
 const { equalTerminalState, selectShellState, selectToolbarState, selectControlsState, selectPanelState } = load(
   "screens/terminal/terminal-state-selection.ts"
 );
@@ -15,6 +16,18 @@ const fixture = () => ({
   owner: "profile", ready: true, authenticated: true, status: "connected", name: "Name",
   preferences: { symbol: "A", instrumentUid: "A", timeframe: "1d", rightPanelCollapsed: false },
   rows: [row("A"), row("B")], pricesDirection: new Map(), candles: [], dialog: null
+});
+
+test("control selections preserve the workspace migration mutation barrier", () => {
+  let state = fixture();
+  const controls = selectedSnapshot(() => state, selectControlsState, shallowEqual);
+  const ready = controls();
+  assert.equal(importWritable(ready), true);
+  state = { ...state, workspaceMigrationIncomplete: true };
+  assert.notEqual(controls(), ready);
+  assert.equal(importWritable(controls()), false);
+  state = { ...state, workspaceMigrationIncomplete: false };
+  assert.equal(importWritable(controls()), true);
 });
 
 test("unrelated mutable provider quotes retain instrument snapshots and direction identity", () => {

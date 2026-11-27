@@ -34,6 +34,7 @@ export const selectControlsState = (state: TerminalState) => ({
   backupBusy: state.backupBusy,
   importingBackup: state.importingBackup,
   importRecoveryRequired: state.importRecoveryRequired,
+  workspaceMigrationIncomplete: state.workspaceMigrationIncomplete,
   annotationReady: state.annotationReady,
   chartRevision: state.chartRevision,
   mobilePanelOpen: state.mobilePanelOpen,
