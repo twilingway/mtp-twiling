@@ -84,12 +84,12 @@ test("ReactDOM subscribers avoid crosshair-only commits while explicit OHLC hove
     const prefs = { ...f.controller.getSnapshot().preferences, symbol: "B" };
     flushSync(() => f.update({ preferences: prefs }));
     assert.equal(counts.editor - initial.editor, 1);
-    assert.equal(counts.watchlist - initial.watchlist, 2);
+    assert.equal(counts.watchlist - initial.watchlist, 1);
     assert.equal(latest.editor, prefs);
     const rows = [{ ...f.controller.getSnapshot().rows[0], price: 45 }];
     flushSync(() => f.update({ rows }));
     assert.equal(latest.default.rows[0].price, 45);
-    assert.equal(counts.watchlist - initial.watchlist, 3);
+    assert.equal(counts.watchlist - initial.watchlist, 2);
     flushSync(() => f.update({ toast: "Saved", importingBackup: true, historyViewReady: false }));
     assert.equal(latest.default.toast, "Saved");
     assert.equal(latest.default.importingBackup, true);

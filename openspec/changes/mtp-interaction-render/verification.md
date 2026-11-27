@@ -1,5 +1,42 @@
 # Verification
 
+## Viewport follow-up, 2026-11-27
+
+База follow-up: 3da43551312fd0dc74cee31207e3dc0d24c0fae9. Изменён только raster cache, его source
+tests и документы этого OpenSpec. Формулы, исходные свечи, prefix, время, индексы, сигнатуры
+инвалидации и production adapters не менялись. Этот раздел обновляет нижеописанное поведение settle:
+covered ordinary raster теперь сохраняется после точного нативного кадра.
+
+- Ordinary capture: целевой X reserve — один экран с каждой стороны; сначала сохраняется прежний
+  бюджетный Y reserve (до 20% с каждой стороны), остаток бюджета выделяется X. При достаточном
+  бюджете 400x400 превращается в 1200x558; при 808x1848/DPR 2,75 — в 1620x2586, то есть 16757280
+  bytes и по 406 physical px (0,5025 экрана) по X. Лимиты 16 MiB, 4M pixels, 4096 px не менялись.
+  Полный соседний экран не гарантирован высоким/DPR viewport.
+- Холодный normal domain теперь читает только реально захваченные bounds. Проверка с Proxy запрещает
+  любое чтение дальних bounds: для normal fixture захвачено 591 из 15083, ранее обходились
+  все 15083. SMA640 на левом краю захвата сверена с независимой суммой предшествующих 640 close —
+  полный prefix и исторический прогрев сохранены.
+- Проверка required logical indices перенесена перед ранним выходом empty coverage. Регрессия:
+  domain прежнего захвата оказался выше экрана, а новый незахваченный viewport содержит видимые
+  линии. Нельзя признать его пустым: создаётся новая поверхность и реальные новые линии.
+- Pan внутри запаса в обе стороны, pointerup/native settle и следующий covered gesture оставляют
+  одну поверхность. Выход за padding освобождает её и захватывает соседний диапазон. Прежние
+  data/style/DPR/projection invalidations сохраняются; изменённый tail пересоздаёт cache.
+- После settle рисуется исходный нативный диапазон, без расширенных joins: строгое равенство всех
+  151 paths/styles проверено также для width=64. В начале/конце истории geometry clamped; каждое
+  доступное исходное значение и прогрев сохранены. Expanded capture ограничен span<=3000, поэтому
+  шаг выборки остаётся 1.
+- Dense ветка сохраняет прежние sampling phase, whole-history domain и политику settle: её
+  расширение здесь потребовало бы менять фазу выборки, поэтому оставлено за пределами follow-up.
+
+Проверено: новый файл — 12 pass/2 optional benchmark skip; существующие raster — 9 pass, projection
+— 7 pass/1 skip, geometry pixel-render — 6 pass/1 skip. Итого 34 pass, 4 optional skip. Scoped
+strict TypeScript 6, ESLint production файла, Prettier и strict OpenSpec прошли. Сборка, сервер,
+активный DEV и физический телефон не запускались; новый FPS/GPU speedup не заявляется. Root отдельно
+выполняет matched phone pass и независимое ревью перед интеграцией.
+
+## Initial implementation evidence
+
 Дата: 2026-11-27. База: 04a9d2d, ветка perf/mtp-interaction-render. Изолированная рабочая копия
 artifacts/mtp-interaction-render. Сервер, приложение, активный DEV, публикация и другие ветки не
 изменялись. Использованы skills openspec-workflow и performance-optimization.

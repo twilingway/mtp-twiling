@@ -44,3 +44,40 @@ DOM для компонентов без разметки. На 100 уведом
 — 100. Watchlist выполняет реальные hooks, его разметка отбрасывается. Число уведомлений store не
 сокращается: шесть подписок получают 600 вызовов. Проверка относится к подпискам и не заменяет
 повторный браузерный pan-профиль реальных компонентов.
+
+## Quote and candle subscriptions
+
+Повторная проверка настоящего `TerminalController → TerminalSession.attach → ReactDOM Profiler`
+показала 20 commits DrawingToolbar, ObjectTree, открытого AccountDialog и самостоятельных кнопок
+measure/zoom/zoom-out на 20 котировок либо 20 live-candle событий. Верхние Toolbar/RightPanel уже
+сохраняли снимки.
+
+- Каждый статичный компонент выбирает используемые поля явно и применяет `shallowEqual`.
+  DrawingToolbar учитывает объекты, настройки, выбранный UID, owner/auth/dialog/activeTool; меню
+  закрывается при смене границы. Дерево выбирает объекты и выделение. AccountDialog сохраняет
+  name/auth/status/error/owner/initialAccountSection и настройки локали.
+- Кнопки выбирают локаль, активный инструмент и доступность как boolean. Изменение цены или
+  содержимого существующей свечи не меняет доступность. Подписки на measurement/zoom sessions
+  сохраняются; ZoomOut проверяет source/camera и текущие возможности chart.
+- Срез ZoomOut содержит только неизменяемые поля store. Текущий adapter и его возможности
+  проверяются на каждом render: асинхронный attach без нового snapshot не должен оставлять кнопку
+  недоступной после следующего родительского render. Тест сохраняет identity snapshot, назначает
+  chart и повторяет render; отдельно проверяется исчезновение zoom capability без обновления store.
+- Watchlist, его таблица и фильтр сохраняют реальные rows/quotes и состояния импорта, исключая
+  candles. Вложенные ApplicationInfo, BackupTransferSettings, DetailsDivider, внешний
+  InstrumentDetails и TechnicalObjectTree также имеют самостоятельные селекторы. TechnicalRows
+  выбирает количество свечей для проверки лимита расчёта.
+- Default snapshot по-прежнему исключает только crosshair. Глобальной фильтрации rows/candles нет.
+
+`terminal-quote-react.test.mjs` выполняет настоящие функции компонентов и их hooks, отбрасывает
+разметку, подаёт рыночные события через реальную session и измеряет commits Profiler. Для 20
+котировок выбранного и другого инструмента статичные компоненты получают 0, Watchlist/table/filter
+— 20. Для 20 live-candle событий эти компоненты получают 0, default reader — 20. Дополнительно
+проверяются API error/status/name, открытие/закрытие меню, activeTool, выделение объектов,
+owner/instrument/locale, measurement/zoom sessions и недоступная история.
+
+Границы: legacy GoogleDriveSettings не изменён, поскольку его заменяет отдельная облачная UI-задача;
+StoragePanel сохраняет rows для имён в хранилище и может обновляться от котировок при открытой
+вкладке. Открытый InstrumentDetailsSession получает настоящие дневные свечи для статистики. Поэтому
+эти результаты не означают 0 commits всего смонтированного поддерева и не измеряют FPS/стоимость
+DOM.

@@ -1,3 +1,5 @@
+import { selectControlsState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { t } from "../../i18n/messages.js";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { MarketRow } from "../../model/types.js";
@@ -39,7 +41,7 @@ export function WatchlistMenu({
   canDown?: boolean;
   onClose: () => void;
 }) {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectControlsState, shallowEqual);
   const menuWidth = Math.min(mode === "flag" ? 282 : 320, window.innerWidth - 12);
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ left: x, top: y });

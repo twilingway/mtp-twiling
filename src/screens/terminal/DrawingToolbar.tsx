@@ -1,3 +1,5 @@
+import { selectDrawingToolbarState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { t } from "../../i18n/messages.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { drawingToolbarSettings, type DrawingTarget } from "../../model/drawing-toolbar.js";
@@ -33,7 +35,7 @@ interface OpenMenu {
 const disabledReason = "Пока не реализовано";
 
 export function DrawingToolbar() {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectDrawingToolbarState, shallowEqual);
   const mobile = useMobileLayout();
   const settings = drawingToolbarSettings(state.preferences.chartSettings);
   const showValuesOnHold = state.preferences.chartSettings.ohlcOnHold === true;
@@ -59,6 +61,7 @@ export function DrawingToolbar() {
     state.dialog,
     state.preferences.symbol,
     state.preferences.instrumentUid,
+    state.selectedUid,
     closeMenu
   ]);
   const run = (action: () => Promise<unknown>, close = true) => {

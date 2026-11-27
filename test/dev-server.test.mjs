@@ -9,8 +9,45 @@ import {
   disableWorker,
   loadStatic,
   parseOptions,
-  requestFile
+  requestFile,
+  sameOutputFiles
 } from "../scripts/dev-files.mjs";
+
+test("unchanged browser outputs preserve the page across unrelated watcher rebuilds", () => {
+  const first = new Map([
+    ["app.js", Buffer.from("app")],
+    ["chunk.js", Buffer.from("chunk")]
+  ]);
+  assert.equal(sameOutputFiles(undefined, first), false);
+  assert.equal(
+    sameOutputFiles(
+      first,
+      new Map([...first].reverse().map(([name, bytes]) => [name, Buffer.from(bytes)]))
+    ),
+    true
+  );
+  assert.equal(
+    sameOutputFiles(
+      first,
+      new Map([
+        ["app.js", Buffer.from("new")],
+        ["chunk.js", Buffer.from("chunk")]
+      ])
+    ),
+    false
+  );
+  assert.equal(sameOutputFiles(first, new Map([["app.js", Buffer.from("app")]])), false);
+  assert.equal(
+    sameOutputFiles(
+      first,
+      new Map([
+        ["app.js", Buffer.from("app")],
+        ["other.js", Buffer.from("chunk")]
+      ])
+    ),
+    false
+  );
+});
 import {
   browserBuildOptions,
   browserEntryPoints,

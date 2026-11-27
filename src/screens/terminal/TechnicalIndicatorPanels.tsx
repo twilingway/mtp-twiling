@@ -1,5 +1,7 @@
 import { useCallback, useId, useRef, useState } from "react";
 import { useTerminal } from "./context.js";
+import { selectControlsState, selectTechnicalRowsState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { technicalIndicatorDefinitions } from "../../model/technical-indicators/definitions.js";
 import {
   technicalCalculationUnavailableReason,
@@ -213,7 +215,7 @@ function TechnicalRows({
   group: TechnicalIndicatorGroup;
   inChartPane?: boolean;
 }) {
-  const { state, controller } = useTerminal();
+  const { state, controller } = useTerminal(selectTechnicalRowsState, shallowEqual);
   const { pending, run } = useIndicatorMenuAction(controller);
   const dragging = useRef<string | null>(null);
   const english = state.preferences.locale === "en";
@@ -226,7 +228,7 @@ function TechnicalRows({
       {group.instances.map((instance, index) => {
         const label = instanceLabel(instance);
         const limited =
-          technicalCalculationUnavailableReason(instance, state.candles?.length ?? 0) ===
+          technicalCalculationUnavailableReason(instance, state.candleCount) ===
           "calculation-limit";
         return (
           <div
@@ -366,7 +368,7 @@ export function TechnicalPriceLegend() {
 }
 
 export function TechnicalObjectTree() {
-  const { state } = useTerminal();
+  const { state } = useTerminal(selectControlsState, shallowEqual);
   const groups = technicalIndicatorGroups(
     state.preferences.technicalIndicators ?? [],
     state.preferences.technicalPaneLayout

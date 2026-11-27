@@ -1,3 +1,5 @@
+import { selectWatchlistState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { DragEvent, MouseEvent } from "react";
 import { createPortal } from "react-dom";
@@ -49,7 +51,7 @@ export function WatchlistSectionsTable({
   chartEditor?: TerminalController;
   activeInstrument?: MarketRow | null;
 }) {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectWatchlistState, shallowEqual);
   const startup = watchlistStartupNotice(state);
   const editor = chartEditor ?? controller;
   const rowMenuId = useId();

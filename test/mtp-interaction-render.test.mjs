@@ -319,11 +319,13 @@ test("ordinary heavy pan/Y preview hits padded capture and settled paths retain 
   f.input("pointerup");
   f.settle();
   assert.equal(f.cache.draw(moved), false, "settled frame always uses the exact native range");
-  assert.equal(f.paints(), 2);
-  assert.equal(f.surfaces[0].width, 0);
+  assert.equal(f.paints(), 1, "settling inside padding retains the captured raster");
+  assert.equal(f.surfaces.length, 1);
+  assert.ok(f.surfaces[0].width > 0);
+  moved.paint(moved.scope.context);
   const expected = recordingContext();
   f.model.draw(expected, moved.from, moved.to, moved.xFor, moved.yFor);
-  const actual = f.surfaces[1].context.paths;
+  const actual = moved.scope.context.paths;
   assert.equal(actual.length, 151);
   for (let line = 0; line < 151; line++) {
     assert.deepEqual(
@@ -338,8 +340,175 @@ test("ordinary heavy pan/Y preview hits padded capture and settled paths retain 
     for (const key of ["color", "width", "alpha"])
       assert.equal(actual[line][key], expected.paths[line][key]);
   }
-  assert.ok(f.surfaces[1].width * f.surfaces[1].height * 4 <= 16 * 1024 * 1024);
+  assert.ok(f.surfaces[0].width * f.surfaces[0].height * 4 <= 16 * 1024 * 1024);
   f.destroy();
+});
+
+test("ordinary viewport padding reaches one screen when budget permits and recenters only outside", () => {
+  for (const direction of [-1, 1]) {
+    const f = heavyFixture();
+    function frame(shift = 0) {
+      const value = f.frame(14600 - shift, 14742 - shift, shift * 1.015);
+      return { ...value, scope: { ...value.scope, bitmapSize: { width: 400, height: 400 } } };
+    }
+    f.cache.draw(frame());
+    assert.equal(f.surfaces[0].width, 1200, "one original screen is captured on each X side");
+    assert.equal(f.surfaces[0].height, 558, "the existing Y reserve is preserved");
+    f.input("pointerdown");
+    const inside = frame(direction * 100);
+    assert.equal(f.cache.draw(inside), true);
+    assert.equal(f.paints(), 1);
+    f.input("pointerup");
+    f.settle();
+    assert.equal(f.cache.draw(inside), false);
+    assert.equal(f.paints(), 1, "native settle does not recreate an already covered cache");
+    f.input("pointerdown");
+    assert.equal(f.cache.draw(frame(direction * 110)), true);
+    assert.equal(f.paints(), 1, "the next covered gesture reuses the same capture");
+    assert.equal(f.cache.draw(frame(direction * 200)), false);
+    assert.equal(f.paints(), 2, "crossing the padding boundary captures the next viewport");
+    assert.equal(f.surfaces[0].width, 0);
+    assert.ok(f.surfaces[1].width > 0);
+    f.destroy();
+  }
+});
+
+test("ordinary tall phone padding spends only the remaining budget after the existing Y reserve", () => {
+  const f = heavyFixture(),
+    initial = f.frame();
+  const frame = {
+    ...initial,
+    scope: { ...initial.scope, bitmapSize: { width: 808, height: 1848 } }
+  };
+  f.cache.draw(frame);
+  const surface = f.surfaces[0];
+  assert.equal(surface.height, 2586);
+  assert.equal(surface.width, 1620);
+  assert.ok(surface.width * surface.height * 4 <= 16 * 1024 * 1024);
+  assert.ok(surface.width <= 4096 && surface.height <= 4096);
+  assert.ok((surface.width - 808) / 2 / 808 > 0.5);
+  assert.ok(
+    (surface.width - 808) / 2 / 808 < 0.51,
+    "budget limits X reserve to about half a screen per side"
+  );
+  f.destroy();
+});
+
+test("ordinary thick joins settle through exact native paths and tail changes still invalidate", () => {
+  const f = heavyFixture();
+  f.model.styles.mtpAll.width = 64;
+  f.cache.draw(f.frame());
+  f.input("pointerdown");
+  const moved = f.frame(14590, 14818, 10.15, 1.1);
+  assert.equal(f.cache.draw(moved), true);
+  f.input("pointerup");
+  f.settle();
+  assert.equal(f.cache.draw(moved), false);
+  assert.equal(f.surfaces.length, 1);
+  moved.paint(moved.scope.context);
+  const expected = recordingContext();
+  f.model.draw(expected, moved.from, moved.to, moved.xFor, moved.yFor);
+  assert.deepEqual(moved.scope.context.paths, expected.paths);
+  assert.equal(expected.paths.length, 151);
+  assert.ok(expected.paths.every((path) => path.width === 64));
+  f.data[f.data.length - 1] = { ...f.data.at(-1), close: 999 };
+  f.model.update(f.data);
+  assert.equal(f.cache.draw(moved), false, "settled changed data must capture the current model");
+  assert.equal(f.surfaces.length, 2);
+  assert.equal(f.surfaces[0].width, 0);
+  f.destroy();
+});
+
+test("ordinary domain reads only captured bounds while preserving full-history SMA prefix", () => {
+  const f = heavyFixture(),
+    reads = [],
+    ranges = [];
+  const extrema = f.model.extrema.bind(f.model);
+  f.model.extrema = (from, to) => {
+    ranges.push([from, to]);
+    return extrema(from, to);
+  };
+  f.model.bounds = new Proxy(f.model.bounds, {
+    get(target, key) {
+      if (typeof key === "string" && /^\d+$/.test(key)) {
+        const index = Number(key);
+        assert.ok(index > 14000, `far history bounds read: ${index}`);
+        reads.push(index);
+      }
+      return Reflect.get(target, key);
+    }
+  });
+  f.cache.draw(f.frame());
+  const captured = f.captures[0],
+    first = Math.max(0, Math.floor(captured.from) - 1),
+    last = Math.min(f.data.length - 1, Math.ceil(captured.to) + 1);
+  assert.deepEqual(ranges, [[first, last]]);
+  assert.equal(reads.length, last - first + 1);
+  assert.ok(reads.length < f.data.length / 10);
+  const period = 640,
+    index = first;
+  const independent =
+    f.data.slice(index - period + 1, index + 1).reduce((sum, bar) => sum + bar.close, 0) / period;
+  assert.ok(Math.abs(f.model.sma(index, period) - independent) < 1e-7);
+  f.destroy();
+});
+
+test("local offscreen price domain cannot claim empty coverage for a new uncaptured viewport", () => {
+  const f = heavyFixture();
+  f.cache.draw(f.frame());
+  f.input("pointerdown");
+  const next = {
+    ...f.frame(10000, 10228, (14600 - 10000) * 1.015),
+    yFor: (price) => 450 - price * 2
+  };
+  next.paint = (ctx, from = next.from, to = next.to) =>
+    f.model.draw(ctx, from, to, next.xFor, next.yFor);
+  assert.equal(
+    f.cache.draw(next),
+    false,
+    "new required indices must be checked before offscreen-domain emptiness"
+  );
+  assert.equal(f.surfaces.length, 2);
+  assert.equal(f.surfaces[0].width, 0);
+  assert.ok(
+    f.surfaces[1].context.paths.some((path) =>
+      path.points.some((point) => point[2] >= 0 && point[2] < 1848 / 2.75)
+    ),
+    "new viewport has real visible MTP geometry"
+  );
+  f.destroy();
+});
+
+test("ordinary capture clamps at loaded edges and keeps expanded sampling step exactly one", () => {
+  for (const [from, to] of [
+    [0, 228],
+    [14800, 15082],
+    [10000, 12500]
+  ]) {
+    const f = heavyFixture(),
+      frame = f.frame(from, to);
+    frame.xFor = (index) => (index - from) * 1.015;
+    frame.paint = (ctx, captureFrom = from, captureTo = to) => {
+      f.captures.push({ from: captureFrom, to: captureTo });
+      f.model.draw(ctx, captureFrom, captureTo, frame.xFor, frame.yFor);
+    };
+    f.cache.draw(frame);
+    const range = f.captures[0];
+    const start = Math.max(0, Math.floor(range.from) - 1),
+      end = Math.min(f.data.length - 1, Math.ceil(range.to) + 1);
+    assert.ok(end - start <= 3000);
+    assert.equal(f.surfaces[0].context.paths.length, 151);
+    for (const [line, path] of f.surfaces[0].context.paths.entries()) {
+      assert.equal(
+        path.points.length,
+        Math.max(0, end - Math.max(start, MTP_COMBINED_PERIODS[line] - 1) + 1),
+        "period warmup and every step-one source vertex are preserved"
+      );
+      for (let i = 1; i < path.points.length; i++)
+        assert.ok(Math.abs(path.points[i][1] - path.points[i - 1][1] - 1.015) < 1e-8);
+    }
+    f.destroy();
+  }
 });
 
 test("ordinary cache handles affine modes, DPR/style/history invalidation and refused oversized frames", () => {
