@@ -27,5 +27,6 @@
   (`node --test --experimental-test-isolation=none test/chart-drawing-touch.test.mjs test/workspace-touch.test.mjs test/chart-navigation-controls.test.mjs test/ohlc-legend.test.mjs`).
 - Scoped ESLint and Prettier: passed.
 - `pnpm spec:validate`: 116 passed, 0 failed.
-- Browser and physical phone validation are pending coordinator integration; no phone result
-  claimed.
+- Browser and physical phone validation passed on `1d70b1f`: touch drawing/hold/drag, both native
+  price axes in a two-chart stack, workspace scrolling, and stationary KLine cancel preserve
+  autoscale. Original user drawings and preferences were restored.
