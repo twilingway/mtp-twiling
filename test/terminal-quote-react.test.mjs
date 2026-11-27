@@ -165,3 +165,83 @@ test("real controller quote/candle events leave static component hooks idle and 
     env.restore();
   }
 });
+
+test("actual async canvas lifecycle enables ZoomOut after setData without parent/store updates", async () => {
+  const env = environment();
+  let releaseView;
+  const viewGate = new Promise((resolve) => { releaseView = resolve; });
+  const calls = [];
+  const load = sourceModules({ react: React, "react/jsx-runtime": jsx, "react-dom": ReactDOM,
+    "services/storage.ts": {}, "services/storage-db.ts": {},
+    "services/chart-camera.ts": { loadChartView: () => viewGate, saveAdapterView: async () => {},
+      saveChartView: async () => {} },
+    "screens/terminal/chart-price-metadata.ts": { watchChartPriceMetadata: () => noop },
+    "charts/lightweight.ts": { makeLightweight: () => {
+      let hasData = false;
+      return { getView: () => hasData ? { camera: { barSpace: 8 } } : null, zoom: noop,
+        setView: () => calls.push("view"), setData: () => { calls.push("data"); hasData = true; },
+        updateBar: () => calls.push("tick"), redrawDrawings: noop,
+        destroy: () => calls.push("destroy") };
+    } }
+  });
+  const { TerminalController } = load("screens/terminal/controller.js");
+  const { TerminalContext } = load("screens/terminal/context.js");
+  const { ChartZoomOutButton } = load("screens/terminal/ChartRangeZoom.js");
+  const { useChartCanvas } = load("screens/terminal/chart-lifecycle.js");
+  const { chartAdapterReadySignal } = load("screens/terminal/chart-adapter-ready.js");
+  const c = new TerminalController();
+  c.update({ owner: "lifecycle-owner", marketReady: true, ready: true, rows: [row("A")],
+    preferences: { ...c.getSnapshot().preferences, symbol: "A", instrumentUid: "uid-A" },
+    candles: [bar(1000, 100)] });
+  c.notify = (message) => assert.fail(message);
+  const signal = chartAdapterReadySignal(c), otherSignal = chartAdapterReadySignal({});
+  const stop = signal.subscribe(() => {
+    assert.ok(c.chart === null || calls.includes("data"), "ready must follow initial setData");
+    assert.equal(otherSignal.getSnapshot(), 0, "controllers have independent signals");
+  });
+  let button, commits = 0;
+  const visible = (state) => state.drawings;
+  const supplemental = {};
+  function Canvas() {
+    const ref = React.useRef({ closest: () => null });
+    useChartCanvas(ref, visible, supplemental);
+    return null;
+  }
+  function Button() { button = ChartZoomOutButton({ onChoose: noop }); return null; }
+  const root = createRoot(env.container), sync = (run) => ReactDOM.flushSync(run);
+  const render = (canvas = true) => root.render(React.createElement(TerminalContext, { value: c },
+    canvas && React.createElement(Canvas, { key: "canvas" }),
+    React.createElement(React.Profiler, { key: "button", id: "zoom", onRender: () => { commits++; } },
+      React.createElement(Button))));
+  try {
+    sync(() => render());
+    assert.equal(button.props.disabled, true);
+    assert.equal(c.chart, null);
+    const before = c.getSnapshot(), revision = before.chartRevision;
+    releaseView({ camera: { barSpace: 8 } });
+    await new Promise(setImmediate);
+    sync(noop); // Flush the external signal only; do not rerender the parent or mutate the store.
+    assert.equal(c.getSnapshot(), before);
+    assert.equal(c.getSnapshot().chartRevision, revision);
+    assert.deepEqual(calls.slice(0, 2), ["view", "data"]);
+    assert.equal(button.props.disabled, false);
+    assert.equal(signal.getSnapshot(), 1);
+    const readyCommits = commits;
+    for (let index = 0; index < 20; index++) sync(() => c.update({ candles: [bar(1000, 101 + index)] }));
+    assert.equal(commits, readyCommits, "live candle content must not publish readiness");
+    assert.equal(signal.getSnapshot(), 1);
+    const beforeCleanup = c.getSnapshot();
+    sync(() => render(false));
+    await new Promise(setImmediate);
+    sync(noop);
+    assert.equal(c.chart, null);
+    assert.equal(c.getSnapshot(), beforeCleanup);
+    assert.equal(button.props.disabled, true);
+    assert.equal(signal.getSnapshot(), 2);
+  } finally {
+    stop();
+    sync(() => root.unmount());
+    await new Promise(setImmediate);
+    env.restore();
+  }
+});

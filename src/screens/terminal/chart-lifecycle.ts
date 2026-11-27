@@ -25,6 +25,7 @@ import { publishWorkspaceCrosshair } from "./workspace-sync-controller.js";
 import { persistTechnicalPaneLayout } from "./technical-indicator-actions.js";
 import type { TerminalPreferences } from "./state.js";
 import { drawingHandleRadius } from "./chart-drawing-touch.js";
+import { chartAdapterReadySignal } from "./chart-adapter-ready.js";
 
 function technicalInputs(preferences: TerminalPreferences) {
   const instances = preferences.technicalIndicators ?? [];
@@ -245,6 +246,7 @@ export function useChartCanvas(
         fittedWorkspaceHistory.current = !current.loading || !!view;
       }
       if (!ready || !candles.length || waitingForSlotAnchor) pendingSavedView.current = view;
+      if (matches() && controller.chart === owned) chartAdapterReadySignal(controller).publish();
     };
     void initialize().catch((error: unknown) => {
       if (matches())
@@ -287,7 +289,10 @@ export function useChartCanvas(
         if (view) void saveView(owner, key, view).catch(() => {});
       }
       owned?.destroy();
-      if (controller.chart === owned) controller.chart = null;
+      if (owned && controller.chart === owned) {
+        controller.chart = null;
+        chartAdapterReadySignal(controller).publish();
+      }
       adapterRef.current = null;
       dataRef.current = [];
       dataFallback.current = false;
@@ -323,18 +328,28 @@ export function useChartCanvas(
       waitingForSlotAnchor =
         controller.workspaceSlot !== undefined && !viewAnchorCovered(pending, next);
     if (adapter?.retired || state.importRecoveryRequired) return;
+    const previousPersistView = adapter?.persistView;
+    const publishReadiness = () => {
+      if (adapter && controller.chart === adapter && previousPersistView !== adapter.persistView)
+        chartAdapterReadySignal(controller).publish();
+    };
     if (adapter)
       adapter.persistView =
         !fallback &&
         !waitingForSlotAnchor &&
         !state.importingBackup &&
         state.historyViewReady !== false;
-    if (state.importingBackup || state.historyViewReady === false) return;
-    if (!adapter || !next.length) return;
+    if (state.importingBackup || state.historyViewReady === false || !adapter || !next.length) {
+      publishReadiness();
+      return;
+    }
     const firstWorkspaceHistory =
       controller.workspaceSlot !== undefined && !fittedWorkspaceHistory.current && !pending;
     if (firstWorkspaceHistory && !state.loading) fittedWorkspaceHistory.current = true;
-    if (next === previous) return;
+    if (next === previous) {
+      publishReadiness();
+      return;
+    }
     const incremental =
       previous.length > 0 &&
       next.length >= previous.length &&
@@ -358,6 +373,9 @@ export function useChartCanvas(
     dataRef.current = next;
     dataFallback.current = fallback;
     if (!waitingForSlotAnchor) pendingSavedView.current = undefined;
+    if (!previous.length && controller.chart === adapter)
+      chartAdapterReadySignal(controller).publish();
+    else publishReadiness();
   }, [
     controller,
     state.candles,

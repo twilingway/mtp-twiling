@@ -24,3 +24,6 @@
 - [x] 6.3 Проверить TypeScript, ESLint, форматирование изменённых файлов и OpenSpec.
 - [ ] 6.4 Координатор интегрирует результат, проводит независимое ревью, запускает общий
       `pnpm check` и выполняет браузерную проверку перед сменой runtime.
+- [x] 6.5 Добавить отдельный сигнал adapter ready после initial data/view и cleanup, сохранив
+      quote/candle gates; проверить настоящий async useChartCanvas без parent/store render тестом
+      `terminal-quote-react.test.mjs`.
