@@ -234,13 +234,21 @@
 }
 
 @media (pointer: coarse), (max-width: 800px) {
-  .chart-timeframe-inline,
-  .chart-instrument-heading .chart-range-control[data-placement="plot"] {
+  .chart-timeframe-inline {
     min-block-size: 40px;
+  }
+
+  .chart-instrument-heading .chart-range-control[data-placement="plot"] {
+    min-block-size: 42px;
+  }
+
+  .chart-range-control[data-placement="plot"] select {
+    min-block-size: 40px;
+    box-sizing: border-box;
   }
 
   .chart-depth-pill {
     min-inline-size: 38px;
-    min-block-size: 38px;
+    min-block-size: 40px;
   }
 }
