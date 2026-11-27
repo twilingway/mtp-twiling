@@ -1,9 +1,11 @@
+import { selectApplicationInfoState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { t, systemText } from "../../i18n/messages.js";
 import { APP_VERSION, BUILD_ID } from "../../generated/app-version.js";
 import { useTerminal } from "./context.js";
 
 export function ApplicationInfo() {
-  const { state } = useTerminal();
+  const { state } = useTerminal(selectApplicationInfoState, shallowEqual);
   return (
     <details className="application-info">
       <summary>{t("О приложении и подключении")}</summary>

@@ -1,3 +1,5 @@
+import { selectControlsState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { SyntheticEvent } from "react";
 import { detailsGeometry, detailsRatio } from "../../model/details-resize.js";
@@ -28,7 +30,7 @@ const outerHeight = (element: Element | null) => {
 };
 
 export function DetailsDivider() {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectControlsState, shallowEqual);
   const divider = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const generation = useRef(0);

@@ -1,3 +1,5 @@
+import { selectAccountState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { t, systemText } from "../../i18n/messages.js";
 import { useState } from "react";
 import { useTerminal } from "./context.js";
@@ -7,7 +9,7 @@ import { GoogleDriveSettings } from "./GoogleDriveSettings.js";
 import { StoragePanel } from "./StoragePanel.js";
 import { BackupTransferSettings } from "./BackupTransferSettings.js";
 export function AccountDialog() {
-  const { controller, state } = useTerminal(),
+  const { controller, state } = useTerminal(selectAccountState, shallowEqual),
     [name, setName] = useState(state.name),
     [token, setToken] = useState(""),
     [remember, setRemember] = useState(true),

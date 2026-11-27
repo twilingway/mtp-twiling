@@ -1,3 +1,5 @@
+import { selectObjectTreeState } from "../terminal-state-selection.js";
+import { shallowEqual } from "../snapshot-selector.js";
 import { t } from "../../../i18n/messages.js";
 import { useState } from "react";
 import type { MouseEvent } from "react";
@@ -11,7 +13,7 @@ import { VisibilityIcon, LockIcon, DeleteIcon } from "../VisibilityIcon.js";
 import { TechnicalObjectTree } from "../TechnicalIndicatorPanels.js";
 
 export function ObjectTree({ onClose }: { onClose?: (() => void) | undefined } = {}) {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectObjectTreeState, shallowEqual);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [name, setName] = useState("");
   const run = (action: Promise<void>) => {

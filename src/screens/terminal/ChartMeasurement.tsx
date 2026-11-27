@@ -12,6 +12,13 @@ import { useTerminal } from "./context.js";
 import type { TerminalController } from "./controller.js";
 import type { TerminalState } from "./state.js";
 import { DrawingToolIcon } from "./DrawingToolIcon.js";
+import { shallowEqual } from "./snapshot-selector.js";
+
+const selectMeasurementButtonState = (state: TerminalState) => ({
+  locale: state.preferences.locale,
+  activeTool: state.activeTool,
+  ready: state.candles.length > 0 && state.historyViewReady !== false
+});
 
 const strings = {
   en: {
@@ -31,10 +38,10 @@ const strings = {
 };
 
 export function ChartMeasurementButton({ onChoose }: { onChoose: () => void }) {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectMeasurementButtonState, shallowEqual);
   const session = chartMeasurement(controller);
   const active = useSyncExternalStore(session.subscribe, session.isActive, session.isActive);
-  const label = t("Линейка", state.preferences.locale);
+  const label = t("Линейка", state.locale);
   return (
     <button
       id="measure"
@@ -43,7 +50,7 @@ export function ChartMeasurementButton({ onChoose }: { onChoose: () => void }) {
       title={label}
       aria-label={label}
       aria-pressed={active}
-      disabled={!state.candles.length || state.historyViewReady === false}
+      disabled={!state.ready}
       onClick={() => {
         onChoose();
         if (!active && state.activeTool) controller.setTool(null);

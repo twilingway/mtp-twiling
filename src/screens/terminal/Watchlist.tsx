@@ -1,10 +1,11 @@
+import { selectPreferences, selectWatchlistState } from "./terminal-state-selection.js";
+import { shallowEqual } from "./snapshot-selector.js";
 import { t, systemText } from "../../i18n/messages.js";
 import { timeZoneOffset } from "../../i18n/timezones.js";
 import { useState } from "react";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { precision } from "../../charts/adapter.js";
 import { useTerminal, useTerminalState } from "./context.js";
-import { selectPreferences } from "./terminal-state-selection.js";
 import { number, signClass, timeLabel } from "./state.js";
 import { WatchlistSectionsTable } from "./WatchlistSectionsTable.js";
 import { watchlistStartupNotice } from "./WatchlistStartupStatus.js";
@@ -18,7 +19,7 @@ import type { TerminalController } from "./controller.js";
 export { InstrumentIcon } from "./WatchlistQuoteRow.js";
 type SortKey = "symbol" | "price" | "change" | "changePercent";
 export function Watchlist({ chartEditor }: { chartEditor?: TerminalController } = {}) {
-  const { controller, state } = useTerminal();
+  const { controller, state } = useTerminal(selectWatchlistState, shallowEqual);
   const editor = chartEditor ?? controller;
   const chartPreferences = useTerminalState(editor, selectPreferences);
   const [query, setQuery] = useState(""),
