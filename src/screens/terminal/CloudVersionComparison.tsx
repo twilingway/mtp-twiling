@@ -2,12 +2,13 @@ import type {
   CloudComparison,
   CloudSelection,
   CloudSummary,
-  CloudProviderId
+  CloudProviderId,
+  CloudSyncStatus
 } from "../../model/cloud-sync.js";
 import { t } from "../../i18n/messages.js";
 import { intlLocale } from "../../i18n/preferences.js";
-import { CLOUD_TEST_CLIENT_ID } from "../../model/cloud-client-identity.js";
 import { CloudDeleteVersion } from "./CloudDeleteVersion.js";
+import { CloudRemoteVersions } from "./CloudRemoteVersions.js";
 
 interface Props {
   id: CloudProviderId;
@@ -17,6 +18,8 @@ interface Props {
   activeChoice?: CloudSelection | undefined;
   migration: boolean;
   receiveAvailable: boolean;
+  clientId?: string | undefined;
+  deleteAction?: CloudSyncStatus["deleteAction"] | undefined;
   onSend: () => void;
   onReceive: (id: string) => void;
   onDelete?: ((id: string) => void) | undefined;
@@ -60,6 +63,8 @@ export function CloudVersionComparison({
   activeChoice,
   migration,
   receiveAvailable,
+  clientId,
+  deleteAction,
   onSend,
   onReceive,
   onDelete
@@ -71,13 +76,17 @@ export function CloudVersionComparison({
   return (
     <section id={`${id}-conflict`} className="cloud-comparison" aria-busy={busy}>
       <h4>{t("Сравнение версий")}</h4>
-      <div className="cloud-comparison-grid">
+      <div className="cloud-comparison-local">
         <article className="cloud-version-card cloud-version-local">
           <h5>{t("На этом устройстве")}</h5>
           <VersionDate value={comparison.checkedAt} local />
           <Summary value={comparison.local} />
           <p id={`${id}-send-effect`}>
-            {t("Отправка сохранит версию устройства в облаке. Предыдущие снимки сохранятся.")}
+            {t(
+              id === "yandex-disk"
+                ? "Отправка сохранит текущую версию этого клиента и одну предыдущую копию."
+                : "Отправка сохранит версию устройства в облаке. Предыдущие снимки сохранятся."
+            )}
           </p>
           <p>{t("На устройстве ничего не заменяется.")}</p>
           <button
@@ -98,21 +107,37 @@ export function CloudVersionComparison({
             <p>{t("В облаке пока нет доступных снимков.")}</p>
           </article>
         )}
-        {comparison.remotes.map((remote, index) => {
+      </div>
+      {comparison.remotes.length > 0 && (
+        <p className="cloud-version-total">
+          {t("Всего снимков в списке")}: <strong>{comparison.remotes.length}</strong>
+          {id === "yandex-disk" && (
+            <small>
+              {t(
+                "Для каждого клиента хранятся текущая и предыдущая версии. Сохранения других браузеров и тестового клиента считаются отдельно. Старые форматы показаны отдельно."
+              )}
+            </small>
+          )}
+        </p>
+      )}
+      <CloudRemoteVersions remotes={comparison.remotes} clientId={clientId}>
+        {(remote, index) => {
           const selected = activeChoice?.kind === "remote" && activeChoice.id === remote.id;
+          const deleting = deleteAction?.id === remote.id && deleteAction.state === "running";
+          const failed =
+            deleteAction?.id === remote.id &&
+            (deleteAction.state === "unconfirmed" || deleteAction.state === "review");
           const description =
             index === 0 ? `${id}-receive-effect` : `${id}-receive-effect-${index}`;
-          const deviceLabel =
-            remote.deviceLabel ??
-            (remote.deviceId === CLOUD_TEST_CLIENT_ID
-              ? t("Тестирование")
-              : remote.deviceId
-                ? `${t("Браузер")} · ${remote.deviceId.slice(0, 8)}`
-                : undefined);
           return (
-            <article key={remote.id} className="cloud-version-card cloud-version-remote">
+            <article
+              key={remote.id}
+              className="cloud-version-card cloud-version-remote"
+              data-cloud-version={remote.id}
+              aria-busy={deleting}
+            >
               <h5>{t(cloudTitle)}</h5>
-              {deviceLabel && <p className="cloud-version-device">{deviceLabel}</p>}
+              {remote.deviceLabel && <p className="cloud-version-device">{remote.deviceLabel}</p>}
               <p className="cloud-version-device" title={remote.id}>
                 {t("Сохранение")} · {remote.id.slice(0, 8)}
               </p>
@@ -122,9 +147,11 @@ export function CloudVersionComparison({
                   {t(
                     remote.deletion.kind === "previous"
                       ? "Предыдущая версия"
-                      : remote.deletion.kind === "retired-peer"
-                        ? "Принятая версия старого клиента"
-                        : "Текущая версия"
+                      : remote.deletion.kind === "legacy"
+                        ? "Сохранение старого формата"
+                        : remote.deletion.kind === "retired-peer"
+                          ? "Принятая версия старого клиента"
+                          : "Текущая версия"
                   )}
                 </p>
               )}
@@ -165,13 +192,16 @@ export function CloudVersionComparison({
                   }
                   busy={busy}
                   blocked={blocked}
+                  deleting={deleting}
+                  failed={failed}
+                  retry={failed}
                   onDelete={onDelete}
                 />
               )}
             </article>
           );
-        })}
-      </div>
+        }}
+      </CloudRemoteVersions>
     </section>
   );
 }

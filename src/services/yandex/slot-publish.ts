@@ -15,6 +15,8 @@ import type { YandexSlotStore } from "./slot-store.js";
 import { retainYandexSlots } from "./slot-retention.js";
 import { ensureYandexRetentionProof } from "./slot-proof.js";
 import type { CloudRetentionStatus } from "../../model/cloud-sync.js";
+import { CLOUD_TEST_CLIENT_ID } from "../../model/cloud-client-identity.js";
+import type { SlotAcceptanceProof } from "./slot-acceptance.js";
 
 export async function publishYandexSlot(
   store: YandexSlotStore,
@@ -25,7 +27,8 @@ export async function publishYandexSlot(
   explicit: boolean,
   valid: () => boolean,
   beforeEffect: (() => Promise<void>) | undefined,
-  reportRetention: (status: CloudRetentionStatus) => void
+  reportRetention: (status: CloudRetentionStatus) => void,
+  acceptanceProofs: readonly SlotAcceptanceProof[]
 ) {
   const transport = store.transport,
     deviceId = pending.revision.deviceId,
@@ -55,7 +58,16 @@ export async function publishYandexSlot(
     }
   for (const { envelope } of snapshot.latest)
     accepted.set(envelope.current.revision.deviceId, slotClaim(envelope.current));
-  const seq = (previous?.seq ?? 0) + 1;
+  // The shared test identity can return after its accepted carrier was retired.
+  // Continue its proven sequence instead of reusing seq=1 for a different logical save.
+  const retiredWriter =
+    !own && deviceId === CLOUD_TEST_CLIENT_ID
+      ? snapshot.latest
+          .flatMap(({ envelope }) => slotPrunedPeers(envelope))
+          .filter((peer) => peer.deviceId === deviceId)
+          .toSorted((a, b) => b.seq - a.seq)[0]
+      : undefined;
+  const seq = (previous?.seq ?? retiredWriter?.seq ?? 0) + 1;
   accepted.set(deviceId, { deviceId, seq, revisionId: pending.revision.revisionId });
   const retired = [...(previous?.retired ?? [])];
   if (explicit)
@@ -68,7 +80,9 @@ export async function publishYandexSlot(
       seq,
       revision: pending.revision,
       bundle: pending.reference,
-      priorVersionHash: previous ? await slotVersionHash(previous) : null,
+      priorVersionHash: previous
+        ? await slotVersionHash(previous)
+        : (retiredWriter?.versionHash ?? null),
       accepted: [...accepted.values()],
       retired,
       legacyHeads: [
@@ -78,7 +92,7 @@ export async function publishYandexSlot(
         ])
       ]
     },
-    generation = own ? slotGeneration(own.envelope) + 1 : 1,
+    generation = own ? slotGeneration(own.envelope) + 1 : seq,
     proofs = new Map(
       snapshot.latest
         .flatMap(({ envelope }) => slotPrunedPeers(envelope))
@@ -90,7 +104,8 @@ export async function publishYandexSlot(
         generation,
         current,
         previous,
-        prunedPeers: [...proofs.values()].filter((peer) => peer.deviceId !== deviceId)
+        prunedPeers: [...proofs.values()].filter((peer) => peer.deviceId !== deviceId),
+        ...(acceptanceProofs.length ? { acceptanceProofs } : {})
       },
       pending.body,
       previousBody
@@ -135,7 +150,7 @@ export async function publishYandexSlot(
   async function retain(): Promise<void> {
     try {
       reportRetention(
-        await retainYandexSlots(store, transport, deviceId, auth.signal, valid, () =>
+        await retainYandexSlots(store, transport, auth.signal, valid, () =>
           ensureYandexRetentionProof(transport, auth, valid)
         )
       );

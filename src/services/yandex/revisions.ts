@@ -25,6 +25,8 @@ import { slotDeleteCapabilities } from "./slot-maintenance-selection.js";
 import { createSlotMaintenancePlan } from "./slot-maintenance-plan.js";
 import type { YandexManualDeletePlan } from "./slot-maintenance-plan.js";
 import { executeSlotMaintenance } from "./slot-maintenance-execute.js";
+import { pruneAcceptedYandexLegacy, retireAcceptedYandexTestClient } from "./accepted-retention.js";
+import { captureYandexAcceptanceProofs } from "./slot-acceptance-capture.js";
 export { validateYandexManualDeletePlan } from "./slot-maintenance-plan.js";
 export type { YandexManualDeletePlan } from "./slot-maintenance-plan.js";
 
@@ -104,6 +106,13 @@ export class YandexRevisions {
         remotes.map(({ revision }) => revision),
         ordinarySlots.map(({ revision }) => revision)
       );
+    const identities = new Map<string, string>();
+    for (const { revision } of [...remotes, ...ordinarySlots]) {
+      const serialized = JSON.stringify(revision),
+        previous = identities.get(revision.revisionId);
+      if (previous && previous !== serialized) throw new YandexError("conflict");
+      identities.set(revision.revisionId, serialized);
+    }
     this.legacyHeads = legacy.heads;
     const covered = new Set(slots.latest.flatMap(({ envelope }) => envelope.current.legacyHeads));
     return {
@@ -223,21 +232,51 @@ export class YandexRevisions {
   }
   async retryPrune(valid: () => boolean): Promise<void> {
     try {
-      const deviceId = await this.journal.deviceId(),
-        files = await this.transport.list();
+      const files = await this.transport.list();
       await this.slots.inspect(files, valid);
       this.retention = await retainYandexSlots(
         this.slots,
         this.transport,
-        deviceId,
         this.auth.signal,
         valid,
         () => ensureYandexRetentionProof(this.transport, this.auth, valid)
       );
+      if (this.retention.phase === "complete") await this.pruneAccepted(valid);
     } catch (error) {
       assertCurrent(this.auth.signal, valid);
       this.retention = { phase: "pending", error: yandexErrorCode(error) };
     }
+  }
+  private async pruneAccepted(valid: () => boolean): Promise<void> {
+    const writerDeviceId = await this.journal.deviceId(),
+      settings = await this.journal.settings(),
+      inspect = () => this.inspect(valid),
+      beforeEffect = async () => {
+        const current = await this.journal.settings();
+        assertCurrent(this.auth.signal, valid);
+        if (
+          current.enabled !== settings.enabled ||
+          current.clientMode !== settings.clientMode ||
+          (await this.journal.deviceId()) !== writerDeviceId
+        )
+          throw new YandexError("local-changed");
+        await ensureYandexRetentionProof(this.transport, this.auth, valid);
+      };
+    const retired = await retireAcceptedYandexTestClient(
+        this.slots,
+        this.auth,
+        writerDeviceId,
+        valid,
+        inspect,
+        beforeEffect
+      ),
+      legacy = await pruneAcceptedYandexLegacy(this.slots, this.auth, valid, inspect, beforeEffect);
+    this.retention = {
+      phase: "complete",
+      keptFiles: (await this.transport.list()).filter((file) => !file.name.startsWith("probe_"))
+        .length,
+      deletedFiles: (this.retention?.deletedFiles ?? 0) + retired + legacy
+    };
   }
   private async download(file: YandexFile) {
     this.downloadedBytes += file.size;
@@ -361,7 +400,14 @@ export class YandexRevisions {
         )
           throw new YandexError("local-changed");
       };
-    return publishYandexSlot(
+    const acceptanceProofs = await captureYandexAcceptanceProofs(
+      this.slots,
+      plan,
+      current.remotes,
+      rebindConfirmed && !already,
+      valid
+    );
+    const revision = await publishYandexSlot(
       this.slots,
       pending,
       plan,
@@ -372,7 +418,15 @@ export class YandexRevisions {
       checkPlan,
       (status) => {
         this.retention = status;
-      }
+      },
+      acceptanceProofs
     );
+    try {
+      if (this.retention?.phase === "complete") await this.pruneAccepted(valid);
+    } catch (error) {
+      assertCurrent(this.auth.signal, valid);
+      this.retention = { phase: "pending", error: yandexErrorCode(error) };
+    }
+    return revision;
   }
 }

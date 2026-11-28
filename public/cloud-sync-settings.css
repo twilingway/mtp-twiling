@@ -91,6 +91,45 @@
   align-items: stretch;
   gap: 12px;
 }
+.cloud-comparison-local {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: 12px;
+}
+.cloud-client-group {
+  display: grid;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--control-line);
+}
+.cloud-client-group-heading {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+}
+.cloud-client-group-heading > span,
+.cloud-version-total small {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.cloud-version-archive {
+  display: grid;
+  gap: 10px;
+}
+.cloud-version-archive h6 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.cloud-version-archive .cloud-version-card {
+  border-style: dashed;
+}
+.cloud-version-card[aria-busy="true"] {
+  border-color: var(--accent);
+}
 .cloud-version-card {
   display: flex;
   flex-direction: column;

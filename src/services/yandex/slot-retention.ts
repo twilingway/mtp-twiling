@@ -5,11 +5,10 @@ import { slotFingerprint } from "./slot-store.js";
 import type { YandexSlotStore } from "./slot-store.js";
 import type { CloudRetentionStatus } from "../../model/cloud-sync.js";
 
-/** Only exact compatible ancestors of this writer can be pruned; unknown late branches survive. */
+/** Exact compatible ancestors can be pruned; every client's latest complete carrier survives. */
 export async function retainYandexSlots(
   store: YandexSlotStore,
   transport: YandexTransport,
-  deviceId: string,
   signal: AbortSignal,
   valid: () => boolean,
   beforeDelete: () => Promise<unknown>
@@ -20,19 +19,17 @@ export async function retainYandexSlots(
     assertCurrent(signal, valid);
     const before = await transport.list(),
       snapshot = await store.inspect(before, valid),
-      own = snapshot.files.filter(
-        ({ envelope }) => envelope.current.revision.deviceId === deviceId
-      );
-    if (own.length <= 1) return { phase: "complete", keptFiles: own.length, deletedFiles };
+      keptFiles = snapshot.files.length;
     if (snapshot.uncertain.length)
-      return { phase: "pending", keptFiles: own.length, deletedFiles, error: "conflict" };
-    const candidate = snapshot.obsolete
-      .filter(({ envelope }) => envelope.current.revision.deviceId === deviceId)
-      .sort((a, b) => a.envelope.current.seq - b.envelope.current.seq)[0];
-    if (!candidate)
-      return { phase: "pending", keptFiles: own.length, deletedFiles, error: "conflict" };
+      return { phase: "pending", keptFiles, deletedFiles, error: "conflict" };
+    if (!snapshot.obsolete.length) return { phase: "complete", keptFiles, deletedFiles };
+    const candidate = snapshot.obsolete.toSorted(
+      (a, b) => a.envelope.current.seq - b.envelope.current.seq
+    )[0];
+    if (!candidate) return { phase: "pending", keptFiles, deletedFiles, error: "conflict" };
     const latest = snapshot.latest.find(
-      ({ envelope }) => envelope.current.revision.deviceId === deviceId
+      ({ envelope }) =>
+        envelope.current.revision.deviceId === candidate.envelope.current.revision.deviceId
     );
     if (!latest) throw new YandexError("conflict");
     // Headers prove ancestry, not recoverability. Validate both complete payloads before
@@ -46,7 +43,7 @@ export async function retainYandexSlots(
     // Re-evaluate the exact protected set before each irreversible request.
     const checked = await inspectSlots(snapshot.files);
     if (checked.uncertain.length || !checked.obsolete.includes(candidate))
-      return { phase: "pending", keptFiles: own.length, deletedFiles, error: "conflict" };
+      return { phase: "pending", keptFiles, deletedFiles, error: "conflict" };
     if (!gatePassed) {
       await beforeDelete();
       assertCurrent(signal, valid);
