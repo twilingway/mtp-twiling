@@ -34,7 +34,7 @@ export function CloudRemoteVersions({
           : own
             ? t("Этот браузер")
             : remote.deviceId
-              ? `${t("Другой браузер")} · ${remote.deviceId.slice(0, 8)}`
+              ? `${t(clientId ? "Другой браузер" : "Браузер")} · ${remote.deviceId.slice(0, 8)}`
               : t("Клиент не указан");
       group = { id, title, own: own && !legacy, versions: [] };
       groups.set(id, group);

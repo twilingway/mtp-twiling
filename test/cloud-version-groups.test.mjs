@@ -55,6 +55,13 @@ function fixture() {
   return { render, remotes, CLOUD_TEST_CLIENT_ID };
 }
 
+test("unknown local identity never mislabels an own cloud copy as another browser", () => {
+  const { render } = fixture();
+  const html = render({ id: "google-drive", clientId: undefined });
+  assert.match(html, /Browser · own-brow/);
+  assert.doesNotMatch(html, /Other browser|This browser/);
+});
+
 test("all nine copies stay visible with exact client and legacy counts and own client first", () => {
   const { render } = fixture();
   const html = render();

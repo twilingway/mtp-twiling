@@ -50,8 +50,8 @@ test("Yandex preview keeps the client identity separate from each distinct save"
     devices
   );
   const html = render("yandex-disk", comparison);
-  assert.equal((html.match(/Other browser · 11111111<\/h5>/g) ?? []).length, 1);
-  assert.equal((html.match(/Other browser · 22222222<\/h5>/g) ?? []).length, 1);
+  assert.equal((html.match(/Browser · 11111111<\/h5>/g) ?? []).length, 1);
+  assert.equal((html.match(/Browser · 22222222<\/h5>/g) ?? []).length, 1);
   assert.match(html, /Testing<\/h5><span>Snapshots: 1<\/span>/);
   assert.equal((html.match(/<span>Snapshots: 2<\/span>/g) ?? []).length, 2);
   assert.equal((html.match(/title="save-id[0-4]-distinct">Save · save-id[0-4]/g) ?? []).length, 5);
