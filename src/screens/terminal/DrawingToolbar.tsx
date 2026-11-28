@@ -217,8 +217,8 @@ export function DrawingToolbar() {
       () => run(() => controller.tools.toggleOption("snapIndicators"), false)
     );
   } else if (menu?.key === "lock") {
-    title = t("Для всех объектов: блокировка");
-    sections = toolbarLockSections(selectedLock, scopeRows("lock"), mobile, () =>
+    title = t("Блокировка объектов");
+    sections = toolbarLockSections(selectedLock, scopeRows("lock"), () =>
       run(() => controller.tools.toggleSelectedLock())
     );
   } else if (menu?.key === "hide") {

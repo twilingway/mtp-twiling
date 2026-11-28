@@ -104,7 +104,7 @@ test("object tree and left lock share individual drawing/image flags in both dir
     f.treeButton(kind).props.onClick();
     assert.equal(f.props().active, true);
     assert.equal(f.props().icon, "lock");
-    assert.equal(f.props().label, "Разблокировать объект");
+    assert.equal(f.props().label, "Открепить объект");
     await f.props().onChoose();
     assert.equal(f.treeButton(kind).props["aria-pressed"], false);
     assert.equal(f.props().active, false);
@@ -176,7 +176,7 @@ test("mobile lock always opens global menu; selected action alone can be unavail
     assert.equal(opened, 1);
     assert.equal(f.writes.length, 0);
     const globals = [{ id: "lock-all", label: "Разблокировать всё", checked: true }];
-    const sections = f.lockUi.toolbarLockSections(f.lockStatus(), globals, true, () => {});
+    const sections = f.lockUi.toolbarLockSections(f.lockStatus(), globals, () => {});
     assert.equal(sections[0].items[0].disabled, true);
     assert.equal(sections[1].items, globals);
     assert.equal(sections[1].items[0].checked, true);
@@ -186,5 +186,32 @@ test("mobile lock always opens global menu; selected action alone can be unavail
       true
     );
     assert.ok(find(desktop, (node) => node.props?.className === "drawing-tool-arrow"));
+  }
+});
+
+test("lock menu unpins the selected tree object and keeps global locking separate", async () => {
+  for (const kind of ["drawing", "image"]) {
+    const f = fixture();
+    f.update({ selectedObject: kind });
+    f.treeButton(kind).props.onClick();
+    const globals = [{ id: "lock-drawings", label: "Закрепить объекты рисования", checked: false }];
+    const sections = () =>
+      f.lockUi.toolbarLockSections(f.lockStatus(), globals, () =>
+        f.controller.tools.toggleSelectedLock()
+      );
+    const selected = sections()[0];
+    assert.equal(selected.title, "Выделенный объект");
+    assert.equal(selected.items[0].label, "Открепить объект");
+    assert.equal(selected.items[0].checked, true);
+    assert.equal(selected.items[0].disabled, false);
+    assert.equal(sections()[1].items, globals);
+    await selected.items[0].action();
+    assert.equal(f.treeButton(kind).props["aria-pressed"], false);
+    assert.equal(sections()[0].items[0].label, "Закрепить объект");
+    assert.equal(sections()[0].items[0].checked, false);
+    assert.equal(globals[0].checked, false);
+    f.update({ selectedObject: null });
+    assert.equal(sections()[0].items[0].disabled, true);
+    assert.equal(sections()[0].items[0].checked, false);
   }
 });
