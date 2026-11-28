@@ -2,13 +2,13 @@
 
 ## Canvas pass ordering
 
-Actual OffscreenCanvas isolation found deferred-backend interactions between the exact core pass
-and the clipped edge pass: unchanged core drawing commands still produced 6–18 changed interior
-pixels. A Worker-only `getImageData(0, 0, 1, 1)` fence before clearing/clipping the side strips
-preserves exact core pixels. It runs only when an actual edge pass is needed, creates no second
-surface, and uses the existing Worker failure/fallback path if readback fails. Diagnostic repeats
-measured approximately 13–18 ms additional Worker round-trip time; this is not a free operation or
-a claim of improved FPS. Final production-build pixel and gesture checks remain required.
+Actual OffscreenCanvas isolation found deferred-backend interactions between the exact core pass and
+the clipped edge pass: unchanged core drawing commands still produced 6–18 changed interior pixels.
+A Worker-only `getImageData(0, 0, 1, 1)` fence before clearing/clipping the side strips preserves
+exact core pixels. It runs only when an actual edge pass is needed, creates no second surface, and
+uses the existing Worker failure/fallback path if readback fails. Diagnostic repeats measured
+approximately 13–18 ms additional Worker round-trip time; this is not a free operation or a claim of
+improved FPS. Final production-build pixel and gesture checks remain required.
 
 ## Context
 
