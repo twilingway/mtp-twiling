@@ -163,5 +163,6 @@ export const drawingMessages = {
   "Изображения на графике": "Chart images",
   "объекты рисования": "drawing objects",
   индикаторы: "indicators",
-  всё: "everything"
+  всё: "everything",
+  "Завершить рисунок": "Finish drawing"
 } as const;

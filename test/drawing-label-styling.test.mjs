@@ -4,6 +4,7 @@ import { sourceLoader } from "./helpers/market-source-loader.mjs";
 
 const load = sourceLoader();
 const { paintDrawings, TOOL_NAMES } = load("model/drawing-model.ts");
+const { drawingPointCount } = load("model/drawing-tool-policy.ts");
 const { validateBackup } = load("model/backup-format.ts");
 const { assertReadableDrivePayload } = load("services/drive/reader-guard.ts");
 const { prepareDriveBackup, restoreDriveBackup } = load("services/drive/backup.ts");
@@ -22,13 +23,12 @@ const rectPoints = [
 const project = ({ timestamp, value }) => ({ x: timestamp, y: value });
 
 function drawing(name, settings = {}) {
-  const points = ["horizontalStraightLine", "horizontalRayLine", "verticalStraightLine"].includes(
-    name
-  )
-    ? rectPoints.slice(0, 1)
-    : name === "fibonacciExtension"
-      ? [...rectPoints, { timestamp: 100, value: 210 }]
-      : rectPoints;
+  const count = drawingPointCount(name) ?? 2;
+  const points = [
+    ...rectPoints,
+    { timestamp: 100, value: 210 },
+    { timestamp: 180, value: 80 }
+  ].slice(0, count);
   return {
     id: name,
     name,

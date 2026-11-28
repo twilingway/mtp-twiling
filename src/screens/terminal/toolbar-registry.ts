@@ -43,6 +43,21 @@ const capabilities: Record<string, Partial<ToolbarTool>> = {
   LineToolHorzRay: { tool: "horizontalRayLine", icon: "horizontalRay" },
   LineToolVertLine: { tool: "verticalStraightLine", icon: "vertical" },
   LineToolRectangle: { tool: "rectangle", icon: "rectangle" },
+  LineToolBrush: { tool: "brush", icon: "brush" },
+  LineToolHighlighter: { tool: "highlighter", icon: "highlighter" },
+  LineToolArrowMarker: { tool: "arrowPointer", icon: "arrowLine" },
+  LineToolArrow: { id: "LineToolArrow", tool: "arrow", icon: "arrowLine" },
+  LineToolArrowMarkUp: { tool: "arrowUp", icon: "arrowUp" },
+  LineToolArrowMarkDown: { tool: "arrowDown", icon: "arrowDown" },
+  LineToolRotatedRectangle: { tool: "rotatedRectangle", icon: "rotatedRectangle" },
+  LineToolPath: { tool: "path", icon: "path" },
+  LineToolCircle: { tool: "circle", icon: "circle" },
+  LineToolEllipse: { tool: "ellipse", icon: "ellipse" },
+  LineToolPolyline: { tool: "polyline", icon: "path" },
+  LineToolTriangle: { tool: "triangle", icon: "triangle" },
+  LineToolArc: { tool: "arc", icon: "arc" },
+  LineToolBezierQuadro: { tool: "quadraticCurve", icon: "curve" },
+  LineToolBezierCubic: { tool: "cubicCurve", icon: "doubleCurve" },
   LineToolFibRetracement: { tool: "fibonacciLine", icon: "fibonacci", shortcut: "Alt+F" },
   LineToolTrendBasedFibExtension: { tool: "fibonacciExtension", icon: "fibExtension" },
   LineToolImage: { image: true, icon: "image" }
@@ -348,7 +363,7 @@ export function rememberedToolbarTool(
 ): ToolbarTool {
   const items = group.sections.flatMap((part) => part.items);
   return (
-    items.find((item) => item.id === lastTools[group.id]) ??
+    items.find((item) => item.id === lastTools[group.id] || item.tool === lastTools[group.id]) ??
     items.find(toolbarToolAvailable) ??
     items[0]!
   );

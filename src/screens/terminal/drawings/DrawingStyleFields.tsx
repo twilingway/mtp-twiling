@@ -1,4 +1,5 @@
 import { t } from "../../../i18n/messages.js";
+import { drawingSupportsFill } from "../../../model/drawing-tool-policy.js";
 import type { DrawingSettings, DrawingTool, FibLevelStyle } from "../../../model/types.js";
 import { Swatch } from "./DrawingStylePopover.js";
 import type { ColorTarget } from "./DrawingStylePopover.js";
@@ -25,7 +26,7 @@ export function DrawingStyleFields({
   onPatch: (patch: Partial<DrawingSettings>) => void;
 }) {
   const fib = name.startsWith("fibonacci");
-  const rectangle = name === "rectangle";
+  const rectangle = drawingSupportsFill(name);
   const checked = (key: CheckKey, label: string) => (
     <label className="checkbox-label">
       <input

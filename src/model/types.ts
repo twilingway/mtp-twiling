@@ -122,6 +122,21 @@ export type DrawingTool =
   | "horizontalRayLine"
   | "verticalStraightLine"
   | "rectangle"
+  | "brush"
+  | "highlighter"
+  | "arrowPointer"
+  | "arrow"
+  | "arrowUp"
+  | "arrowDown"
+  | "rotatedRectangle"
+  | "path"
+  | "circle"
+  | "ellipse"
+  | "polyline"
+  | "triangle"
+  | "arc"
+  | "quadraticCurve"
+  | "cubicCurve"
   | "fibonacciLine"
   | "fibonacciExtension";
 export type LineStyle = "solid" | "dashed" | "dotted";
@@ -181,16 +196,38 @@ export interface DrawingBase {
 }
 export type DrawingShape =
   | {
-      name: "horizontalStraightLine" | "horizontalRayLine" | "verticalStraightLine";
+      name:
+        | "horizontalStraightLine"
+        | "horizontalRayLine"
+        | "verticalStraightLine"
+        | "arrowUp"
+        | "arrowDown";
       points: [DrawingPoint];
     }
   | {
-      name: "segment" | "rayLine" | "straightLine" | "rectangle" | "fibonacciLine";
+      name:
+        | "segment"
+        | "rayLine"
+        | "straightLine"
+        | "rectangle"
+        | "fibonacciLine"
+        | "circle"
+        | "ellipse"
+        | "arrow"
+        | "arrowPointer";
       points: [DrawingPoint, DrawingPoint];
     }
   | {
-      name: "fibonacciExtension";
+      name: "fibonacciExtension" | "rotatedRectangle" | "triangle" | "arc" | "quadraticCurve";
       points: [DrawingPoint, DrawingPoint, DrawingPoint];
+    }
+  | {
+      name: "cubicCurve";
+      points: [DrawingPoint, DrawingPoint, DrawingPoint, DrawingPoint];
+    }
+  | {
+      name: "brush" | "highlighter" | "path" | "polyline";
+      points: DrawingPoint[];
     };
 export type Drawing = DrawingBase & DrawingShape;
 export type BackupDrawing = Omit<DrawingBase, "id"> & { id?: string } & DrawingShape;

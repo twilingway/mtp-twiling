@@ -14,6 +14,7 @@ import { authPauseFixture } from "./drive-reader-auth-pause-helpers.mjs";
 
 const load = sourceLoader(root);
 const { TOOL_NAMES } = load("model/drawing-model.ts");
+const { drawingPointCount } = load("model/drawing-tool-policy.ts");
 const { assertReadableDrivePayload } = load("services/drive/reader-guard.ts");
 const { sanitizeDriveBackup, driveBackupDigest } = load("services/drive/backup.ts");
 const { DriveSync } = load("services/drive/sync.ts");
@@ -27,11 +28,7 @@ const drawing = (name = "segment", id = "fixture") => ({
   name,
   points: Array.from(
     {
-      length: ["horizontalStraightLine", "horizontalRayLine", "verticalStraightLine"].includes(name)
-        ? 1
-        : name === "fibonacciExtension"
-          ? 3
-          : 2
+      length: drawingPointCount(name) ?? 2
     },
     (_, index) => ({ timestamp: 1700000000000 + index * 86400000, value: 10 + index })
   )
@@ -77,9 +74,9 @@ test.after(() => {
   assert.equal(fetchCalls, 0);
 });
 
-test("all nine drawing kinds and historical fixtures retain exact readable projection", () => {
+test("all supported drawing kinds and historical fixtures retain exact readable projection", () => {
   const value = backup();
-  assert.equal(Object.keys(TOOL_NAMES).length, 9);
+  assert.equal(Object.keys(TOOL_NAMES).length, 24);
   value.drawings = [
     {
       symbol: "SBER",

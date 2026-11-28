@@ -7,6 +7,7 @@ import { startTerminalCloudSync } from "./controller-cloud-sync.js";
 import { TransferMutationBarrier } from "./TransferMutationBarrier.js";
 import { WelcomeGate } from "./WelcomeDialog.js";
 import type { TerminalController } from "./controller.js";
+import { finishEditorDrawing } from "./drawing-input-completion.js";
 export const UpdateBanner = memo(function UpdateBanner() {
   useTerminal();
   return (
@@ -85,6 +86,16 @@ export function TerminalLifecycle({ chartEditor }: { chartEditor?: TerminalContr
     const keydown = (e: KeyboardEvent) => {
       if (editingText(e.target)) return;
       const editor = selectedEditor();
+      if (
+        e.key === "Enter" &&
+        !e.defaultPrevented &&
+        !controller.getSnapshot().dialog &&
+        finishEditorDrawing(editor)
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.code === "KeyZ" || e.code === "KeyY")) {
         e.preventDefault();
         if (!editor.getSnapshot().loading)

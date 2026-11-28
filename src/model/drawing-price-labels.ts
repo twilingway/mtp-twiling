@@ -1,4 +1,5 @@
 import { drawingStyle } from "./drawing-model.js";
+import { drawingHandleIndices } from "./drawing-tool-policy.js";
 import type { DrawingDraft, DrawingPoint } from "./types.js";
 
 export interface DrawingPriceTarget {
@@ -18,7 +19,9 @@ export function drawingPriceTargets(
   ): DrawingPriceTarget => ({ point, color: drawingStyle(drawing).color, anchor });
   const selectedTargets =
     selected && selected.name !== "verticalStraightLine"
-      ? selected.points.map((point) => target(selected, point, "visible"))
+      ? drawingHandleIndices(selected.name, selected.points.length).map((index) =>
+          target(selected, selected.points[index]!, "visible")
+        )
       : [];
   return [
     ...drawings.flatMap((drawing) => {

@@ -2,7 +2,14 @@ import type { PointerEvent } from "react";
 import { t } from "../../i18n/messages.js";
 import { DEFAULT_FIB_LEVELS, drawingStyle } from "../../model/drawing-model.js";
 import { isDrawing } from "../../model/backup-format.js";
-import type { DrawingPoint, PixelPoint } from "../../model/types.js";
+import {
+  drawingPointCount,
+  isFreehandTool,
+  isVertexTool,
+  MAX_DRAWING_POINTS
+} from "../../model/drawing-tool-policy.js";
+import { DrawingStrokeSampler } from "../../model/drawing-stroke-sampler.js";
+import type { DrawingTool, DrawingPoint, PixelPoint } from "../../model/types.js";
 import type { TerminalController } from "./controller.js";
 
 type PlotPointer = PointerEvent<HTMLDivElement>;
@@ -13,22 +20,45 @@ export function drawingHandleRadius(container: HTMLElement, coarse: boolean): nu
   return (touch === undefined ? coarse : touch === "true") ? 13 : 5;
 }
 
-/** Multi-click on mouse; a single captured drag for two-point touch tools. */
+/** Mouse clicks and touch drags share persistent time/price anchors. */
 export function createDrawingInput(
   controller: TerminalController,
   pointAt: (point: PixelPoint, temporary: boolean) => DrawingPoint | null
 ) {
   let points: DrawingPoint[] = [];
-  let touch: { id: number; start: PixelPoint } | null = null;
+  let vertices: PixelPoint[] = [];
+  let stroke: DrawingStrokeSampler | null = null;
+  let scope: string | null = null;
+  let pointerId: number | null = null;
+  const scopeKey = () => {
+    const state = controller.getSnapshot();
+    return JSON.stringify([
+      state.owner,
+      state.preferences.symbol,
+      state.preferences.instrumentUid,
+      state.preferences.timeframe,
+      state.activeTool
+    ]);
+  };
+  let capture: { id: number; start: PixelPoint; element: HTMLDivElement } | null = null;
+  const release = () => {
+    const owned = capture;
+    capture = null;
+    if (owned?.element.hasPointerCapture(owned.id)) owned.element.releasePointerCapture(owned.id);
+  };
   const cancel = () => {
     points = [];
-    touch = null;
+    vertices = [];
+    stroke = null;
+    scope = null;
+    pointerId = null;
+    release();
     controller.setPreview(null);
   };
   const complete = () => {
     const current = controller.getSnapshot(),
       tool = current.activeTool;
-    if (!tool) return cancel();
+    if (!tool || scope !== scopeKey()) return cancel();
     const candidate: unknown = {
       id: crypto.randomUUID(),
       name: tool,
@@ -43,55 +73,109 @@ export function createDrawingInput(
     if (isDrawing(candidate)) void controller.addDrawing(candidate);
     else controller.notify(t("Не удалось создать рисунок."));
   };
+  const preview = (tool: DrawingTool, point?: DrawingPoint) =>
+    controller.setPreview({
+      id: "preview",
+      name: tool,
+      points: point ? [...points, point] : [...points]
+    });
+  const finish = () => {
+    const tool = controller.getSnapshot().activeTool;
+    if (!tool || !isVertexTool(tool) || points.length < 2) return false;
+    if (scope !== scopeKey()) {
+      cancel();
+      return false;
+    }
+    complete();
+    return true;
+  };
   return {
-    active: () => touch !== null,
-    owns: (id: number) => touch?.id === id,
+    active: () => capture !== null,
+    pending: () => points.length > 0,
+    owns: (id: number) => (capture?.id ?? pointerId) === id,
     cancel,
+    finish,
+    canFinish: () => points.length >= 2,
     down(event: PlotPointer, pixel: PixelPoint) {
       const tool = controller.getSnapshot().activeTool;
       if (!tool) return false;
       event.preventDefault();
       event.stopPropagation();
-      if (event.isPrimary === false) return true;
-      if (touch) return true;
+      if (event.isPrimary === false || capture) return true;
+      if (points.length && scope !== scopeKey()) cancel();
       const point = pointAt(pixel, event.ctrlKey || event.metaKey);
       if (!point) return true;
-      const required = [
-        "horizontalStraightLine",
-        "horizontalRayLine",
-        "verticalStraightLine"
-      ].includes(tool)
-        ? 1
-        : tool === "fibonacciExtension"
-          ? 3
-          : 2;
-      if (event.pointerType === "touch" && required === 2) {
+      if (!points.length) scope = scopeKey();
+      pointerId = event.pointerId;
+      const required = drawingPointCount(tool);
+      if (isFreehandTool(tool)) {
+        stroke = new DrawingStrokeSampler();
+        stroke.add(point, pixel);
+        points = stroke.points();
+        capture = { id: event.pointerId, start: pixel, element: event.currentTarget };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      } else if (isVertexTool(tool)) {
+        const first = vertices[0],
+          last = vertices.at(-1);
+        if (
+          tool === "polyline" &&
+          first &&
+          points.length >= 3 &&
+          Math.hypot(pixel.x - first.x, pixel.y - first.y) <
+            (event.pointerType === "touch" ? 22 : 10)
+        ) {
+          if (points.length < MAX_DRAWING_POINTS) points.push({ ...points[0]! });
+          complete();
+          return true;
+        }
+        // A double click delivers two downs at the same location; retain one vertex.
+        if (!last || Math.hypot(pixel.x - last.x, pixel.y - last.y) >= 1) {
+          points.push(point);
+          vertices.push(pixel);
+        }
+        if (points.length >= MAX_DRAWING_POINTS) {
+          complete();
+          return true;
+        }
+      } else if (event.pointerType === "touch" && required === 2) {
         points = [point];
-        touch = { id: event.pointerId, start: pixel };
+        capture = { id: event.pointerId, start: pixel, element: event.currentTarget };
         event.currentTarget.setPointerCapture(event.pointerId);
       } else points.push(point);
-      if (points.length >= required) complete();
-      else controller.setPreview({ id: "preview", name: tool, points: [...points] });
+      if (required !== null && points.length >= required) complete();
+      else preview(tool);
       return true;
     },
     move(event: PlotPointer, pixel: PixelPoint) {
       const tool = controller.getSnapshot().activeTool;
       if (!tool || !points.length) return false;
-      if (touch && touch.id !== event.pointerId) return true;
+      if (capture && capture.id !== event.pointerId) return true;
       const point = pointAt(pixel, event.ctrlKey || event.metaKey);
-      if (point) controller.setPreview({ id: "preview", name: tool, points: [...points, point] });
+      if (point && stroke) {
+        if (stroke.add(point, pixel)) {
+          points = stroke.points();
+          preview(tool);
+        }
+      } else if (point) preview(tool, point);
       return true;
     },
     up(event: PlotPointer, pixel: PixelPoint) {
-      if (!touch || touch.id !== event.pointerId) return false;
-      const start = touch.start,
+      if (!capture || capture.id !== event.pointerId) return false;
+      const start = capture.start,
         point = pointAt(pixel, event.ctrlKey || event.metaKey);
       if (point && Math.hypot(pixel.x - start.x, pixel.y - start.y) >= 6) {
-        points.push(point);
+        if (stroke) {
+          stroke.add(point, pixel, true);
+          points = stroke.points();
+        } else points.push(point);
+        if (points.length >= 2) complete();
+        else cancel();
+      } else if (stroke && points.length >= 3) {
+        // A closed stroke can end near its start after travelling a long distance.
+        if (point) stroke.add(point, pixel, true);
+        points = stroke.points();
         complete();
       } else cancel();
-      if (event.currentTarget.hasPointerCapture(event.pointerId))
-        event.currentTarget.releasePointerCapture(event.pointerId);
       return true;
     }
   };
