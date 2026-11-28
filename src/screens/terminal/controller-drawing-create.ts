@@ -10,12 +10,15 @@ export async function addControllerDrawing(
   const state = controller.getSnapshot(),
     owner = state.owner,
     activeTool = state.activeTool,
+    creationToken = state.drawingCreationDraft?.token,
     symbol = state.preferences.symbol,
     uid = selectedMarketRow(state.rows, state.preferences)?.uid;
   await controller.setDrawings([...state.drawings, drawing]);
   const current = controller.getSnapshot();
   if (
     owner === current.owner &&
+    (!current.drawingCreationDraft || current.drawingCreationDraft.token === creationToken) &&
+    (!current.preview || current.preview.id === drawing.id) &&
     activeTool === current.activeTool &&
     symbol === current.preferences.symbol &&
     uid === selectedMarketRow(current.rows, current.preferences)?.uid

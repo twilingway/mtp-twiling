@@ -74,6 +74,7 @@ export function AnnotationInlineEditor({ projection }: { projection?: EventTarge
       const current =
         controller.getSnapshot().drawingCreationDraft ??
         controller.getSnapshot().drawingSettingsPreview;
+      if (current?.token !== draft.token) return;
       const candidate = current && {
         ...current.drawing,
         settings: {
@@ -81,11 +82,21 @@ export function AnnotationInlineEditor({ projection }: { projection?: EventTarge
           text: text?.token === current.token ? text.value : (current.drawing.settings?.text ?? "")
         }
       };
-      if (!current || !candidate || !(await transaction.commit(current.token, candidate)))
-        setError(t("Введите текст и проверьте настройки рисунка."));
-      else controller.setDialog(null);
+      const saved = candidate && (await transaction.commit(current.token, candidate));
+      const after = controller.getSnapshot();
+      const active = after.drawingCreationDraft ?? after.drawingSettingsPreview;
+      if (!saved) {
+        if (active?.token === current.token)
+          setError(t("Введите текст и проверьте настройки рисунка."));
+      } else if (
+        after.dialog === "annotation-editor" &&
+        (!active || active.token === current.token)
+      )
+        controller.setDialog(null);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : t("Не удалось сохранить рисунок."));
+      const current = controller.getSnapshot();
+      if ((current.drawingCreationDraft ?? current.drawingSettingsPreview)?.token === draft.token)
+        setError(reason instanceof Error ? reason.message : t("Не удалось сохранить рисунок."));
     } finally {
       submitting.current = false;
       setSaving(false);

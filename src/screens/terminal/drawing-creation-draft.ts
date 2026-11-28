@@ -5,7 +5,7 @@ import { importWritable } from "./controller-transfer-guard.js";
 import { validSettingsDrawing } from "./drawings/drawing-settings-model.js";
 import type { TerminalState } from "./state.js";
 
-function scope(state: TerminalState): string {
+export function drawingCreationContext(state: TerminalState): string {
   return JSON.stringify([
     state.owner,
     state.authenticated,
@@ -14,9 +14,11 @@ function scope(state: TerminalState): string {
     selectedMarketRow(state.rows, state.preferences)?.uid,
     state.preferences.timeframe,
     state.preferences.engine,
-    state.chartRevision,
-    state.activeTool
+    state.chartRevision
   ]);
+}
+function scope(state: TerminalState): string {
+  return JSON.stringify([drawingCreationContext(state), state.activeTool]);
 }
 export interface DrawingCreationDraft {
   token: string;
@@ -49,9 +51,9 @@ interface Bridge {
   addDrawing(drawing: Drawing): Promise<void>;
   isAlive(): boolean;
 }
-/** A new annotation is never part of the portable document until its first Save. */
+/** A new annotation enters the document through Save or an explicit toolbar tool change. */
 export class TerminalDrawingCreation {
-  private committing = new Set<string>();
+  private committing = new Map<string, { context: string; promise: Promise<boolean> }>();
   constructor(private readonly bridge: Bridge) {}
   begin = (drawing: Drawing): string | null => {
     const state = this.bridge.getState();
@@ -98,25 +100,39 @@ export class TerminalDrawingCreation {
     if (draft && (token === undefined || draft.token === token))
       this.bridge.update({ drawingCreationDraft: null, preview: null, dialog: null });
   };
-  commit = async (token: string, drawing: Drawing): Promise<boolean> => {
+  pendingCommit = (): Promise<boolean> | null => {
+    const state = this.bridge.getState();
+    if (!this.bridge.isAlive() || !importWritable(state)) return null;
+    const context = drawingCreationContext(state);
+    return (
+      [...this.committing.values()].find((pending) => pending.context === context)?.promise ?? null
+    );
+  };
+  commit = (token: string, drawing: Drawing): Promise<boolean> => {
+    const pending = this.committing.get(token);
+    if (pending) return pending.promise;
     const draft = this.active(token);
-    if (
-      !draft ||
-      this.committing.has(token) ||
-      !validSettingsDrawing(drawing) ||
-      !this.preview(token, drawing)
-    )
-      return false;
-    this.committing.add(token);
-    try {
-      await this.bridge.addDrawing(structuredClone(drawing));
-      const saved =
-        this.bridge.isAlive() &&
-        this.bridge.getState().drawings.some((item) => item.id === drawing.id);
-      if (saved) this.cancel(token);
-      return saved;
-    } finally {
-      this.committing.delete(token);
-    }
+    if (!draft || !validSettingsDrawing(drawing) || !this.preview(token, drawing))
+      return Promise.resolve(false);
+    const candidate = structuredClone(drawing);
+    // Register before addDrawing can synchronously replace the draft with its optimistic object.
+    const promise = Promise.resolve().then(async () => {
+      try {
+        if (!this.active(token)) return false;
+        await this.bridge.addDrawing(candidate);
+        const saved =
+          this.bridge.isAlive() &&
+          this.bridge.getState().drawings.some((item) => item.id === candidate.id);
+        if (saved) this.cancel(token);
+        return saved;
+      } finally {
+        this.committing.delete(token);
+      }
+    });
+    this.committing.set(token, {
+      context: drawingCreationContext(this.bridge.getState()),
+      promise
+    });
+    return promise;
   };
 }

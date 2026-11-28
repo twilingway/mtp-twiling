@@ -62,7 +62,12 @@ export class ChartSettingsCommands {
     }
   }
 
-  async setOrdinary(patch: ChartSettings, apply: Apply): Promise<void> {
+  async setOrdinary(
+    patch: ChartSettings,
+    apply: Apply,
+    valid: () => boolean = () => true
+  ): Promise<void> {
+    if (!valid()) return;
     const initial = this.bridge.getSnapshot();
     const session = this.bridge.sessionKey();
     const initialSettings = initial.preferences.chartSettings;
@@ -71,6 +76,7 @@ export class ChartSettingsCommands {
     const current = this.bridge.getSnapshot();
     if (
       !this.alive() ||
+      !valid() ||
       this.bridge.sessionKey() !== session ||
       !importWritable(current, initial.owner)
     )

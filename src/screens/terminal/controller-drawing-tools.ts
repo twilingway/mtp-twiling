@@ -7,6 +7,9 @@ import type {
 import type { DrawingTool, IndicatorKey } from "../../model/types.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import type { TerminalController } from "./controller.js";
+import { drawingCreationContext } from "./drawing-creation-draft.js";
+import { importWritable } from "./controller-transfer-guard.js";
+import { validSettingsDrawing } from "./drawings/drawing-settings-model.js";
 
 /** Profile-scoped actions shared by the toolbar and keyboard shortcuts. */
 export class TerminalDrawingTools {
@@ -16,6 +19,7 @@ export class TerminalDrawingTools {
       ))
     | null = null;
   private writes: Promise<void> = Promise.resolve();
+  private toolIntent = 0;
   constructor(private readonly controller: TerminalController) {}
   scopeKey = (): string => {
     const state = this.controller.getSnapshot();
@@ -55,33 +59,91 @@ export class TerminalDrawingTools {
         drawingTools: { ...options, [key]: !options[key] }
       });
     });
-  choose = (tool: DrawingTool | null): Promise<void> => {
-    this.controller.setTool(tool);
-    const group = tool ? TOOL_GROUP[tool] : undefined;
-    if (!group || !tool) return Promise.resolve();
-    return this.enqueue(async () => {
-      const settings = this.controller.getSnapshot().preferences.chartSettings;
-      const options = drawingToolbarSettings(settings);
-      await this.controller.setChartSettings({
-        drawingTools: {
-          ...options,
-          cursor: "crosshair",
-          lastTools: { ...options.lastTools, [group]: tool }
-        }
-      });
-    });
-  };
-  setCursor = (cursor: DrawingCursor): Promise<void> => {
-    this.controller.setTool(null);
-    return this.enqueue(async () => {
-      const options = drawingToolbarSettings(
-        this.controller.getSnapshot().preferences.chartSettings
+  private changeTool(
+    tool: DrawingTool | null,
+    apply: (current?: () => boolean) => Promise<void>
+  ): Promise<void> {
+    const intent = ++this.toolIntent;
+    const state = this.controller.getSnapshot(),
+      draft = state.drawingCreationDraft,
+      creation = this.controller.drawingCreation;
+    if (draft && !validSettingsDrawing(draft.drawing)) creation.cancel(draft.token);
+    const pending =
+      draft && validSettingsDrawing(draft.drawing)
+        ? () => creation.commit(draft.token, draft.drawing)
+        : () => creation?.pendingCommit() ?? null;
+    // Ordinary toolbar selection remains synchronous when there is nothing to save.
+    if (!draft && !creation?.pendingCommit()) {
+      this.controller.setTool(tool);
+      return apply();
+    }
+    const context = drawingCreationContext(state),
+      session = this.controller.sessionKey();
+    let cancelled = false;
+    const current = () => {
+      const next = this.controller.getSnapshot();
+      return (
+        !cancelled &&
+        intent === this.toolIntent &&
+        this.controller.sessionKey() === session &&
+        importWritable(next) &&
+        drawingCreationContext(next) === context &&
+        (!next.drawingCreationDraft || next.drawingCreationDraft.token === draft?.token)
       );
-      await this.controller.setChartSettings({
-        drawingTools: { ...options, cursor, lastTools: { ...options.lastTools, cursors: cursor } }
+    };
+    const unsubscribe = this.controller.subscribe(() => {
+      if (!current()) cancelled = true;
+    });
+    return (async () => {
+      try {
+        const saving = pending();
+        if ((saving && !(await saving)) || !current()) return;
+        this.controller.setTool(tool);
+        await apply(current);
+      } finally {
+        unsubscribe();
+      }
+    })();
+  }
+  choose = (tool: DrawingTool | null): Promise<void> =>
+    this.changeTool(tool, (current) => {
+      const group = tool ? TOOL_GROUP[tool] : undefined;
+      if (!group || !tool) return Promise.resolve();
+      return this.enqueue(async () => {
+        if (current && !current()) return;
+        const settings = this.controller.getSnapshot().preferences.chartSettings;
+        const options = drawingToolbarSettings(settings);
+        await this.controller.setChartSettings(
+          {
+            drawingTools: {
+              ...options,
+              cursor: "crosshair",
+              lastTools: { ...options.lastTools, [group]: tool }
+            }
+          },
+          current
+        );
       });
     });
-  };
+  setCursor = (cursor: DrawingCursor): Promise<void> =>
+    this.changeTool(null, (current) => {
+      return this.enqueue(async () => {
+        if (current && !current()) return;
+        const options = drawingToolbarSettings(
+          this.controller.getSnapshot().preferences.chartSettings
+        );
+        await this.controller.setChartSettings(
+          {
+            drawingTools: {
+              ...options,
+              cursor,
+              lastTools: { ...options.lastTools, cursors: cursor }
+            }
+          },
+          current
+        );
+      });
+    });
   toggleMagnet = (): Promise<void> =>
     this.enqueue(async () => {
       const options = drawingToolbarSettings(

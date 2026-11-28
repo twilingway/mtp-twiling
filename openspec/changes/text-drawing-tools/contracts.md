@@ -92,8 +92,9 @@ viewport. Font, padding и размеры блока остаются CSS px п�
 - Renderer: единая раскладка для paint и hit; передаёт измерения текста одинаковым способом.
   Реальная Canvas-метрика допустима через injected provider, DOM/Canvas не импортируются в core.
   Layout возвращает рамки строк/ячеек, соединитель, символ и targets выбора.
-- UI: textarea/table editor, field limits, создание/изменение scoped draft; Save — одна запись,
-  Cancel — ноль. Ввод текста не запускает глобальные команды графика.
+- UI: textarea/table editor, field limits, создание/изменение scoped draft; Save и явный переход к
+  курсору/другому инструменту при корректном создании — одна запись, Cancel — ноль. Ввод текста не
+  запускает глобальные команды графика.
 - Controller: draft привязан к owner, instrument, engine, timeframe, chart revision и object id;
   stale callback не коммитит. Portable selectors читают только committed drawings.
 

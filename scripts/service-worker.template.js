@@ -36,6 +36,18 @@ self.addEventListener("fetch", (event) => {
   event.respondWith(
     (async () => {
       const cache = await caches.open(CACHE);
+      if (url.pathname === new URL("manifest.webmanifest", scope).pathname) {
+        // Keep the build cache immutable while allowing install metadata to refresh online.
+        try {
+          const response = await fetch(event.request, { cache: "no-cache" });
+          if (response.ok) return response;
+          return (await cache.match(event.request, { ignoreSearch: true })) || response;
+        } catch (error) {
+          const cached = await cache.match(event.request, { ignoreSearch: true });
+          if (cached) return cached;
+          throw error;
+        }
+      }
       // Only the app entry aliases the shell. Documents and assets keep their exact response.
       if (event.request.mode === "navigate" && url.pathname === scope.pathname)
         return (await cache.match(new URL("index.html", scope).href)) || fetch(event.request);

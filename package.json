@@ -1,6 +1,6 @@
 {
   "name": "mtp-twiling",
-  "version": "0.3.49",
+  "version": "0.3.50",
   "private": true,
   "type": "module",
   "description": "Личный браузерный терминал с прямым T‑Invest API и локальными сохранениями",
