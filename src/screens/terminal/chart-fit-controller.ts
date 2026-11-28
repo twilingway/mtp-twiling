@@ -48,6 +48,7 @@ class ControllerFitProgress extends ChartFitSession {
         if (chart) userCameraAction(controller, chart, () => chart.fit());
       },
       signature: () => cameraSignature(chart?.getView() ?? null),
+      pending: () => chart?.renderPending?.() ?? false,
       watch: (cancel) => {
         const stopState = controller.subscribe(cancel),
           stopAdapter = chartAdapterReadySignal(controller).subscribe(cancel);

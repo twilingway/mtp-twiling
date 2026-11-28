@@ -85,6 +85,8 @@ export interface ChartAdapter {
   setLinkedCrosshair?(timestamp: number | null): void;
   setLinkedTimeWindow?(window: LinkedTimeWindow): void;
   fit(): void;
+  /** Asynchronous indicator raster has not reached the current canvas yet. */
+  renderPending?(): boolean;
   zoom?(direction: -1 | 1): void;
   zoomToSelection?(from: DrawingPoint, to: DrawingPoint): void;
   /** Fractional repeat follows beginPan; a missing fraction keeps the one-shot Y freeze. */

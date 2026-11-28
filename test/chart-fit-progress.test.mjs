@@ -7,6 +7,7 @@ import { createSourceLoader } from "./technical-volume-registration-fixture.mjs"
 
 function frames() {
   let next = 0;
+  let elapsed = 0;
   const callbacks = new Map();
   return {
     frame(callback) {
@@ -14,8 +15,10 @@ function frames() {
       return next;
     },
     cancel: (id) => callbacks.delete(id),
+    now: () => elapsed,
     count: () => callbacks.size,
-    async advance() {
+    async advance(milliseconds = 16) {
+      elapsed += milliseconds;
       const pending = [...callbacks.values()];
       callbacks.clear();
       for (const callback of pending) callback();
@@ -25,6 +28,50 @@ function frames() {
 }
 const load = createSourceLoader({ react: React, "react/jsx-runtime": jsxRuntime });
 const { ChartFitSession } = load("screens/terminal/chart-fit-session.js");
+
+test("fit stays busy beyond native settle while an asynchronous raster is pending", async () => {
+  const scheduler = frames(),
+    session = new ChartFitSession(scheduler);
+  let pendingRaster = true,
+    camera = "same-camera";
+  const result = session.request({
+    current: () => true,
+    apply: () => {},
+    signature: () => camera,
+    pending: () => pendingRaster,
+    watch: () => () => {}
+  });
+  for (let i = 0; i < 24; i++) await scheduler.advance();
+  assert.equal(session.getSnapshot(), true);
+  pendingRaster = false;
+  await scheduler.advance();
+  assert.equal(session.getSnapshot(), true);
+  camera = "native-adjusted-camera";
+  await scheduler.advance();
+  assert.equal(session.getSnapshot(), true);
+  await scheduler.advance();
+  assert.equal(await result, "completed");
+  assert.equal(session.getSnapshot(), false);
+  assert.equal(scheduler.count(), 0);
+});
+
+test("a broken asynchronous renderer cannot retain the fit status indefinitely", async () => {
+  const scheduler = frames(),
+    session = new ChartFitSession(scheduler);
+  const result = session.request({
+    current: () => true,
+    apply: () => {},
+    signature: () => "same-camera",
+    pending: () => true,
+    watch: () => () => {}
+  });
+  await scheduler.advance();
+  await scheduler.advance();
+  await scheduler.advance(10_001);
+  assert.equal(await result, "cancelled");
+  assert.equal(session.getSnapshot(), false);
+  assert.equal(scheduler.count(), 0);
+});
 
 test("busy publishes before fit, with a paint opportunity and two native settle frames", async () => {
   const scheduler = frames(),

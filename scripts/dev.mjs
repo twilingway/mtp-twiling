@@ -38,7 +38,7 @@ const types = {
   ".woff2": "font/woff2"
 };
 const csp =
-  "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; frame-src https://accounts.google.com/gsi/; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://invest-brands.cdn-tinkoff.ru; connect-src 'self' https://api.bybit.com wss://stream.bybit.com https://openapi.okx.com wss://ws.okx.com https://invest-public-api.tbank.ru wss://invest-public-api.tbank.ru https://accounts.google.com/gsi/ https://www.googleapis.com https://oauth.yandex.ru https://login.yandex.ru https://cloud-api.yandex.net https://*.dst.yandex.net https://*.disk.yandex.net https://downloader.dst.yandex.ru https://downloader.disk.yandex.ru https://*.storage.yandex.net; worker-src 'none'; manifest-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+  "default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; frame-src https://accounts.google.com/gsi/; style-src 'self' 'unsafe-inline' https://accounts.google.com/gsi/style; img-src 'self' data: blob: https://invest-brands.cdn-tinkoff.ru; connect-src 'self' https://api.bybit.com wss://stream.bybit.com https://openapi.okx.com wss://ws.okx.com https://invest-public-api.tbank.ru wss://invest-public-api.tbank.ru https://accounts.google.com/gsi/ https://www.googleapis.com https://oauth.yandex.ru https://login.yandex.ru https://cloud-api.yandex.net https://*.dst.yandex.net https://*.disk.yandex.net https://downloader.dst.yandex.ru https://downloader.disk.yandex.ru https://*.storage.yandex.net; worker-src 'self'; manifest-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
 export async function startDev({ port = 5210, projectRoot = root, outputDirectory } = {}) {
   const outdir = outputDirectory ?? join(projectRoot, "artifacts/dev-runtime");
@@ -217,7 +217,11 @@ export async function startDev({ port = 5210, projectRoot = root, outputDirector
         splitting: true,
         format: "esm",
         chunkNames: "assets/[name]-[hash]",
-        define: { ...cloudPublicDefines(projectRoot), "process.env.NODE_ENV": '"development"' },
+        define: {
+          ...cloudPublicDefines(projectRoot),
+          "process.env.NODE_ENV": '"development"',
+          __MTP_RASTER_DEV__: "true"
+        },
         plugins: [...common.plugins, devPlugin("app")]
       })
     );

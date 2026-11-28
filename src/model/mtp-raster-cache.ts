@@ -1,4 +1,7 @@
 import type { MtpBitmapScope, MtpModel } from "./mtp.js";
+import type { MtpWorkerRasterCache, MtpWorkerStatus } from "./mtp-worker-raster-cache.js";
+
+declare const __MTP_RASTER_DEV__: boolean;
 
 type Surface = HTMLCanvasElement | OffscreenCanvas;
 interface Matrix {
@@ -11,6 +14,7 @@ export interface MtpRasterEnvironment {
   canvas(width: number, height: number): Surface | null;
   delay(action: () => void, milliseconds: number): unknown;
   cancel(timer: unknown): void;
+  loadWorker?(): Promise<{ MtpWorkerRasterCache: typeof MtpWorkerRasterCache }>;
 }
 const browser: MtpRasterEnvironment = {
   canvas(width, height) {
@@ -72,6 +76,10 @@ const identity: Matrix = { xScale: 1, xOffset: 0, yScale: 1, yOffset: 0 };
 
 /** A single bounded, transparent MTP layer; settled frames always use native raster geometry. */
 export class MtpRasterCache {
+  private worker: MtpWorkerRasterCache | undefined;
+  private workerLoading = false;
+  private workerLoadError: string | undefined;
+  private workerLoadTimer: unknown;
   private cached: Cached | undefined;
   private observed = identity;
   private timer: unknown;
@@ -85,6 +93,31 @@ export class MtpRasterCache {
     container?: HTMLElement,
     private readonly environment = browser
   ) {
+    if (
+      typeof __MTP_RASTER_DEV__ !== "undefined" &&
+      __MTP_RASTER_DEV__ &&
+      typeof location !== "undefined" &&
+      new URLSearchParams(location.search).get("mtpRaster") === "worker"
+    ) {
+      this.workerLoading = true;
+      const fail = (reason = "worker-module-load-error") => {
+        if (!this.workerLoading || this.disposed) return;
+        this.finishWorkerLoad(reason);
+        this.requestUpdate();
+      };
+      this.workerLoadTimer = this.environment.delay(() => fail("worker-module-deadline"), 5000);
+      void Promise.resolve()
+        .then(() => this.environment.loadWorker?.() ?? import("./mtp-worker-raster-cache.js"))
+        .then(
+          ({ MtpWorkerRasterCache }) => {
+            if (!this.workerLoading || this.disposed) return;
+            this.finishWorkerLoad();
+            this.worker = new MtpWorkerRasterCache(this.requestUpdate);
+            this.requestUpdate();
+          },
+          () => fail()
+        );
+    }
     if (!container) return;
     const view = container.ownerDocument.defaultView;
     if (!view) return;
@@ -118,6 +151,12 @@ export class MtpRasterCache {
       view.removeEventListener("pointercancel", up, true);
       view.removeEventListener("blur", blur, true);
     };
+  }
+  private finishWorkerLoad(reason?: string): void {
+    if (this.workerLoadTimer !== undefined) this.environment.cancel(this.workerLoadTimer);
+    this.workerLoadTimer = undefined;
+    this.workerLoading = false;
+    this.workerLoadError = reason;
   }
   private cancelTimer(): void {
     if (this.timer !== undefined) this.environment.cancel(this.timer);
@@ -182,6 +221,11 @@ export class MtpRasterCache {
   }
   draw(frame: MtpRasterFrame): boolean {
     if (this.disposed) return false;
+    if (this.workerLoading) return true;
+    if (this.worker?.draw(frame)) {
+      this.release();
+      return true;
+    }
     const { scope, model, mode } = frame;
     if (!model.periods.length) {
       this.release();
@@ -414,9 +458,35 @@ export class MtpRasterCache {
   }
   destroy(): void {
     this.disposed = true;
+    this.finishWorkerLoad();
+    this.worker?.destroy();
     this.stopInput();
     this.cancelTimer();
     this.pointers.clear();
     this.release();
+  }
+  pending(): boolean {
+    return !this.disposed && (this.workerLoading || (this.worker?.pending() ?? false));
+  }
+  invalidate(active = false): void {
+    this.worker?.invalidate(active);
+  }
+  workerStatus(): MtpWorkerStatus {
+    return (
+      this.worker?.status() ?? {
+        state: this.disposed
+          ? "destroyed"
+          : this.workerLoading
+            ? "loading"
+            : this.workerLoadError !== undefined
+              ? "fallback"
+              : "off",
+        pending: this.pending(),
+        dispatched: 0,
+        completed: 0,
+        stale: 0,
+        ...(this.workerLoadError === undefined ? {} : { reason: this.workerLoadError })
+      }
+    );
   }
 }

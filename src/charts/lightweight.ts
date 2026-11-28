@@ -426,6 +426,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       series.priceScale().applyOptions({ autoScale: true });
       loadedFit.fit();
     },
+    renderPending: () => mtp.pending(),
     redrawDrawings: () => updateDrawings(),
     destroy() {
       calendar.dispose();

@@ -1,11 +1,13 @@
 export interface FitScheduler {
   frame(callback: () => void): number;
   cancel(id: number): void;
+  now?(): number;
 }
 export interface FitOperation {
   current(): boolean;
   apply(): void;
   signature(): string | null;
+  pending?(): boolean;
   watch(cancel: () => void): () => void;
 }
 export type FitResult = "completed" | "cancelled";
@@ -94,11 +96,21 @@ export class ChartFitSession {
       operation.apply();
       let previous: string | null = null;
       // SDK scale writes/paint can themselves be queued. Observe at least two frames.
-      for (let attempt = 0; attempt < 8; attempt++) {
+      const now = () => this.scheduler.now?.() ?? performance.now();
+      const deadline = now() + 10_000;
+      for (let attempt = 0; ;) {
         if (!(await this.frame(job, operation))) return "cancelled";
         if (job.cancelled || !operation.current()) return "cancelled";
         const signature = operation.signature();
+        if (operation.pending?.()) {
+          if (now() >= deadline) return "cancelled";
+          attempt = 0;
+          previous = null;
+          continue;
+        }
         if (attempt > 0 && signature !== null && signature === previous) break;
+        if (attempt >= 7) break;
+        attempt++;
         previous = signature;
       }
       return "completed";
