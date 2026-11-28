@@ -136,6 +136,42 @@ test("own price is formatted independently of current candles and caption", () =
   assert.equal(labelLayout.font.bold, true);
 });
 
+test("price note picking follows each caption's measured glyph width", () => {
+  const measureText = (text) => text.length * 10;
+  const wide = drawing("priceNote", { text: "hi", annotation: { width: 1600 } });
+  const caption = drawingGeometry(wide, project, 2000, 1000, { measureText }).annotation.text[0];
+  assert.equal(caption.maxWidth, 20);
+  assert.equal(
+    hitDrawing([wide], { x: 800, y: caption.y + 5 }, project, 2000, 1000, 4, { measureText }),
+    null
+  );
+  assert.deepEqual(
+    hitDrawing([wide], { x: caption.x + 5, y: caption.y + 5 }, project, 2000, 1000, 4, {
+      measureText
+    }),
+    { id: wide.id, handle: -1 }
+  );
+  const wrapped = drawing("priceNote", {
+    text: "abcdefghij",
+    annotation: { width: 100, wrap: true }
+  });
+  const lines = drawingGeometry(wrapped, project, 800, 600, { measureText }).annotation.text;
+  assert.deepEqual(
+    lines.map((line) => line.text),
+    ["abcdefgh", "ij"]
+  );
+  assert.deepEqual(
+    lines.map((line) => line.maxWidth),
+    [80, 20]
+  );
+  assert.equal(
+    hitDrawing([wrapped], { x: lines[1].x + 30, y: lines[1].y + 5 }, project, 800, 600, 4, {
+      measureText
+    }),
+    null
+  );
+});
+
 test("callout tail is selectable while surrounding empty space is not", () => {
   const item = drawing("callout", { text: "Box", annotation: { width: 100, height: 50 } }, [
     point(100, 150),

@@ -226,7 +226,18 @@ export function annotationLayout(
       bodyHeight
     );
     const caption = value
-      ? textLines(value, captionBounds, font, measure, "center", "top", settings.wrap !== false)
+      ? textLines(
+          value,
+          captionBounds,
+          font,
+          measure,
+          "center",
+          "top",
+          settings.wrap !== false
+        ).map((line) => ({
+          ...line,
+          maxWidth: Math.min(line.maxWidth, measure(line.text, font))
+        }))
       : [];
     return {
       kind,
