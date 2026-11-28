@@ -35,6 +35,7 @@ const { MtpWorkerRasterCache } = load("model/mtp-worker-raster-cache.js");
 const { mtpWorkerIntent } = load("model/mtp-worker-snapshot.js");
 const { paintMtpWorkerFrame, MTP_WORKER_PROTOCOL } = load("model/mtp-worker-protocol.js");
 const { MtpWorkerRefill } = load("model/mtp-worker-refill.js");
+const { MTP_EMERGENCY_VERTEX_LIMIT } = load("model/mtp-worker-emergency.js");
 
 function rasterCacheFor(search = "?mtpRaster=worker", enabled = true) {
   const code = ts.transpileModule(
@@ -560,18 +561,149 @@ test("unchanged LW redraws reuse exact ready and in-flight keys without history 
   assert.equal(f.cache.status().dispatched, 1);
   assert.equal(reads.extrema, before.extrema);
   assert.equal(reads.prefix, before.prefix);
-  assert.ok(reads.x - before.x <= 60 * 3);
+  assert.ok(
+    reads.x - before.x <= 60 * (MTP_EMERGENCY_VERTEX_LIMIT + 3),
+    "warmup phases may use different X samples, but even no-bitmap work has a fixed total budget"
+  );
   f.result();
   f.cache.draw(frame);
   const readyReads = { ...reads };
+  const readyEmergency = f.cache.status().emergency.paints;
   for (let i = 0; i < 60; i++) f.cache.draw(frame);
   assert.equal(f.cache.status().snapshots, 1);
   assert.equal(f.cache.status().dispatched, 1);
   assert.equal(reads.extrema, readyReads.extrema);
   assert.equal(reads.prefix, readyReads.prefix);
   assert.ok(reads.x - readyReads.x <= 60 * 3);
+  assert.equal(
+    f.cache.status().emergency.paints,
+    readyEmergency,
+    "ready coverage never invokes main emergency paint"
+  );
   assert.equal(f.cache.pending(), false);
   f.cache.destroy();
+});
+
+test("a jump beyond one captured viewport paints bounded current-data MA until exact worker pixels arrive", () => {
+  let clock = 0;
+  const f = fixture({ now: () => clock }),
+    { frame, camera, reads } = partialFrame();
+  f.ready();
+  f.cache.draw(frame);
+  const a = f.result();
+  f.cache.draw(frame);
+  const baseline = { ...f.cache.status().emergency },
+    blits = frame.scope.context.blits.length;
+  camera(600);
+  f.cache.draw(frame, true);
+  const job = f.messages.at(-1),
+    sampled = f.cache.status().emergency;
+  assert.equal(sampled.paints, baseline.paints + 1);
+  assert.ok(sampled.lastVertices > 0 && sampled.lastVertices <= MTP_EMERGENCY_VERTEX_LIMIT);
+  assert.equal(
+    frame.scope.context.blits.length,
+    blits,
+    "the non-overlapping old raster is not faked into the new view"
+  );
+  assert.equal(a.closed, 0);
+  assert.equal(f.cache.pending(), true);
+  const busyReads = { ...reads },
+    busySnapshots = f.cache.status().snapshots;
+  clock = 10;
+  camera(605);
+  for (let i = 0; i < 20; i++) f.cache.draw(frame, true);
+  assert.equal(f.cache.status().emergency.paints, sampled.paints + 20);
+  assert.equal(reads.prefix, busyReads.prefix);
+  assert.equal(reads.extrema, busyReads.extrema);
+  assert.equal(f.cache.status().snapshots, busySnapshots);
+  assert.equal(f.cache.status().dispatched, 2);
+  assert.equal(f.cache.pending(), true, "coarse real points never complete exact readiness");
+  f.result(job);
+  const beforeBitmap = f.cache.status().emergency.paints;
+  f.cache.draw(frame, true);
+  assert.equal(
+    f.cache.status().emergency.paints,
+    beforeBitmap,
+    "a safe partial worker bitmap takes priority over coarse main paint"
+  );
+  assert.equal(frame.scope.context.blits.length, blits + 1);
+  f.cache.setInteraction(false);
+  f.cache.draw(frame);
+  f.result();
+  f.cache.draw(frame);
+  assert.equal(f.cache.pending(), false);
+  f.cache.destroy();
+});
+
+test("covered and tiny-but-nonzero bitmap clips never double-paint a coarse main fan", () => {
+  const f = fixture({ now: () => 0 }),
+    { frame, camera } = partialFrame();
+  f.ready();
+  f.cache.draw(frame);
+  f.result();
+  f.cache.draw(frame);
+  const emergency = f.cache.status().emergency.paints;
+  camera(0);
+  f.cache.draw(frame, true);
+  assert.equal(f.cache.status().emergency.paints, emergency);
+  camera(423);
+  const blits = frame.scope.context.blits.length;
+  f.cache.draw(frame, true);
+  const clip = frame.scope.context.clips.at(-1);
+  assert.ok(clip[2] > 0 && clip[2] < 10, "the boundary has a real but tiny safe clip");
+  assert.equal(frame.scope.context.blits.length, blits + 1);
+  assert.equal(
+    f.cache.status().emergency.paints,
+    emergency,
+    "ZERO-overlap policy is deliberate; no full coarse layer under a partial bitmap"
+  );
+  f.cache.destroy();
+});
+
+test("emergency paint uses new reset data while old ownership, unsupported projection and destroyed caches cannot paint", () => {
+  const f = fixture({ now: () => 0 }),
+    { frame } = partialFrame();
+  f.ready();
+  f.cache.draw(frame);
+  const old = f.result();
+  f.cache.draw(frame);
+  const before = f.cache.status().emergency.paints,
+    blits = frame.scope.context.blits.length;
+  frame.model.reset(
+    frame.model.data.map((candle) => ({ ...candle, close: candle.close + 200 })),
+    frame.model.periods
+  );
+  frame.yFor = (price) => 200 - (price - 300) * 3;
+  f.cache.invalidate(true);
+  f.cache.draw(frame, true);
+  assert.equal(old.closed, 1);
+  assert.equal(frame.scope.context.blits.length, blits);
+  assert.equal(f.cache.status().emergency.paints, before + 1);
+  assert.equal(f.cache.pending(), true);
+  const after = f.cache.status().emergency.paints;
+  f.cache.draw({ ...frame, mode: 1 }, true);
+  assert.equal(
+    f.cache.status().emergency.paints,
+    after,
+    "unsafe mode never reaches emergency main paint"
+  );
+  f.cache.destroy();
+  f.cache.draw(frame, true);
+  assert.equal(f.cache.status().emergency.paints, after);
+  const g = fixture(),
+    other = partialFrame();
+  g.ready();
+  g.cache.draw(other.frame);
+  g.result();
+  g.cache.draw(other.frame);
+  const count = g.cache.status().emergency.paints;
+  assert.equal(g.cache.draw(partialFrame().frame, true), false);
+  assert.equal(
+    g.cache.status().emergency.paints,
+    count,
+    "different model owner cannot borrow the old emergency path"
+  );
+  g.cache.destroy();
 });
 
 test("held old response is preview only and never dispatches the previously queued camera", () => {

@@ -16,33 +16,9 @@ import type { MtpWorkerGeometry, MtpWorkerMatrix } from "./mtp-worker-geometry.j
 import { MtpWorkerRefill } from "./mtp-worker-refill.js";
 import type { MtpWorkerPreviewPlan } from "./mtp-worker-geometry.js";
 import type { MtpWorkerReadyBitmap as Ready } from "./mtp-worker-geometry.js";
-
-export interface MtpRasterWorker {
-  onmessage: ((event: MessageEvent<MtpWorkerResponse>) => void) | null;
-  onerror: ((event: ErrorEvent) => void) | null;
-  onmessageerror: ((event: MessageEvent<unknown>) => void) | null;
-  postMessage(message: MtpWorkerRequest, transfer?: Transferable[]): void;
-  terminate(): void;
-}
-export interface MtpWorkerEnvironment {
-  create(): MtpRasterWorker;
-  delay(action: () => void, milliseconds: number): unknown;
-  cancel(timer: unknown): void;
-  build: string;
-  now?(): number;
-}
-export interface MtpWorkerStatus {
-  state: "off" | "loading" | "ready" | "fallback" | "destroyed";
-  pending: boolean;
-  dispatched: number;
-  completed: number;
-  stale: number;
-  snapshots?: number;
-  previews?: number;
-  quickHits?: number;
-  queued?: boolean;
-  reason?: string;
-}
+import { MtpEmergencyPreview } from "./mtp-worker-emergency.js";
+import type { MtpRasterWorker, MtpWorkerEnvironment, MtpWorkerStatus } from "./mtp-worker-types.js";
+export type { MtpRasterWorker, MtpWorkerEnvironment, MtpWorkerStatus } from "./mtp-worker-types.js";
 const browser: MtpWorkerEnvironment = {
   create() {
     if (typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined")
@@ -90,11 +66,13 @@ export class MtpWorkerRasterCache {
   private owner: MtpRasterFrame["model"] | undefined;
   private readonly refill: MtpWorkerRefill;
   private refillPermit = false;
+  private readonly emergency: MtpEmergencyPreview;
   constructor(
     private readonly requestUpdate: () => void,
     private readonly environment = browser
   ) {
     this.refill = new MtpWorkerRefill(environment, requestUpdate);
+    this.emergency = new MtpEmergencyPreview(() => environment.now?.() ?? performance.now());
     try {
       const worker = this.environment.create();
       this.worker = worker;
@@ -122,6 +100,7 @@ export class MtpWorkerRasterCache {
       previews: this.previews,
       quickHits: this.quickHits,
       queued: this.deferred !== undefined || this.latest !== undefined,
+      emergency: this.emergency.status(),
       ...(this.reason === undefined ? {} : { reason: this.reason })
     };
   }
@@ -193,6 +172,7 @@ export class MtpWorkerRasterCache {
   private fail(reason: string): void {
     if (this.state === "fallback" || this.state === "destroyed") return;
     this.state = "fallback";
+    this.emergency.cancel();
     this.forceBudget = 0;
     this.forcedKey = undefined;
     this.reason = reason;
@@ -346,18 +326,28 @@ export class MtpWorkerRasterCache {
     } else this.previews++;
   }
   private preview(source: MtpRasterFrame): MtpWorkerPreviewPlan | undefined {
-    if (!this.ready) return undefined;
-    const plan = mtpWorkerPreview(source, this.ready.geometry);
-    if (plan?.covered) this.blit(source, this.ready, plan.matrix, false);
-    else if (plan?.clip) {
+    const ready = this.ready;
+    const plan = ready ? mtpWorkerPreview(source, ready.geometry) : undefined;
+    if (ready && plan?.covered) this.blit(source, ready, plan.matrix, false);
+    else if (ready && plan?.clip) {
       const context = source.scope.context,
         clip = plan.clip;
       context.save();
       context.beginPath();
       context.rect(clip.x, clip.y, clip.width, clip.height);
       context.clip();
-      this.blit(source, this.ready, plan.matrix, false);
+      this.blit(source, ready, plan.matrix, false);
       context.restore();
+    } else {
+      const key = this.lastContentKey;
+      this.emergency.draw(
+        source,
+        () =>
+          this.state !== "fallback" &&
+          this.state !== "destroyed" &&
+          this.owner === source.model &&
+          key === this.lastContentKey
+      );
     }
     return plan;
   }
@@ -468,6 +458,7 @@ export class MtpWorkerRasterCache {
     return true;
   }
   invalidate(active = false): void {
+    this.emergency.cancel();
     this.releaseResult();
     this.refill.clear();
     this.refillPermit = false;
@@ -482,6 +473,7 @@ export class MtpWorkerRasterCache {
     if (!active) this.releaseReady();
   }
   destroy(): void {
+    this.emergency.cancel();
     this.state = "destroyed";
     this.forceBudget = 0;
     this.forcedKey = undefined;
