@@ -113,13 +113,13 @@ export async function saveAdapterView(
 }
 
 /** A backup's per-symbol views take precedence over outgoing live shared-camera state. */
-export async function resetSharedChartCamera(owner: string): Promise<void> {
+export async function resetSharedChartCamera(owner: string, preserveStored = false): Promise<void> {
   await Promise.all(
     [...writes].flatMap(([key, write]) =>
       memory.get(key)?.owner === owner ? [write.catch(() => {})] : []
     )
   );
-  const records = await all("preferences");
+  const records = preserveStored ? [] : await all("preferences");
   const ids = records.flatMap((record) => {
     if (!record || typeof record !== "object" || !("id" in record) || !("owner" in record))
       return [];

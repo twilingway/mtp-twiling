@@ -43,6 +43,8 @@ export async function localBackend() {
     records,
     key: async () => key,
     read: async (id) => structuredClone(records.get(id)),
+    readAssociations: async clientId => [...records].filter(([id]) => id.startsWith(`mtp:yandex:device:${clientId}:`) && id.endsWith(":association"))
+      .map(([id,value]) => ({accountId:id.split(":").at(-2),value:structuredClone(value)})),
     write: async (id, value, signal) => {
       signal.throwIfAborted();
       records.set(id, structuredClone(value));

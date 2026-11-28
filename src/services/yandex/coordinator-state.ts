@@ -1,5 +1,9 @@
 import type { CloudSyncStatus } from "../../model/cloud-sync.js";
 import type { YandexStatusClear } from "./coordinator-status.js";
+export function yandexSubscribe(listeners: Set<() => void>, listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
 
 export function yandexUpdatedStatus(
   previous: CloudSyncStatus,
@@ -15,6 +19,7 @@ export function yandexUpdatedStatus(
       "pauseReason",
       "conflict",
       "choiceAction",
+      "deleteAction",
       "progress",
       "comparison"
     ] as const)

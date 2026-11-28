@@ -4,12 +4,16 @@ import { sha256, YandexError } from "./types.js";
 import { parseSlotEnvelope } from "./slot-model.js";
 import type { SlotEnvelope } from "./slot-model.js";
 
-export const SLOT_MAGIC = "MTPYDX02";
+export const SLOT_MAGIC = "MTPYDX03";
+export const SLOT_V2_MAGIC = "MTPYDX02";
 export const MAX_SLOT_HEADER = 256 * 1024;
 export const MAX_SLOT_BYTES = 512 * 1024 * 1024 + MAX_SLOT_HEADER + 12;
 export async function slotHeaderSize(body: Blob): Promise<number> {
   const bytes = new Uint8Array(await body.slice(0, 12).arrayBuffer());
-  if (bytes.length !== 12 || new TextDecoder().decode(bytes.slice(0, 8)) !== SLOT_MAGIC)
+  if (
+    bytes.length !== 12 ||
+    ![SLOT_MAGIC, SLOT_V2_MAGIC].includes(new TextDecoder().decode(bytes.slice(0, 8)))
+  )
     throw new YandexError("unsupported-format");
   const size = new DataView(bytes.buffer).getUint32(8, false);
   if (!size || size > MAX_SLOT_HEADER) throw new YandexError("limit");
@@ -25,6 +29,9 @@ export async function decodeSlotHeader(body: Blob, size: number): Promise<SlotEn
     throw new YandexError("remote-invalid");
   }
   const envelope = await parseSlotEnvelope(value);
+  const magic = new TextDecoder().decode(await body.slice(0, 8).arrayBuffer());
+  if (magic !== (envelope.protocol === 3 ? SLOT_MAGIC : SLOT_V2_MAGIC))
+    throw new YandexError("remote-invalid");
   if (offset + envelope.current.bundle.size + (envelope.previous?.bundle.size ?? 0) !== size)
     throw new YandexError("remote-invalid");
   return envelope;
@@ -50,7 +57,7 @@ export async function encodeSlot(
   const header = new TextEncoder().encode(JSON.stringify(checked));
   if (header.length > MAX_SLOT_HEADER) throw new YandexError("limit");
   const prefix = new Uint8Array(12);
-  prefix.set(new TextEncoder().encode(SLOT_MAGIC));
+  prefix.set(new TextEncoder().encode(checked.protocol === 3 ? SLOT_MAGIC : SLOT_V2_MAGIC));
   new DataView(prefix.buffer).setUint32(8, header.length, false);
   const body = new Blob([prefix, header, current, ...(previous ? [previous] : [])]);
   return { body, reference: { size: body.size, sha256: await sha256(body) } };
@@ -80,7 +87,9 @@ export async function decodeSlot(body: Blob): Promise<{
   return { envelope, current, previous, prepared };
 }
 export async function yandexHeaderSize(prefix: Blob): Promise<number> {
-  return new TextDecoder().decode(await prefix.slice(0, 8).arrayBuffer()) === SLOT_MAGIC
+  return [SLOT_MAGIC, SLOT_V2_MAGIC].includes(
+    new TextDecoder().decode(await prefix.slice(0, 8).arrayBuffer())
+  )
     ? slotHeaderSize(prefix)
     : revisionHeaderSize(prefix);
 }

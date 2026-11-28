@@ -37,6 +37,13 @@ export interface CloudRemoteChoice extends CloudSummary {
   id: string;
   deviceLabel?: string;
   readonly deviceId?: string;
+  readonly deletion?: CloudRemoteDeletion;
+}
+export interface CloudRemoteDeletion {
+  kind: "current" | "previous" | "retired-peer" | "legacy";
+  allowed: boolean;
+  versions?: number;
+  reason?: "current" | "last-head" | "legacy" | "conflict" | "unsupported";
 }
 export interface CloudComparison {
   local: CloudSummary;
@@ -75,7 +82,18 @@ export interface CloudSyncStatus {
   conflict?: { local: CloudSummary; remotes: readonly CloudRemoteChoice[] };
   comparison?: CloudComparison;
   choiceAction?: { selection: CloudSelection; state: CloudChoiceState };
+  deleteAction?: {
+    id: string;
+    state: "running" | "confirmed" | "review" | "unconfirmed";
+    target?: CloudDeleteTarget;
+  };
   progress?: CloudProgress;
+}
+export interface CloudDeleteTarget {
+  deviceId: string;
+  date: string;
+  versions: number;
+  kind: CloudRemoteDeletion["kind"];
 }
 export interface CloudSyncProvider {
   readonly id: CloudProviderId;
@@ -96,6 +114,8 @@ export interface CloudSyncProvider {
   inspect?(): Promise<void>;
   /** Applies a pinned remote version locally; does not publish a cloud conflict resolution. */
   receive?(id: string): Promise<void>;
+  /** Explicitly removes only a reviewed cloud version; keeps local data unchanged. */
+  remove?(id: string): Promise<void>;
   choose(selection: CloudSelection): Promise<void>;
   dispose(): void;
 }

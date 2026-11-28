@@ -1,4 +1,4 @@
-import type { CloudSelection, CloudSummary } from "../../model/cloud-sync.js";
+import type { CloudSelection } from "../../model/cloud-sync.js";
 import type {
   CloudOperationGuard,
   CloudPreparedSnapshot,
@@ -16,7 +16,7 @@ import { recoverYandexPending } from "./pending-recovery.js";
 
 export const sameHeads = (a: readonly string[], b: readonly string[]) =>
   JSON.stringify([...a].sort()) === JSON.stringify([...b].sort());
-interface TransferActions extends YandexApplyActions {
+export interface TransferActions extends YandexApplyActions {
   preview(): {
     revision: number | undefined;
     heads: readonly string[];
@@ -36,7 +36,7 @@ interface TransferActions extends YandexApplyActions {
   ): Promise<void>;
   conflict(
     captured: CloudPreparedSnapshot,
-    remotes: readonly { remote: YandexRemote; summary: CloudSummary }[],
+    remotes: readonly YandexPreviewRemote[],
     heads: readonly string[]
   ): void;
   inspected(
@@ -57,7 +57,8 @@ export async function yandexTransfer(
   guard: CloudOperationGuard,
   actions: TransferActions,
   selection?: CloudSelection,
-  inspectionOnly = false
+  inspectionOnly = false,
+  contextAssociation?: { value: YandexAssociation | undefined }
 ): Promise<void> {
   const valid = () => !guard.signal.aborted && guard.isCurrent(),
     scope = host.scope("yandex-disk");
@@ -65,8 +66,12 @@ export async function yandexTransfer(
   if (scope.blocked || scope.associationConflict) throw new YandexError("local-changed");
   const captured = await host.capture("yandex-disk", guard),
     inspected = await revisions.inspect(valid);
+  const capabilities = await revisions.manualDeleteCapabilities(inspected.remotes, inspected.heads);
   const remotes = new Map(
-      yandexVisibleChoices(inspected).map((item) => [item.remote.revision.revisionId, item])
+      yandexVisibleChoices(inspected).map((item) => [
+        item.remote.revision.revisionId,
+        { ...item, deletion: capabilities[item.remote.revision.revisionId] }
+      ])
     ),
     all = inspected.remotes;
   if (!valid() || host.scope("yandex-disk").revision !== captured.revision)
@@ -99,7 +104,9 @@ export async function yandexTransfer(
       throw new YandexError("local-changed");
     }
   };
-  let association = await journal.association(clientId, accountId);
+  let association = contextAssociation
+    ? contextAssociation.value
+    : await journal.association(clientId, accountId);
   if (!valid() || host.scope("yandex-disk").revision !== captured.revision)
     throw new YandexError("local-changed");
   const context: YandexApplyContext = {

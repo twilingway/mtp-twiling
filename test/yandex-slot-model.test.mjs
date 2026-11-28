@@ -40,7 +40,7 @@ test("slot packages validate exact bytes and reject corruption, future formats a
   bytes[bytes.length - 1] ^= 1;
   await assert.rejects(decodeSlot(new Blob([bytes])), (e) => e.code === "remote-invalid");
   await assert.rejects(
-    parseSlotEnvelope({ ...f.envelope, protocol: 3 }),
+    parseSlotEnvelope({ ...f.envelope, protocol: 4 }),
     (e) => e.code === "unsupported-format"
   );
   const poisoned = JSON.parse(JSON.stringify(f.envelope));
@@ -101,4 +101,46 @@ test("the embedded previous makes its exact physical carrier obsolete but never 
   assert.deepEqual(unknown.obsolete, []);
   assert.deepEqual(unknown.uncertain, [fork]);
   assert.equal(unknown.heads.length, 2);
+});
+
+
+test("v3 physical generations can remove previous without changing logical version; divergent equal seq never wins",async()=>{
+  const previous=await first(),next=await first(previous.current.revision.deviceId);
+  previous.current=(await parseSlotEnvelope(previous.envelope)).current;
+  next.current.seq=2;
+  next.current.priorVersionHash=await slotVersionHash(previous.current);
+  next.current.accepted=[{deviceId:next.current.revision.deviceId,seq:2,revisionId:next.current.revision.revisionId}];
+  const original=await parseSlotEnvelope({protocol:2,current:next.current,previous:previous.current}),
+    maintained=await parseSlotEnvelope({protocol:3,generation:3,current:original.current,previous:null,prunedPeers:[]}),
+    old={file:{name:slotName(original.current.revision.deviceId,2)},envelope:original},
+    latest={file:{name:slotName(original.current.revision.deviceId,3)},envelope:maintained},
+    inspected=await inspectSlots([old,latest]);
+  assert.deepEqual(inspected.latest,[latest]);
+  assert.deepEqual(inspected.obsolete,[old]);
+  assert.deepEqual(inspected.heads,[original.current.revision.revisionId]);
+  await assert.rejects(parseSlotEnvelope({...maintained,protocol:2,generation:undefined}),e=>e.code==="remote-invalid");
+  const divergent=structuredClone(maintained);
+  divergent.generation=4;divergent.current.legacyHeads.push(crypto.randomUUID());
+  await assert.rejects(inspectSlots([latest,{file:{name:slotName(original.current.revision.deviceId,4)},envelope:divergent}]),e=>e.code==="conflict");
+  const staleWriter=structuredClone(original);
+  staleWriter.current.seq=3;
+  // A pre-v3 writer may arrive after maintenance with a lower physical generation.
+  await assert.rejects(inspectSlots([{...old,envelope:staleWriter},latest]),e=>e.code==="conflict");
+});
+
+test("missing accepted peer requires exact durable proof with full accepted closure; proof cycles and lost monotonicity fail",async()=>{
+  const a=await first(),b=await first();
+  a.current.accepted.push(...b.current.accepted);
+  const proof={...b.current.accepted[0],versionHash:await slotVersionHash(b.current),accepted:b.current.accepted},
+    envelope=await parseSlotEnvelope({protocol:3,generation:2,current:a.current,previous:null,prunedPeers:[proof]}),
+    physical={file:{name:slotName(a.current.revision.deviceId,2)},envelope};
+  assert.deepEqual((await inspectSlots([physical])).heads,[a.current.revision.revisionId]);
+  const missing=structuredClone(envelope);missing.prunedPeers=[];
+  await assert.rejects(inspectSlots([{...physical,envelope:missing}]),e=>e.code==="conflict");
+  const wrong=structuredClone(envelope);wrong.prunedPeers[0].revisionId=crypto.randomUUID();
+  await assert.rejects(inspectSlots([{...physical,envelope:wrong}]),e=>e.code==="conflict");
+  const cyclic=structuredClone(envelope);cyclic.prunedPeers[0].accepted.push(a.current.accepted[0]);
+  await assert.rejects(inspectSlots([{...physical,envelope:await parseSlotEnvelope(cyclic)}]),e=>e.code==="remote-invalid");
+  const newer=structuredClone(envelope);newer.generation=3;newer.prunedPeers=[];
+  await assert.rejects(inspectSlots([physical,{file:{name:slotName(a.current.revision.deviceId,3)},envelope:newer}]),e=>e.code==="conflict");
 });

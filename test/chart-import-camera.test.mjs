@@ -8,7 +8,7 @@ import ts from "typescript";
 
 const root = fileURLToPath(new URL("../src/", import.meta.url));
 function sources(overrides) {
-  const context = vm.createContext({ console, Map, Date, Math, TextEncoder, TextDecoder, DOMException }),
+  const context = vm.createContext({ console, Map, Date, Math, crypto, TextEncoder, TextDecoder, DOMException }),
     modules = new Map();
   function load(relative) {
     const file = path.resolve(root, relative).replace(/\.js$/, ".ts"),
@@ -42,7 +42,7 @@ async function fixture(fails = false) {
       anchor: { timestamp: 1700000000000, xFraction: 0.5 }
     },
     state = { owner, name: "Profile", chartRevision: 0 };
-  let camera;
+  let camera, recoveryJournal;
   const controls = { resetFailure: false, onSharedReset: null };
   const outgoing = { getView: () => oldView };
   let currentChart = outgoing;
@@ -53,11 +53,15 @@ async function fixture(fails = false) {
       db.set(id, { id, owner: account, value });
     },
     loadView: async (account, viewKey) => db.get(`view:${account}:${viewKey}`)?.value,
-    importBackup: async (account, data) => {
+    importBackup: async (account, data, options = {}) => {
       events.push("import");
       assert.equal(outgoing.persistView, false);
       assert.equal(outgoing.retired, true);
       if (fails) throw new Error("transaction failed");
+      if (options.restoreRecovery) {
+        const record=recoveryJournal.nativeImportRecoveryRecord(account,options.restoreRecovery);
+        db.set(record.id,record);
+      }
       for (const view of data.views ?? []) {
         const id = `view:${account}:${view.key}`;
         db.set(id, { id, owner: account, value: view.value });
@@ -68,7 +72,7 @@ async function fixture(fails = false) {
     },
     loadWatchlist: async () => undefined
   };
-  const load = sources({
+  const overrides = {
     "services/storage.ts": storage,
     "services/storage-db.ts": {
       get: async (_store, id) => db.get(id),
@@ -80,10 +84,16 @@ async function fixture(fails = false) {
       put: async (_store, record) => {
         db.set(record.id, record);
       },
-      transaction: async (_stores, action) =>
-        action({ objectStore: () => ({ delete: (id) => db.delete(id) }) })
+      transaction: async (_stores, action) => {
+        action({ objectStore: () => ({ delete: (id) => db.delete(id), get: (id) => {
+          const request={};queueMicrotask(()=>{request.result=db.get(id);request.onsuccess?.();});return request;
+        } }) });
+        await Promise.resolve();
+      }
     }
-  });
+  };
+  const load = sources(overrides);
+  recoveryJournal=load("services/restore-recovery-journal.ts");
   camera = load("services/chart-camera.ts");
   const { importTerminalBackup, restoreImportedProfile } = load(
     "screens/terminal/controller-import.ts"
@@ -133,6 +143,7 @@ async function fixture(fails = false) {
   };
   return {
     db,
+    storage,
     events,
     outgoing,
     camera,
@@ -142,6 +153,11 @@ async function fixture(fails = false) {
     backup,
     importTerminalBackup,
     restoreImportedProfile,
+    coldRestore: () => sources(overrides)("screens/terminal/controller-import.ts").restoreImportedProfile,
+    recoveryQueue: (cold = false) => {
+      const {TerminalBackups}=(cold ? sources(overrides) : load)("screens/terminal/controller-backups.ts");
+      return new TerminalBackups({ ...bridge, isAlive: () => true, flush: async () => { throw new Error("recovery must not export/flush stale state"); } });
+    },
     controls,
     setChart: (chart) => {
       currentChart = chart;
@@ -151,6 +167,49 @@ async function fixture(fails = false) {
     state
   };
 }
+for (const cold of [false,true]) for (const failure of ["prepare","client","history"]) {
+  test(`failed shared refresh preserves canonical camera on ${cold?"cold":"UI default"} retry (${failure})`,async()=>{
+    const f=await fixture(), sharedKey="chart-camera:profile-v2:owner:kline";
+    const canonical={id:sharedKey,owner:"profile-v2:owner",value:{symbol:"GAZP",camera:{barSpace:23,rightOffsetBars:5}}};
+    f.db.set(sharedKey,structuredClone(canonical));
+    const prepare=f.bridge.session.prepareProfile;
+    let failing=true;
+    if(failure==="prepare")f.bridge.session.prepareProfile=async(...args)=>{await prepare(...args);if(failing)throw new Error("prepare failed");};
+    if(failure==="client"){
+      const client={rows:[],start:async()=>{if(failing)throw new Error("client failed");return {};}};
+      f.bridge.getClient=()=>client;f.storage.loadWatchlist=async()=>[];
+    }
+    f.bridge.loadHistory=async()=>{if(failure==="history"&&failing)throw new Error("history failed");f.state.historyViewReady=true;};
+    await assert.rejects(f.recoveryQueue().recover(true));
+    assert.equal(f.state.importRecoveryRequired,true);
+    assert.deepEqual(f.db.get(sharedKey),canonical);
+    assert.equal(f.db.get("workspace-restore-recovery:owner").value.mode,"shared-runtime");
+    failing=false;
+    await f.recoveryQueue(cold).recover();
+    assert.deepEqual(f.db.get(sharedKey),canonical);
+    assert.equal(f.state.importRecoveryRequired,false);
+    assert.equal(f.state.historyViewReady,true);
+    assert.equal(f.db.has("workspace-restore-recovery:owner"),false);
+    assert.equal(f.events.includes("import"),false);
+    assert.equal(f.outgoing.retired,true);
+  });
+}
+test("ordinary import recovery keeps its clearing behavior and completed shared mode never leaks into a new restore",async()=>{
+  const f=await fixture(), sharedKey="chart-camera:profile-v2:owner:kline";
+  let failing=true;
+  f.bridge.loadHistory=async()=>{if(failing)throw new Error("restore failed");};
+  await assert.rejects(f.importTerminalBackup(f.backup,f.bridge));
+  assert.equal(f.db.get("workspace-restore-recovery:owner").value.mode,"import");
+  const stale={id:sharedKey,owner:"profile-v2:owner",value:{symbol:"GAZP",camera:{barSpace:7,rightOffsetBars:5}}};
+  f.db.set(sharedKey,stale);failing=false;
+  await f.recoveryQueue(true).recover();
+  assert.equal(f.db.has(sharedKey),false);
+  assert.equal(f.db.has("workspace-restore-recovery:owner"),false);
+  f.db.set(sharedKey,stale);await f.recoveryQueue().recover(true);
+  assert.equal(f.db.has(sharedKey),true);
+  f.db.set(sharedKey,stale);await f.recoveryQueue().recover();
+  assert.equal(f.db.has(sharedKey),false,"successful shared restore must not leave a sticky preserve mode");
+});
 
 test("backup camera survives outgoing cleanup while only the importing owner's shared state is cleared", async () => {
   const f = await fixture();

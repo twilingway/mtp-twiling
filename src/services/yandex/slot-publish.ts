@@ -1,5 +1,12 @@
 import { encodeSlot } from "./slot-codec.js";
-import { slotClaim, slotName, slotVersionHash, stageName } from "./slot-model.js";
+import {
+  slotClaim,
+  slotName,
+  slotVersionHash,
+  stageName,
+  slotGeneration,
+  slotPrunedPeers
+} from "./slot-model.js";
 import type { SlotClaim, SlotInspection, SlotVersion } from "./slot-model.js";
 import type { YandexPending } from "./journal.js";
 import { assertCurrent, sha256, yandexErrorCode, YandexError } from "./types.js";
@@ -71,9 +78,25 @@ export async function publishYandexSlot(
         ])
       ]
     },
-    encoded = await encodeSlot({ protocol: 2, current, previous }, pending.body, previousBody),
+    generation = own ? slotGeneration(own.envelope) + 1 : 1,
+    proofs = new Map(
+      snapshot.latest
+        .flatMap(({ envelope }) => slotPrunedPeers(envelope))
+        .map((peer) => [`${peer.deviceId}:${peer.seq}:${peer.revisionId}`, peer])
+    ),
+    encoded = await encodeSlot(
+      {
+        protocol: 3,
+        generation,
+        current,
+        previous,
+        prunedPeers: [...proofs.values()].filter((peer) => peer.deviceId !== deviceId)
+      },
+      pending.body,
+      previousBody
+    ),
     stage = stageName(pending.revision.revisionId),
-    destination = slotName(deviceId, seq);
+    destination = slotName(deviceId, generation);
   assertCurrent(auth.signal, valid);
   await transport.putImmutable(stage, encoded.body, encoded.reference, valid);
   let knownOutcome = false;

@@ -170,6 +170,11 @@ async function harness(root, store, recordPatch = {}, automatic = false) {
         resetSharedChartCamera: async () => {
           events.push({ op: "resetCamera" });
         }
+      },
+      "services/restore-recovery-journal.ts": {
+        createNativeImportRecovery: owner => ({owner,operationId:crypto.randomUUID()}),
+        beginRestoreRecovery: async (owner, preserve) => ({version:1,owner,operationId:"fixture-restore",mode:preserve?"shared-runtime":"import"}),
+        completeRestoreRecovery: async () => {}
       }
     },
     events

@@ -123,9 +123,9 @@ export class TerminalBackups {
       const input: unknown = JSON.parse(text);
       await this.importNow(input, undefined, onProgress);
     });
-  recover = (): Promise<void> =>
+  recover = (preserveStoredCamera?: boolean): Promise<void> =>
     this.enqueue(async () => {
       this.bridge.update({ importingBackup: true, importRecoveryRequired: false });
-      await restoreImportedProfile(this.bridge);
+      await restoreImportedProfile(this.bridge, undefined, preserveStoredCamera);
     });
 }

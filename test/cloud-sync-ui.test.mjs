@@ -53,6 +53,33 @@ function modules(providers = new Map()) {
   load("i18n/preferences.ts").setDisplayPreferences({ locale: "en" });
   return load;
 }
+test("Yandex version cards expose only allowed deletion with protected-current reason and no initial destructive confirm", () => {
+  const load = modules(), {CloudProviderSettings}=load("screens/terminal/CloudProviderSettings.tsx");
+  let deletes=0;
+  const p=provider("yandex-disk",{enabled:true,connected:true,phase:"conflict",comparison:{
+    checkedAt:"2026-11-28T10:00:00Z",local:{instruments:1,drawings:0,images:0},remotes:[
+      {id:"current",instruments:1,drawings:0,images:0,deletion:{kind:"current",allowed:false,reason:"last-head"}},
+      {id:"previous",instruments:1,drawings:0,images:0,deletion:{kind:"previous",allowed:true}}
+    ]}});
+  p.remove=async()=>{deletes++;};
+  const html=renderToStaticMarkup(jsx.jsx(CloudProviderSettings,{provider:p}));
+  assert.equal((html.match(/Delete this copy…/g)??[]).length,1);
+  assert.match(html,/last independent version/);
+  assert.match(html,/Cloud sign-in is complete. Data exchange is not currently confirmed/);
+  assert.doesNotMatch(html,/Delete permanently/);
+  assert.equal(deletes,0);
+});
+test("an auth-required manual-delete status exposes an enabled reconnect control",()=>{
+  const load=modules(),{CloudProviderSettings}=load("screens/terminal/CloudProviderSettings.tsx");
+  const failure=load("services/yandex/coordinator-status.ts").yandexFailureStatus({code:"auth-required"});
+  const p=provider("yandex-disk",{enabled:true,connected:true,...failure,deleteAction:{id:"pending-copy",state:"unconfirmed"}});
+  p.remove=async()=>{};
+  const html=renderToStaticMarkup(jsx.jsx(CloudProviderSettings,{provider:p}));
+  const reconnect=html.match(/<button[^>]*id="yandex-disk-connect"[^>]*>/)?.[0];
+  assert.ok(reconnect);assert.doesNotMatch(reconnect,/disabled/);
+  assert.doesNotMatch(html,/id="yandex-disk-sync-now"/);
+  assert.match(html,/Sign-in required|Sign in again|sign-in|Sign in/);
+});
 
 test("disabled provider hides retained conflicts and errors and never mounts native detail", () => {
   const load = modules(),

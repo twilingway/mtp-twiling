@@ -8,6 +8,7 @@ export interface YandexPendingMatch {
 export interface YandexLocalStore {
   key(): Promise<CryptoKey>;
   read(id: string): Promise<unknown>;
+  readAssociations?(clientId: string): Promise<readonly { accountId: string; value: unknown }[]>;
   write(id: string, value: unknown, signal: AbortSignal): Promise<void>;
   readOrCreate(id: string, create: () => string, signal: AbortSignal): Promise<unknown>;
   remove(
@@ -22,6 +23,34 @@ export async function yandexLocalStore(): Promise<YandexLocalStore> {
     { deviceKey } = await import("../storage.js");
   return {
     key: deviceKey,
+    readAssociations: (clientId) =>
+      new Promise((resolve, reject) => {
+        const prefix = `mtp:yandex:device:${clientId}:`,
+          result: { accountId: string; value: unknown }[] = [],
+          tx = storage.db.transaction("vault", "readonly"),
+          store = tx.objectStore("vault"),
+          keys = store.openKeyCursor();
+        keys.onsuccess = () => {
+          const cursor = keys.result;
+          if (!cursor) return;
+          const key = cursor.key;
+          if (typeof key === "string" && key.startsWith(prefix) && key.endsWith(":association")) {
+            const accountId = key.slice(prefix.length, -":association".length);
+            if (/^\d{1,30}$/.test(accountId)) {
+              const selected = store.get(key);
+              selected.onsuccess = () => {
+                const record: unknown = selected.result;
+                if (record && typeof record === "object" && "value" in record)
+                  result.push({ accountId, value: record.value });
+              };
+            }
+          }
+          cursor.continue();
+        };
+        tx.oncomplete = () => resolve(result);
+        tx.onerror = tx.onabort = () =>
+          reject(new Error("Yandex association metadata unavailable"));
+      }),
     read: async (id) => {
       const value = await storage.get("vault", id);
       return value !== null && typeof value === "object" && "value" in value

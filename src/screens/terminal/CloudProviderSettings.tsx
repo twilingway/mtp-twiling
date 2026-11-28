@@ -14,6 +14,7 @@ import type { TerminalState } from "./state.js";
 import { cloudOperationTiming } from "./cloud-operation-clock.js";
 import type { GoogleStatus } from "../../services/drive/device-slot-provider.js";
 import { CloudVersionComparison } from "./CloudVersionComparison.js";
+import { CloudDeleteVersion } from "./CloudDeleteVersion.js";
 const phases: Record<CloudSyncStatus["phase"], string> = {
   disabled: "Синхронизация выключена",
   disconnected: "Облако не подключено",
@@ -418,8 +419,46 @@ export function CloudProviderSettings({
                 if (migration) run(provider.choose({ kind: "remote", id: remoteId }));
                 else if (provider.receive) run(provider.receive(remoteId));
               }}
+              onDelete={provider.remove ? (remoteId) => run(provider.remove!(remoteId)) : undefined}
             />
           )}
+          {id === "yandex-disk" &&
+            status.connected &&
+            status.phase === "conflict" &&
+            !status.lastSyncedAt && (
+              <p role="status">
+                {t(
+                  "Вход в облако выполнен. Подтверждения обмена данными сейчас нет. Для завершения выберите «Получить эту версию» или «Отправить версию устройства»."
+                )}
+              </p>
+            )}
+          {status.deleteAction && (
+            <p role={status.deleteAction.state === "unconfirmed" ? "alert" : "status"}>
+              {t(
+                status.deleteAction.state === "confirmed"
+                  ? "Выбранная копия удалена из облака. Данные устройства сохранены."
+                  : status.deleteAction.state === "running"
+                    ? "Проверяем и удаляем выбранную копию…"
+                    : status.deleteAction.state === "review"
+                      ? "Версии изменились. Проверьте список перед удалением."
+                      : "Удаление не подтверждено. Повтор использует сохранённый план."
+              )}
+            </p>
+          )}
+          {provider.remove &&
+            status.deleteAction &&
+            ["unconfirmed", "review"].includes(status.deleteAction.state) && (
+              <CloudDeleteVersion
+                key={status.deleteAction.id}
+                id={status.deleteAction.id}
+                deletion={{ kind: status.deleteAction.target?.kind ?? "previous", allowed: true }}
+                target={status.deleteAction.target}
+                busy={busy}
+                blocked={blocked}
+                retry
+                onDelete={(remoteId) => run(provider.remove!(remoteId))}
+              />
+            )}
           <small className="drive-auth-note">
             {t(
               status.error === "unsupported-format"

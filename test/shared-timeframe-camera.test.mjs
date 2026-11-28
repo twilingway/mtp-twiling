@@ -47,6 +47,18 @@ function fixture(records = new Map(), hooks = {}) {
   };
 }
 
+test("shared-window refresh drops only its stale camera memory and preserves the peer's canonical camera", async () => {
+  const records = new Map(), stale = fixture(records), peer = fixture(records);
+  const viewKey = key("GAZP", "1h");
+  await stale.main.saveChartView("owner", viewKey, full(camera(7, -10)));
+  await peer.main.saveChartView("owner", viewKey, full(camera(19, -31)));
+  const before = clone([...records]);
+  assert.equal((await stale.main.loadChartView("owner", viewKey)).camera.barSpace, 7);
+  await stale.main.resetSharedChartCamera("owner", true);
+  assert.deepEqual(clone([...records]), before);
+  assert.deepEqual(clone(await stale.main.loadChartView("owner", viewKey)), full(camera(19, -31)));
+});
+
 test("both engines carry live spacing and signed gap across every supported timeframe and reload", async () => {
   for (const engine of ["tradingview", "kline"]) {
     for (const symbol of ["GAZP", "BYBIT:linear:BTCUSDT", "OKX:SWAP:BTC-USDT-SWAP"]) {

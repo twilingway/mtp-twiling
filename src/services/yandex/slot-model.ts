@@ -3,7 +3,7 @@ import type { YandexRevision } from "./bundle.js";
 import { hashPattern, object, sha256, uuidPattern, YandexError } from "./types.js";
 import type { YandexFile, YandexReference } from "./types.js";
 
-export const SLOT_PROTOCOL = 2;
+export const SLOT_PROTOCOL = 3;
 export const MAX_SLOT_SEQUENCE = 0x7fffffff;
 export interface SlotClaim {
   deviceId: string;
@@ -22,11 +22,26 @@ export interface SlotVersion {
   retired: readonly SlotRetired[];
   legacyHeads: readonly string[];
 }
-export interface SlotEnvelope {
-  protocol: 2;
-  current: SlotVersion;
-  previous: SlotVersion | null;
+export interface SlotPrunedPeer extends SlotRetired {
+  accepted: readonly SlotClaim[];
 }
+export type SlotEnvelope =
+  | {
+      protocol: 2;
+      current: SlotVersion;
+      previous: SlotVersion | null;
+    }
+  | {
+      protocol: 3;
+      generation: number;
+      current: SlotVersion;
+      previous: SlotVersion | null;
+      prunedPeers: readonly SlotPrunedPeer[];
+    };
+export const slotGeneration = (envelope: SlotEnvelope): number =>
+  envelope.protocol === 3 ? envelope.generation : envelope.current.seq;
+export const slotPrunedPeers = (envelope: SlotEnvelope): readonly SlotPrunedPeer[] =>
+  envelope.protocol === 3 ? envelope.prunedPeers : [];
 export interface SlotPhysical {
   file: YandexFile;
   envelope: SlotEnvelope;
@@ -139,27 +154,74 @@ export function parseSlotVersion(input: unknown): SlotVersion {
   };
 }
 export async function parseSlotEnvelope(input: unknown): Promise<SlotEnvelope> {
-  const value = slotObject(input, ["protocol", "current", "previous"]);
-  if (value.protocol !== SLOT_PROTOCOL) throw new YandexError("unsupported-format");
+  const raw = object(input);
+  if (raw?.protocol !== 2 && raw?.protocol !== 3) throw new YandexError("unsupported-format");
+  const value = slotObject(
+    input,
+    raw.protocol === 2
+      ? ["protocol", "current", "previous"]
+      : ["protocol", "generation", "current", "previous", "prunedPeers"]
+  );
   const current = parseSlotVersion(value.current),
     previous = value.previous === null ? null : parseSlotVersion(value.previous);
-  if ((current.seq === 1) !== (previous === null)) return bad();
+  if (value.protocol === 2 && (current.seq === 1) !== (previous === null)) return bad();
   if (
     previous &&
     (previous.seq !== current.seq - 1 ||
       previous.revision.deviceId !== current.revision.deviceId ||
       (await slotVersionHash(previous)) !== current.priorVersionHash ||
-      !previous.accepted.every((old) =>
-        current.accepted.some(
-          (next) =>
-            next.deviceId === old.deviceId &&
-            (next.seq > old.seq || (next.seq === old.seq && next.revisionId === old.revisionId))
-        )
-      ))
+      !previous.accepted.every((old) => current.accepted.some((next) => coversClaim(next, old))))
   )
     return bad();
-  return { protocol: SLOT_PROTOCOL, current, previous };
+  if (value.protocol === 2) return { protocol: 2, current, previous };
+  const generation = sequence(value.generation);
+  if (
+    generation < current.seq ||
+    !Array.isArray(value.prunedPeers) ||
+    value.prunedPeers.length > 512
+  )
+    return bad();
+  const prunedPeers = value.prunedPeers.map((input): SlotPrunedPeer => {
+    const record = slotObject(input, ["deviceId", "seq", "revisionId", "versionHash", "accepted"]);
+    const peer = claim(
+      {
+        deviceId: record.deviceId,
+        seq: record.seq,
+        revisionId: record.revisionId,
+        versionHash: record.versionHash
+      },
+      true
+    ) as SlotRetired;
+    if (!Array.isArray(record.accepted) || record.accepted.length > 256) return bad();
+    const accepted = record.accepted.map((item) => claim(item));
+    if (
+      peer.deviceId === current.revision.deviceId ||
+      new Set(accepted.map((item) => item.deviceId)).size !== accepted.length ||
+      !accepted.some((item) => sameClaim(item, peer)) ||
+      !accepted.every((old) => current.accepted.some((next) => coversClaim(next, old)))
+    )
+      return bad();
+    return { ...peer, accepted: accepted.sort((a, b) => a.deviceId.localeCompare(b.deviceId)) };
+  });
+  if (
+    new Set(prunedPeers.map((peer) => JSON.stringify(slotProofKey(peer)))).size !==
+    prunedPeers.length
+  )
+    return bad();
+  return {
+    protocol: 3,
+    generation,
+    current,
+    previous,
+    prunedPeers: prunedPeers.sort((a, b) => slotProofKey(a).localeCompare(slotProofKey(b)))
+  };
 }
+export const sameClaim = (a: SlotClaim, b: SlotClaim): boolean =>
+  a.deviceId === b.deviceId && a.seq === b.seq && a.revisionId === b.revisionId;
+export const coversClaim = (a: SlotClaim, b: SlotClaim): boolean =>
+  a.deviceId === b.deviceId && (a.seq > b.seq || sameClaim(a, b));
+export const slotProofKey = (claim: SlotClaim): string =>
+  `${claim.deviceId}:${claim.seq}:${claim.revisionId}`;
 export const slotVersionHash = (version: SlotVersion): Promise<string> =>
   sha256(new Blob([JSON.stringify(version)]));
 export const slotClaim = (version: SlotVersion): SlotClaim => ({
@@ -194,7 +256,7 @@ export async function inspectSlots(files: readonly SlotPhysical[]): Promise<Slot
   for (const item of files) {
     const device = item.envelope.current.revision.deviceId,
       prior = currentByDevice.get(device);
-    if (!prior || prior.envelope.current.seq < item.envelope.current.seq)
+    if (!prior || slotGeneration(prior.envelope) < slotGeneration(item.envelope))
       currentByDevice.set(device, item);
   }
   const resolved = [...currentByDevice.values()].flatMap(
@@ -203,10 +265,34 @@ export async function inspectSlots(files: readonly SlotPhysical[]): Promise<Slot
   for (const device of devices) {
     const group = files
         .filter(({ envelope }) => envelope.current.revision.deviceId === device)
-        .sort((a, b) => b.envelope.current.seq - a.envelope.current.seq),
+        .sort((a, b) => slotGeneration(b.envelope) - slotGeneration(a.envelope)),
       top = group[0]!;
-    if (new Set(group.map(({ envelope }) => envelope.current.seq)).size !== group.length)
+    if (new Set(group.map(({ envelope }) => slotGeneration(envelope))).size !== group.length)
       throw new YandexError("conflict");
+    const logical = new Map<number, string>();
+    for (const { envelope } of group) {
+      const hash = hashes.get(envelope.current)!;
+      if (logical.has(envelope.current.seq) && logical.get(envelope.current.seq) !== hash)
+        throw new YandexError("conflict");
+      logical.set(envelope.current.seq, hash);
+      if (envelope.current.seq > top.envelope.current.seq) throw new YandexError("conflict");
+    }
+    for (const { envelope } of group.slice(1)) {
+      for (const proof of slotPrunedPeers(envelope)) {
+        const kept = slotPrunedPeers(top.envelope).find(
+          (item) => slotProofKey(item) === slotProofKey(proof)
+        );
+        if (!kept || JSON.stringify(kept) !== JSON.stringify(proof))
+          throw new YandexError("conflict");
+      }
+      if (
+        envelope.protocol === 3 &&
+        envelope.current.seq === top.envelope.current.seq &&
+        !envelope.previous &&
+        top.envelope.previous
+      )
+        throw new YandexError("conflict");
+    }
     latest.push(top);
     const known = new Map<number, string>();
     for (const version of [top.envelope.current, top.envelope.previous])
@@ -238,6 +324,15 @@ export async function inspectSlots(files: readonly SlotPhysical[]): Promise<Slot
       }
     }
   }
+  const proofs = new Map<string, SlotPrunedPeer>();
+  for (const { envelope } of latest)
+    for (const proof of slotPrunedPeers(envelope)) {
+      const key = slotProofKey(proof),
+        prior = proofs.get(key);
+      if (prior && JSON.stringify(prior) !== JSON.stringify(proof))
+        throw new YandexError("conflict");
+      proofs.set(key, proof);
+    }
   const byDevice = new Map(latest.map((item) => [item.envelope.current.revision.deviceId, item])),
     dominated = new Set<string>(),
     dependencies = new Map<string, string[]>();
@@ -247,8 +342,19 @@ export async function inspectSlots(files: readonly SlotPhysical[]): Promise<Slot
     for (const entry of current.accepted) {
       if (entry.deviceId === current.revision.deviceId) continue;
       const peer = byDevice.get(entry.deviceId)?.envelope.current;
+      if (!peer) {
+        const proof = proofs.get(slotProofKey(entry));
+        if (
+          !proof ||
+          !proof.accepted.every((old) => current.accepted.some((next) => coversClaim(next, old)))
+        )
+          throw new YandexError("conflict");
+        const edges = dependencies.get(current.revision.revisionId) ?? [];
+        edges.push(proof.revisionId);
+        dependencies.set(current.revision.revisionId, edges);
+        continue;
+      }
       if (
-        !peer ||
         peer.seq < entry.seq ||
         (peer.seq === entry.seq && peer.revision.revisionId !== entry.revisionId)
       )
@@ -271,6 +377,23 @@ export async function inspectSlots(files: readonly SlotPhysical[]): Promise<Slot
         dependencies.set(current.revision.revisionId, edges);
       }
     }
+  for (const proof of proofs.values()) {
+    const edges = dependencies.get(proof.revisionId) ?? [];
+    for (const claim of proof.accepted) {
+      if (claim.deviceId === proof.deviceId) continue;
+      const peer = byDevice.get(claim.deviceId)?.envelope.current;
+      const missing = proofs.get(slotProofKey(claim));
+      if (!peer && !missing) throw new YandexError("conflict");
+      if (
+        peer &&
+        (peer.seq < claim.seq ||
+          (peer.seq === claim.seq && peer.revision.revisionId !== claim.revisionId))
+      )
+        throw new YandexError("conflict");
+      if (peer?.seq === claim.seq || !peer) edges.push(claim.revisionId);
+    }
+    dependencies.set(proof.revisionId, edges);
+  }
   const visiting = new Set<string>(),
     visited = new Set<string>();
   const visit = (id: string): void => {
@@ -282,6 +405,7 @@ export async function inspectSlots(files: readonly SlotPhysical[]): Promise<Slot
     visited.add(id);
   };
   for (const { envelope } of latest) visit(envelope.current.revision.revisionId);
+  for (const proof of proofs.values()) visit(proof.revisionId);
   return {
     files,
     latest,
