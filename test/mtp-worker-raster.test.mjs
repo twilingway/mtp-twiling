@@ -35,6 +35,204 @@ const { MtpWorkerRasterCache } = load("model/mtp-worker-raster-cache.js");
 const { mtpWorkerIntent } = load("model/mtp-worker-snapshot.js");
 const { paintMtpWorkerFrame, MTP_WORKER_PROTOCOL } = load("model/mtp-worker-protocol.js");
 
+function rasterCacheFor(search = "?mtpRaster=worker", enabled = true) {
+  const code = ts.transpileModule(
+    readFileSync(new URL("../src/model/mtp-raster-cache.ts", import.meta.url), "utf8"),
+    {
+      compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS }
+    }
+  ).outputText;
+  const module = { exports: {} };
+  new vm.Script(
+    `(function(require,module,exports,__MTP_RASTER_DEV__,location){${code}\n})`
+  ).runInThisContext()(
+    (specifier) => load(path.relative(sourceRoot, path.resolve(sourceRoot, "model", specifier))),
+    module,
+    module.exports,
+    enabled,
+    { search }
+  );
+  return module.exports.MtpRasterCache;
+}
+
+function activationEnvironment() {
+  const workers = [],
+    timers = new Map();
+  let loads = 0,
+    serial = 0;
+  const environment = {
+    canvas: () => null,
+    delay(action, milliseconds) {
+      const id = serial++;
+      timers.set(id, { action, milliseconds });
+      return id;
+    },
+    cancel(id) {
+      timers.delete(id);
+    },
+    async loadWorker() {
+      loads++;
+      return { MtpWorkerRasterCache: OwnedClient };
+    }
+  };
+  class OwnedClient extends MtpWorkerRasterCache {
+    constructor(update) {
+      super(update, {
+        build: "unit",
+        delay: environment.delay,
+        cancel: environment.cancel,
+        create() {
+          const worker = {
+            onmessage: null,
+            onerror: null,
+            onmessageerror: null,
+            terminated: 0,
+            messages: [],
+            postMessage(message, transfer = []) {
+              this.messages.push(structuredClone(message, { transfer }));
+            },
+            terminate() {
+              this.terminated++;
+            }
+          };
+          workers.push(worker);
+          return worker;
+        }
+      });
+    }
+  }
+  return { environment, workers, timers, loads: () => loads };
+}
+
+test("default auto creates one owned worker lazily on the first supported heavy LW draw", async () => {
+  const Cache = rasterCacheFor(""),
+    f = activationEnvironment(),
+    { frame } = lightweightFrame();
+  const cache = new Cache(() => {}, undefined, f.environment);
+  assert.equal(f.loads(), 0);
+  assert.equal(f.workers.length, 0);
+  assert.equal(cache.pending(), false);
+  assert.equal(cache.draw(frame), true, "heavy native paint is suppressed while worker starts");
+  assert.equal(cache.pending(), true);
+  cache.draw(frame);
+  await new Promise((done) => setImmediate(done));
+  assert.equal(f.loads(), 1);
+  assert.equal(f.workers.length, 1);
+  const worker = f.workers[0];
+  assert.equal(worker.messages[0].type, "hello");
+  worker.onmessage({ data: { type: "ready", protocol: MTP_WORKER_PROTOCOL, build: "unit" } });
+  cache.draw(frame);
+  cache.draw(frame);
+  assert.equal(worker.messages.filter((message) => message.type === "render").length, 1);
+  cache.draw({ ...frame, to: 5 });
+  assert.equal(f.loads(), 1);
+  assert.equal(f.workers.length, 1, "zooming light keeps the already-owned worker");
+  cache.destroy();
+  assert.equal(worker.terminated, 1);
+  assert.equal(f.timers.size, 0);
+});
+
+test("default auto leaves disabled, empty, light and unsupported frames native without loading a worker", async () => {
+  const Cache = rasterCacheFor("?unrelated=1");
+  for (const change of [
+    (frame) => {
+      frame.model.periods = [];
+    },
+    (frame) => {
+      frame.model.reset([], frame.model.periods);
+    },
+    (frame) => {
+      frame.model.periods = MTP_COMBINED_PERIODS.slice(0, 29);
+    },
+    (frame) => {
+      frame.from = 0;
+      frame.to = 5;
+    },
+    (frame) => {
+      frame.model.reset(frame.model.data.slice(0, 5), frame.model.periods);
+    },
+    (frame) => {
+      frame.mode = 1;
+    },
+    (frame) => {
+      frame.mode = undefined;
+    },
+    (frame) => {
+      delete frame.uniformX;
+    },
+    (frame) => {
+      frame.scope.bitmapSize = { width: 4097, height: 100 };
+    },
+    (frame) => {
+      frame.scope.bitmapSize = { width: 4096, height: 4096 };
+    },
+    (frame) => {
+      frame.scope.verticalPixelRatio = 0;
+    },
+    (frame) => {
+      frame.scope.context.filter = "blur(1px)";
+    }
+  ]) {
+    const f = activationEnvironment(),
+      { frame } = lightweightFrame();
+    change(frame);
+    const cache = new Cache(() => {}, undefined, f.environment);
+    assert.equal(cache.draw(frame), false);
+    assert.equal(cache.pending(), false);
+    await new Promise((done) => setImmediate(done));
+    assert.equal(f.loads(), 0);
+    assert.equal(f.workers.length, 0);
+    assert.equal(cache.workerStatus().state, "off");
+    cache.destroy();
+  }
+});
+
+test("native opt-out and disabled build never activate; explicit worker preserves eager loading", async () => {
+  for (const [search, enabled] of [
+    ["?mtpRaster=native", true],
+    ["", false]
+  ]) {
+    const Cache = rasterCacheFor(search, enabled),
+      f = activationEnvironment(),
+      { frame } = lightweightFrame();
+    const cache = new Cache(() => {}, undefined, f.environment);
+    assert.equal(cache.draw(frame), false);
+    assert.equal(cache.pending(), false);
+    await new Promise((done) => setImmediate(done));
+    assert.equal(f.loads(), 0);
+    assert.equal(f.workers.length, 0);
+    cache.destroy();
+  }
+  const Cache = rasterCacheFor("?mtpRaster=worker"),
+    f = activationEnvironment();
+  const cache = new Cache(() => {}, undefined, f.environment);
+  assert.equal(cache.pending(), true);
+  await new Promise((done) => setImmediate(done));
+  assert.equal(f.loads(), 1);
+  assert.equal(f.workers.length, 1, "force mode retains its pre-existing no-draw startup behavior");
+  cache.destroy();
+  assert.equal(f.workers[0].terminated, 1);
+});
+
+test("default cache instances own independent lazy workers and cancellation", async () => {
+  const Cache = rasterCacheFor(""),
+    f = activationEnvironment();
+  const a = new Cache(() => {}, undefined, f.environment),
+    b = new Cache(() => {}, undefined, f.environment);
+  a.draw(lightweightFrame().frame);
+  b.draw(lightweightFrame().frame);
+  await new Promise((done) => setImmediate(done));
+  assert.equal(f.loads(), 2);
+  assert.equal(f.workers.length, 2);
+  a.destroy();
+  assert.equal(f.workers[0].terminated, 1);
+  assert.equal(f.workers[1].terminated, 0);
+  assert.equal(b.pending(), true);
+  b.destroy();
+  assert.equal(f.workers[1].terminated, 1);
+  assert.equal(f.timers.size, 0);
+});
+
 function context() {
   const commands = [],
     blits = [],
@@ -1072,17 +1270,7 @@ test("worker entry verifies build, reuses bounded backing, paints/transfers and 
 });
 
 test("worker module deadline, rejection and destroy prevent late worker creation (including timer ID zero)", async () => {
-  const code = ts.transpileModule(
-    readFileSync(new URL("../src/model/mtp-raster-cache.ts", import.meta.url), "utf8"),
-    {
-      compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS }
-    }
-  ).outputText;
-  const module = { exports: {} };
-  new vm.Script(
-    `(function(module,exports,__MTP_RASTER_DEV__,location){${code}\n})`
-  ).runInThisContext()(module, module.exports, true, { search: "?mtpRaster=worker" });
-  const Cache = module.exports.MtpRasterCache;
+  const Cache = rasterCacheFor();
   for (const outcome of ["timeout", "destroy", "reject", "success"]) {
     let resolve,
       reject,
@@ -1161,16 +1349,7 @@ test("worker module deadline, rejection and destroy prevent late worker creation
 });
 
 test("LW wrapper reuses its 180ms pointer/wheel tracker and explicit Fit preserves physical pointers", async () => {
-  const code = ts.transpileModule(
-    readFileSync(new URL("../src/model/mtp-raster-cache.ts", import.meta.url), "utf8"),
-    {
-      compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS }
-    }
-  ).outputText;
-  const module = { exports: {} };
-  new vm.Script(
-    `(function(module,exports,__MTP_RASTER_DEV__,location){${code}\n})`
-  ).runInThisContext()(module, module.exports, true, { search: "?mtpRaster=worker" });
+  const Cache = rasterCacheFor();
   const timers = new Map(),
     held = [],
     interactions = [];
@@ -1207,7 +1386,7 @@ test("LW wrapper reuses its 180ms pointer/wheel tracker and explicit Fit preserv
       timers.delete(id);
     }
   };
-  const cache = new module.exports.MtpRasterCache(() => {}, container, environment);
+  const cache = new Cache(() => {}, container, environment);
   await new Promise((done) => setImmediate(done));
   const frame = frameWith();
   const event = (name, values) => Object.assign(new Event(name), values);

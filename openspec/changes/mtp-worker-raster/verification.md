@@ -14,8 +14,8 @@
 - Первый candidate optimized build: 0.3.47/cfacb89f57fe12bd, 98 assets, локальный порт 5299. Для
   сборки явно задан MTP_EXPERIMENTAL_RASTER_WORKER=1; значение не входит в buildId и фиксируется
   отдельно.
-- Режим выбирается ?mtpRaster=worker или ?mtpRaster=native. Обычная production-сборка выключает
-  эксперимент. Основная ветка и опубликованная версия не менялись.
+- В предыдущих dev-сборках режим выбирался ?mtpRaster=worker или ?mtpRaster=native, production
+  выключал эксперимент. Эти измерения предшествуют решению включить ленивый auto после проверки.
 - Первый A/B подтвердил actual Worker runtime и нулевую разницу RGBA с direct paint, но выявил
   регрессию жестов из-за полного snapshot каждый redraw и feedback ответов. При CPU ×4 cold Fit main
   cache max сократился со 106–126 до 3,5–5,3 мс; вертикальный жест вырос примерно со 120 до 430 мс

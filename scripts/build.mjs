@@ -75,7 +75,8 @@ const result = await build({
   define: {
     ...cloudPublicDefines(root),
     "process.env.NODE_ENV": '"production"',
-    __MTP_RASTER_DEV__: process.env.MTP_EXPERIMENTAL_RASTER_WORKER === "1" ? "true" : "false"
+    // Eligible MTP panes activate lazily; ?mtpRaster=native keeps the native fallback.
+    __MTP_RASTER_DEV__: "true"
   }
 });
 const outputs = [

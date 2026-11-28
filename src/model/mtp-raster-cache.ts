@@ -1,4 +1,6 @@
 import type { MtpWorkerRasterCache, MtpWorkerStatus } from "./mtp-worker-raster-cache.js";
+import { loadMtpWorker, mtpWorkerEligible, mtpWorkerMode } from "./mtp-worker-activation.js";
+import type { MtpWorkerMode } from "./mtp-worker-activation.js";
 import type {
   MtpRasterCached as Cached,
   MtpRasterEnvironment,
@@ -35,7 +37,8 @@ export class MtpRasterCache {
   private worker: MtpWorkerRasterCache | undefined;
   private workerLoading = false;
   private workerLoadError: string | undefined;
-  private workerLoadTimer: unknown;
+  private cancelWorkerLoad = () => {};
+  private readonly workerMode: MtpWorkerMode;
   private forceRequested = false;
   private interactionEpoch = false;
   private workerCamera: { signature: string; prices: number[] } | undefined;
@@ -52,31 +55,13 @@ export class MtpRasterCache {
     container?: HTMLElement,
     private readonly environment = browser
   ) {
-    if (
+    this.workerMode = mtpWorkerMode(
       typeof __MTP_RASTER_DEV__ !== "undefined" &&
-      __MTP_RASTER_DEV__ &&
-      typeof location !== "undefined" &&
-      new URLSearchParams(location.search).get("mtpRaster") === "worker"
-    ) {
-      this.workerLoading = true;
-      const fail = (reason = "worker-module-load-error") => {
-        if (!this.workerLoading || this.disposed) return;
-        this.finishWorkerLoad(reason);
-        this.requestUpdate();
-      };
-      this.workerLoadTimer = this.environment.delay(() => fail("worker-module-deadline"), 5000);
-      void Promise.resolve()
-        .then(() => this.environment.loadWorker?.() ?? import("./mtp-worker-raster-cache.js"))
-        .then(
-          ({ MtpWorkerRasterCache }) => {
-            if (!this.workerLoading || this.disposed) return;
-            this.finishWorkerLoad();
-            this.worker = new MtpWorkerRasterCache(this.requestUpdate);
-            this.requestUpdate();
-          },
-          () => fail()
-        );
-    }
+        __MTP_RASTER_DEV__ &&
+        typeof location !== "undefined",
+      typeof location === "undefined" ? "" : location.search
+    );
+    if (this.workerMode === "worker") this.startWorker();
     if (!container) return;
     const view = container.ownerDocument.defaultView;
     if (!view) return;
@@ -114,11 +99,17 @@ export class MtpRasterCache {
       view.removeEventListener("blur", blur, true);
     };
   }
-  private finishWorkerLoad(reason?: string): void {
-    if (this.workerLoadTimer !== undefined) this.environment.cancel(this.workerLoadTimer);
-    this.workerLoadTimer = undefined;
-    this.workerLoading = false;
-    this.workerLoadError = reason;
+  private startWorker(): void {
+    if (this.disposed || this.worker || this.workerLoading || this.workerLoadError !== undefined)
+      return;
+    this.workerLoading = true;
+    this.cancelWorkerLoad = loadMtpWorker(this.environment, (module, reason) => {
+      if (this.disposed) return;
+      this.workerLoading = false;
+      this.workerLoadError = reason;
+      if (module) this.worker = new module.MtpWorkerRasterCache(this.requestUpdate);
+      this.requestUpdate();
+    });
   }
   private cancelTimer(): void {
     if (this.timer !== undefined) this.environment.cancel(this.timer);
@@ -211,6 +202,7 @@ export class MtpRasterCache {
   }
   draw(frame: MtpRasterFrame): boolean {
     if (this.disposed) return false;
+    if (this.workerMode === "auto" && !this.worker && mtpWorkerEligible(frame)) this.startWorker();
     if (this.worker || this.workerLoading) this.trackWorkerMotion(frame);
     if (this.workerLoading) return true;
     if (this.forceRequested && this.worker) {
@@ -458,7 +450,8 @@ export class MtpRasterCache {
   }
   destroy(): void {
     this.disposed = true;
-    this.finishWorkerLoad();
+    this.cancelWorkerLoad();
+    this.workerLoading = false;
     this.worker?.destroy();
     this.stopInput();
     this.cancelTimer();

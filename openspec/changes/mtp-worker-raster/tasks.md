@@ -15,6 +15,10 @@
 
 ## 3. Сборка и сравнение
 
+- [ ] 3.5 Включить ленивый auto для тяжёлого слоя; unit проверяет отсутствие Worker без МТП, на
+      лёгком слое и с native override. Браузерный smoke проверяет обычный URL и 1/6/16 окон.
+- [ ] 3.6 Повторить полный check, strict spec, получить зелёный CI exact head перед merge/release.
+
 - [x] 3.4 Сохранить безопасный held tail-preview при same-close и changed-close update; 27 worker
       unit и независимая проверка hard guards/ленивого ключа проходят, точный кадр нужен после idle.
 
