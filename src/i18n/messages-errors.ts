@@ -109,6 +109,22 @@ export const errorMessages = {
   "Поток банка временно недоступен. Переподключаемся…":
     "Bank stream is temporarily unavailable. Reconnecting…",
   "Поток прерван. Переподключаемся…": "Stream interrupted. Reconnecting…",
+  "Поток Bybit (спот) прерван; переподключаемся. Источник сохранён.":
+    "Bybit (spot) stream interrupted; reconnecting. Source retained.",
+  "Поток Bybit (контракты) прерван; переподключаемся. Источник сохранён.":
+    "Bybit (linear contracts) stream interrupted; reconnecting. Source retained.",
+  "Обновления Bybit (спот) остановлены. Повторим подключение при возвращении сети или вкладки; источник сохранён.":
+    "Bybit (spot) updates stopped. Connection will retry when the network or tab returns; source retained.",
+  "Обновления Bybit (контракты) остановлены. Повторим подключение при возвращении сети или вкладки; источник сохранён.":
+    "Bybit (linear contracts) updates stopped. Connection will retry when the network or tab returns; source retained.",
+  "Нет сети; обновления Bybit (спот) остановлены до её возвращения.":
+    "Offline; Bybit (spot) updates stopped until the network returns.",
+  "Нет сети; обновления Bybit (контракты) остановлены до её возвращения.":
+    "Offline; Bybit (linear contracts) updates stopped until the network returns.",
+  "Поток Bybit (спот) восстановлен; котировки снова обновляются.":
+    "Bybit (spot) stream restored; quotes are updating again.",
+  "Поток Bybit (контракты) восстановлен; котировки снова обновляются.":
+    "Bybit (linear contracts) stream restored; quotes are updating again.",
   "Неизвестная ошибка.": "Unknown error.",
   "Предыдущее дневное закрытие недоступно. Изменение показано прочерком.":
     "Previous daily close is unavailable. Change is shown as a dash."
