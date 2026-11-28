@@ -144,6 +144,66 @@ function textLines(
   }));
 }
 
+function placePriceCaption(
+  lines: AnnotationTextLine[],
+  font: AnnotationFont,
+  price: AnnotationBounds,
+  width: number,
+  height: number
+): AnnotationTextLine[] {
+  if (!lines.length) return lines;
+  const margin = 4,
+    gap = 5,
+    lineHeight = font.size * 1.3;
+  const boundsOf = (items: AnnotationTextLine[]) =>
+    combined(
+      items.map((line) => rect(line.x - line.maxWidth / 2, line.y, line.maxWidth, lineHeight))
+    );
+  const translate = (items: AnnotationTextLine[], dx: number, dy: number) =>
+    items.map((line) => ({ ...line, x: line.x + dx, y: line.y + dy }));
+  const bounds = boundsOf(lines);
+  const placed = translate(
+    lines,
+    clamp(bounds.left, margin, Math.max(margin, width - margin - (bounds.right - bounds.left))) -
+      bounds.left,
+    clamp(bounds.top, margin, Math.max(margin, height - margin - (bounds.bottom - bounds.top))) -
+      bounds.top
+  );
+  const current = boundsOf(placed);
+  const overlaps =
+    current.left < price.right + gap &&
+    current.right > price.left - gap &&
+    current.top < price.bottom + gap &&
+    current.bottom > price.top - gap;
+  if (!overlaps) return placed;
+  const shifts = [
+    { x: 0, y: price.top - gap - current.bottom },
+    { x: 0, y: price.bottom + gap - current.top },
+    { x: price.left - gap - current.right, y: 0 },
+    { x: price.right + gap - current.left, y: 0 }
+  ];
+  for (const shift of shifts) {
+    if (
+      current.left + shift.x >= margin &&
+      current.right + shift.x <= width - margin &&
+      current.top + shift.y >= margin &&
+      current.bottom + shift.y <= height - margin
+    )
+      return translate(placed, shift.x, shift.y);
+  }
+  // A small plot can expose only part of a long caption; retain every line in stored text.
+  const above = Math.max(0, price.top - gap - margin);
+  const below = Math.max(0, height - margin - price.bottom - gap);
+  const visible = placed.slice(0, Math.floor(Math.max(above, below) / lineHeight));
+  if (!visible.length) return [];
+  const visibleBounds = boundsOf(visible);
+  return translate(
+    visible,
+    0,
+    above >= below ? price.top - gap - visibleBounds.bottom : price.bottom + gap - visibleBounds.top
+  );
+}
+
 /** Pure shared geometry. Browser painting and picking inject the same font measurement provider. */
 export function annotationLayout(
   drawing: DrawingDraft,
@@ -219,13 +279,15 @@ export function annotationLayout(
     const priceFont = { ...font, size: 12, bold: false };
     const priceWidth = Math.max(36, measure(priceText, priceFont) + 12);
     const priceBounds = rect(position.x - priceWidth / 2, position.y - 14, priceWidth, 28);
+    const captionWidth = Math.min(bodyWidth, Math.max(24, width - 8));
+    const captionHeight = Math.min(bodyHeight, Math.max(font.size * 1.3 + 12, height - 8));
     const captionBounds = rect(
-      (anchor.x + position.x) / 2 - bodyWidth / 2,
-      (anchor.y + position.y) / 2 - bodyHeight - 5,
-      bodyWidth,
-      bodyHeight
+      (anchor.x + position.x) / 2 - captionWidth / 2,
+      (anchor.y + position.y) / 2 - captionHeight - 5,
+      captionWidth,
+      captionHeight
     );
-    const caption = value
+    const initialCaption = value
       ? textLines(
           value,
           captionBounds,
@@ -233,12 +295,13 @@ export function annotationLayout(
           measure,
           "center",
           "top",
-          settings.wrap !== false
+          settings.wrap !== false || rawWidth > width - 8
         ).map((line) => ({
           ...line,
           maxWidth: Math.min(line.maxWidth, measure(line.text, font))
         }))
       : [];
+    const caption = placePriceCaption(initialCaption, font, priceBounds, width, height);
     return {
       kind,
       bounds: combined([

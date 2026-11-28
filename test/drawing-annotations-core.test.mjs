@@ -172,6 +172,78 @@ test("price note picking follows each caption's measured glyph width", () => {
   );
 });
 
+test("price note captions avoid the own-price box on short leaders and near plot edges", () => {
+  const measureText = (text) => Array.from(text).length * 7;
+  const formatPrice = (value) => value.toFixed(2);
+  const fixtures = [
+    { caption: "Коротко", a: { x: 720, y: 320 }, b: { x: 800, y: 270 }, width: 1000, height: 600 },
+    {
+      caption: "first\nsecond",
+      a: { x: 720, y: 320 },
+      b: { x: 800, y: 270 },
+      width: 1000,
+      height: 600
+    },
+    { caption: "first\nsecond", a: { x: 15, y: 30 }, b: { x: 20, y: 14 }, width: 200, height: 140 },
+    {
+      caption: "first\nsecond",
+      a: { x: 180, y: 125 },
+      b: { x: 180, y: 124 },
+      width: 200,
+      height: 140
+    }
+  ];
+  for (const fixture of fixtures) {
+    const item = drawing("priceNote", { text: fixture.caption }, [
+      point(1, 64437.2),
+      point(2, 64000)
+    ]);
+    const projection = (point) => (point.timestamp === 1 ? fixture.a : fixture.b);
+    const layout = drawingGeometry(item, projection, fixture.width, fixture.height, {
+      measureText,
+      formatPrice
+    }).annotation;
+    assert.deepEqual(layout.anchor, fixture.a);
+    assert.equal(layout.price.text[0].text, "64437.20");
+    assert.deepEqual(
+      layout.text.map((line) => line.text),
+      fixture.caption.split("\n")
+    );
+    for (const line of layout.text) {
+      const bounds = {
+        left: line.x - line.maxWidth / 2,
+        right: line.x + line.maxWidth / 2,
+        top: line.y,
+        bottom: line.y + layout.font.size * 1.3
+      };
+      const price = layout.price.bounds;
+      assert.ok(
+        bounds.right <= price.left - 5 ||
+          bounds.left >= price.right + 5 ||
+          bounds.bottom <= price.top - 5 ||
+          bounds.top >= price.bottom + 5,
+        JSON.stringify({ bounds, price })
+      );
+      assert.ok(bounds.left >= 4 && bounds.right <= fixture.width - 4);
+      assert.ok(bounds.top >= 4 && bounds.bottom <= fixture.height - 4);
+      assert.equal(line.maxWidth, measureText(line.text));
+      assert.equal(layout.font.size, 14);
+      assert.deepEqual(
+        hitDrawing(
+          [item],
+          { x: line.x, y: line.y + 5 },
+          projection,
+          fixture.width,
+          fixture.height,
+          4,
+          { measureText, formatPrice }
+        ),
+        { id: item.id, handle: -1 }
+      );
+    }
+  }
+});
+
 test("callout tail is selectable while surrounding empty space is not", () => {
   const item = drawing("callout", { text: "Box", annotation: { width: 100, height: 50 } }, [
     point(100, 150),
