@@ -404,8 +404,8 @@ export class TerminalController {
     if (key === "volume") this.scheduleOlderHistory(true);
     else await this.loadHistory(true);
   };
-  setChartSettings = (patch: ChartSettings): Promise<void> =>
-    this.chartSettings.setOrdinary(patch, (settings) => this.applyChartSettings(settings));
+  setChartSettings = (patch: ChartSettings, valid: () => boolean = () => true): Promise<void> =>
+    this.chartSettings.setOrdinary(patch, (settings) => this.applyChartSettings(settings), valid);
   setChartType = (value: unknown) =>
     this.chartSettings.setType(value, (settings) => this.applyChartSettings(settings, true));
   protected applyChartSettings = async (chartSettings: ChartSettings, changingType = false) => {
