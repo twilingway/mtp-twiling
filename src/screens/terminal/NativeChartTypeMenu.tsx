@@ -8,12 +8,14 @@ import { useTerminalControls } from "./context.js";
 
 const labels: Record<NativeChartType, string> = {
   candles: "Японские свечи",
+  hollowCandles: "Пустые свечи",
   bars: "Бары",
   line: "Линия",
   area: "Область"
 };
 const paths: Record<NativeChartType, string> = {
   candles: "M5 2v3m0 9v3m-2-12h4v9H3zM13 3v5m0 5v4m-2-9h4v5h-4z",
+  hollowCandles: "M5 2v3m0 9v3m-2-12h4v9H3zM13 3v5m0 5v4m-2-9h4v5h-4zM12 9h2v3h-2z",
   bars: "M5 2v15M2 5h3m0 8h3M13 3v13m-3-6h3m0-3h3",
   line: "m2 14 4-6 3 2 4-6 3 2",
   area: "m2 14 4-6 3 2 4-6 3 2v9H2Z"
@@ -92,11 +94,12 @@ export function NativeChartTypeMenu() {
     const width = Math.min(220, window.innerWidth - 16);
     const below = window.innerHeight - rect.bottom - 14;
     const above = rect.top - 14;
-    const down = below >= 170 || below >= above;
+    const menuHeight = NATIVE_CHART_TYPES.length * 36 + 22;
+    const down = below >= menuHeight || below >= above;
     const maxHeight = Math.max(0, down ? below : above);
     setPlacement({
       left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
-      top: down ? rect.bottom + 6 : Math.max(8, rect.top - Math.min(maxHeight, 166) - 6),
+      top: down ? rect.bottom + 6 : Math.max(8, rect.top - Math.min(maxHeight, menuHeight) - 6),
       width,
       maxHeight
     });

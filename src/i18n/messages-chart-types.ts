@@ -1,6 +1,7 @@
 export const chartTypeMessages = {
   "Тип графика": "Chart type",
   "Японские свечи": "Candlesticks",
+  "Пустые свечи": "Hollow candles",
   Бары: "OHLC bars",
   "Цвета баров (OHLC)": "OHLC bar colors",
   "Палитра баров": "Bar palette",

@@ -5,6 +5,7 @@ import { lineColor } from "../model/candle-palette.js";
 import { activeMtpPeriods } from "../model/mtp.js";
 import { drawingToolbarSettings } from "../model/drawing-toolbar.js";
 import { volumeAverageSettings, volumeSma } from "../model/volume-average.js";
+import { initializeKlineHollowCandles } from "./kline-hollow-candles.js";
 
 /** Flags/styles are fixed for the adapter's lifetime by chartRenderConfigKey. */
 export function initializeKlineIndicators(
@@ -13,6 +14,7 @@ export function initializeKlineIndicators(
   volumeHeight: number
 ): void {
   const { indicators, settings } = options;
+  initializeKlineHollowCandles(chart, settings);
   for (const [key, name, period, color] of [
     ["ma", "MA", 20, "#ddad56"],
     ["ema", "EMA", 50, "#7b8fff"]
