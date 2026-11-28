@@ -75,6 +75,7 @@ export interface CloudSyncStatus {
   credentialSaveError: boolean;
   clientMode?: CloudClientMode;
   clientLabel?: string;
+  readonly clientId?: string;
   retention?: CloudRetentionStatus;
   lastSyncedAt?: string;
   error?: CloudErrorCode;

@@ -18,6 +18,8 @@ export function CloudDeleteVersion({
   busy,
   blocked,
   retry = false,
+  deleting = false,
+  failed = false,
   target,
   onDelete
 }: {
@@ -26,14 +28,28 @@ export function CloudDeleteVersion({
   busy: boolean;
   blocked: boolean;
   retry?: boolean;
+  deleting?: boolean;
+  failed?: boolean;
   target?: CloudDeleteTarget | undefined;
   onDelete: (id: string) => void;
 }) {
   const [confirming, setConfirming] = useState(false);
+  if (deleting)
+    return (
+      <div className="cloud-delete-controls" aria-busy="true">
+        <p role="status">{t("Удаляем…")}</p>
+        <small>{t("Копия исчезнет из списка после подтверждения удаления облаком.")}</small>
+      </div>
+    );
   if (!deletion.allowed)
     return <p className="cloud-delete-protected">{t(reasons[deletion.reason ?? "current"])}</p>;
   return (
     <div className="cloud-delete-controls">
+      {failed && (
+        <p role="alert">
+          {t("Удаление не подтверждено. Копия остаётся в списке. Повторите попытку.")}
+        </p>
+      )}
       {!confirming ? (
         <button type="button" disabled={busy || blocked} onClick={() => setConfirming(true)}>
           {t(retry ? "Проверить и продолжить удаление…" : "Удалить эту копию…")}

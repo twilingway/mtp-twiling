@@ -1,4 +1,24 @@
 export const cloudMessages = {
+  "Проверка читает список версий, не изменяя данные облака и устройства.":
+    "Inspection reads the version list without changing cloud or device data.",
+  "Отправка сохранит текущую версию этого клиента и одну предыдущую копию.":
+    "Sending retains this client's current version and one previous copy.",
+  "Активный клиент": "Active client",
+  "Старый формат": "Legacy format",
+  "Другой браузер": "Other browser",
+  "Клиент не указан": "Client not specified",
+  Снимков: "Snapshots",
+  "Всего снимков в списке": "Total snapshots in this list",
+  "Сохранения старого формата": "Legacy format saves",
+  "Сохранение старого формата": "Legacy format save",
+  "Предыдущие копии": "Previous copies",
+  "Для каждого клиента хранятся текущая и предыдущая версии. Сохранения других браузеров и тестового клиента считаются отдельно. Старые форматы показаны отдельно.":
+    "Each client retains its current and previous versions. Other browsers and the test client are counted separately. Legacy formats are listed separately.",
+  "Удаляем…": "Deleting…",
+  "Копия исчезнет из списка после подтверждения удаления облаком.":
+    "The copy will disappear from this list once cloud deletion is confirmed.",
+  "Удаление не подтверждено. Копия остаётся в списке. Повторите попытку.":
+    "Deletion is unconfirmed. The copy remains in this list. Try again.",
   Клиент: "Client",
   "Копий к удалению": "Copies to delete",
   "Будут удалены все сохранения выбранного старого клиента.":
