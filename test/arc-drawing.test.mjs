@@ -5,7 +5,7 @@ import { sourceLoader } from "./helpers/market-source-loader.mjs";
 const load = sourceLoader({ "i18n/messages.ts": { t: (value) => value } });
 const { drawingGeometry, hitDrawing, paintDrawings } = load("model/drawing-model.ts");
 const { drawingSupportsFill } = load("model/drawing-tool-policy.ts");
-const { editDrawingAnchors } = load("model/drawing-anchor-edit.ts");
+const { drawingDragPixels, editDrawingAnchors } = load("model/drawing-anchor-edit.ts");
 const { createDrawingInput } = load("screens/terminal/chart-drawing-touch.ts");
 const { isDrawing, validateBackup } = load("model/backup-format.ts");
 const { encodeDrawingClipboard, parseObjectClipboard, DrawingUndoHistory } = load(
@@ -127,7 +127,49 @@ test("Arc control dragging ignores tangential movement and endpoint edits preser
   const translated = original.map((p) => ({ timestamp: p.timestamp + 30, value: p.value + 50 }));
   assert.deepEqual(editDrawingAnchors("arc", original, translated, -1, projection), translated);
   const unavailable = { ...projection, pixelToPoint: () => null };
-  assert.deepEqual(editDrawingAnchors("arc", original, translated, 2, unavailable), translated);
+  assert.deepEqual(editDrawingAnchors("arc", original, translated, 2, unavailable), original);
+});
+
+test("Arc endpoint edit is atomic when the height-preserving control leaves the pane", () => {
+  const original = [
+    { timestamp: 0, value: 100 },
+    { timestamp: 200, value: 100 },
+    { timestamp: 100, value: 180 }
+  ];
+  const bounded = {
+    pointToPixel: project,
+    pixelToPoint: (timestamp, value) =>
+      timestamp >= 0 && timestamp <= 200 && value >= 0 && value <= 200 ? { timestamp, value } : null
+  };
+  const edited = [{ timestamp: 0, value: 180 }, original[1], original[2]];
+  assert.deepEqual(editDrawingAnchors("arc", original, edited, 0, bounded), original);
+  const offPane = editDrawingAnchors("arc", original, edited, 0, projection)[2];
+  near(project(offPane), { x: 129.7112541083283, y: 214.27813527082073 });
+});
+
+test("legacy off-normal Arc body and Ctrl-clone translate every stored anchor by the same delta", () => {
+  const original = [
+    { timestamp: 0, value: 0 },
+    { timestamp: 200, value: 0 },
+    { timestamp: 350, value: 80 }
+  ];
+  const rawPixels = original.map(project),
+    expected = original.map((p) => ({ timestamp: p.timestamp + 30, value: p.value + 50 }));
+  for (const [handle, clone] of [
+    [-1, false],
+    [-1, true],
+    [2, true]
+  ]) {
+    const starts = drawingDragPixels("arc", rawPixels, handle, clone);
+    const translated = starts.map((p) => projection.pixelToPoint(p.x + 30, p.y + 50));
+    assert.deepEqual(editDrawingAnchors("arc", original, translated, -1, projection), expected);
+  }
+  near(drawingDragPixels("arc", rawPixels, 2, false)[2], { x: 100, y: 80 });
+  assert.deepEqual(
+    rawPixels,
+    original.map(project),
+    "choosing a visible handle never rewrites raw pixels"
+  );
 });
 
 test("Arc creation and preview commit the constrained control instead of the tangential pointer", () => {

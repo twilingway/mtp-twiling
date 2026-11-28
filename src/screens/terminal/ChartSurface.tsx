@@ -1,10 +1,10 @@
 import { t } from "../../i18n/messages.js";
 import { useEffect, useMemo, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { drawingGeometry, hitDrawing } from "../../model/drawing-model.js";
+import { hitDrawing } from "../../model/drawing-model.js";
 import { isDrawing } from "../../model/backup-format.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
-import { editDrawingAnchors } from "../../model/drawing-anchor-edit.js";
+import { drawingDragPixels, editDrawingAnchors } from "../../model/drawing-anchor-edit.js";
 import { isVertexTool } from "../../model/drawing-tool-policy.js";
 import { chartBackground } from "../../model/theme.js";
 import type { Drawing, PixelPoint } from "../../model/types.js";
@@ -226,9 +226,7 @@ export function ChartGestures({
       handle: hit.handle,
       start: p,
       original: structuredClone(drawing),
-      pixels:
-        drawingGeometry(drawing, (point) => chart.pointToPixel(point), 0, 0)?.points ??
-        drawing.points.map((point) => chart.pointToPixel(point)),
+      pixels: drawing.points.map((point) => chart.pointToPixel(point)),
       token: controller.editing.beginGesture(),
       clone: event.ctrlKey || event.metaKey,
       cloneId: null
@@ -292,9 +290,11 @@ export function ChartGestures({
       active.cloneId = crypto.randomUUID();
     }
     const step = nativePriceStep(selectedMarketRow(current.rows, current.preferences));
+    const { name } = active.original;
+    const pixels = drawingDragPixels(name, active.pixels, active.handle, active.clone);
     const points = active.original.points.map((point, i) => {
       if (!active.clone && active.handle >= 0 && active.handle !== i) return point;
-      const start = active.pixels[i];
+      const start = pixels[i];
       const moved = start
         ? ((!active.clone && active.handle >= 0
             ? drawingPoint(
@@ -310,7 +310,7 @@ export function ChartGestures({
       ...active.original,
       id: active.cloneId ?? active.id,
       points: editDrawingAnchors(
-        active.original.name,
+        name,
         active.original.points,
         points,
         active.clone ? -1 : active.handle,

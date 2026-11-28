@@ -6,6 +6,19 @@ interface AnchorProjection {
   pixelToPoint(x: number, y: number): DrawingPoint | null;
 }
 
+/** Body and clone gestures translate stored anchors; only the Arc control uses its visible normal. */
+export function drawingDragPixels(
+  name: DrawingTool,
+  pixels: readonly (PixelPoint | null)[],
+  handle: number,
+  clone: boolean
+): readonly (PixelPoint | null)[] {
+  const [a, b, c] = pixels;
+  return name === "arc" && handle === 2 && !clone && a && b && c
+    ? pixels.map((point, index) => (index === 2 ? drawingArcControlPoint(a, b, c) : point))
+    : pixels;
+}
+
 /** Apply geometric handle constraints only to an explicit edit, never to stored data on read. */
 export function editDrawingAnchors(
   name: DrawingTool,
@@ -17,8 +30,9 @@ export function editDrawingAnchors(
   const result = preservePolylineClosure(name, original, edited, handle);
   if (name !== "arc" || handle < 0 || !projection) return result;
   const [a, b, c] = result.map((point) => projection.pointToPixel(point));
-  if (!a || !b || !c) return result;
+  if (!a || !b || !c) return result.length < 3 ? result : [...original];
   const [oldA, oldB, oldC] = original.map((point) => projection.pointToPixel(point));
+  if (handle < 2 && (!oldA || !oldB || !oldC)) return [...original];
   const height =
     handle < 2 && oldA && oldB && oldC
       ? drawingArcHeight(oldA, oldB, oldC)
@@ -27,7 +41,7 @@ export function editDrawingAnchors(
   const point = projection.pixelToPoint(control.x, control.y);
   return point && Number.isFinite(point.timestamp) && Number.isFinite(point.value)
     ? result.map((value, index) => (index === 2 ? point : value))
-    : result;
+    : [...original];
 }
 
 /** A repeated first vertex encodes closure without adding a persistence field. */
