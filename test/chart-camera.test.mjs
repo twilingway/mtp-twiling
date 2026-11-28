@@ -14,8 +14,7 @@ function sources(overrides = {}, globals = {}) {
   function load(relative) {
     const file = path.resolve(root, relative).replace(/\.js$/, ".ts"),
       key = path.relative(root, file).replaceAll(path.sep, "/");
-    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts"))
-      return overrides["services/storage.ts"];
+    if (key === "services/storage-v2.ts" && Object.hasOwn(overrides, "services/storage.ts")) return overrides["services/storage.ts"];
     if (Object.hasOwn(overrides, key)) return overrides[key];
     if (modules.has(file)) return modules.get(file).exports;
     const module = { exports: {} };
@@ -86,10 +85,7 @@ test("camera persistence scopes owner/engine, shares timeframes, and keeps signe
   assert.equal(switched.anchor, undefined);
   assert.equal((await loadChartView("owner1", "GAZP:1d:kline:365")).anchor.timestamp, 2000);
   assert.equal(await loadChartView("owner2", "RTSI:1d:kline:365"), undefined);
-  assert.equal(
-    (await loadChartView("owner1", "RTSI:1h:kline:365")).camera.rightOffsetBars,
-    -123.25
-  );
+  assert.equal((await loadChartView("owner1", "RTSI:1h:kline:365")).camera.rightOffsetBars, -123.25);
   assert.equal(await loadChartView("owner1", "RTSI:1d:tradingview:365"), undefined);
   await saveChartView("owner1", "RUS:GAZP:1d:kline:365", view);
   assert.equal((await loadChartView("owner1", "RUS:GAZP:1d:kline:365")).anchor.timestamp, 2000);
@@ -103,10 +99,7 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
     dataWrites = 0,
     paneWrites = 0;
   const actions = new Map(),
-    calls = [],
-    priceFormats = [],
-    formatRedraws = [],
-    lastPriceStrokes = [],
+    calls = [], priceFormats = [], formatRedraws = [], lastPriceStrokes = [],
     primitives = [],
     frames = new Map();
   let constructedOptions;
@@ -203,9 +196,7 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
         firstSeries = false;
         if (candles) priceFormats.push(nativeOptions.priceFormat);
         return {
-          applyOptions(patch) {
-            if (candles && patch.priceFormat) priceFormats.push(patch.priceFormat);
-          },
+          applyOptions(patch) { if (candles && patch.priceFormat) priceFormats.push(patch.priceFormat); },
           setData(next) {
             if (candles) {
               dataWrites++;
@@ -215,18 +206,13 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
           },
           setSeriesOrder() {},
           createPriceLine(options) {
-            const line = {
-              options: { ...options },
-              applyOptions(patch) {
-                Object.assign(this.options, patch);
-              }
-            };
+            const line = { options: { ...options }, applyOptions(patch) {
+              Object.assign(this.options, patch);
+            } };
             priceLabels.add(line);
             return line;
           },
-          removePriceLine(line) {
-            priceLabels.delete(line);
-          },
+          removePriceLine(line) { priceLabels.delete(line); },
           attachPrimitive(primitive) {
             primitives.push(primitive);
           },
@@ -260,12 +246,8 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
         assert.equal(options.id, "x_axis_pane");
         assert.equal(typeof options.axisOptions.name, "string");
       },
-      setPriceVolumePrecision(precision) {
-        priceFormats.push({ precision });
-      },
-      setStyles(patch) {
-        formatRedraws.push(patch);
-      },
+      setPriceVolumePrecision(precision) { priceFormats.push({ precision }); },
+      setStyles(patch) { formatRedraws.push(patch); },
       getSize: () => size,
       resize() {},
       subscribeAction: (name, callback) => actions.set(name, callback),
@@ -319,17 +301,9 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
       ]
     };
     const ctx = {
-      setTransform() {},
-      clearRect() {},
-      save() {},
-      restore() {},
-      beginPath() {},
-      setLineDash() {},
-      moveTo() {},
-      lineTo() {},
-      stroke() {
-        lastPriceStrokes.push(this.strokeStyle);
-      }
+      setTransform() {}, clearRect() {}, save() {}, restore() {}, beginPath() {},
+      setLineDash() {}, moveTo() {}, lineTo() {},
+      stroke() { lastPriceStrokes.push(this.strokeStyle); }
     };
     factory = sources(
       {
@@ -377,116 +351,62 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
     primitives,
     priceLabels,
     nativeWrites: () => ({ dataWrites, paneWrites }),
-    nativeLastPriceLabel: () =>
-      klineFormat.formatPrecision(data.at(-1)?.close, priceFormats.at(-1)?.precision),
+    nativeLastPriceLabel: () => klineFormat.formatPrecision(data.at(-1)?.close, priceFormats.at(-1)?.precision),
     camera: () => ({ spacing, offset })
   };
 }
 
-for (const engine of ["lightweight", "kline"]) {
-  test(`${engine} unknown tick uses actual quote precision before metadata, expands without jitter, and yields to a real step`, () => {
-    const f = harness(engine, { symbol: "TGKA", uid: "tgka", step: null, price: 0.004842 });
-    f.adapter.source = { owner: "A", uid: "tgka", viewKey: `TGKA:1d:${engine}:365` };
-    if (engine === "lightweight") assert.equal(f.priceFormats[0].formatter(0.004842), "0.004842");
-    else assert.equal(f.priceFormats[0].precision, 6);
-    f.adapter.setData(
-      Array.from({ length: 1200 }, (_, i) => ({
-        timestamp: Date.UTC(2022, 0, 1) + i * 86400000,
-        open: 0.0048,
-        high: 0.0049,
-        low: 0.0047,
-        close: 0.004842,
-        volume: 1
-      })),
-      false
-    );
-    f.ready();
-    f.adapter.setView({
-      camera: { barSpace: 1.0550660792951543, rightOffsetBars: -444.16359109010153 }
-    });
-    f.ready();
-    const before = f.camera();
-    f.calls.length = 0;
-    f.adapter.updatePriceFormat({ owner: "A", uid: "tgka", step: null, priceHint: 0.004842001 });
-    f.ready();
-    if (engine === "lightweight")
-      assert.equal(f.priceFormats.at(-1).formatter(0.004842001), "0.004842001");
-    else assert.equal(f.priceFormats.at(-1).precision, 9);
-    const expanded = f.priceFormats.length;
-    f.adapter.updatePriceFormat({ owner: "A", uid: "tgka", step: null, priceHint: 0.0048 });
-    assert.equal(f.priceFormats.length, expanded);
-    f.adapter.updatePriceFormat({ owner: "B", uid: "tgka", step: null, priceHint: 0.004842111 });
-    assert.equal(f.priceFormats.length, expanded);
-    f.adapter.updatePriceFormat({ owner: "A", uid: "tgka", step: 0.000002 });
-    f.ready();
-    assert.equal(f.priceFormats.at(-1).precision, 6);
-    const resolved = f.priceFormats.length;
-    f.adapter.updatePriceFormat({ owner: "A", uid: "tgka", step: null, priceHint: 0.004842111 });
-    assert.equal(f.priceFormats.length, resolved);
-    assert.deepEqual(f.camera(), before);
-    assert.deepEqual(f.calls, []);
-  });
-  test(`${engine} late price metadata updates precision without data, camera, canvas or label replacement`, () => {
-    const f = harness(engine, { symbol: "VTBR", uid: "vtbr", step: null });
-    f.adapter.source = { owner: "A", uid: "vtbr", viewKey: `VTBR:1d:${engine}:365` };
-    const bars = Array.from({ length: 1200 }, (_, i) => ({
-      timestamp: Date.UTC(2022, 0, 1) + i * 86400000,
-      open: 57.35,
-      high: 57.38,
-      low: 57.33,
-      close: 57.365,
-      volume: 1
-    }));
-    f.adapter.setData(bars, false);
-    f.ready();
-    f.adapter.setView({
-      camera: { barSpace: 1.0550660792951543, rightOffsetBars: -444.16359109010153 }
-    });
-    f.ready();
-    const before = f.camera(),
-      label = [...f.priceLabels][0],
-      nativeBefore = f.nativeWrites();
-    f.calls.length = 0;
-    f.adapter.updatePriceFormat({ owner: "A", uid: "vtbr", step: 0.005, priceHint: 57.365 });
-    f.ready();
-    assert.equal(f.priceFormats.at(-1).precision, 3);
-    if (engine === "kline") {
-      assert.equal(f.formatRedraws.length, 1, "precision invalidates native labels immediately");
-      assert.deepEqual(Object.keys(f.formatRedraws[0]), ["yAxis"]);
-      assert.deepEqual(Object.keys(f.formatRedraws[0].yAxis), ["size"]);
-      assert.equal(f.formatRedraws[0].yAxis.size, 78, "reserve space for three fractional digits");
-      assert.equal(f.nativeLastPriceLabel(), "57.365");
-    }
-    if (engine === "lightweight") assert.equal(f.priceFormats.at(-1).minMove, 0.005);
-    assert.deepEqual(f.camera(), before);
-    assert.deepEqual(f.calls, []);
-    assert.deepEqual(f.nativeWrites(), nativeBefore);
-    if (engine === "lightweight") {
-      assert.equal([...f.priceLabels][0], label);
-      assert.equal(label.options.price, 57.365);
-    }
-    const count = f.priceFormats.length;
-    for (const metadata of [
-      { owner: "B", uid: "vtbr", step: 0.000002 },
-      { owner: "A", uid: "other", step: 0.000002 },
-      ...[null, 0, -1, NaN, Infinity].map((step) => ({ owner: "A", uid: "vtbr", step }))
-    ])
-      f.adapter.updatePriceFormat(metadata);
-    f.adapter.updatePriceFormat({ owner: "A", uid: "vtbr", step: 0.005 });
-    assert.equal(f.priceFormats.length, count);
-    if (engine === "kline") assert.equal(f.formatRedraws.length, 1);
-    f.adapter.retired = true;
-    f.adapter.updatePriceFormat({ owner: "A", uid: "vtbr", step: 0.000002 });
-    assert.equal(f.priceFormats.length, count);
-    f.adapter.retired = false;
-    f.adapter.updatePriceFormat({ owner: "A", uid: "vtbr", step: 0.000002 });
-    f.ready();
-    assert.equal(f.priceFormats.at(-1).precision, 6);
-    assert.deepEqual(f.camera(), before);
-    assert.deepEqual(f.calls, []);
-    assert.deepEqual(f.nativeWrites(), nativeBefore);
-    if (engine === "kline") assert.equal(f.nativeLastPriceLabel(), "57.365000");
-  });
+for(const engine of ["lightweight","kline"]){
+ test(`${engine} unknown tick uses actual quote precision before metadata, expands without jitter, and yields to a real step`,()=>{
+  const f=harness(engine,{symbol:"TGKA",uid:"tgka",step:null,price:.004842});
+  f.adapter.source={owner:"A",uid:"tgka",viewKey:`TGKA:1d:${engine}:365`};
+  if(engine==="lightweight")assert.equal(f.priceFormats[0].formatter(.004842),"0.004842");
+  else assert.equal(f.priceFormats[0].precision,6);
+  f.adapter.setData(Array.from({length:1200},(_,i)=>({timestamp:Date.UTC(2022,0,1)+i*86400000,open:.0048,high:.0049,low:.0047,close:.004842,volume:1})),false);f.ready();
+  f.adapter.setView({camera:{barSpace:1.0550660792951543,rightOffsetBars:-444.16359109010153}});f.ready();
+  const before=f.camera();f.calls.length=0;
+  f.adapter.updatePriceFormat({owner:"A",uid:"tgka",step:null,priceHint:.004842001});f.ready();
+  if(engine==="lightweight")assert.equal(f.priceFormats.at(-1).formatter(.004842001),"0.004842001");
+  else assert.equal(f.priceFormats.at(-1).precision,9);
+  const expanded=f.priceFormats.length;
+  f.adapter.updatePriceFormat({owner:"A",uid:"tgka",step:null,priceHint:.0048});assert.equal(f.priceFormats.length,expanded);
+  f.adapter.updatePriceFormat({owner:"B",uid:"tgka",step:null,priceHint:.004842111});assert.equal(f.priceFormats.length,expanded);
+  f.adapter.updatePriceFormat({owner:"A",uid:"tgka",step:.000002});f.ready();assert.equal(f.priceFormats.at(-1).precision,6);
+  const resolved=f.priceFormats.length;
+  f.adapter.updatePriceFormat({owner:"A",uid:"tgka",step:null,priceHint:.004842111});assert.equal(f.priceFormats.length,resolved);
+  assert.deepEqual(f.camera(),before);assert.deepEqual(f.calls,[]);
+ });
+ test(`${engine} late price metadata updates precision without data, camera, canvas or label replacement`,()=>{
+  const f=harness(engine,{symbol:"VTBR",uid:"vtbr",step:null});
+  f.adapter.source={owner:"A",uid:"vtbr",viewKey:`VTBR:1d:${engine}:365`};
+  const bars=Array.from({length:1200},(_,i)=>({timestamp:Date.UTC(2022,0,1)+i*86400000,open:57.35,high:57.38,low:57.33,close:57.365,volume:1}));
+  f.adapter.setData(bars,false);f.ready();
+  f.adapter.setView({camera:{barSpace:1.0550660792951543,rightOffsetBars:-444.16359109010153}});f.ready();
+  const before=f.camera(),label=[...f.priceLabels][0],nativeBefore=f.nativeWrites();f.calls.length=0;
+  f.adapter.updatePriceFormat({owner:"A",uid:"vtbr",step:.005,priceHint:57.365});f.ready();
+  assert.equal(f.priceFormats.at(-1).precision,3);
+  if (engine === "kline") {
+    assert.equal(f.formatRedraws.length, 1, "precision invalidates native labels immediately");
+    assert.deepEqual(Object.keys(f.formatRedraws[0]), ["yAxis"]);
+    assert.deepEqual(Object.keys(f.formatRedraws[0].yAxis), ["size"]);
+    assert.equal(f.formatRedraws[0].yAxis.size, 78, "reserve space for three fractional digits");
+    assert.equal(f.nativeLastPriceLabel(), "57.365");
+  }
+  if(engine==="lightweight")assert.equal(f.priceFormats.at(-1).minMove,.005);
+  assert.deepEqual(f.camera(),before);assert.deepEqual(f.calls,[]);
+  assert.deepEqual(f.nativeWrites(), nativeBefore);
+  if(engine==="lightweight"){assert.equal([...f.priceLabels][0],label);assert.equal(label.options.price,57.365);}
+  const count=f.priceFormats.length;
+  for(const metadata of [{owner:"B",uid:"vtbr",step:.000002},{owner:"A",uid:"other",step:.000002},
+    ...[null,0,-1,NaN,Infinity].map(step=>({owner:"A",uid:"vtbr",step}))])f.adapter.updatePriceFormat(metadata);
+  f.adapter.updatePriceFormat({owner:"A",uid:"vtbr",step:.005});assert.equal(f.priceFormats.length,count);
+  if(engine==="kline")assert.equal(f.formatRedraws.length,1);
+  f.adapter.retired=true;f.adapter.updatePriceFormat({owner:"A",uid:"vtbr",step:.000002});assert.equal(f.priceFormats.length,count);
+  f.adapter.retired=false;f.adapter.updatePriceFormat({owner:"A",uid:"vtbr",step:.000002});f.ready();
+  assert.equal(f.priceFormats.at(-1).precision,6);assert.deepEqual(f.camera(),before);assert.deepEqual(f.calls,[]);
+  assert.deepEqual(f.nativeWrites(), nativeBefore);
+  if (engine === "kline") assert.equal(f.nativeLastPriceLabel(), "57.365000");
+ });
 }
 
 for (const engine of ["lightweight", "kline"]) {
