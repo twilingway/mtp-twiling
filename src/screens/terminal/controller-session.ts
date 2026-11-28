@@ -15,6 +15,11 @@ import type { SessionBridge } from "./controller-bridge.js";
 import { DEVICE_OWNER, prepareDeviceWorkspace } from "../../services/workspace-identity.js";
 import type { DeviceWorkspaceBinding } from "../../services/workspace-identity.js";
 import { shareMarketRows } from "./market-state-sharing.js";
+import {
+  readRestoreRecovery,
+  completeRestoreRecovery
+} from "../../services/restore-recovery-journal.js";
+import { resetSharedChartCamera } from "../../services/chart-camera.js";
 const cancelled = () => new DOMException("Отключено", "AbortError");
 
 export class TerminalSession {
@@ -245,8 +250,18 @@ export class TerminalSession {
         : false;
     if (previous) this.transitionPauses.set(previous, previousPaused);
     let candidate: MarketClient | undefined;
+    let recovery: Awaited<ReturnType<typeof readRestoreRecovery>>;
+    let recoveryOwner: string | undefined,
+      readingRecovery = false;
     const attempt = () => this.current(lifecycle, activation) && !transition.signal.aborted;
-    const cameraViews = this.bridge.captureCameraViews?.();
+    if (!previous) {
+      const unbound = this.bridge.getChart?.();
+      if (unbound) {
+        unbound.retired = true;
+        unbound.persistView = false;
+      }
+    }
+    const cameraViews = previous ? this.bridge.captureCameraViews?.() : undefined;
     this.bridge.update({ profileTransition: true });
     this.bridge.resetHistory();
     this.cancelLiveFrame();
@@ -264,8 +279,27 @@ export class TerminalSession {
         signal: transition.signal
       });
       if (!attempt()) throw cancelled();
-      candidate = new MarketClient(token, name, storage, { owner: binding.owner });
       const target = binding.owner;
+      recoveryOwner = target;
+      readingRecovery = true;
+      recovery = await readRestoreRecovery(target);
+      readingRecovery = false;
+      if (!attempt()) throw cancelled();
+      if (recovery) {
+        const outgoing = this.bridge.getChart();
+        if (outgoing) {
+          outgoing.retired = true;
+          outgoing.persistView = false;
+        }
+        this.bridge.update({
+          owner: target,
+          importRecoveryRequired: true,
+          historyViewReady: false
+        });
+        await resetSharedChartCamera(target, recovery.mode === "shared-runtime");
+        if (!attempt()) throw cancelled();
+      }
+      candidate = new MarketClient(token, name, storage, { owner: target });
       await candidate.start();
       if (!attempt()) throw cancelled();
       const recoveringImport = !!this.bridge.getState().importRecoveryRequired;
@@ -309,15 +343,39 @@ export class TerminalSession {
         });
       }
       this.bridge.update({ profileTransition: false });
+      if (recovery && deferEmptyWatchlist) {
+        // Saved credentials are restored by the next activation; portable backups omit candles.
+        this.bridge.update({ importRecoveryRequired: true, historyViewReady: false });
+        return candidate;
+      }
       await this.bridge.loadHistory(true);
       if (!valid()) throw cancelled();
+      if (recovery) {
+        const state = this.bridge.getState();
+        if (
+          selectedMarketRow(state.rows, state.preferences)?.uid &&
+          state.historyViewReady === false
+        )
+          throw new Error("Не удалось восстановить сохранённый вид после импорта.");
+        if (!selectedMarketRow(state.rows, state.preferences)?.uid)
+          this.bridge.update({ historyViewReady: true });
+        await completeRestoreRecovery(recovery);
+        if (!valid()) throw cancelled();
+      }
       return candidate;
     } catch (error) {
       if (candidate && candidate !== this.client) {
         candidate.cachePaused = true;
         await candidate.close();
       }
-      if (attempt() && !this.client)
+      if (attempt() && recoveryOwner && (recovery || readingRecovery))
+        this.bridge.update({
+          owner: recoveryOwner,
+          workspaceMigrationIncomplete: true,
+          importRecoveryRequired: true,
+          historyViewReady: false
+        });
+      else if (attempt() && !this.client)
         this.bridge.update({ workspaceMigrationIncomplete: true, ready: false });
       else if (attempt() && candidate === this.client)
         this.bridge.update({ importRecoveryRequired: true, historyViewReady: false });

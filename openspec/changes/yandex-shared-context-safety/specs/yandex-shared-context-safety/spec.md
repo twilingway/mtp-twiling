@@ -63,6 +63,15 @@
 - **THEN** прежняя очистка shared-camera записей сохраняется и завершённый shared refresh не
   оставляет постоянный режим сохранения камеры
 
+#### Scenario: Cold startup after native import commit
+
+- **WHEN** приложение закрыто после native commit импорта и открыто заново до завершения
+  восстановления
+- **THEN** запуск обнаруживает owner-scoped receipt до загрузки графика и записи камеры,
+  восстанавливает импортированные настройки без старой shared camera и очищает только свою запись
+  после успеха
+- **AND** при ошибке receipt и барьер записи сохраняются для повторного восстановления
+
 #### Scenario: A new ordinary import commits before restoration fails
 
 - **WHEN** после незавершённого shared refresh новый обычный импорт записан, но callback

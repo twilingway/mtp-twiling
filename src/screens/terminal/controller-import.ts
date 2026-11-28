@@ -10,6 +10,7 @@ import type { TerminalSession } from "./controller-session.js";
 import { flushWorkspaceAnnotations } from "./workspace-annotations.js";
 import { summarizeBackupFile } from "../../model/backup-transfer-progress.js";
 import type { FileImportObserver } from "../../model/backup-transfer-progress.js";
+import { selectedMarketRow } from "../../model/selected-instrument.js";
 import {
   beginRestoreRecovery,
   completeRestoreRecovery,
@@ -90,6 +91,13 @@ export async function restoreImportedProfile(
     // An adapter born under the transfer barrier may have read the old shared camera.
     invalidateImportedView(bridge, false);
     await bridge.loadHistory();
+    const restored = bridge.getState();
+    if (
+      restored.rows?.length &&
+      selectedMarketRow(restored.rows, restored.preferences)?.uid &&
+      restored.historyViewReady === false
+    )
+      throw new Error("Не удалось восстановить сохранённый вид после импорта.");
     if (valid()) await completeRestoreRecovery(recovery);
   } catch (error) {
     if (sessionValid() && (recovery || preserveStoredCamera !== true)) {

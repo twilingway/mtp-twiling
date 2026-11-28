@@ -72,6 +72,8 @@ function fixture(restored = null) {
   };
   const load = flowModules({
     "services/storage-v2.ts": storage,
+    "services/chart-camera.ts": { resetSharedChartCamera: async () => {} },
+    "services/restore-recovery-journal.ts": { readRestoreRecovery: async () => undefined, completeRestoreRecovery: async () => {} },
     "services/market-client.ts": { MarketClient },
     "services/workspace-identity.ts": {
       DEVICE_OWNER: "device",
@@ -98,6 +100,7 @@ function fixture(restored = null) {
   };
   const session = new TerminalSession({
     getState: () => state,
+    getChart: () => null,
     update: (patch) => {
       state = { ...state, ...patch };
     },

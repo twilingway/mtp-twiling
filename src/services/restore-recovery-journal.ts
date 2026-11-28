@@ -72,6 +72,10 @@ function record(input: unknown, owner: string): RestoreRecovery | undefined {
 }
 
 /** A pending operation's mode survives default UI retries and cold controller creation. */
+export async function readRestoreRecovery(owner: string): Promise<RestoreRecovery | undefined> {
+  const storage = await import("./storage-db.js");
+  return record(await storage.get("preferences", key(owner)), owner);
+}
 export async function beginRestoreRecovery(
   owner: string,
   preserveStoredCamera?: boolean

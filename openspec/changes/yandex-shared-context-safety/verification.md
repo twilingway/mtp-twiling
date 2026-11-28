@@ -41,3 +41,15 @@ regressions PASS: onCommitted throw, postcommit guard, отсутствие от
 
 Облачные записи, синхронизация, импорт и DELETE на реальных аккаунтах в этой задаче не выполнялись.
 Сборка, визуальный smoke и выпуск принадлежат координатору.
+
+## Холодный запуск после native commit
+
+Независимое release-ревью обнаружило, что durable receipt читался лишь явным retry. Actual new
+controller.start воспроизвёл старую shared camera вместо импортированной (RED). Запуск теперь читает
+owner-scoped receipt до первого chart read, запрещает запись старого вида до обязательного flush и
+сохраняет барьер при ошибке. Сохранённый ключ банка восстанавливается до финальной загрузки истории;
+пустой watchlist считается успешным восстановлением без графика.
+
+10 новых cold-start регрессий проверяют оба режима камеры, foreign owner, read/reset/client/history
+failure с реальным public recoverBackup, пустой список и сохранённый bank token. Совместный scoped
+batch: 62/62 PASS. Эти проверки используют локальные native-storage/market-boundary fixtures.
