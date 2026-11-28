@@ -634,7 +634,7 @@ test("outside dismissal runs in capture phase and never consumes the canvas poin
   assert.equal(harness.handlers.size, 0);
 });
 
-test("native toolbar/menu pointer and focus transitions retain the selected object", () => {
+test("native toolbar, menu and object-tree transitions retain the selected object", () => {
   for (const object of [
     { id: "line", name: "segment", points: [] },
     { id: "image", name: "Photo" }
@@ -652,7 +652,9 @@ test("native toolbar/menu pointer and focus transitions retain the selected obje
       ["pointerdown", ".drawing-toolbar"],
       ["focusin", "#drawing-toolbar-menu"],
       ["pointerdown", "#drawing-toolbar-menu"],
-      ["focusin", ".drawing-toolbar"]
+      ["focusin", ".drawing-toolbar"],
+      ["pointerdown", "#objects-view"],
+      ["focusin", "#objects-view"]
     ]) {
       dispatch(type, new harness.Element(ancestor));
       assert.equal(harness.state.selectedObject, object.id, `${type}: ${ancestor}`);

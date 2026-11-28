@@ -84,7 +84,7 @@ export function MobileObjectWidget() {
         !root.current?.contains(event.target) &&
         !(
           event.target instanceof Element &&
-          event.target.closest(".drawing-toolbar, #drawing-toolbar-menu")
+          event.target.closest(".drawing-toolbar, #drawing-toolbar-menu, #objects-view")
         )
       )
         controller.selectObject(null);
