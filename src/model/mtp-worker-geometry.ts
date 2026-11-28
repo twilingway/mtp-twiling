@@ -32,6 +32,11 @@ export interface MtpWorkerGeometry {
   end: number;
   fullHistory: boolean;
 }
+export interface MtpWorkerReadyBitmap {
+  key: string;
+  bitmap: ImageBitmap;
+  geometry: MtpWorkerGeometry;
+}
 const finite = (values: readonly (number | null)[]): values is number[] =>
   values.every((value) => value !== null && Number.isFinite(value));
 
@@ -208,4 +213,59 @@ export function mtpWorkerCovered(
       top >= -geometry.padY &&
       bottom <= geometry.height + geometry.padY)
   );
+}
+
+export interface MtpWorkerPreviewPlan {
+  matrix: MtpWorkerMatrix;
+  covered: boolean;
+  refill: boolean;
+  clip: { x: number; y: number; width: number; height: number } | null;
+}
+
+/** Missing captured bars invalidate only that part of the preview, not the whole fan. */
+export function mtpWorkerPreview(
+  source: MtpRasterFrame,
+  geometry: MtpWorkerGeometry
+): MtpWorkerPreviewPlan | undefined {
+  const matrix = mtpWorkerMatrix(source, geometry);
+  if (!matrix) return undefined;
+  const covered = mtpWorkerCovered(source, geometry, matrix);
+  if (covered) return { matrix, covered, refill: false, clip: null };
+  const start = Math.max(0, Math.floor(source.from) - 1);
+  const end = Math.min(source.model.data.length - 1, Math.ceil(source.to) + 1);
+  const margin = geometry.x[0]! - geometry.left;
+  // A new continuation can alter the old endpoint's cap/join. Do not expose those pixels.
+  const capturedLeft = start < geometry.start ? geometry.x[0]! + margin : -geometry.padX;
+  const capturedRight =
+    end > geometry.end ? geometry.x[1]! - margin : geometry.width + geometry.padX;
+  const left = Math.max(0, Math.max(-geometry.padX, capturedLeft) * matrix.xScale + matrix.xOffset);
+  const right = Math.min(
+    geometry.width,
+    Math.min(geometry.width + geometry.padX, capturedRight) * matrix.xScale + matrix.xOffset
+  );
+  const top = Math.max(0, -geometry.padY * matrix.yScale + matrix.yOffset);
+  const bottom = Math.min(
+    geometry.height,
+    (geometry.height + geometry.padY) * matrix.yScale + matrix.yOffset
+  );
+  const finite = [left, right, top, bottom].every(Number.isFinite);
+  const clip =
+    finite && right > left && bottom > top
+      ? { x: left, y: top, width: right - left, height: bottom - top }
+      : null;
+  const fraction = clip ? (clip.width * clip.height) / (geometry.width * geometry.height) : 0;
+  // Scale limits request a sharper raster; a finite affine, clipped image remains a valid
+  // temporary projection at coarser resolution while that worker job is pending.
+  const coarse =
+    matrix.xScale < 0.5 || matrix.xScale > 2 || matrix.yScale < 0.5 || matrix.yScale > 2;
+  return { matrix, covered: false, clip, refill: fraction < 0.85 || coarse };
+}
+
+export function mtpWorkerPreviewScore(source: MtpRasterFrame, geometry: MtpWorkerGeometry): number {
+  const plan = mtpWorkerPreview(source, geometry);
+  return plan?.covered
+    ? 1
+    : plan?.clip
+      ? (plan.clip.width * plan.clip.height) / (geometry.width * geometry.height)
+      : 0;
 }

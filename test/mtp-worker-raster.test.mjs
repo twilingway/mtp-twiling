@@ -34,6 +34,7 @@ const { MtpModel, MTP_COMBINED_PERIODS } = load("model/mtp.js");
 const { MtpWorkerRasterCache } = load("model/mtp-worker-raster-cache.js");
 const { mtpWorkerIntent } = load("model/mtp-worker-snapshot.js");
 const { paintMtpWorkerFrame, MTP_WORKER_PROTOCOL } = load("model/mtp-worker-protocol.js");
+const { MtpWorkerRefill } = load("model/mtp-worker-refill.js");
 
 function rasterCacheFor(search = "?mtpRaster=worker", enabled = true) {
   const code = ts.transpileModule(
@@ -237,12 +238,14 @@ function context() {
   const commands = [],
     blits = [],
     blitStates = [],
-    transforms = [];
+    transforms = [],
+    clips = [];
   return {
     commands,
     blits,
     blitStates,
     transforms,
+    clips,
     globalCompositeOperation: "source-over",
     filter: "none",
     shadowBlur: 0,
@@ -282,7 +285,11 @@ function context() {
     },
     scale(...values) {
       transforms.push(["scale", ...values]);
-    }
+    },
+    rect(...values) {
+      clips.push(values);
+    },
+    clip() {}
   };
 }
 function frameWith(length = 1000, periods = [4, 6, 49, 160, 446, 640]) {
@@ -341,7 +348,7 @@ function sameCommands(actual, expected) {
   assert.equal(actual.length, expected.length, "command count");
   for (let i = 0; i < actual.length; i++) assert.deepEqual(actual[i], expected[i], `command ${i}`);
 }
-function fixture() {
+function fixture(options = {}) {
   const messages = [],
     timers = new Map();
   let timerId = 0,
@@ -369,6 +376,7 @@ function fixture() {
       timers.delete(id);
     }
   };
+  if (options.now) environment.now = options.now;
   const cache = new MtpWorkerRasterCache(() => updates++, environment);
   const send = (data) => worker.onmessage?.({ data });
   const ready = () => send({ type: "ready", protocol: MTP_WORKER_PROTOCOL, build: "unit" });
@@ -387,6 +395,32 @@ function fixture() {
     result,
     updates: () => updates
   };
+}
+
+function partialFrame() {
+  const f = lightweightFrame();
+  const { frame, reads } = f;
+  let from = 5000;
+  const span = 424;
+  frame.scope.bitmapSize = { width: 1000, height: 400 };
+  frame.scope.horizontalPixelRatio = frame.scope.verticalPixelRatio = 1;
+  frame.scope.context.miterLimit = 1;
+  frame.model.styles = {};
+  frame.xFor = (index) => {
+    reads.x++;
+    return ((index - from) * 1000) / span;
+  };
+  frame.yFor = (price) => {
+    reads.y++;
+    return 200 - (price - 100) * 3;
+  };
+  const camera = (delta) => {
+    from = 5000 - delta;
+    frame.from = from;
+    frame.to = from + span;
+  };
+  camera(0);
+  return { frame, reads, camera };
 }
 
 function lightweightFrame(length = 5425) {
@@ -643,8 +677,8 @@ test("a non-held tail update requires new exact data and disabled/empty/destroy 
   }
 });
 
-test("uncovered, generic, gapped and non-affine held views stay blank without preparing heavy work", () => {
-  for (const kind of ["uncovered", "generic", "gapped", "non-affine"]) {
+test("generic, gapped and non-affine held views stay blank without preparing heavy work", () => {
+  for (const kind of ["generic", "gapped", "non-affine"]) {
     const f = fixture(),
       { frame, camera } = lightweightFrame();
     if (kind === "generic" || kind === "non-affine") delete frame.uniformX;
@@ -656,20 +690,326 @@ test("uncovered, generic, gapped and non-affine held views stay blank without pr
       const native = frame.xFor;
       frame.xFor = (i) => native(i) + Math.sin(i / 5);
     }
-    if (kind === "uncovered") frame.yFor = (price) => 300 - price * 2;
     f.ready();
     f.cache.draw(frame);
     f.result();
     f.cache.draw(frame);
     const before = f.cache.status().snapshots,
       blits = frame.scope.context.blits.length;
-    camera(kind === "uncovered" ? 0 : 4, kind === "uncovered" ? 200 : 0);
-    if (kind === "uncovered") frame.yFor = (price) => 275 - price * 2;
+    camera(4, 0);
     f.cache.draw(frame, true);
     assert.equal(f.cache.status().snapshots, before, kind);
     assert.equal(frame.scope.context.blits.length, blits, kind);
     assert.equal(f.cache.pending(), true);
     f.cache.destroy();
+  }
+});
+
+test("one newly revealed bar keeps a clipped safe fan visible and reversal reuses the ready bitmap", () => {
+  let clock = 0;
+  const f = fixture({ now: () => clock }),
+    { frame, camera, reads } = partialFrame();
+  f.ready();
+  f.cache.draw(frame);
+  const image = f.result();
+  f.cache.draw(frame);
+  const before = { ...f.cache.status() },
+    oldReads = { ...reads },
+    blits = frame.scope.context.blits.length;
+  camera(1);
+  f.cache.draw(frame, true);
+  assert.equal(frame.scope.context.blits.length, blits + 1);
+  assert.equal(frame.scope.context.blits.at(-1)[0], image);
+  const [x, y, width, height] = frame.scope.context.clips.at(-1);
+  assert.ok(x > 0 && x < 10 && y >= 0 && x + width <= 1000 && y + height <= 400);
+  assert.ok(width > 990, "only unsafe endpoint pixels are excluded from the one-bar preview");
+  assert.equal(f.cache.status().snapshots, before.snapshots);
+  assert.equal(f.cache.status().dispatched, before.dispatched);
+  assert.equal(reads.prefix, oldReads.prefix);
+  assert.equal(reads.extrema, oldReads.extrema);
+  clock = 20;
+  camera(0);
+  f.cache.draw(frame, true);
+  assert.equal(frame.scope.context.blits.at(-1)[0], image);
+  assert.equal(f.cache.status().dispatched, 1);
+  assert.equal(image.closed, 0, "coverage loss never discards a hard-compatible ready layer");
+  f.cache.destroy();
+  assert.equal(image.closed, 1);
+});
+
+test("long held pan refills below 85 percent at most once per 150ms, then idle draws latest exact", () => {
+  let clock = 0;
+  const f = fixture({ now: () => clock }),
+    { frame, camera, reads } = partialFrame();
+  f.ready();
+  f.cache.draw(frame);
+  f.result();
+  f.cache.draw(frame);
+  const before = { ...f.cache.status() },
+    oldReads = { ...reads },
+    blits = frame.scope.context.blits.length;
+  const sent = [];
+  for (let i = 1; i <= 80; i++) {
+    clock = i * 10;
+    camera(i * 5);
+    const dispatched = f.cache.status().dispatched;
+    f.cache.draw(frame, true);
+    if (f.cache.status().dispatched > dispatched) {
+      sent.push(clock);
+      f.result();
+    }
+    assert.equal(
+      f.cache.pending(),
+      true,
+      "refill responses and clipped previews never settle readiness"
+    );
+  }
+  assert.ok(sent.length >= 2 && sent.length <= 6);
+  assert.ok(sent.every((time, index) => !index || time - sent[index - 1] >= 150));
+  assert.equal(f.cache.status().snapshots - before.snapshots, sent.length);
+  assert.equal(reads.prefix - oldReads.prefix, sent.length);
+  assert.equal(reads.extrema - oldReads.extrema, sent.length);
+  assert.equal(
+    frame.scope.context.blits.length - blits,
+    80,
+    "the fan remains visible on every pan frame"
+  );
+  clock += 10;
+  camera(401);
+  const pending = f.cache.status().dispatched;
+  f.cache.setInteraction(false);
+  f.cache.draw(frame);
+  assert.equal(f.cache.status().dispatched, pending + 1);
+  assert.equal(f.messages.at(-1).key, mtpWorkerIntent(frame).key);
+  f.result();
+  assert.equal(f.cache.pending(), true);
+  f.cache.draw(frame);
+  assert.equal(f.cache.pending(), false);
+  assert.equal(f.timers.size, 0);
+  f.cache.destroy();
+});
+
+test("reversal chooses the better ready bitmap at actual draw, never from the response callback", () => {
+  for (const reversal of [0, 1]) {
+    let clock = 0;
+    const f = fixture({ now: () => clock }),
+      { frame, camera, reads } = partialFrame();
+    f.ready();
+    f.cache.draw(frame);
+    const a = f.result();
+    f.cache.draw(frame);
+    camera(100);
+    f.cache.draw(frame, true);
+    const request = f.messages.at(-1);
+    clock = 10;
+    camera(reversal);
+    f.cache.draw(frame, true);
+    const probes = { ...reads },
+      b = f.result(request);
+    assert.equal(reads.x, probes.x);
+    assert.equal(reads.y, probes.y, "receive never queries the SDK");
+    assert.equal(a.closed, 0);
+    assert.equal(b.closed, 0, "one transition bitmap waits for actual camera validation");
+    f.cache.draw(frame, true);
+    assert.equal(b.closed, 1);
+    assert.equal(a.closed, 0);
+    assert.equal(frame.scope.context.blits.at(-1)[0], a);
+    assert.equal(f.cache.status().dispatched, 2);
+    assert.equal(f.cache.pending(), true);
+    f.cache.destroy();
+    assert.equal(a.closed, 1);
+  }
+});
+
+test("a finite coarse zoom remains clipped and visible while requesting a sharper raster", () => {
+  const f = fixture({ now: () => 0 }),
+    { frame } = partialFrame();
+  f.ready();
+  f.cache.draw(frame);
+  const image = f.result();
+  f.cache.draw(frame);
+  const nativeX = frame.xFor;
+  frame.xFor = (index) => nativeX(index) * 2.5;
+  frame.to = frame.from + 424 / 2.5;
+  f.cache.draw(frame, true);
+  assert.equal(frame.scope.context.blits.at(-1)[0], image);
+  assert.deepEqual(frame.scope.context.clips.at(-1), [0, 0, 1000, 400]);
+  assert.ok(
+    frame.scope.context.transforms.some(
+      (entry) => entry[0] === "scale" && Math.abs(entry[1] - 2.5) < 1e-9
+    )
+  );
+  assert.equal(f.cache.status().dispatched, 2);
+  assert.equal(f.cache.pending(), true);
+  f.result();
+  f.cache.draw(frame, true);
+  assert.equal(f.cache.pending(), true);
+  f.cache.setInteraction(false);
+  f.cache.draw(frame);
+  assert.equal(f.cache.pending(), false);
+  f.cache.destroy();
+});
+
+test("a fresh held chart with zero coverage starts one bounded first refill instead of waiting for release", () => {
+  let clock = 0;
+  const f = fixture({ now: () => clock }),
+    { frame } = partialFrame();
+  f.ready();
+  f.cache.draw(frame, true);
+  assert.equal(f.cache.status().dispatched, 1);
+  assert.equal(f.cache.status().snapshots, 1);
+  for (let i = 0; i < 20; i++) {
+    clock++;
+    f.cache.draw(frame, true);
+  }
+  assert.equal(f.cache.status().dispatched, 1);
+  f.result();
+  f.cache.draw(frame, true);
+  assert.equal(frame.scope.context.blits.length, 1);
+  assert.equal(f.cache.pending(), true);
+  f.cache.setInteraction(false);
+  f.cache.draw(frame);
+  assert.equal(f.cache.pending(), false);
+  f.cache.destroy();
+});
+
+test("transition results close on invalidation and destroy without touching the SDK", () => {
+  for (const ending of ["invalidate", "destroy"]) {
+    const f = fixture({ now: () => 0 }),
+      { frame, camera, reads } = partialFrame();
+    f.ready();
+    f.cache.draw(frame);
+    const a = f.result();
+    f.cache.draw(frame);
+    camera(100);
+    f.cache.draw(frame, true);
+    const b = f.result();
+    const before = { ...reads };
+    if (ending === "invalidate") f.cache.invalidate(true);
+    else f.cache.destroy();
+    assert.equal(b.closed, 1);
+    assert.equal(reads.x, before.x);
+    assert.equal(reads.y, before.y);
+    if (ending === "invalidate") assert.equal(a.closed, 0);
+    f.cache.destroy();
+    assert.equal(a.closed, 1);
+  }
+});
+
+test("a busy refill keeps one cheap latest intent and a live tail remains preview-only until latest exact", () => {
+  let clock = 0;
+  const f = fixture({ now: () => clock }),
+    { frame, camera } = partialFrame();
+  f.ready();
+  f.cache.draw(frame);
+  const initial = f.result();
+  f.cache.draw(frame);
+  camera(100);
+  f.cache.draw(frame, true);
+  const job = f.messages.at(-1);
+  assert.equal(f.cache.status().dispatched, 2);
+  for (let i = 0; i < 60; i++) {
+    clock += 5;
+    camera(101 + i);
+    f.cache.draw(frame, true);
+  }
+  assert.equal(f.cache.status().snapshots, 2);
+  assert.equal(f.cache.status().dispatched, 2);
+  frame.model.data.at(-1).close += 3;
+  frame.model.update(frame.model.data);
+  f.cache.invalidate(true);
+  const stale = f.result(job);
+  assert.equal(stale.closed, 1);
+  assert.equal(initial.closed, 0);
+  f.cache.draw(frame, true);
+  assert.equal(f.cache.status().dispatched, 3);
+  assert.equal(f.messages.at(-1).prefix.length, frame.model.data.length + 1);
+  f.result();
+  assert.equal(f.cache.pending(), true);
+  camera(162);
+  f.cache.setInteraction(false);
+  f.cache.draw(frame);
+  assert.equal(f.messages.at(-1).key, mtpWorkerIntent(frame).key);
+  f.result();
+  f.cache.draw(frame);
+  assert.equal(f.cache.pending(), false);
+  f.cache.destroy();
+});
+
+test("refill clock timer ID zero notifies without dispatch and cancels on clear", () => {
+  let clock = 0,
+    updates = 0;
+  const timers = new Map(),
+    cancelled = [];
+  const gate = new MtpWorkerRefill(
+    {
+      now: () => clock,
+      delay(action, milliseconds) {
+        timers.set(0, { action, milliseconds });
+        return 0;
+      },
+      cancel(id) {
+        cancelled.push(id);
+        timers.delete(id);
+      }
+    },
+    () => updates++
+  );
+  assert.equal(gate.allow(true), true);
+  gate.sent();
+  clock = 20;
+  assert.equal(gate.allow(true), false);
+  assert.equal(timers.get(0).milliseconds, 130);
+  gate.clear();
+  assert.deepEqual(cancelled, [0]);
+  assert.equal(timers.size, 0);
+  assert.equal(gate.allow(true), false);
+  clock = 150;
+  const timer = timers.get(0);
+  timers.delete(0);
+  timer.action();
+  assert.equal(updates, 1);
+  assert.equal(gate.allow(true), true);
+  gate.sent();
+  clock = 160;
+  assert.equal(gate.allow(true), false);
+  gate.allow(false);
+  assert.equal(timers.size, 0);
+});
+
+test("pending refill timers and bitmaps close on hard reset, disable, failure and destroy", () => {
+  for (const ending of ["reset", "disable", "error", "destroy"]) {
+    let clock = 0;
+    const f = fixture({ now: () => clock }),
+      { frame, camera } = partialFrame();
+    f.ready();
+    f.cache.draw(frame);
+    f.result();
+    f.cache.draw(frame);
+    camera(100);
+    f.cache.draw(frame, true);
+    const image = f.result();
+    clock = 10;
+    camera(200);
+    f.cache.draw(frame, true);
+    assert.ok([...f.timers.values()].some((timer) => timer.milliseconds < 5000));
+    if (ending === "reset") {
+      frame.model.reset(frame.model.data, frame.model.periods);
+      f.cache.invalidate(true);
+      assert.equal(f.timers.size, 0, "hard invalidation cancels the old coverage timer");
+      f.cache.draw(frame, true);
+    } else if (ending === "disable") f.cache.invalidate(false);
+    else if (ending === "error") f.worker.onerror({});
+    else f.cache.destroy();
+    assert.equal(image.closed, 1, ending);
+    if (ending === "reset")
+      assert.ok(
+        [...f.timers.values()].every((timer) => timer.milliseconds <= 150),
+        "zero current coverage may arm a new bounded refill"
+      );
+    else assert.equal(f.timers.size, 0, ending);
+    f.cache.destroy();
+    assert.equal(f.timers.size, 0, ending);
   }
 });
 
@@ -719,7 +1059,11 @@ test("held hard changes close preview immediately and a different model owner fa
     f.cache.draw(frame, true);
     assert.equal(image.closed, 1);
     assert.equal(frame.scope.context.blits.length, blits);
-    assert.equal(f.cache.status().snapshots, before);
+    assert.equal(
+      f.cache.status().snapshots,
+      before + 1,
+      "zero coverage may request one current-data refill; the old hard-invalid bitmap is never painted"
+    );
     f.cache.destroy();
   }
   const f = fixture(),

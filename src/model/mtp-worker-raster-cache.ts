@@ -7,12 +7,15 @@ import type { MtpRasterFrame } from "./mtp-raster-cache.js";
 import {
   MTP_IDENTITY,
   mtpWorkerContentKey,
-  mtpWorkerCovered,
   mtpWorkerExact,
   mtpWorkerGeometry,
-  mtpWorkerMatrix
+  mtpWorkerPreview,
+  mtpWorkerPreviewScore
 } from "./mtp-worker-geometry.js";
 import type { MtpWorkerGeometry, MtpWorkerMatrix } from "./mtp-worker-geometry.js";
+import { MtpWorkerRefill } from "./mtp-worker-refill.js";
+import type { MtpWorkerPreviewPlan } from "./mtp-worker-geometry.js";
+import type { MtpWorkerReadyBitmap as Ready } from "./mtp-worker-geometry.js";
 
 export interface MtpRasterWorker {
   onmessage: ((event: MessageEvent<MtpWorkerResponse>) => void) | null;
@@ -26,6 +29,7 @@ export interface MtpWorkerEnvironment {
   delay(action: () => void, milliseconds: number): unknown;
   cancel(timer: unknown): void;
   build: string;
+  now?(): number;
 }
 export interface MtpWorkerStatus {
   state: "off" | "loading" | "ready" | "fallback" | "destroyed";
@@ -56,11 +60,6 @@ interface Dispatched {
   intent: MtpWorkerIntent;
   geometry: MtpWorkerGeometry;
 }
-interface Ready {
-  key: string;
-  bitmap: ImageBitmap;
-  geometry: MtpWorkerGeometry;
-}
 
 /** One owned worker, one dispatched job, one latest intent and one owned ready bitmap. */
 export class MtpWorkerRasterCache {
@@ -80,6 +79,7 @@ export class MtpWorkerRasterCache {
   private desiredKey: string | undefined;
   private sentDataKey: string | undefined;
   private ready: Ready | undefined;
+  private result: Ready | undefined;
   private displayedKey: string | undefined;
   private needsDraw = true;
   private interacting = false;
@@ -88,10 +88,13 @@ export class MtpWorkerRasterCache {
   private lastContentKey: string | undefined;
   private deferred: { contentKey: string; from: number; to: number } | undefined;
   private owner: MtpRasterFrame["model"] | undefined;
+  private readonly refill: MtpWorkerRefill;
+  private refillPermit = false;
   constructor(
     private readonly requestUpdate: () => void,
     private readonly environment = browser
   ) {
+    this.refill = new MtpWorkerRefill(environment, requestUpdate);
     try {
       const worker = this.environment.create();
       this.worker = worker;
@@ -139,9 +142,45 @@ export class MtpWorkerRasterCache {
     this.timer = this.environment.delay(() => this.fail(reason), 5000);
   }
   private releaseReady(): void {
+    this.refill.clear();
     this.ready?.bitmap.close();
     this.ready = undefined;
     this.displayedKey = undefined;
+  }
+  private releaseResult(): void {
+    this.result?.bitmap.close();
+    this.result = undefined;
+  }
+  private selectResult(
+    source: MtpRasterFrame,
+    contentKey: string,
+    hardKey: string | undefined
+  ): void {
+    const result = this.result;
+    if (!result) return;
+    this.result = undefined;
+    if (
+      result.geometry.contentKey !== contentKey &&
+      !(this.interacting && result.geometry.previewHardKey === hardKey)
+    ) {
+      result.bitmap.close();
+      return;
+    }
+    const old = this.ready;
+    const oldExact =
+      old?.geometry.contentKey === contentKey && mtpWorkerExact(source, old.geometry);
+    const newExact =
+      result.geometry.contentKey === contentKey && mtpWorkerExact(source, result.geometry);
+    if (
+      !old ||
+      (!oldExact &&
+        (newExact ||
+          mtpWorkerPreviewScore(source, result.geometry) >=
+            mtpWorkerPreviewScore(source, old.geometry)))
+    ) {
+      this.releaseReady();
+      this.ready = result;
+    } else result.bitmap.close();
   }
   private stopWorker(): void {
     if (!this.worker) return;
@@ -160,6 +199,7 @@ export class MtpWorkerRasterCache {
     this.cancelDeadline();
     this.stopWorker();
     this.releaseReady();
+    this.releaseResult();
     this.inFlight = undefined;
     this.latest = undefined;
     this.deferred = undefined;
@@ -180,7 +220,7 @@ export class MtpWorkerRasterCache {
       this.inFlight ||
       this.state !== "ready" ||
       !this.worker ||
-      (this.interacting && this.forceBudget === 0)
+      (this.interacting && this.forceBudget === 0 && !this.refillPermit)
     )
       return;
     const { intent, geometry } = job;
@@ -202,6 +242,8 @@ export class MtpWorkerRasterCache {
       transfer.push(request.prefix.buffer);
     }
     this.inFlight = { id: request.id, intent, geometry };
+    if (this.refillPermit) this.refill.sent();
+    this.refillPermit = false;
     if (this.forceBudget > 0) {
       this.forceBudget = 0;
       this.forcedKey = intent.key;
@@ -253,8 +295,8 @@ export class MtpWorkerRasterCache {
       (message.key === this.desiredKey ||
         (this.interacting && job.geometry.contentKey === this.lastContentKey))
     ) {
-      this.releaseReady();
-      this.ready = { key: message.key, bitmap: message.bitmap, geometry: job.geometry };
+      this.releaseResult();
+      this.result = { key: message.key, bitmap: message.bitmap, geometry: job.geometry };
     } else {
       message.bitmap.close();
       this.stale++;
@@ -265,6 +307,7 @@ export class MtpWorkerRasterCache {
   setInteraction(active: boolean): void {
     if (this.interacting === active) return;
     this.interacting = active;
+    if (!active) this.refill.clear();
     if (active && this.forceBudget === 0 && this.forcedKey === undefined) {
       this.latest = undefined;
       this.deferred = undefined;
@@ -273,6 +316,7 @@ export class MtpWorkerRasterCache {
     }
   }
   forceRender(): void {
+    this.refill.clear();
     this.forceBudget = 1;
     this.forcedKey = undefined;
     this.needsDraw = true;
@@ -301,15 +345,26 @@ export class MtpWorkerRasterCache {
       this.forcedKey = undefined;
     } else this.previews++;
   }
-  private preview(source: MtpRasterFrame): void {
-    if (!this.ready) return;
-    const matrix = mtpWorkerMatrix(source, this.ready.geometry);
-    if (matrix && mtpWorkerCovered(source, this.ready.geometry, matrix))
-      this.blit(source, this.ready, matrix, false);
+  private preview(source: MtpRasterFrame): MtpWorkerPreviewPlan | undefined {
+    if (!this.ready) return undefined;
+    const plan = mtpWorkerPreview(source, this.ready.geometry);
+    if (plan?.covered) this.blit(source, this.ready, plan.matrix, false);
+    else if (plan?.clip) {
+      const context = source.scope.context,
+        clip = plan.clip;
+      context.save();
+      context.beginPath();
+      context.rect(clip.x, clip.y, clip.width, clip.height);
+      context.clip();
+      this.blit(source, this.ready, plan.matrix, false);
+      context.restore();
+    }
+    return plan;
   }
   /** True includes a blank pending layer; the caller must not run heavy sync paint as well. */
   draw(source: MtpRasterFrame, interacting = false): boolean {
     if (this.state === "fallback" || this.state === "destroyed") return false;
+    this.refillPermit = false;
     if (this.owner && this.owner !== source.model) {
       this.fail("source-owner-changed");
       return false;
@@ -322,7 +377,7 @@ export class MtpWorkerRasterCache {
       return false;
     }
     this.lastContentKey = contentKey;
-    let previewHardKey = [this.ready, this.inFlight, this.latest].find(
+    let previewHardKey = [this.ready, this.result, this.inFlight, this.latest].find(
       (job) => job?.geometry.contentKey === contentKey
     )?.geometry.previewHardKey;
     if (this.ready && this.ready.geometry.contentKey !== contentKey) {
@@ -330,6 +385,9 @@ export class MtpWorkerRasterCache {
       if (!this.interacting || this.ready.geometry.previewHardKey !== previewHardKey)
         this.releaseReady();
     }
+    if (this.result && this.result.geometry.contentKey !== contentKey && this.interacting)
+      previewHardKey ??= mtpWorkerContentKey(source, true) ?? undefined;
+    this.selectResult(source, contentKey, previewHardKey);
     const candidate = [this.ready, this.inFlight, this.latest].find(
       (job) => job?.geometry.contentKey === contentKey && mtpWorkerExact(source, job.geometry)
     );
@@ -344,10 +402,16 @@ export class MtpWorkerRasterCache {
       this.latest = undefined;
       this.desiredKey = undefined;
       this.needsDraw = true;
-      this.preview(source);
-      return true;
+      this.refillPermit = this.refill.allow(
+        this.preview(source)?.refill ?? (!this.ready && source.uniformX === "lightweight")
+      );
+      if (!this.refillPermit) return true;
     }
     if (candidate) {
+      if (this.refillPermit) {
+        this.refillPermit = false;
+        return true;
+      }
       this.quickHits++;
       const key = "intent" in candidate ? candidate.intent.key : candidate.key;
       if (candidate === this.inFlight && this.forceBudget > 0) {
@@ -373,7 +437,8 @@ export class MtpWorkerRasterCache {
       this.deferred = { contentKey, from: source.from, to: source.to };
       this.desiredKey = undefined;
       this.needsDraw = true;
-      this.preview(source);
+      if (!this.refillPermit) this.preview(source);
+      this.refillPermit = false;
       return true;
     }
     this.deferred = undefined;
@@ -384,8 +449,8 @@ export class MtpWorkerRasterCache {
       this.fail("unsupported-frame");
       return false;
     }
-    this.desiredKey = intent.key;
-    this.needsDraw = false;
+    this.desiredKey = this.refillPermit ? undefined : intent.key;
+    this.needsDraw = this.refillPermit;
     previewHardKey ??= mtpWorkerContentKey(source, true) ?? undefined;
     if (previewHardKey === undefined) {
       this.fail("unsupported-frame");
@@ -398,12 +463,15 @@ export class MtpWorkerRasterCache {
       return true;
     }
     if (this.ready && !this.ready.geometry.fast) this.releaseReady();
-    this.preview(source);
+    if (!this.refillPermit) this.preview(source);
     this.latest = { intent, geometry };
     this.dispatch();
     return true;
   }
   invalidate(active = false): void {
+    this.releaseResult();
+    this.refill.clear();
+    this.refillPermit = false;
     this.latest = undefined;
     this.deferred = undefined;
     this.desiredKey = undefined;
@@ -421,6 +489,7 @@ export class MtpWorkerRasterCache {
     this.cancelDeadline();
     this.stopWorker();
     this.releaseReady();
+    this.releaseResult();
     this.inFlight = undefined;
     this.latest = undefined;
     this.deferred = undefined;
