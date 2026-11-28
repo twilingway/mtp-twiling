@@ -40,6 +40,7 @@ const load = (name, imports = {}, globals = {}) => {
   return module.exports;
 };
 const helpers = load("mobile-object-widget.ts");
+const annotations = load("../../../model/drawing-annotation.ts");
 
 function menuDismissHarness({ mobile = true, kind = "drawing" } = {}) {
   class Node {
@@ -535,6 +536,7 @@ function componentHarness(object) {
         Fragment: "fragment"
       },
       "../../../i18n/messages.js": { t: (value) => value },
+      "../../../model/drawing-annotation.js": annotations,
       "../../../model/drawing-model.js": {
         TOOL_NAMES: Object.fromEntries(tools.map((name) => [name, name])),
         drawingStyle: (drawing) => ({
