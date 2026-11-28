@@ -108,6 +108,23 @@ export async function removeYandexSlot(
 ): Promise<void> {
   if ((!isSlotName(file.name) && !isStageName(file.name)) || !/^[a-f\d]{32}$/.test(file.md5))
     throw new YandexError("permission");
+  return removeExactFile(access, file, valid);
+}
+/** Separate capability for legacy bodies accepted by a verified slot snapshot. */
+export async function removeYandexLegacy(
+  access: SlotMutationAccess,
+  file: YandexFile,
+  valid: () => boolean
+): Promise<void> {
+  if (!/^[a-f\d-]{36}_[a-f\d-]{36}\.mtp$/.test(file.name) || !/^[a-f\d]{32}$/.test(file.md5))
+    throw new YandexError("permission");
+  return removeExactFile(access, file, valid);
+}
+async function removeExactFile(
+  access: SlotMutationAccess,
+  file: YandexFile,
+  valid: () => boolean
+): Promise<void> {
   assertCurrent(access.auth.signal, valid);
   const response = await access.request(
     API +

@@ -9,7 +9,7 @@ const load = sourceLoader(),
   { encodeBundle, revisionName } = load("services/yandex/bundle.ts"),
   { prepareDriveBackup, restoreDriveBackup, driveBackupDigest } = load("services/drive/backup.ts");
 const payloadDigest = async (payload) => driveBackupDigest(JSON.parse(await payload.text()));
-async function fixture(enabled = true, shared) {
+async function fixture(enabled = true, shared, overrides = {}) {
   const backend = shared?.backend ?? await localBackend(),
     journal = new YandexJournal(async () => backend),
     disk = shared?.disk ?? diskFixture();
@@ -82,7 +82,8 @@ async function fixture(enabled = true, shared) {
         sleep: async () => {},
         timeoutMs: 100
       }),
-    lock: async (_, run) => run()
+    lock: async (_, run) => run(),
+    ...overrides
   };
   const make = () => new YandexCoordinator(host, config, options),
     coordinator = make();
@@ -285,6 +286,260 @@ async function reviewedPrevious(f) {
   const comparison = f.coordinator.getSnapshot().comparison;
   return { current: comparison.remotes.find(x => x.deletion?.kind === "current"),
     previous: comparison.remotes.find(x => x.deletion?.kind === "previous") };
+}
+
+test("manual deletion deadline releases a queued writer and fences its late callback before transport", async () => {
+  const queued = deferred();
+  let wait = false, late;
+  const f = await fixture(true, undefined, {
+    manualDeleteTimeoutMs: 20,
+    lock: async (_, run) => {
+      if (!wait) return run();
+      late = async () => { await run(); queued.resolve(); };
+      return queued.promise;
+    }
+  });
+  try {
+    const { previous } = await reviewedPrevious(f), calls = f.disk.calls.length;
+    wait = true;
+    await f.coordinator.remove(previous.id);
+    const status = f.coordinator.getSnapshot();
+    assert.equal(status.phase, "error");
+    assert.equal(status.error, "network");
+    assert.equal(status.deleteAction.state, "unconfirmed");
+    assert.equal(status.progress, undefined);
+    assert.equal(status.comparison.remotes.some(x => x.id === previous.id), true);
+    assert.equal(f.disk.calls.length, calls);
+    await assert.rejects(late(), { code: "network" });
+    assert.equal(f.disk.calls.length, calls, "a released stale lock continuation cannot touch cloud");
+    wait = false;
+    await f.coordinator.inspect();
+    assert.notEqual(f.coordinator.getSnapshot().phase, "syncing", "a new action is no longer busy");
+  } finally { f.coordinator.dispose(); }
+});
+
+test("manual deletion deadline aborts an active request, keeps its plan, and an explicit retry refreshes the card", async () => {
+  const f = await fixture(true, undefined, { manualDeleteTimeoutMs: 100 });
+  try {
+    const { previous, current } = await reviewedPrevious(f), fetcher = f.disk.fetcher;
+    let aborted = false;
+    f.disk.fetcher = async (target, init) => {
+      const path = new URL(target).searchParams.get("path");
+      if (init.method !== "DELETE" || !path?.includes("/slot_")) return fetcher(target, init);
+      return new Promise((_, reject) => {
+        init.signal.addEventListener("abort", () => { aborted = true; reject(init.signal.reason); }, { once: true });
+      });
+    };
+    await f.coordinator.remove(previous.id);
+    assert.equal(aborted, true);
+    assert.equal(f.coordinator.getSnapshot().phase, "error");
+    assert.equal(f.coordinator.getSnapshot().deleteAction.state, "unconfirmed");
+    assert.ok(await f.journal.maintenance(config.clientId, f.disk.auth.accountId));
+    f.disk.fetcher = fetcher;
+    f.coordinator.manualDeleteTimeoutMs = 5000;
+    await f.coordinator.remove(previous.id);
+    assert.equal(f.coordinator.getSnapshot().deleteAction.state, "confirmed");
+    assert.deepEqual(f.coordinator.getSnapshot().comparison.remotes.map(x => x.id), [current.id]);
+  } finally { f.coordinator.dispose(); }
+});
+
+test("manual deletion sees another tab disable before entering the lock and ends disabled without transport", async () => {
+  let before;
+  const f = await fixture(true, undefined, { lock: async (_, run) => { await before?.(); return run(); } });
+  try {
+    const { previous } = await reviewedPrevious(f), calls = f.disk.calls.length;
+    before = () => f.journal.saveSettings({ enabled: false, automatic: false, clientMode: "normal" }, new AbortController().signal);
+    await f.coordinator.remove(previous.id);
+    assert.equal(f.coordinator.getSnapshot().phase, "disabled");
+    assert.equal(f.coordinator.getSnapshot().progress, undefined);
+    assert.equal(f.coordinator.getSnapshot().deleteAction, undefined);
+    assert.equal(f.disk.calls.length, calls);
+    assert.equal(f.coordinator.operation, undefined);
+  } finally { f.coordinator.dispose(); }
+});
+
+test("confirmed deletion retains every surviving card while its refresh lock reaches the same deadline", async () => {
+  const f = await fixture(true, undefined, { manualDeleteTimeoutMs: 200 });
+  try {
+    const { previous, current } = await reviewedPrevious(f), counts = [];
+    let first = true;
+    f.coordinator.lock = async (auth, run) => {
+      if (first) { first = false; return run(); }
+      return new Promise((_, reject) => auth.signal.addEventListener("abort", () => reject(auth.signal.reason), { once: true }));
+    };
+    const unsubscribe = f.coordinator.subscribe(() => counts.push(f.coordinator.getSnapshot().comparison?.remotes.length ?? 0));
+    await f.coordinator.remove(previous.id);
+    unsubscribe();
+    assert.equal(f.coordinator.getSnapshot().deleteAction.state, "confirmed");
+    assert.deepEqual(f.coordinator.getSnapshot().comparison.remotes.map(x => x.id), [current.id]);
+    assert.equal(counts.every(count => count > 0), true, "refresh never clears surviving cards");
+    assert.notEqual(f.coordinator.getSnapshot().phase, "syncing");
+    assert.equal(f.coordinator.operation, undefined);
+  } finally { f.coordinator.dispose(); }
+});
+
+test("automatic wake reads only; semantic edit bursts publish once and further wakes upload nothing", async () => {
+  const f = await fixture(), timeout = globalThis.setTimeout, clear = globalThis.clearTimeout,
+    jobs = new Map();
+  let last;
+  globalThis.setTimeout = (run, delay, ...args) => {
+    if (delay !== 750) return timeout(run, delay, ...args);
+    const id = {};
+    jobs.set(id, () => run(...args));
+    return id;
+  };
+  globalThis.clearTimeout = id => { if (!jobs.delete(id)) clear(id); };
+  const fire = async () => {
+    const batch = [...jobs.values()]; jobs.clear();
+    for (const job of batch) job();
+    await last;
+  };
+  try {
+    await f.coordinator.prepare(); await f.coordinator.inspect();
+    assert.equal(f.coordinator.getSnapshot().clientId, undefined);
+    await f.coordinator.choose({ kind: "local" });
+    assert.equal(f.coordinator.getSnapshot().clientId, await f.journal.deviceId());
+    const run = f.coordinator.run.bind(f.coordinator);
+    f.coordinator.run = (...args) => last = run(...args);
+    await f.coordinator.setAutomatic(true);
+    const calls = f.disk.calls.length, puts = f.disk.puts();
+    for (let wake = 0; wake < 4; wake++) { f.coordinator.resume(); await fire(); }
+    assert.equal(f.disk.puts(), puts);
+    assert.equal(f.disk.calls.slice(calls).some(({ init }) => ["PUT", "POST", "DELETE"].includes(init.method)), false);
+    for (const timeframe of ["5m", "15m", "30m"]) { f.edit(timeframe); f.coordinator.localChanged(); }
+    assert.equal(jobs.size, 1, "a burst retains one debounced semantic job");
+    await fire();
+    assert.equal(f.disk.puts(), puts + 1);
+    assert.equal(f.coordinator.getSnapshot().pendingChanges, false);
+    const after = f.disk.calls.length;
+    for (let wake = 0; wake < 4; wake++) { f.coordinator.resume(); await fire(); }
+    assert.equal(f.disk.puts(), puts + 1);
+    assert.equal(f.disk.calls.slice(after).some(({ init }) => ["PUT", "POST", "DELETE"].includes(init.method)), false);
+  } finally {
+    f.coordinator.dispose();
+    globalThis.setTimeout = timeout; globalThis.clearTimeout = clear;
+  }
+});
+
+test("continuous semantic edits publish by five seconds and retain a later dirty burst", async t => {
+  const f = await fixture();
+  try {
+    await f.coordinator.prepare(); await f.coordinator.inspect(); await f.coordinator.choose({ kind: "local" });
+    t.mock.timers.enable({ apis: ["setTimeout"] });
+    const run = f.coordinator.run.bind(f.coordinator); let last;
+    f.coordinator.run = (...args) => last = run(...args);
+    await f.coordinator.setAutomatic(true);
+    const puts = f.disk.puts();
+    for (let step = 0; step < 10; step++) {
+      f.edit(["1m", "5m", "15m", "30m", "1h"][step % 5]); f.coordinator.localChanged();
+      t.mock.timers.tick(500);
+      if (step < 9) assert.equal(f.disk.puts(), puts);
+    }
+    assert.ok(last, "continuous edits cannot postpone the first attempt beyond five seconds");
+    await last;
+    assert.equal(f.disk.puts(), puts + 1);
+    for (let step = 0; step < 4; step++) {
+      f.edit(["5m", "15m", "30m", "1d"][step]); f.coordinator.localChanged(); t.mock.timers.tick(500);
+    }
+    assert.equal(f.coordinator.getSnapshot().pendingChanges, true);
+    assert.equal(f.disk.puts(), puts + 1);
+    t.mock.timers.tick(250); await last;
+    assert.equal(f.disk.puts(), puts + 2);
+    assert.equal(f.coordinator.getSnapshot().pendingChanges, false);
+  } finally { f.coordinator.dispose(); }
+});
+
+test("a busy writer retains the five-second deadline and flushes the latest dirty state after completion", async t => {
+  const { YandexScheduler } = load("services/yandex/coordinator-scheduler.ts"), scheduler = new YandexScheduler();
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let busy = true, runs = 0, latest = 0, captured;
+  const run = async () => { runs++; captured = latest; }, resume = () => scheduler.schedule(run, () => busy, true);
+  for (let step = 0; step < 12; step++) { latest = step; resume(); t.mock.timers.tick(500); }
+  assert.equal(runs, 0);
+  busy = false; scheduler.complete(resume);
+  assert.equal(runs, 1, "the elapsed deadline does not restart another trailing debounce");
+  assert.equal(captured, 11);
+  t.mock.timers.tick(10000); assert.equal(runs, 1);
+  latest = 12; resume(); t.mock.timers.tick(400); scheduler.clear();
+  t.mock.timers.tick(10000); assert.equal(runs, 1, "account/disable cancellation clears both deadline timers");
+});
+
+for (const kind of ["legacy", "test"]) {
+  test(`explicit unchanged sync physically cleans accepted ${kind} copies without creating another logical snapshot`, async () => {
+    const f = await fixture();
+    try {
+      let returned;
+      if (kind === "legacy") {
+        const revision = await seedRemote(f);
+        returned = new Map([[revisionName(revision), f.disk.files.get(revisionName(revision))]]);
+      } else {
+        const backend = await localBackend(), journal = new YandexJournal(async () => backend);
+        await journal.saveSettings({ enabled: true, automatic: false, clientMode: "test" }, f.disk.auth.signal);
+        const transport = new (load("services/yandex/transport.ts").YandexTransport)(f.disk.auth, { fetch: f.disk.fetcher, sleep: async () => {} }),
+          testing = new (load("services/yandex/revisions.ts").YandexRevisions)(transport, journal, f.disk.auth, config.clientId), captured = await f.host.capture();
+        await testing.publish(captured.prepared, captured.digest, [], () => true, true);
+        returned = new Map(f.disk.files);
+      }
+      await f.coordinator.prepare(); await f.coordinator.inspect();
+      await f.coordinator.choose({ kind: "local" });
+      const accepted = await f.journal.association(config.clientId, f.disk.auth.accountId), digest = (await f.host.capture()).digest;
+      for (const [name, body] of returned) { assert.equal(f.disk.files.has(name), false); f.disk.files.set(name, body); }
+      const puts = f.disk.puts();
+      await f.coordinator.sync();
+      for (const name of returned.keys()) assert.equal(f.disk.files.has(name), false);
+      assert.equal(f.disk.puts(), puts + (kind === "test" ? 1 : 0), "test retirement only uploads its durable maintenance envelope");
+      assert.deepEqual(await f.journal.association(config.clientId, f.disk.auth.accountId), accepted);
+      assert.equal((await f.host.capture()).digest, digest);
+      assert.equal(f.applies(), 0);
+      for (const [name, body] of f.disk.files) {
+        if (!name.startsWith("slot_")) continue;
+        const decoded = await load("services/yandex/slot-codec.ts").decodeSlot(body);
+        assert.equal(decoded.envelope.current.revision.revisionId, accepted.heads[0]);
+        assert.equal(decoded.envelope.current.seq, 1);
+      }
+      await f.coordinator.sync();
+      assert.equal(f.disk.puts(), puts + (kind === "test" ? 1 : 0));
+    } finally { f.coordinator.dispose(); }
+  });
+
+  test(`a reviewed unchanged local choice establishes missing ${kind} proof while generic sync preserves the old carrier`, async () => {
+    const f = await fixture(), Revisions = load("services/yandex/revisions.ts").YandexRevisions,
+      prune = Revisions.prototype.pruneAccepted;
+    try {
+      let target;
+      if (kind === "legacy") {
+        const revision = await seedRemote(f); target = revisionName(revision);
+      } else {
+        const backend = await localBackend(), journal = new YandexJournal(async () => backend);
+        await journal.saveSettings({ enabled: true, automatic: false, clientMode: "test" }, f.disk.auth.signal);
+        const transport = new (load("services/yandex/transport.ts").YandexTransport)(f.disk.auth, { fetch: f.disk.fetcher, sleep: async () => {} }),
+          testing = new Revisions(transport, journal, f.disk.auth, config.clientId), captured = await f.host.capture();
+        await testing.publish(captured.prepared, captured.digest, [], () => true, true);
+        target = [...f.disk.files.keys()].find(name => name.includes("00000000-0000-4000-8000-000000000001"));
+      }
+      Revisions.prototype.pruneAccepted = async () => {};
+      await f.coordinator.prepare(); await f.coordinator.inspect(); await f.coordinator.choose({ kind: "local" });
+      Revisions.prototype.pruneAccepted = prune;
+      const { decodeSlot, encodeSlot } = load("services/yandex/slot-codec.ts");
+      for (const [name, body] of [...f.disk.files]) {
+        if (!name.startsWith("slot_") || name === target) continue;
+        const decoded = await decodeSlot(body), { acceptanceProofs, ...envelope } = decoded.envelope;
+        assert.ok(acceptanceProofs?.length);
+        f.disk.files.set(name, (await encodeSlot(envelope, decoded.current, decoded.previous)).body);
+      }
+      const digest = (await f.host.capture()).digest, accepted = await f.journal.association(config.clientId, f.disk.auth.accountId), puts = f.disk.puts();
+      await f.coordinator.sync();
+      assert.equal(f.disk.files.has(target), true);
+      assert.equal(f.coordinator.getSnapshot().retention.phase, "pending");
+      assert.equal(f.disk.puts(), puts, "generic sync cannot mint a new original-body acceptance proof");
+      await f.coordinator.inspect(); await f.coordinator.choose({ kind: "local" });
+      assert.equal(f.coordinator.getSnapshot().choiceAction.state, "confirmed");
+      assert.equal(f.disk.files.has(target), false);
+      assert.notDeepEqual((await f.journal.association(config.clientId, f.disk.auth.accountId)).heads, accepted.heads);
+      assert.equal((await f.host.capture()).digest, digest);
+      assert.equal(f.applies(), 0);
+    } finally { Revisions.prototype.pruneAccepted = prune; f.coordinator.dispose(); }
+  });
 }
 
 test("manual deletion reduces previous history while keeping exact current ID, local data and accepted association", async () => {

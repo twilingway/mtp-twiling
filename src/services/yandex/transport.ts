@@ -1,6 +1,6 @@
 import { assertCurrent, object, sha256, YANDEX_ROOT, YandexError } from "./types.js";
 import type { YandexAuthorization, YandexFile, YandexReference } from "./types.js";
-import { moveYandexSlot, removeYandexSlot } from "./slot-transport.js";
+import { moveYandexSlot, removeYandexSlot, removeYandexLegacy } from "./slot-transport.js";
 import type { SlotMutationAccess } from "./slot-transport.js";
 
 const API = "https://cloud-api.yandex.net/v1/disk/resources";
@@ -398,6 +398,9 @@ export class YandexTransport {
   }
   removeExact(file: YandexFile, valid: () => boolean = () => true): Promise<void> {
     return removeYandexSlot(this.slotAccess(), file, valid);
+  }
+  removeLegacyExact(file: YandexFile, valid: () => boolean): Promise<void> {
+    return removeYandexLegacy(this.slotAccess(), file, valid);
   }
   /** Only explicit probe cleanup; regular synchronization never invokes physical deletion. */
   async removeProbe(item: YandexFile): Promise<void> {

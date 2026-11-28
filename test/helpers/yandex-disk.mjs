@@ -71,7 +71,7 @@ export function diskFixture() {
     if (init.method === "PUT") return new Response(null, { status: 201 });
     if (init.method === "DELETE") {
       if (
-        /^(?:probe_)?(?:slot|stage)_/.test(itemName) &&
+        /^(?:(?:probe_)?(?:slot|stage)_|[a-f\d-]{36}_[a-f\d-]{36}\.mtp$)/.test(itemName) &&
         files.has(itemName) &&
         url.searchParams.get("md5") &&
         url.searchParams.get("md5") !== (await itemMetadata(files.get(itemName), itemName)).md5

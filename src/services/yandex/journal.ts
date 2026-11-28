@@ -86,6 +86,14 @@ export class YandexJournal {
       throw new YandexError("local-save");
     return value;
   }
+  async existingDeviceId(): Promise<string | undefined> {
+    if ((await this.settings()).clientMode === "test") return CLOUD_TEST_CLIENT_ID;
+    const value = await (await this.backend()).read("mtp:yandex:device:device-id");
+    if (value === undefined) return undefined;
+    if (typeof value !== "string" || !uuidPattern.test(value) || value === CLOUD_TEST_CLIENT_ID)
+      throw new YandexError("local-save");
+    return value;
+  }
   async matchesCurrentDevice(id: string): Promise<boolean> {
     const settings = await this.settings();
     if (!settings.enabled) return false;

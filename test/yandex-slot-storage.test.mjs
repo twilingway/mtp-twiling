@@ -45,6 +45,265 @@ async function write(f, timeframe, explicit = true) {
   await f.journal.clearPending(config.clientId, f.auth.accountId, f.auth.signal);
   return revision;
 }
+
+test("verified current removes accepted legacy ancestry physically and preserves an unaccepted late copy", async () => {
+  const f = await fixture(), legacy = [];
+  const deviceId = crypto.randomUUID();
+  for (const timeframe of ["1m", "5m", "15m"]) {
+    const value = backup(timeframe), encoded = await encodeBundle(await prepareDriveBackup(value), {
+      revisionId: crypto.randomUUID(), deviceId,
+      parents: legacy.length ? [legacy.at(-1).revision.revisionId] : [],
+      createdAt: new Date().toISOString(), digest: await driveBackupDigest(value)
+    });
+    legacy.push(encoded); f.files.set(revisionName(encoded.revision), encoded.body);
+  }
+  let deletes = 0;
+  f.hooks.before = async (url, init) => {
+    if (init.method !== "DELETE" || !legacy.some(x => url.searchParams.get("path")?.endsWith(revisionName(x.revision)))) return;
+    const carriers = [...f.files].filter(([name]) => name.startsWith("slot_"));
+    assert.equal(carriers.length, 1);
+    const decoded = await decodeSlot(carriers[0][1]);
+    assert.equal(JSON.parse(await decoded.prepared.get(decoded.envelope.current.revision.revisionId).payload.text()).layout.timeframe, "1h");
+    deletes++;
+  };
+  const current = await write(f, "1h");
+  assert.equal(deletes, 3);
+  assert.equal(f.files.size, 1);
+  const late = legacy[0]; f.files.set(revisionName(late.revision), late.body);
+  await new YandexRevisions(f.transport, f.journal, f.auth, config.clientId).retryPrune(() => true);
+  assert.equal(f.files.has(revisionName(late.revision)), false, "the original exact proof also protects a cold cleanup of a returned ancestor");
+  const unknownValue = backup("4h"), unknown = await encodeBundle(await prepareDriveBackup(unknownValue), {
+    revisionId: crypto.randomUUID(), deviceId: crypto.randomUUID(), parents: [],
+    createdAt: new Date().toISOString(), digest: await driveBackupDigest(unknownValue)
+  });
+  f.files.set(revisionName(unknown.revision), unknown.body);
+  await new YandexRevisions(f.transport, f.journal, f.auth, config.clientId).retryPrune(() => true);
+  assert.equal(f.files.has(revisionName(unknown.revision)), true);
+  const inspected = await f.revisions.inspect(() => true);
+  assert.deepEqual(new Set(inspected.heads), new Set([current.revisionId, unknown.revision.revisionId]));
+});
+
+test("accepted legacy cleanup refuses a corrupted durable current and a changed MD5 at DELETE", async () => {
+  for (const damage of ["current", "legacy-replacement"]) {
+    const f = await fixture(), value = backup("5m"), encoded = await encodeBundle(await prepareDriveBackup(value), {
+      revisionId: crypto.randomUUID(), deviceId: crypto.randomUUID(), parents: [],
+      createdAt: new Date().toISOString(), digest: await driveBackupDigest(value)
+    }), name = revisionName(encoded.revision);
+    f.files.set(name, encoded.body);
+    f.hooks.before = async (url, init) => {
+      if (init.method === "DELETE" && url.searchParams.get("path")?.endsWith(name)) throw new TypeError("retain legacy for cold retry");
+    };
+    await write(f, "1h"); f.hooks.before = undefined;
+    const before = f.calls.length;
+    if (damage === "current") {
+      const [carrier, body] = [...f.files].find(([key]) => key.startsWith("slot_")), bytes = new Uint8Array(await body.arrayBuffer());
+      bytes[bytes.length - 1] ^= 1; f.files.set(carrier, new Blob([bytes]));
+    } else {
+      f.hooks.before = async (url, init) => {
+        if (init.method === "DELETE" && url.searchParams.get("path")?.endsWith(name))
+          f.files.set(name, new Blob(["unexpected replacement body"]));
+      };
+    }
+    const cold = new YandexRevisions(f.transport, f.journal, f.auth, config.clientId);
+    await cold.retryPrune(() => true);
+    assert.equal(cold.retention.phase, "pending");
+    assert.equal(f.files.has(name), true);
+    if (damage === "current") assert.equal(f.calls.slice(before).some(({ init }) => init.method === "DELETE"), false);
+    else assert.equal(await f.files.get(name).text(), "unexpected replacement body");
+  }
+});
+
+test("another client's proven obsolete carriers are pruned while its exact latest two payloads survive", async () => {
+  const f = await fixture(), backend = await localBackend(), journal = new YandexJournal(async () => backend),
+    other = { ...f, journal, revisions: new YandexRevisions(f.transport, journal, f.auth, config.clientId) };
+  f.hooks.before = async (url, init) => {
+    if (init.method === "DELETE" && url.searchParams.get("path")?.includes("/slot_")) throw new TypeError("defer cleanup");
+  };
+  const old = await write(other, "1m"), previous = await write(other, "5m"), latest = await write(other, "15m");
+  const otherId = await journal.deviceId();
+  assert.equal([...f.files.keys()].filter(name => name.includes(otherId)).length, 3);
+  f.hooks.before = undefined;
+  await write(f, "1h");
+  assert.equal([...f.files.keys()].filter(name => name.includes(otherId)).length, 1);
+  const inspected = await f.revisions.inspect(() => true), ids = inspected.remotes.filter(x => x.revision.deviceId === otherId).map(x => x.revision.revisionId);
+  assert.deepEqual(new Set(ids), new Set([previous.revisionId, latest.revisionId]));
+  assert.equal(ids.includes(old.revisionId), false);
+});
+
+test("accepted shared test copies retire with durable proofs and returning testing continues the proven sequence", async () => {
+  const f = await fixture(), backend = await localBackend(), journal = new YandexJournal(async () => backend),
+    testClient = { ...f, journal, revisions: new YandexRevisions(f.transport, journal, f.auth, config.clientId) },
+    testId = "00000000-0000-4000-8000-000000000001";
+  await journal.saveSettings({ enabled: true, automatic: false, clientMode: "test" }, f.auth.signal);
+  const first = await write(testClient, "1m");
+  await write(f, "1h");
+  assert.equal([...f.files.keys()].some(name => name.includes(testId)), false);
+  let decoded = await decodeSlot([...f.files.values()][0]);
+  assert.ok(decoded.envelope.prunedPeers.some(proof => proof.revisionId === first.revisionId));
+  testClient.revisions = new YandexRevisions(f.transport, journal, f.auth, config.clientId);
+  const second = await write(testClient, "5m");
+  const testFile = [...f.files].find(([name]) => name.includes(testId));
+  decoded = await decodeSlot(testFile[1]);
+  assert.equal(decoded.envelope.current.seq, 2);
+  assert.equal(decoded.envelope.generation, 2);
+  assert.equal(decoded.envelope.previous, null);
+  assert.ok(decoded.envelope.current.priorVersionHash);
+  assert.deepEqual((await new YandexRevisions(f.transport, journal, f.auth, config.clientId).inspect(() => true)).heads, [second.revisionId]);
+  await write(f, "4h");
+  assert.equal([...f.files.keys()].some(name => name.includes(testId)), false);
+  testClient.revisions = new YandexRevisions(f.transport, journal, f.auth, config.clientId);
+  const third = await write(testClient, "15m");
+  const resumed = await decodeSlot([...f.files].find(([name]) => name.includes(testId))[1]);
+  assert.equal(resumed.envelope.current.seq, 3);
+  assert.deepEqual((await testClient.revisions.inspect(() => true)).heads, [third.revisionId]);
+});
+
+test("a stale pending test upload cannot resurrect a retired logical save or delete the surviving normal device", async () => {
+  const f = await fixture(), backend = await localBackend(), journal = new YandexJournal(async () => backend),
+    testing = new YandexRevisions(f.transport, journal, f.auth, config.clientId), value = backup("1m"),
+    prepared = await prepareDriveBackup(value), digest = await driveBackupDigest(value);
+  await journal.saveSettings({ enabled: true, automatic: false, clientMode: "test" }, f.auth.signal);
+  await testing.publish(prepared, digest, [], () => true, true);
+  const pending = await journal.pending(config.clientId, f.auth.accountId);
+  const normal = await write(f, "1h"), before = new Map(f.files), calls = f.calls.length;
+  assert.ok(pending);
+  const cold = new YandexRevisions(f.transport, journal, f.auth, config.clientId);
+  await assert.rejects(cold.publish(prepared, digest, [], () => true, false), error => error.code === "local-changed");
+  assert.deepEqual(f.files, before);
+  assert.equal(f.calls.slice(calls).some(({ init }) => ["PUT", "POST", "DELETE"].includes(init.method)), false);
+  assert.deepEqual((await cold.inspect(() => true)).heads, [normal.revisionId]);
+  assert.equal((await journal.pending(config.clientId, f.auth.accountId)).revision.revisionId, pending.revision.revisionId);
+});
+
+test("returning independent testing writers still exclude a same-sequence fork after retirement", async () => {
+  const f = await fixture(), journals = [];
+  for (let index = 0; index < 2; index++) {
+    const backend = await localBackend(), journal = new YandexJournal(async () => backend);
+    await journal.saveSettings({ enabled: true, automatic: false, clientMode: "test" }, f.auth.signal);
+    journals.push(journal);
+  }
+  const first = { ...f, journal: journals[0], revisions: new YandexRevisions(f.transport, journals[0], f.auth, config.clientId) };
+  await write(first, "1m");
+  await write(f, "1h");
+  const heads = (await f.revisions.inspect(() => true)).heads,
+    values = [backup("5m"), backup("15m")], prepared = await Promise.all(values.map(prepareDriveBackup)), digests = await Promise.all(values.map(driveBackupDigest)),
+    clients = journals.map(journal => new YandexRevisions(f.transport, journal, f.auth, config.clientId));
+  const results = await Promise.allSettled(clients.map((client, index) => client.publish(prepared[index], digests[index], heads, () => true, true)));
+  assert.equal(results.filter(result => result.status === "fulfilled").length, 1);
+  assert.equal(results.filter(result => result.status === "rejected").length, 1);
+  const testFiles = [...f.files].filter(([name]) => name.includes("00000000-0000-4000-8000-000000000001"));
+  assert.equal(testFiles.length, 1);
+  const decoded = await decodeSlot(testFiles[0][1]);
+  assert.equal(decoded.envelope.current.seq, 2);
+  assert.equal(decoded.envelope.generation, 2);
+  assert.equal((await f.revisions.inspect(() => true)).heads.length, 1);
+});
+
+for (const kind of ["legacy", "test"]) {
+  for (const migration of [false, true]) {
+    test(`exact accepted ${kind} bytes cannot be replaced under the same ID before cold prune or automatic publish (${migration ? "old no-proof carrier" : "durable original proof"})`, async () => {
+      const f = await fixture(), prune = f.revisions.pruneAccepted.bind(f.revisions);
+      f.revisions.pruneAccepted = async () => {};
+      let name, original;
+      if (kind === "legacy") {
+        const value = backup("5m"); original = await encodeBundle(await prepareDriveBackup(value), {
+          revisionId: crypto.randomUUID(), deviceId: crypto.randomUUID(), parents: [],
+          createdAt: new Date().toISOString(), digest: await driveBackupDigest(value)
+        });
+        name = revisionName(original.revision); f.files.set(name, original.body);
+      } else {
+        const backend = await localBackend(), journal = new YandexJournal(async () => backend);
+        await journal.saveSettings({ enabled: true, automatic: false, clientMode: "test" }, f.auth.signal);
+        await write({ ...f, journal, revisions: new YandexRevisions(f.transport, journal, f.auth, config.clientId) }, "5m");
+        [name, original] = [...f.files].find(([key]) => key.includes("00000000-0000-4000-8000-000000000001"));
+        original = await decodeSlot(original);
+      }
+      await write(f, "1h"); f.revisions.pruneAccepted = prune;
+      if (migration) {
+        for (const [key, body] of [...f.files]) {
+          if (!key.startsWith("slot_") || key === name) continue;
+          const decoded = await decodeSlot(body), { acceptanceProofs, ...envelope } = decoded.envelope;
+          assert.ok(acceptanceProofs?.length);
+          f.files.set(key, (await encodeSlot(envelope, decoded.current, decoded.previous)).body);
+        }
+      }
+      const changed = backup("4h"), changedBundle = await encodeBundle(await prepareDriveBackup(changed), {
+        ...(kind === "legacy" ? original.revision : original.envelope.current.revision), digest: await driveBackupDigest(changed)
+      });
+      if (kind === "legacy") f.files.set(name, changedBundle.body);
+      else f.files.set(name, (await encodeSlot({ ...original.envelope,
+        current: { ...original.envelope.current, revision: changedBundle.revision, bundle: changedBundle.reference }
+      }, changedBundle.body, original.previous)).body);
+      const replacement = f.files.get(name), before = new Map(f.files), calls = f.calls.length;
+      const cold = new YandexRevisions(f.transport, f.journal, f.auth, config.clientId);
+      await cold.retryPrune(() => true);
+      assert.equal(cold.retention.phase, "pending");
+      assert.deepEqual(f.files, before);
+      assert.equal(f.calls.slice(calls).some(({ init }) => ["PUT", "POST", "DELETE"].includes(init.method)), false);
+      await write(f, "2h", false);
+      assert.equal(f.files.get(name), replacement);
+      const current = (await f.revisions.inspect(() => true)).remotes.find(remote => remote.revision.deviceId !== (kind === "test" ? "00000000-0000-4000-8000-000000000001" : changedBundle.revision.deviceId));
+      const normal = await decodeSlot(f.files.get(current.file.name));
+      if (migration) assert.equal(normal.envelope.acceptanceProofs, undefined, "automatic edits never upgrade UUID-only legacy acceptance");
+      else assert.ok(normal.envelope.acceptanceProofs?.length);
+      assert.equal(f.revisions.retention.phase, "pending");
+      assert.equal(f.calls.slice(calls).some(({ url, init }) => init.method === "DELETE" && url.searchParams.get("path")?.endsWith(name)), false);
+    });
+  }
+}
+
+test("a replaced legacy ancestor is preserved even while its accepted head remains byte-identical", async () => {
+  const f = await fixture(), legacy = [], prune = f.revisions.pruneAccepted.bind(f.revisions);
+  f.revisions.pruneAccepted = async () => {};
+  for (const timeframe of ["5m", "15m"]) {
+    const value = backup(timeframe), encoded = await encodeBundle(await prepareDriveBackup(value), {
+      revisionId: crypto.randomUUID(), deviceId: legacy[0]?.revision.deviceId ?? crypto.randomUUID(),
+      parents: legacy.length ? [legacy[0].revision.revisionId] : [],
+      digest: await driveBackupDigest(value), createdAt: new Date().toISOString()
+    }); legacy.push(encoded); f.files.set(revisionName(encoded.revision), encoded.body);
+  }
+  await write(f, "1h"); f.revisions.pruneAccepted = prune;
+  const replacementValue = backup("4h"), replacement = await encodeBundle(await prepareDriveBackup(replacementValue), {
+    ...legacy[0].revision, digest: await driveBackupDigest(replacementValue)
+  });
+  f.files.set(revisionName(replacement.revision), replacement.body);
+  const files = new Map(f.files), calls = f.calls.length, cold = new YandexRevisions(f.transport, f.journal, f.auth, config.clientId);
+  await cold.retryPrune(() => true);
+  assert.equal(cold.retention.phase, "pending");
+  assert.deepEqual(f.files, files);
+  assert.equal(f.calls.slice(calls).some(({ init }) => ["PUT", "POST", "DELETE"].includes(init.method)), false);
+});
+
+test("different legacy bodies reusing one revision UUID are a protected conflict before cleanup", async () => {
+  const f = await fixture(), value = backup("5m"), revisionId = crypto.randomUUID();
+  for (let index = 0; index < 2; index++) {
+    const encoded = await encodeBundle(await prepareDriveBackup(value), {
+      revisionId, deviceId: crypto.randomUUID(), parents: [], digest: await driveBackupDigest(value), createdAt: new Date().toISOString()
+    }); f.files.set(revisionName(encoded.revision), encoded.body);
+  }
+  const files = new Map(f.files), calls = f.calls.length;
+  await assert.rejects(f.revisions.inspect(() => true), error => error.code === "conflict");
+  await f.revisions.retryPrune(() => true);
+  assert.equal(f.revisions.retention.phase, "pending"); assert.deepEqual(f.files, files);
+  assert.equal(f.calls.slice(calls).some(({ init }) => ["PUT", "POST", "DELETE"].includes(init.method)), false);
+});
+
+test("automatic edits and manual metadata-only history deletion preserve original acceptance proofs exactly", async () => {
+  const f = await fixture(), value = backup("5m"), legacy = await encodeBundle(await prepareDriveBackup(value), {
+    revisionId: crypto.randomUUID(), deviceId: crypto.randomUUID(), parents: [],
+    digest: await driveBackupDigest(value), createdAt: new Date().toISOString()
+  }); f.files.set(revisionName(legacy.revision), legacy.body);
+  const first = await write(f, "1h"), initial = await decodeSlot([...f.files.values()][0]);
+  assert.equal(initial.envelope.acceptanceProofs.length, 1);
+  const current = await write(f, "4h", false), before = await decodeSlot([...f.files.values()][0]);
+  assert.deepEqual(before.envelope.acceptanceProofs, initial.envelope.acceptanceProofs);
+  await f.revisions.executeManualDelete(await deletePlan(f, first.revisionId), () => true);
+  const after = await decodeSlot([...f.files.values()][0]);
+  assert.deepEqual(after.envelope.acceptanceProofs, initial.envelope.acceptanceProofs);
+  assert.equal(after.envelope.current.revision.revisionId, current.revisionId);
+  assert.equal(after.envelope.previous, null);
+  assert.deepEqual((await new YandexRevisions(f.transport, f.journal, f.auth, config.clientId).inspect(() => true)).heads, [current.revisionId]);
+});
 test("new writes retain one container with exactly the latest two physical payloads", async () => {
   const f = await fixture();
   const intervals = ["1m", "5m", "15m", "30m", "1h", "1d"];
@@ -176,7 +435,7 @@ test("a very late lower sequence is preserved as an uncertain branch until expli
   assert.equal((await f.revisions.inspect(() => true)).heads.length, 1);
 });
 
-test("legacy snapshots remain readable and a late dangling v1 snapshot is a visible conflict", async () => {
+test("unaccepted legacy snapshots remain readable until a verified slot explicitly accepts them", async () => {
   const f = await fixture(),
     value = backup("5m"),
     prepared = await prepareDriveBackup(value),
@@ -200,7 +459,7 @@ test("legacy snapshots remain readable and a late dangling v1 snapshot is a visi
     "5m"
   );
   await write(f, "2h");
-  assert.ok(f.files.has(name));
+  assert.equal(f.files.has(name), false);
   assert.equal((await f.revisions.inspect(() => true)).heads.length, 1);
 });
 
@@ -856,7 +1115,7 @@ test("retired peer capability counts every unique physical payload including def
     if(init.method==="DELETE"&&url.searchParams.get("path")?.split("/").at(-1).startsWith("slot_"))throw new TypeError("keep backlog");
   };
   await write(b,"1m");const previous=await write(b,"5m"),current=await write(b,"15m");
-  f.hooks.before=undefined;await write(f,"30m");
+  await write(f,"30m");f.hooks.before=undefined;
   const inspected=await f.revisions.inspect(()=>true),cap=await f.revisions.manualDeleteCapabilities(inspected.remotes,inspected.heads);
   assert.equal(cap[current.revisionId].allowed,true);assert.equal(cap[current.revisionId].versions,3);
   assert.equal(cap[previous.revisionId].versions,1);

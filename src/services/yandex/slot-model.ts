@@ -2,6 +2,12 @@ import { validateRevision } from "./bundle.js";
 import type { YandexRevision } from "./bundle.js";
 import { hashPattern, object, sha256, uuidPattern, YandexError } from "./types.js";
 import type { YandexFile, YandexReference } from "./types.js";
+import {
+  mergeSlotAcceptanceProofs,
+  parseSlotAcceptanceProofs,
+  slotAcceptanceProofs
+} from "./slot-acceptance.js";
+import type { SlotAcceptanceProof } from "./slot-acceptance.js";
 
 export const SLOT_PROTOCOL = 3;
 export const MAX_SLOT_SEQUENCE = 0x7fffffff;
@@ -37,6 +43,7 @@ export type SlotEnvelope =
       current: SlotVersion;
       previous: SlotVersion | null;
       prunedPeers: readonly SlotPrunedPeer[];
+      acceptanceProofs?: readonly SlotAcceptanceProof[];
     };
 export const slotGeneration = (envelope: SlotEnvelope): number =>
   envelope.protocol === 3 ? envelope.generation : envelope.current.seq;
@@ -160,7 +167,7 @@ export async function parseSlotEnvelope(input: unknown): Promise<SlotEnvelope> {
     input,
     raw.protocol === 2
       ? ["protocol", "current", "previous"]
-      : ["protocol", "generation", "current", "previous", "prunedPeers"]
+      : ["protocol", "generation", "current", "previous", "prunedPeers", "acceptanceProofs"]
   );
   const current = parseSlotVersion(value.current),
     previous = value.previous === null ? null : parseSlotVersion(value.previous);
@@ -213,7 +220,10 @@ export async function parseSlotEnvelope(input: unknown): Promise<SlotEnvelope> {
     generation,
     current,
     previous,
-    prunedPeers: prunedPeers.sort((a, b) => slotProofKey(a).localeCompare(slotProofKey(b)))
+    prunedPeers: prunedPeers.sort((a, b) => slotProofKey(a).localeCompare(slotProofKey(b))),
+    ...(value.acceptanceProofs === undefined
+      ? {}
+      : { acceptanceProofs: parseSlotAcceptanceProofs(value.acceptanceProofs) })
   };
 }
 export const sameClaim = (a: SlotClaim, b: SlotClaim): boolean =>
@@ -324,6 +334,7 @@ export async function inspectSlots(files: readonly SlotPhysical[]): Promise<Slot
       }
     }
   }
+  mergeSlotAcceptanceProofs(latest.flatMap(({ envelope }) => slotAcceptanceProofs(envelope)));
   const proofs = new Map<string, SlotPrunedPeer>();
   for (const { envelope } of latest)
     for (const proof of slotPrunedPeers(envelope)) {
