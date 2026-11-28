@@ -43,10 +43,10 @@
   примерно 40 → 9–14 мс, RAF p95 44–60 → 34–37 мс. 134 Worker frames без пустого слоя. Общее время
   Fit не доказанно быстрее; горизонтальный Android OS gesture не дал валидного continuous pan и
   исключён без атрибуции разрыва приложению. Производственная вкладка VTBR восстановлена точно.
-- Final V3: artifacts/mtp-worker-raster-benchmark/candidate-v3/report.json. Два actual held жеста
-  с повтором последней реальной свечи: SHA не меняется, bitmap остаётся открытым/видимым, 0 jobs
-  при удержании, после idle 1 exact новой revision. Performance повторно не измерялся; protocol/paint
-  не менялись, unchanged fast path сохраняет одну сериализацию.
+- Final V3: artifacts/mtp-worker-raster-benchmark/candidate-v3/report.json. Два actual held жеста с
+  повтором последней реальной свечи: SHA не меняется, bitmap остаётся открытым/видимым, 0 jobs при
+  удержании, после idle 1 exact новой revision. Performance повторно не измерялся; protocol/paint не
+  менялись, unchanged fast path сохраняет одну сериализацию.
 - Центрирование загрузки: artifacts/mtp-watchlist-loader-center-review/candidate-smoke.json.
   Реальная сборка 5301 без CSS injection: desktop/mobile, обе темы, loading/error/Retry и короткая
   панель проверены визуально; центр группы 0/0 px, обрезания нет.
