@@ -402,18 +402,18 @@ function fixture(options = {}) {
   };
 }
 
-function partialFrame() {
+function partialFrame(width = 1000, height = 400, ratio = 1) {
   const f = lightweightFrame();
   const { frame, reads } = f;
   let from = 5000;
   const span = 424;
-  frame.scope.bitmapSize = { width: 1000, height: 400 };
-  frame.scope.horizontalPixelRatio = frame.scope.verticalPixelRatio = 1;
+  frame.scope.bitmapSize = { width: Math.round(width * ratio), height: Math.round(height * ratio) };
+  frame.scope.horizontalPixelRatio = frame.scope.verticalPixelRatio = ratio;
   frame.scope.context.miterLimit = 1;
   frame.model.styles = {};
   frame.xFor = (index) => {
     reads.x++;
-    return ((index - from) * 1000) / span;
+    return ((index - from) * width) / span;
   };
   frame.yFor = (price) => {
     reads.y++;
@@ -473,7 +473,7 @@ test("real horizontal capture preserves core and exact dense native X within ada
   assert.ok(captured.captureStart < captured.start);
   assert.equal(captured.captureEnd, 5424, "no invented future bars");
   assert.equal(captured.sampleStep, 1);
-  assert.equal(captured.padX, 96);
+  assert.equal(captured.padX, 500, "each side targets half this actual plot width");
   assert.equal(captured.x.length, captured.captureEnd - captured.captureStart + 1);
   for (let index = captured.captureStart; index <= captured.captureEnd; index++)
     assert.equal(captured.x[index - captured.captureStart], frame.xFor(index));
@@ -501,9 +501,65 @@ test("real horizontal capture preserves core and exact dense native X within ada
     assert.ok(allocation.width * allocation.height <= 4 * 1024 * 1024);
     assert.equal(allocation.width - allocation.padX * 2, width);
     assert.equal(allocation.height - allocation.padY * 2, height);
-    assert.ok(allocation.padX <= Math.ceil(96 * ratio));
+    assert.ok(allocation.padX <= Math.ceil(Math.max(96 * ratio, width / 2)));
   }
   assert.equal(mtpWorkerBuffer(4096, 1024, 3).padX, 0);
+});
+
+test("reserve follows each actual plot, from phone and six small panes to wide desktop, within unchanged caps", () => {
+  for (const [width, height, ratio, expectedPad] of [
+    [144, 300, 1, 96],
+    [268, 700, 1, 134],
+    [737, 1800, 2.75, 369], // Actual 268 CSS px phone plot at fractional DPR.
+    [400, 400, 1, 200], // A small pane independently gets its own half-width.
+    [431, 720, 1, 216], // Actual six-pane geometry reported from the user's browser.
+    [1294, 1213, 1, 647], // Representative single-pane geometry, within the same 4 Mi-pixel cap.
+    [1230, 1150, 1, 615], // Estimated single-pane MTP plot after axes/header space.
+    [1800, 900, 1, 900],
+    [2400, 900, 1, 848], // 4096px side cap.
+    [2400, 1600, 1, 110], // 4 Mi-pixel area cap.
+    [3600, 1000, 2, 248], // Actual 1800 CSS px plot, reduced to 124 CSS px per side.
+    [4096, 1024, 1, 0]
+  ]) {
+    const buffer = mtpWorkerBuffer(width, height, ratio);
+    assert.equal(buffer.padX, expectedPad, `${width} physical px at DPR ${ratio}`);
+    assert.equal(buffer.width - 2 * buffer.padX, width);
+    assert.equal(buffer.height - 2 * buffer.padY, height);
+    assert.ok(buffer.width <= 4096 && buffer.height <= 4096);
+    assert.ok(buffer.width * buffer.height <= 4 * 1024 * 1024);
+  }
+});
+
+test("prefetch uses half the achieved reserve for phone, wide and budget-clamped actual plots", () => {
+  for (const [width, height, ratio] of [
+    [268, 400, 2.75],
+    [1800, 900, 1],
+    [2400, 1600, 1]
+  ]) {
+    const { frame, camera } = partialFrame(width, height, ratio);
+    camera(2700);
+    const intent = mtpWorkerIntent(frame);
+    const geometry = mtpWorkerGeometry(
+      frame,
+      intent,
+      mtpWorkerContentKey(frame),
+      mtpWorkerContentKey(frame, true)
+    );
+    const actualReserve = intent.frame.padX / ratio;
+    assert.ok(
+      actualReserve > 96,
+      "this scene exercises an achieved reserve above the old fixed minimum"
+    );
+    for (const direction of [-1, 1]) {
+      camera(2700 + (direction * actualReserve * 0.49 * 424) / width);
+      assert.equal(mtpWorkerPreview(frame, geometry).refill, false);
+      camera(2700 + (direction * actualReserve * 0.51 * 424) / width);
+      const plan = mtpWorkerPreview(frame, geometry);
+      assert.equal(plan.covered, true);
+      assert.equal(plan.uncovered, false);
+      assert.equal(plan.refill, true, "start before falling to the old fixed 48px remainder");
+    }
+  }
 });
 
 test("half-reserve prefetch runs before any missing edge and stays cheap, bounded and idle-exact", () => {
@@ -522,10 +578,10 @@ test("half-reserve prefetch runs before any missing edge and stays cheap, bounde
     mtpWorkerContentKey(frame, true)
   );
   const paints = f.cache.status().emergency.paints;
-  camera(17); // 40px, with 56px of useful real reserve remaining.
+  camera(100); // 236px, with more than half the 500px actual reserve remaining.
   f.cache.draw(frame, true);
   assert.equal(f.cache.status().dispatched, 1);
-  camera(21); // 49px: refill while the complete pane is still captured.
+  camera(108); // 255px: refill with 245px still available, well before the old 48px threshold.
   const plan = mtpWorkerPreview(frame, geometry);
   assert.equal(plan.covered, true);
   assert.equal(plan.refill, true);
@@ -537,7 +593,7 @@ test("half-reserve prefetch runs before any missing edge and stays cheap, bounde
     snapshot = f.cache.status().snapshots;
   for (let i = 0; i < 60; i++) {
     clock++;
-    camera(21 + i / 100);
+    camera(108 + i / 100);
     f.cache.draw(frame, true);
   }
   assert.equal(reads.extrema, scan.extrema);
@@ -573,7 +629,7 @@ test("even a one-pixel uncovered edge uses full coarse instead of a nearly compl
     mtpWorkerContentKey(frame),
     mtpWorkerContentKey(frame, true)
   );
-  camera((97 * 424) / 1000); // 96px captured reserve plus precisely one uncovered CSS pixel.
+  camera((501 * 424) / 1000); // 500px actual reserve plus precisely one uncovered CSS pixel.
   const plan = mtpWorkerPreview(frame, geometry);
   assert.equal(plan.uncovered, true);
   assert.ok(plan.clip.x >= 0.999 && plan.clip.x <= 1.001);
@@ -617,9 +673,9 @@ test("both loaded-history sides prefetch at half their available reserve, before
   assert.equal(geometry.historyLeft, false);
   assert.equal(geometry.historyRight, false);
   for (const direction of [-1, 1]) {
-    camera(2700 + direction * 17);
+    camera(2700 + direction * 100);
     assert.equal(mtpWorkerPreview(frame, geometry).refill, false);
-    camera(2700 + direction * 21);
+    camera(2700 + direction * 108);
     const plan = mtpWorkerPreview(frame, geometry);
     assert.equal(plan.covered, true);
     assert.equal(plan.refill, true);
@@ -820,7 +876,7 @@ test("covered bitmap stays native while an uncovered clip uses full real coarse 
   camera(0);
   f.cache.draw(frame, true);
   assert.equal(f.cache.status().emergency.paints, emergency);
-  camera(461);
+  camera(634);
   const plan = mtpWorkerPreview(frame, geometry);
   assert.ok(
     plan.clip.width > 0 && plan.clip.width < 10,
@@ -1224,7 +1280,7 @@ test("reversal chooses the better ready bitmap at actual draw, never from the re
     f.cache.draw(frame);
     const a = f.result();
     f.cache.draw(frame);
-    camera(100);
+    camera(600); // Outrun even the adaptive reserve, so the reversed ready has better coverage.
     f.cache.draw(frame, true);
     const request = f.messages.at(-1);
     clock = 10;
@@ -1307,7 +1363,7 @@ test("transition results close on invalidation and destroy without touching the 
     f.cache.draw(frame);
     const a = f.result();
     f.cache.draw(frame);
-    camera(100);
+    camera(120);
     f.cache.draw(frame, true);
     const b = f.result();
     const before = { ...reads };
@@ -1330,7 +1386,7 @@ test("a busy refill keeps one cheap latest intent and a live tail remains previe
   f.cache.draw(frame);
   const initial = f.result();
   f.cache.draw(frame);
-  camera(100);
+  camera(120);
   f.cache.draw(frame, true);
   const job = f.messages.at(-1);
   assert.equal(f.cache.status().dispatched, 2);
@@ -1412,11 +1468,11 @@ test("pending refill timers and bitmaps close on hard reset, disable, failure an
     f.cache.draw(frame);
     f.result();
     f.cache.draw(frame);
-    camera(100);
+    camera(120);
     f.cache.draw(frame, true);
     const image = f.result();
     clock = 10;
-    camera(200);
+    camera(240);
     f.cache.draw(frame, true);
     assert.ok([...f.timers.values()].some((timer) => timer.milliseconds < 5000));
     if (ending === "reset") {

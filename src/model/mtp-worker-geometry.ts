@@ -256,11 +256,10 @@ export function mtpWorkerPreview(
   const prefetch =
     (!geometry.historyLeft &&
       leftReserve > 0 &&
-      -(safeLeft * matrix.xScale + matrix.xOffset) <= Math.min(48, leftReserve / 2)) ||
+      -(safeLeft * matrix.xScale + matrix.xOffset) <= leftReserve / 2) ||
     (!geometry.historyRight &&
       rightReserve > 0 &&
-      safeRight * matrix.xScale + matrix.xOffset - geometry.width <=
-        Math.min(48, rightReserve / 2));
+      safeRight * matrix.xScale + matrix.xOffset - geometry.width <= rightReserve / 2);
   if (covered) return { matrix, covered, refill: prefetch, uncovered: false, clip: null };
   const start = Math.max(0, Math.floor(source.from) - 1);
   const end = Math.min(source.model.data.length - 1, Math.ceil(source.to) + 1);

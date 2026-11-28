@@ -2,13 +2,13 @@ export const MTP_WORKER_RESERVE_CSS = 96;
 const PIXEL_LIMIT = 4 * 1024 * 1024;
 const SIDE_LIMIT = 4096;
 
-/** Horizontal reserve has priority; the core keeps its original physical resolution. */
+/** Each actual plot targets half its CSS width (at least 96px); core resolution is unchanged. */
 export function mtpWorkerBuffer(width: number, height: number, horizontalRatio: number) {
   const maximumWidth = Math.min(SIDE_LIMIT, Math.floor(PIXEL_LIMIT / height));
   const padX = Math.max(
     0,
     Math.min(
-      Math.ceil(MTP_WORKER_RESERVE_CSS * horizontalRatio),
+      Math.ceil(Math.max(MTP_WORKER_RESERVE_CSS * horizontalRatio, width / 2)),
       Math.floor((maximumWidth - width) / 2)
     )
   );
