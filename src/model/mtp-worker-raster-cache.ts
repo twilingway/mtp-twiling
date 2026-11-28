@@ -322,7 +322,14 @@ export class MtpWorkerRasterCache {
       return false;
     }
     this.lastContentKey = contentKey;
-    if (this.ready && this.ready.geometry.contentKey !== contentKey) this.releaseReady();
+    let previewHardKey = [this.ready, this.inFlight, this.latest].find(
+      (job) => job?.geometry.contentKey === contentKey
+    )?.geometry.previewHardKey;
+    if (this.ready && this.ready.geometry.contentKey !== contentKey) {
+      if (this.interacting) previewHardKey ??= mtpWorkerContentKey(source, true) ?? undefined;
+      if (!this.interacting || this.ready.geometry.previewHardKey !== previewHardKey)
+        this.releaseReady();
+    }
     const candidate = [this.ready, this.inFlight, this.latest].find(
       (job) => job?.geometry.contentKey === contentKey && mtpWorkerExact(source, job.geometry)
     );
@@ -379,7 +386,12 @@ export class MtpWorkerRasterCache {
     }
     this.desiredKey = intent.key;
     this.needsDraw = false;
-    const geometry = mtpWorkerGeometry(source, intent, contentKey);
+    previewHardKey ??= mtpWorkerContentKey(source, true) ?? undefined;
+    if (previewHardKey === undefined) {
+      this.fail("unsupported-frame");
+      return false;
+    }
+    const geometry = mtpWorkerGeometry(source, intent, contentKey, previewHardKey);
     if (this.ready?.key === intent.key) {
       this.blit(source, this.ready, MTP_IDENTITY, true);
       this.latest = undefined;
@@ -397,7 +409,10 @@ export class MtpWorkerRasterCache {
     this.desiredKey = undefined;
     this.needsDraw = active;
     this.forcedKey = undefined;
-    this.releaseReady();
+    this.displayedKey = undefined;
+    // Active invalidation defers the hard guard to the actual draw, where held tail previews
+    // can remain visible. Disabled/empty layers release their bitmap immediately.
+    if (!active) this.releaseReady();
   }
   destroy(): void {
     this.state = "destroyed";

@@ -10,6 +10,7 @@ export interface MtpWorkerMatrix {
 export const MTP_IDENTITY: MtpWorkerMatrix = { xScale: 1, yScale: 1, xOffset: 0, yOffset: 0 };
 export interface MtpWorkerGeometry {
   contentKey: string;
+  previewHardKey: string;
   from: number;
   to: number;
   fast: boolean;
@@ -35,7 +36,7 @@ const finite = (values: readonly (number | null)[]): values is number[] =>
   values.every((value) => value !== null && Number.isFinite(value));
 
 /** History-independent metadata: styles/periods have the fixed, bounded MTP definition size. */
-export function mtpWorkerContentKey(source: MtpRasterFrame): string | null {
+export function mtpWorkerContentKey(source: MtpRasterFrame, preview = false): string | null {
   const { scope, model, mode } = source;
   const size = scope.bitmapSize;
   const context = scope.context;
@@ -64,12 +65,12 @@ export function mtpWorkerContentKey(source: MtpRasterFrame): string | null {
   )
     return null;
   return JSON.stringify([
-    model.revision,
+    // Only held previews may ignore a tail update; exact work retains both values.
+    ...(preview ? [] : [model.revision, model.data.at(-1)?.close]),
     model.resetRevision,
     model.data.length,
     model.data[0]?.timestamp,
     model.data.at(-1)?.timestamp,
-    model.data.at(-1)?.close,
     model.styleKey,
     model.styles,
     model.periods,
@@ -90,7 +91,8 @@ export function mtpWorkerContentKey(source: MtpRasterFrame): string | null {
 export function mtpWorkerGeometry(
   source: MtpRasterFrame,
   intent: MtpWorkerIntent,
-  contentKey: string
+  contentKey: string,
+  previewHardKey: string
 ): MtpWorkerGeometry {
   const { frame } = intent;
   const middle = Math.floor((frame.start + frame.end) / 2);
@@ -111,6 +113,7 @@ export function mtpWorkerGeometry(
     1 / Math.min(frame.horizontalRatio, frame.verticalRatio);
   return {
     contentKey,
+    previewHardKey,
     from: source.from,
     to: source.to,
     fast,

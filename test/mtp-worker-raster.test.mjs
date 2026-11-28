@@ -227,6 +227,50 @@ function lightweightFrame(length = 5425) {
   };
 }
 
+test("unchanged ready and in-flight draws serialize metadata once; held tail guard alone may serialize twice", () => {
+  const countSerializations = (action) => {
+    const stringify = JSON.stringify;
+    let count = 0;
+    JSON.stringify = function (...args) {
+      count++;
+      return stringify.apply(this, args);
+    };
+    try {
+      action();
+      return count;
+    } finally {
+      JSON.stringify = stringify;
+    }
+  };
+  const f = fixture(),
+    { frame } = lightweightFrame();
+  f.ready();
+  f.cache.draw(frame);
+  assert.equal(
+    countSerializations(() => f.cache.draw(frame)),
+    1,
+    "unchanged in-flight geometry reuses its hard key"
+  );
+  f.result();
+  assert.equal(
+    countSerializations(() => f.cache.draw(frame)),
+    1,
+    "unchanged ready geometry reuses its hard key"
+  );
+  frame.model.data.at(-1).close += 3;
+  frame.model.update(frame.model.data);
+  f.cache.invalidate(true);
+  const before = f.cache.status().snapshots;
+  assert.equal(
+    countSerializations(() => f.cache.draw(frame, true)),
+    2,
+    "actual held stale-ready checks its separate hard key"
+  );
+  assert.equal(f.cache.status().snapshots, before);
+  assert.equal(f.cache.status().dispatched, 1);
+  f.cache.destroy();
+});
+
 test("60 held LW draws follow a covered full-history bitmap with no snapshots or dispatch until idle", () => {
   const f = fixture(),
     { frame, reads, camera } = lightweightFrame();
@@ -323,32 +367,82 @@ test("held old response is preview only and never dispatches the previously queu
   f.cache.destroy();
 });
 
-test("held data revision invalidates preview immediately and settles only the latest active prefix", () => {
-  const f = fixture(),
-    { frame, camera } = lightweightFrame();
-  f.ready();
-  f.cache.draw(frame);
-  const image = f.result();
-  f.cache.draw(frame);
-  f.cache.setInteraction(true);
-  const before = f.cache.status().snapshots,
-    blits = frame.scope.context.blits.length;
-  frame.model.data.at(-1).close += 3;
-  frame.model.update(frame.model.data);
-  f.cache.invalidate(true);
-  camera(3);
-  f.cache.draw(frame, true);
-  assert.equal(image.closed, 1);
-  assert.equal(frame.scope.context.blits.length, blits);
-  assert.equal(f.cache.status().snapshots, before);
-  f.cache.setInteraction(false);
-  f.cache.draw(frame);
-  assert.equal(f.messages.at(-1).prefix.length, frame.model.data.length + 1);
-  assert.equal(f.messages.at(-1).key, mtpWorkerIntent(frame).key);
-  f.result();
-  f.cache.draw(frame);
-  assert.equal(f.cache.pending(), false);
-  f.cache.destroy();
+test("held unchanged-close and changed-tail revisions preserve safe preview with no history work until exact idle", () => {
+  for (const delta of [0, 3]) {
+    const f = fixture(),
+      { frame, camera, reads } = lightweightFrame();
+    f.ready();
+    f.cache.draw(frame);
+    const image = f.result();
+    f.cache.draw(frame);
+    f.cache.setInteraction(true);
+    const before = { ...f.cache.status() },
+      oldReads = { ...reads },
+      blits = frame.scope.context.blits.length;
+    frame.model.data.at(-1).close += delta;
+    frame.model.update(frame.model.data);
+    f.cache.invalidate(true);
+    assert.equal(image.closed, 0, "active invalidation waits for actual hard guards");
+    camera(3);
+    for (let i = 0; i < 60; i++) f.cache.draw(frame, true);
+    assert.equal(image.closed, 0);
+    assert.equal(frame.scope.context.blits.length, blits + 60);
+    assert.equal(frame.scope.context.blits.at(-1)[0], image);
+    assert.equal(f.cache.pending(), true, "a stale tail preview is never current exact readiness");
+    assert.equal(f.cache.status().snapshots, before.snapshots);
+    assert.equal(f.cache.status().dispatched, before.dispatched);
+    assert.equal(reads.extrema, oldReads.extrema);
+    assert.equal(reads.prefix, oldReads.prefix);
+    assert.ok(reads.x - oldReads.x <= 60 * 3);
+    assert.ok(reads.y - oldReads.y <= 60 * 3);
+    f.cache.setInteraction(false);
+    f.cache.draw(frame);
+    assert.equal(image.closed, 1, "outdated data cannot be displayed as settled exact geometry");
+    assert.equal(frame.scope.context.blits.length, blits + 60);
+    assert.equal(f.cache.status().snapshots, before.snapshots + 1);
+    assert.equal(f.cache.status().dispatched, before.dispatched + 1);
+    assert.equal(f.messages.at(-1).prefix.length, frame.model.data.length + 1);
+    assert.equal(f.messages.at(-1).key, mtpWorkerIntent(frame).key);
+    f.result();
+    assert.equal(f.cache.pending(), true);
+    f.cache.draw(frame);
+    assert.equal(f.cache.pending(), false);
+    f.cache.destroy();
+  }
+});
+
+test("a non-held tail update requires new exact data and disabled/empty/destroy release retained preview immediately", () => {
+  for (const ending of ["settled", "disabled", "empty", "destroy"]) {
+    const f = fixture(),
+      { frame } = lightweightFrame();
+    f.ready();
+    f.cache.draw(frame);
+    const image = f.result();
+    f.cache.draw(frame);
+    frame.model.data.at(-1).close += 3;
+    frame.model.update(frame.model.data);
+    f.cache.invalidate(true);
+    assert.equal(image.closed, 0);
+    const blits = frame.scope.context.blits.length;
+    if (ending === "settled") {
+      f.cache.draw(frame);
+      assert.equal(image.closed, 1);
+      assert.equal(frame.scope.context.blits.length, blits);
+      assert.equal(f.cache.pending(), true);
+      assert.equal(f.cache.status().dispatched, 2);
+      f.result();
+      f.cache.draw(frame);
+      assert.equal(f.cache.pending(), false);
+    } else if (ending === "destroy") f.cache.destroy();
+    else {
+      if (ending === "disabled") frame.model.periods = [];
+      else frame.model.reset([], frame.model.periods);
+      f.cache.invalidate(false);
+      assert.equal(f.cache.pending(), false);
+    }
+    assert.equal(image.closed, 1);
+    f.cache.destroy();
+  }
 });
 
 test("uncovered, generic, gapped and non-affine held views stay blank without preparing heavy work", () => {
@@ -399,6 +493,7 @@ test("held hard changes close preview immediately and a different model owner fa
       frame.mode = 2;
     },
     (frame) => {
+      frame.model.data.at(-1).close += 3;
       frame.model.reset(frame.model.data, frame.model.periods);
     },
     (frame) => {
@@ -417,6 +512,12 @@ test("held hard changes close preview immediately and a different model owner fa
     const before = f.cache.status().snapshots,
       blits = frame.scope.context.blits.length;
     change(frame);
+    f.cache.invalidate(true);
+    assert.equal(
+      image.closed,
+      0,
+      "actual draw must evaluate hard changes before a retained preview can appear"
+    );
     f.cache.draw(frame, true);
     assert.equal(image.closed, 1);
     assert.equal(frame.scope.context.blits.length, blits);

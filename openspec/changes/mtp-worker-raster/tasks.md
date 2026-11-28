@@ -15,6 +15,9 @@
 
 ## 3. Сборка и сравнение
 
+- [x] 3.4 Сохранить безопасный held tail-preview при same-close и changed-close update; 27 worker
+      unit и независимая проверка hard guards/ленивого ключа проходят, точный кадр нужен после idle.
+
 - [x] 3.0 Исправить измеренную регрессию snapshot/redraw: unit проверяет длинный жест без полных
       snapshot/job каждый кадр, точный результат после idle и дешёвый unchanged/in-flight путь.
 

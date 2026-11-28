@@ -42,6 +42,13 @@
 - **THEN** явный force intent запускает точную подготовку новой камеры без минимальной задержки idle
 - **AND** статус сохраняется до actual exact blit и стабилизации native камеры
 
+#### Scenario: Last bar tick during a gesture
+
+- **WHEN** во время жеста приходит обновление последнего бара без reset, append или изменения стилей
+- **THEN** покрывающий preview остаётся видимым и не считается точным кадром новой revision
+- **AND** после idle система выводит точный слой последней revision
+- **AND** reset, append, другой источник, стиль или DPR запрещают использование прежнего preview
+
 ### Requirement: Bounded lifecycle and fallback
 
 Система SHALL освобождать Worker/bitmap при уничтожении слоя и сохранять рабочую отрисовку при
