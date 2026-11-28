@@ -13,6 +13,7 @@ import type {
   FibLevelStyle
 } from "../../../model/types.js";
 import { isDrawing } from "../../../model/backup-format.js";
+import { isAnnotationTool } from "../../../model/drawing-annotation.js";
 export const VISIBILITY_GROUPS = [
   ["minutes", "Минуты", 59],
   ["hours", "Часы", 24],
@@ -38,6 +39,9 @@ export const draftNumber = (value: string): number => (value.trim() ? Number(val
 export function validSettingsDrawing(value: unknown): value is Drawing {
   return (
     isDrawing(value) &&
+    (!isAnnotationTool(value.name) ||
+      ["pin", "table", "flag", "priceLabel", "priceNote"].includes(value.name) ||
+      !!value.settings?.text?.trim()) &&
     value.points.every((point) => Number.isFinite(new Date(point.timestamp).getTime())) &&
     VISIBILITY_GROUPS.every(
       ([group, , max]) =>

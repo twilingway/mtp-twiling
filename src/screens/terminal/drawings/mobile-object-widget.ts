@@ -20,6 +20,22 @@ export function clampObjectWidget(
   };
 }
 
+export function defaultObjectWidgetPosition(
+  size: { width: number; height: number },
+  viewport: WidgetViewport,
+  heading?: { top: number; bottom: number }
+): PixelPoint {
+  if (!heading)
+    return clampObjectWidget({ x: viewport.left + 12, y: viewport.top + 108 }, size, viewport);
+  const below = heading.bottom + 8;
+  const above = heading.top - size.height - 8;
+  const bottom = viewport.top + viewport.height - size.height - 6;
+  const top = viewport.top + 6;
+  const y =
+    below <= bottom ? below : above >= top ? above : below - bottom <= top - above ? bottom : top;
+  return clampObjectWidget({ x: viewport.left + 12, y }, size, viewport);
+}
+
 export function selectedWidgetObject(
   selected: string | null,
   drawings: readonly Drawing[],

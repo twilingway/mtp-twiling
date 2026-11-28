@@ -76,7 +76,7 @@ test.after(() => {
 
 test("all supported drawing kinds and historical fixtures retain exact readable projection", () => {
   const value = backup();
-  assert.equal(Object.keys(TOOL_NAMES).length, 24);
+  assert.equal(Object.keys(TOOL_NAMES).length, 34);
   value.drawings = [
     {
       symbol: "SBER",

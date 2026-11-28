@@ -15,7 +15,8 @@ export type YandexStatusClear =
   | "deleteAction"
   | "progress"
   | "comparison"
-  | "lastSyncedAt";
+  | "lastSyncedAt"
+  | "clientId";
 
 export function yandexUnchangedStatus(association: YandexAssociation): Partial<CloudSyncStatus> {
   return {

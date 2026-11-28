@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { nativeFixture } from "./native-technical-fixture.mjs";
 
-test("KLine static DRAWINGS projects line text, rectangle and Fibonacci", () => {
+test("KLine static DRAWINGS projects line text, rectangle, Fibonacci and annotations", () => {
   let paint = () => {};
   const f = nativeFixture("kline", [], { paint: (...args) => paint(...args) });
   const { paintDrawings } = f.load("model/drawing-model.ts");
@@ -12,6 +12,12 @@ test("KLine static DRAWINGS projects line text, rectangle and Fibonacci", () => 
   const start = Date.UTC(2025, 0, 1),
     commands = [];
   const drawings = [
+    {
+      id: "annotation",
+      name: "text",
+      points: [{ timestamp: start, value: 100 }],
+      settings: { text: "KLine annotation", fontSize: 16 }
+    },
     {
       id: "line",
       name: "segment",
@@ -89,6 +95,11 @@ test("KLine static DRAWINGS projects line text, rectangle and Fibonacci", () => 
   );
   assert.ok(
     commands.some((command) => command.method === "fillText" && command.args[0] === "Entry")
+  );
+  assert.ok(
+    commands.some(
+      (command) => command.method === "fillText" && command.args[0] === "KLine annotation"
+    )
   );
   assert.ok(
     commands.some((command) => command.method === "rect" && command.args[3] === size.height)

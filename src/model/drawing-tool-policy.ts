@@ -36,7 +36,14 @@ export function drawingPointCount(tool: DrawingTool): number | null {
       "horizontalRayLine",
       "verticalStraightLine",
       "arrowUp",
-      "arrowDown"
+      "arrowDown",
+      "text",
+      "pin",
+      "table",
+      "comment",
+      "priceLabel",
+      "signpost",
+      "flag"
     ].includes(tool)
   )
     return 1;
@@ -57,6 +64,7 @@ export function drawingSupportsFill(tool: DrawingTool): boolean {
     "circle",
     "ellipse",
     "triangle",
+    "arc",
     "polyline",
     "arrowPointer",
     "arrowUp",

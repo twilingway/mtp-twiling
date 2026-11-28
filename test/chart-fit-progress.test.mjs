@@ -361,7 +361,7 @@ test("progress and both button variants render from source without a DOM or port
   assert.match(busy, /height:160px/);
   assert.match(busy, /role="status" aria-live="polite"/);
   assert.match(busy, /Подбираем масштаб…/);
-  assert.equal((busy.match(/<span style=/g) ?? []).length, 10);
+  assert.match(busy, /aria-hidden="true"><svg[^>]+focusable="false"/);
   assert.match(render(ChartFitButton), /id="fit-chart".*disabled=""/);
   assert.match(render(ChartFitButton, { menu: true }), /role="menuitem".*disabled=""/);
   setDisplayPreferences({ locale: "en" });

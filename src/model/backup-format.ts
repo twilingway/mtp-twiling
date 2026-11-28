@@ -1,5 +1,10 @@
 import { TOOL_NAMES } from "./drawing-model.js";
 import { validDrawingPointCount } from "./drawing-tool-policy.js";
+import {
+  ANNOTATION_LIMITS,
+  isAnnotationTool,
+  isDrawingAnnotationSettings
+} from "./drawing-annotation.js";
 import type { DrawingTool } from "./types.js";
 import { validNativeChartTypeField } from "./native-chart-type.js";
 import { isInstrumentSymbol, isInstrumentViewKey } from "./instrument-symbol.js";
@@ -103,6 +108,7 @@ export function isDrawingSettings(value: unknown): value is DrawingSettings {
   return (
     isRecord(value) &&
     fields(value, {
+      annotation: isDrawingAnnotationSettings,
       color,
       width: numberBetween(1, 5),
       lineStyle,
@@ -161,6 +167,11 @@ export function isBackupDrawing(value: unknown): value is BackupDrawing {
   return (
     validDrawingPointCount(value.name as DrawingTool, value.points.length) &&
     value.points.every(isDrawingPoint) &&
+    (!isAnnotationTool(value.name) ||
+      !isRecord(value.settings) ||
+      value.settings.text === undefined ||
+      (typeof value.settings.text === "string" &&
+        value.settings.text.length <= ANNOTATION_LIMITS.text)) &&
     fields(value, {
       id: string,
       settings: isDrawingSettings,

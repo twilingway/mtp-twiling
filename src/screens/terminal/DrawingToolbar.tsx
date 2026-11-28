@@ -13,6 +13,7 @@ import { magnetMenuSections } from "./drawing-toolbar-magnet-menu.js";
 import {
   DrawingToolbarLock,
   selectedToolbarLock,
+  toggleToolbarLock,
   toolbarLockSections
 } from "./drawing-toolbar-lock.js";
 import {
@@ -152,7 +153,11 @@ export function DrawingToolbar() {
       id: `${kind}-${target}`,
       label:
         t(
-          kind === "lock" ? (scopeActive(kind, target) ? "Разблокировать" : "Закрепить") : "Скрыть"
+          kind === "lock"
+            ? scopeActive(kind, target)
+              ? "Разблокировать"
+              : "Заблокировать"
+            : "Скрыть"
         ) +
         " " +
         t(targetNames[target]),
@@ -220,7 +225,7 @@ export function DrawingToolbar() {
   } else if (menu?.key === "lock") {
     title = t("Блокировка объектов");
     sections = toolbarLockSections(selectedLock, scopeRows("lock"), () =>
-      run(() => controller.tools.toggleSelectedLock())
+      run(() => toggleToolbarLock(controller))
     );
   } else if (menu?.key === "hide") {
     title = t("Видимость объектов");
@@ -420,7 +425,7 @@ export function DrawingToolbar() {
         status={selectedLock}
         mobile={mobile}
         expanded={menu?.key === "lock"}
-        onChoose={() => run(() => controller.tools.toggleSelectedLock())}
+        onChoose={() => run(() => toggleToolbarLock(controller))}
         onMenu={(anchor) => openMenu("lock", anchor)}
       />
       {utility(

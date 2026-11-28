@@ -324,7 +324,8 @@ test("comparison inspection runs once per ready connection, never syncs, and a f
     assert.equal(find(latest, "yandex-disk-compare").props.disabled, true);
     assert.equal(cloud.getSnapshot().phase, "idle");
     assert.equal(cloud.getSnapshot().progress, undefined);
-    assert.match(renderToStaticMarkup(latest), /<strong>Working…<\/strong>/);
+    assert.match(renderToStaticMarkup(latest), /<strong>Inspecting versions<\/strong>/);
+    assert.match(renderToStaticMarkup(latest), /without changing cloud or device data/);
     assert.doesNotMatch(renderToStaticMarkup(latest), /<strong>Connected<\/strong>/);
     releaseInspection();
     inspectionGate = undefined;

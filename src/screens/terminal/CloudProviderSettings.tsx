@@ -1,5 +1,4 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import type {
   CloudErrorCode,
   CloudProgress,
@@ -87,10 +86,12 @@ export function CloudProviderSettings({
   const [actionError, setActionError] = useState(false),
     [clientModeError, setClientModeError] = useState(false),
     [comparisonError, setComparisonError] = useState(false),
+    [inspecting, setInspecting] = useState(false),
     [elapsed, setElapsed] = useState(0),
     [pendingActions, setPendingActions] = useState(0);
   const busy =
     googleChecking ||
+    inspecting ||
     status.phase === "connecting" ||
     status.phase === "syncing" ||
     pendingActions > 0;
@@ -116,11 +117,18 @@ export function CloudProviderSettings({
   useEffect(() => {
     if (!status.enabled || !status.configured || !status.connected || !provider.inspect) return;
     let current = true;
-    void provider.inspect().catch(() => {
-      if (current) setComparisonError(true);
-    });
+    setInspecting(true);
+    void provider
+      .inspect()
+      .catch(() => {
+        if (current) setComparisonError(true);
+      })
+      .finally(() => {
+        if (current) setInspecting(false);
+      });
     return () => {
       current = false;
+      setInspecting(false);
     };
   }, [provider, status.enabled, status.configured, status.connected]);
   useEffect(() => {
@@ -141,11 +149,15 @@ export function CloudProviderSettings({
   const compare = () => {
     if (!provider.inspect) return;
     setComparisonError(false);
+    setInspecting(true);
     setPendingActions((value) => value + 1);
     void provider
       .inspect()
       .catch(() => setComparisonError(true))
-      .finally(() => setPendingActions((value) => Math.max(0, value - 1)));
+      .finally(() => {
+        setInspecting(false);
+        setPendingActions((value) => Math.max(0, value - 1));
+      });
   };
   return (
     <section
@@ -273,13 +285,20 @@ export function CloudProviderSettings({
                 {t(
                   googleChecking
                     ? "Проверяем подключение…"
-                    : progress
-                      ? stages[progress.stage]
-                      : pendingActions > 0
-                        ? "Выполняем действие…"
-                        : phases[status.phase]
+                    : inspecting
+                      ? "Проверяем версии"
+                      : progress
+                        ? stages[progress.stage]
+                        : pendingActions > 0
+                          ? "Выполняем действие…"
+                          : phases[status.phase]
                 )}
               </strong>
+              {inspecting && (
+                <small>
+                  {t("Проверка читает список версий, не изменяя данные облака и устройства.")}
+                </small>
+              )}
               <small>
                 {t("Прошло")}: {elapsed} {t("с")}
               </small>
@@ -414,6 +433,8 @@ export function CloudProviderSettings({
               activeChoice={activeChoice}
               migration={migration}
               receiveAvailable={migration || !!provider.receive}
+              clientId={status.clientId}
+              deleteAction={status.deleteAction}
               onSend={() => run(provider.choose({ kind: "local" }))}
               onReceive={(remoteId) => {
                 if (migration) run(provider.choose({ kind: "remote", id: remoteId }));
@@ -447,7 +468,8 @@ export function CloudProviderSettings({
           )}
           {provider.remove &&
             status.deleteAction &&
-            ["unconfirmed", "review"].includes(status.deleteAction.state) && (
+            ["unconfirmed", "review"].includes(status.deleteAction.state) &&
+            !comparison?.remotes.some((remote) => remote.id === status.deleteAction?.id) && (
               <CloudDeleteVersion
                 key={status.deleteAction.id}
                 id={status.deleteAction.id}

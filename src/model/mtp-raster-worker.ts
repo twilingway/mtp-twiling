@@ -1,6 +1,7 @@
 import { BUILD_ID } from "../generated/app-version.js";
 import { MTP_WORKER_PROTOCOL, paintMtpWorkerFrame } from "./mtp-worker-protocol.js";
 import type { MtpWorkerRequest, MtpWorkerResponse } from "./mtp-worker-protocol.js";
+import { paintMtpWorkerEdges } from "./mtp-worker-edge-paint.js";
 
 // DOM and Worker globals overlap in the project's browser TS lib; keep the boundary explicit.
 interface RasterWorkerScope {
@@ -40,6 +41,34 @@ scope.onmessage = ({ data }) => {
       frame.width * frame.height > 4 * 1024 * 1024
     )
       throw new Error("Worker surface limit");
+    if (
+      ![
+        frame.length,
+        frame.start,
+        frame.end,
+        frame.captureStart,
+        frame.captureEnd,
+        frame.sampleStep,
+        frame.padX,
+        frame.padY
+      ].every(Number.isInteger) ||
+      frame.captureStart < 0 ||
+      frame.captureStart > frame.start ||
+      frame.start > frame.end ||
+      frame.end > frame.captureEnd ||
+      frame.captureEnd >= frame.length ||
+      frame.sampleStep !== Math.max(1, Math.ceil((frame.end - frame.start) / 3000)) ||
+      frame.x.length !== frame.captureEnd - frame.captureStart + 1 ||
+      frame.padX < 0 ||
+      frame.padY < 0 ||
+      frame.padX * 2 >= frame.width ||
+      frame.padY * 2 >= frame.height ||
+      !Number.isFinite(frame.horizontalRatio) ||
+      frame.horizontalRatio <= 0 ||
+      !Number.isFinite(frame.verticalRatio) ||
+      frame.verticalRatio <= 0
+    )
+      throw new Error("Worker capture geometry mismatch");
     surface ??= new OffscreenCanvas(0, 0);
     // Assigning dimensions also clears pixels and all context state between jobs.
     // Release the old backing before growing either axis; otherwise a tall-to-wide resize
@@ -56,6 +85,7 @@ scope.onmessage = ({ data }) => {
     context.miterLimit = frame.miterLimit;
     context.shadowColor = frame.shadowColor;
     paintMtpWorkerFrame(context, frame, prefix);
+    paintMtpWorkerEdges(context, frame, prefix);
     const bitmap = surface.transferToImageBitmap();
     try {
       scope.postMessage({ type: "result", id: data.id, key: data.key, bitmap }, [bitmap]);

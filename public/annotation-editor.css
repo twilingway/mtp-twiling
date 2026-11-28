@@ -1,0 +1,132 @@
+.annotation-inline-editor {
+  position: absolute;
+  z-index: 30;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #2962ff;
+  border-radius: 6px;
+  background: var(--surface, #1e222d);
+  box-shadow: 0 4px 20px #0006;
+}
+.annotation-inline-editor textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  color: var(--text, #d1d4dc);
+  background: var(--surface-input, #131722);
+  border: 1px solid var(--control-line, #434651);
+  padding: 8px;
+  font: inherit;
+}
+.annotation-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+}
+.annotation-inline-actions span {
+  flex: 1;
+}
+.annotation-inline-editor p {
+  margin: 6px 0;
+  color: #f23645;
+}
+.annotation-position-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 32px);
+  gap: 4px;
+}
+.annotation-position-grid button {
+  min-height: 32px;
+}
+.annotation-position-grid button[aria-pressed="true"] {
+  color: #fff;
+  background: #2962ff;
+}
+.annotation-editor {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.annotation-text {
+  display: grid;
+  gap: 6px;
+}
+.annotation-text textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+}
+.annotation-editor textarea {
+  color: var(--text);
+  background: var(--surface-input, #1e222d);
+  border: 1px solid var(--control-line, #434651);
+  border-radius: 4px;
+  padding: 8px;
+  font: inherit;
+}
+.annotation-format,
+.annotation-table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.annotation-format label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.annotation-format input[type="number"] {
+  width: 64px;
+}
+.annotation-format button[aria-pressed="true"] {
+  color: white;
+  background: #2962ff;
+}
+.annotation-table-editor {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.annotation-table-scroll {
+  max-width: 100%;
+  max-height: 340px;
+  overflow: auto;
+}
+.annotation-table-editor table {
+  border-collapse: collapse;
+}
+.annotation-table-editor td,
+.annotation-table-editor th {
+  padding: 3px;
+  border: 1px solid var(--control-line, #434651);
+}
+.annotation-table-editor textarea {
+  box-sizing: border-box;
+  min-width: 100px;
+  width: 100%;
+  min-height: 54px;
+}
+.annotation-table-editor th input {
+  width: 64px;
+}
+@media (max-width: 650px), (pointer: coarse) {
+  .annotation-editor input,
+  .annotation-editor select,
+  .annotation-editor button {
+    min-height: 44px;
+  }
+  .annotation-text textarea {
+    font-size: 16px;
+  }
+  .annotation-format {
+    gap: 10px;
+  }
+  .annotation-table-scroll {
+    max-height: 260px;
+  }
+}

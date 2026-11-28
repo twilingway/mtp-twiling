@@ -12,4 +12,5 @@ export interface YandexCoordinatorOptions {
   journal?: YandexJournal;
   transport?: (authorization: YandexAuthorization) => YandexTransport;
   lock?: typeof yandexWriterLock;
+  manualDeleteTimeoutMs?: number;
 }

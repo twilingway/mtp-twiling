@@ -4,6 +4,8 @@ import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { drawingVisibleOnInterval } from "../../model/intervals/drawing-visibility.js";
 import { useTerminal } from "./context.js";
 import { LockIcon } from "./VisibilityIcon.js";
+import { DrawingToolIcon } from "./DrawingToolIcon.js";
+import { toggleToolbarLock } from "./drawing-toolbar-lock.js";
 
 export function SelectedDrawingLock() {
   const { controller, state } = useTerminal();
@@ -18,7 +20,7 @@ export function SelectedDrawingLock() {
   )
     return null;
   const label = tools.drawingsLocked
-    ? t("Объекты заблокированы глобально. Разблокируйте их в меню.")
+    ? t("Разблокировать объекты рисования")
     : drawing.lock
       ? t("Разблокировать объект")
       : t("Заблокировать объект");
@@ -29,11 +31,10 @@ export function SelectedDrawingLock() {
       aria-label={label}
       title={label}
       aria-pressed={!!drawing.lock || tools.drawingsLocked}
-      disabled={saving || tools.drawingsLocked}
+      disabled={saving}
       onClick={() => {
         setSaving(true);
-        void controller.tools
-          .toggleSelectedLock()
+        void toggleToolbarLock(controller)
           .catch((error: unknown) =>
             controller.notify(
               error instanceof Error ? error.message : t("Не удалось сохранить объект.")
@@ -43,6 +44,8 @@ export function SelectedDrawingLock() {
       }}
     >
       <LockIcon locked={!!drawing.lock || tools.drawingsLocked} />
+      <span>{label}</span>
+      {(drawing.lock || tools.drawingsLocked) && <DrawingToolIcon name="check" />}
     </button>
   );
 }

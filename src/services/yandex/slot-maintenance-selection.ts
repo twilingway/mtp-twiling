@@ -8,6 +8,7 @@ import {
 } from "./slot-model.js";
 import type { SlotEnvelope, SlotInspection, SlotPhysical, SlotPrunedPeer } from "./slot-model.js";
 import { YandexError } from "./types.js";
+import { slotAcceptanceFields } from "./slot-acceptance.js";
 
 export interface SlotMaintenanceSelection {
   kind: "previous" | "retired-peer";
@@ -44,7 +45,8 @@ export async function selectSlotMaintenance(
           generation: slotGeneration(original.envelope) + 1,
           current: original.envelope.current,
           previous: null,
-          prunedPeers: slotPrunedPeers(original.envelope)
+          prunedPeers: slotPrunedPeers(original.envelope),
+          ...slotAcceptanceFields(original.envelope)
         }
       }))
     };
@@ -91,7 +93,8 @@ export async function selectSlotMaintenance(
           generation: slotGeneration(survivor.envelope) + 1,
           current: survivor.envelope.current,
           previous: survivor.envelope.previous,
-          prunedPeers: [...proofs.values()]
+          prunedPeers: [...proofs.values()],
+          ...slotAcceptanceFields(survivor.envelope)
         }
       }
     ]

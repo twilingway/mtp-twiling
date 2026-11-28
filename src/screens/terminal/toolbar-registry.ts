@@ -60,6 +60,16 @@ const capabilities: Record<string, Partial<ToolbarTool>> = {
   LineToolBezierCubic: { tool: "cubicCurve", icon: "doubleCurve" },
   LineToolFibRetracement: { tool: "fibonacciLine", icon: "fibonacci", shortcut: "Alt+F" },
   LineToolTrendBasedFibExtension: { tool: "fibonacciExtension", icon: "fibExtension" },
+  LineToolText: { tool: "text", icon: "text" },
+  LineToolTextNote: { tool: "note", icon: "note" },
+  LineToolPriceNote: { tool: "priceNote", icon: "priceNote" },
+  LineToolNote: { tool: "pin", icon: "label" },
+  LineToolTable: { tool: "table", icon: "grid" },
+  LineToolCallout: { tool: "callout", icon: "callout" },
+  LineToolComment: { tool: "comment", icon: "comment" },
+  LineToolPriceLabel: { tool: "priceLabel", icon: "priceNote" },
+  LineToolSignpost: { tool: "signpost", icon: "signpost" },
+  LineToolFlagMark: { tool: "flag", icon: "flag" },
   LineToolImage: { image: true, icon: "image" }
 };
 const variants: Record<string, DrawingIconName> = {

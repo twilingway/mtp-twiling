@@ -1,9 +1,21 @@
 export { paintDrawings } from "./drawing-paint.js";
 import { rectangleBounds, rectangleEdges } from "./drawing-screen-geometry.js";
 import type { DrawingRectangle } from "./drawing-screen-geometry.js";
-import { drawingShapeGeometry, pointInShape } from "./drawing-shape-geometry.js";
+import {
+  drawingArcControlPoint,
+  drawingShapeGeometry,
+  pointInShape
+} from "./drawing-shape-geometry.js";
 import type { ShapeGeometry } from "./drawing-shape-geometry.js";
 import { drawingHandleIndices, isGeometricTool } from "./drawing-tool-policy.js";
+import { annotationDefaults, isAnnotationTool } from "./drawing-annotation.js";
+import { annotationContains, annotationLayout } from "./drawing-annotation-layout.js";
+import { annotationPolygonContains } from "./drawing-annotation-outline.js";
+import type {
+  AnnotationLayout,
+  AnnotationLayoutOptions,
+  AnnotationHitOptions
+} from "./drawing-annotation-layout.js";
 import type {
   DrawingDraft,
   DrawingPoint,
@@ -13,6 +25,16 @@ import type {
   PixelPoint
 } from "./types.js";
 export const TOOL_NAMES: Record<DrawingTool, string> = {
+  text: "Текст",
+  note: "Заметка",
+  priceNote: "Заметка цены",
+  pin: "Метка",
+  table: "Таблица",
+  callout: "Сноска",
+  comment: "Комментарий",
+  priceLabel: "Метка цены",
+  signpost: "Знак",
+  flag: "Флаг",
   segment: "Линия тренда",
   rayLine: "Луч",
   straightLine: "Удлинённая линия",
@@ -94,11 +116,16 @@ export const DEFAULT_FIB_LEVELS: FibLevelStyle[] = [
   text: ""
 }));
 export type ResolvedDrawingStyle = Required<
-  Omit<DrawingSettings, "levelStyles" | "oneColor" | "extend" | "textColor">
+  Omit<DrawingSettings, "levelStyles" | "oneColor" | "extend" | "textColor" | "annotation">
 > &
-  Pick<DrawingSettings, "levelStyles" | "oneColor" | "extend" | "textColor">;
+  Pick<DrawingSettings, "levelStyles" | "oneColor" | "extend" | "textColor" | "annotation">;
 export function drawingHasLineText(name: DrawingTool): boolean {
-  return name !== "rectangle" && !isGeometricTool(name) && !name.startsWith("fibonacci");
+  return (
+    name !== "rectangle" &&
+    !isGeometricTool(name) &&
+    !isAnnotationTool(name) &&
+    !name.startsWith("fibonacci")
+  );
 }
 
 export function drawingStyle(d: {
@@ -106,6 +133,7 @@ export function drawingStyle(d: {
   settings?: DrawingSettings;
 }): ResolvedDrawingStyle {
   const lineText = d.name !== undefined && drawingHasLineText(d.name);
+  const annotation = d.name ? annotationDefaults(d.name).annotation : undefined;
   return {
     color: "#f4df30",
     width: 2,
@@ -132,7 +160,11 @@ export function drawingStyle(d: {
     text: "",
     textAlign: lineText ? "left" : "center",
     textVertical: lineText ? "top" : "center",
-    ...d.settings
+    ...(d.name && annotationDefaults(d.name)),
+    ...d.settings,
+    ...((annotation || d.settings?.annotation) && {
+      annotation: { ...annotation, ...d.settings?.annotation }
+    })
   };
 }
 export function fibPrice(
@@ -197,6 +229,7 @@ interface BaseGeometry {
   lines: [PixelPoint, PixelPoint][];
   rectangle?: DrawingRectangle;
   shape?: ShapeGeometry;
+  annotation?: AnnotationLayout;
 }
 export interface FibGeometry extends BaseGeometry {
   levels: {
@@ -218,17 +251,34 @@ export function drawingGeometry(
   d: DrawingDraft,
   project: DrawingProjector,
   width: number,
-  height: number
+  height: number,
+  options: AnnotationLayoutOptions = {}
 ): FibGeometry | LineGeometry | null {
   if (d.visible === false) return null;
   const points: PixelPoint[] = [];
   for (const point of d.points) {
     const p = project(point);
-    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+      if (isAnnotationTool(d.name) && d.settings?.annotation?.screenAnchored) continue;
+      return null;
+    }
     points.push(p);
   }
-  const style = drawingStyle(d),
-    a = points[0],
+  if (d.name === "arc" && points[0] && points[1] && points[2])
+    points[2] = drawingArcControlPoint(points[0], points[1], points[2]);
+  const style = drawingStyle(d);
+  if (isAnnotationTool(d.name)) {
+    const annotation = annotationLayout({ ...d, settings: style }, points, width, height, options);
+    return annotation
+      ? {
+          points: style.annotation?.screenAnchored ? [annotation.anchor] : points,
+          style,
+          lines: annotation.leader && !annotation.outline ? [annotation.leader] : [],
+          annotation
+        }
+      : null;
+  }
+  const a = points[0],
     b = points[1];
   if (!a) return null;
   if (isGeometricTool(d.name)) {
@@ -291,20 +341,72 @@ export function hitDrawing(
   project: DrawingProjector,
   width: number,
   height: number,
-  handleRadius = 10
+  handleRadius = 10,
+  options: AnnotationHitOptions = {}
 ): { id: string; handle: number } | null {
   for (const layer of ["front", "back"] as const) {
     for (let index = items.length - 1; index >= 0; index--) {
       const drawing = items[index]!;
       if (drawingLayer(drawing) !== layer) continue;
-      const geometry = drawingGeometry(drawing, project, width, height);
+      const geometry = drawingGeometry(drawing, project, width, height, {
+        ...options,
+        selected: options.selectedId === drawing.id,
+        hovered: options.hoveredId === drawing.id
+      });
       if (!geometry) continue;
-      const handle = drawingHandleIndices(drawing.name, geometry.points.length).find(
-        (index) =>
-          Math.hypot(geometry.points[index]!.x - point.x, geometry.points[index]!.y - point.y) <
-          handleRadius
-      );
+      const handles =
+        geometry.annotation?.handles ??
+        drawingHandleIndices(drawing.name, geometry.points.length).map((index) => ({
+          index,
+          point: geometry.points[index]!
+        }));
+      const handle = handles.find(
+        (entry) =>
+          (!geometry.annotation || entry.index === 0 || options.selectedId === drawing.id) &&
+          Math.hypot(entry.point.x - point.x, entry.point.y - point.y) < handleRadius
+      )?.index;
       if (handle !== undefined) return { id: drawing.id, handle };
+      const annotation = geometry.annotation;
+      if (annotation?.kind === "table" && options.selectedId === drawing.id && annotation.body) {
+        for (const entry of handles) {
+          if (
+            (entry.index >= 100 &&
+              entry.index < 200 &&
+              Math.abs(entry.point.x - point.x) < 6 &&
+              point.y >= annotation.body.top &&
+              point.y <= annotation.body.bottom) ||
+            (entry.index >= 200 &&
+              Math.abs(entry.point.y - point.y) < 6 &&
+              point.x >= annotation.body.left &&
+              point.x <= annotation.body.right)
+          )
+            return { id: drawing.id, handle: entry.index };
+        }
+      }
+      if (annotation?.outline && annotationPolygonContains(annotation.outline, point))
+        return { id: drawing.id, handle: -1 };
+      if (
+        annotation?.kind === "priceNote" &&
+        annotation.text.some((line) =>
+          annotationContains(
+            {
+              left: line.x - line.maxWidth / 2,
+              right: line.x + line.maxWidth / 2,
+              top: line.y,
+              bottom: line.y + annotation.font.size * 1.3
+            },
+            point
+          )
+        )
+      )
+        return { id: drawing.id, handle: -1 };
+      if (
+        geometry.annotation &&
+        [geometry.annotation.body, geometry.annotation.marker].some(
+          (bounds) => bounds && annotationContains(bounds, point)
+        )
+      )
+        return { id: drawing.id, handle: -1 };
       const tolerance = Math.max(
         7,
         geometry.style.width * (drawing.name === "highlighter" ? 3 : 0.5) + 3

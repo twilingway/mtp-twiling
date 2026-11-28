@@ -1,5 +1,6 @@
 import type { MtpRasterFrame } from "./mtp-raster-cache.js";
 import type { MtpWorkerFrame } from "./mtp-worker-protocol.js";
+import { mtpWorkerBuffer, mtpWorkerCapture } from "./mtp-worker-buffer.js";
 
 export interface MtpWorkerIntent {
   key: string;
@@ -8,6 +9,8 @@ export interface MtpWorkerIntent {
   resetRevision: number;
   model: MtpRasterFrame["model"];
   priceHigh: number;
+  captureLow: number;
+  captureHigh: number;
   frame: MtpWorkerFrame;
 }
 
@@ -69,9 +72,39 @@ export function mtpWorkerIntent(source: MtpRasterFrame): MtpWorkerIntent | null 
   if (!Number.isFinite(slope) || Math.abs(lowY + (middle - low) * slope - middleY) > 1e-7)
     return null;
   const styles = model.paintStyles();
+  const allocation = mtpWorkerBuffer(size.width, size.height, horizontalRatio);
+  const sampleStep = Math.max(1, Math.ceil((end - start) / 3000));
+  const firstX = source.uniformX === "lightweight" ? source.xFor(start) : null;
+  const lastX = source.uniformX === "lightweight" ? source.xFor(end) : null;
+  const spacing =
+    source.uniformX === "lightweight" && firstX !== null && lastX !== null
+      ? (lastX - firstX) / (end - start)
+      : NaN;
+  const margin =
+    Math.max(
+      1,
+      ...styles.map((style) => (Number.isFinite(style.width) && style.width > 0 ? style.width : 1))
+    ) *
+      Math.max(1, context.miterLimit) +
+    1 / Math.min(horizontalRatio, verticalRatio);
+  const capture = mtpWorkerCapture(
+    start,
+    end,
+    model.data.length,
+    allocation.padX / horizontalRatio,
+    spacing,
+    margin,
+    sampleStep
+  );
+  const captureDomain =
+    capture.captureStart === start && capture.captureEnd === end
+      ? domain
+      : model.extrema(capture.captureStart, capture.captureEnd);
+  if (!captureDomain) return null;
   // Dense lookup is O(bars), without repeating the worker's O(periods * samples) walk.
-  const x = new Float64Array(end - start + 1);
-  for (let index = start; index <= end; index++) x[index - start] = source.xFor(index) ?? NaN;
+  const x = new Float64Array(capture.captureEnd - capture.captureStart + 1);
+  for (let index = capture.captureStart; index <= capture.captureEnd; index++)
+    x[index - capture.captureStart] = source.xFor(index) ?? NaN;
   const dataKey = JSON.stringify([
     model.revision,
     model.resetRevision,
@@ -80,28 +113,19 @@ export function mtpWorkerIntent(source: MtpRasterFrame): MtpWorkerIntent | null 
     model.data.at(-1)?.timestamp,
     model.data.at(-1)?.close
   ]);
-  const factor = Math.min(
-    1.4,
-    Math.sqrt((4 * 1024 * 1024) / (size.width * size.height)),
-    4096 / size.width,
-    4096 / size.height
-  );
-  const padX = Math.floor((size.width * (factor - 1)) / 2);
-  const padY = Math.floor((size.height * (factor - 1)) / 2);
   const frame: MtpWorkerFrame = {
     dataKey,
     length: model.data.length,
     start,
     end,
+    ...capture,
+    sampleStep,
     x,
     priceOrigin: low,
     yOrigin: lowY,
     ySlope: slope,
     styles,
-    width: size.width + padX * 2,
-    height: size.height + padY * 2,
-    padX,
-    padY,
+    ...allocation,
     horizontalRatio,
     verticalRatio,
     lineCap: context.lineCap,
@@ -125,6 +149,8 @@ export function mtpWorkerIntent(source: MtpRasterFrame): MtpWorkerIntent | null 
     dataKey,
     model,
     priceHigh: high,
+    captureLow: captureDomain.minValue,
+    captureHigh: captureDomain.maxValue,
     revision: model.revision,
     resetRevision: model.resetRevision,
     frame

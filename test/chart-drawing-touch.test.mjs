@@ -149,6 +149,7 @@ test("image native hold does not open a menu; real mouse right-click still does"
   };
   const controller = {
     getSnapshot: () => state,
+    update: (patch) => Object.assign(state, patch),
     selectObject: (id) => selected.push(id),
     setContext: (value) => contexts.push(value)
   };
@@ -255,6 +256,7 @@ test("ChartSurface preserves the editing owner when a second finger moves, relea
       pixelToPoint: (x, y) => ({ timestamp: x, value: y })
     },
     getSnapshot: () => state,
+    update: (patch) => Object.assign(state, patch),
     setContext() {},
     setPreview(value) {
       state.preview = value;
@@ -287,6 +289,8 @@ test("ChartSurface preserves the editing owner when a second finger moves, relea
     "react/jsx-runtime": jsxRuntime,
     "../../i18n/messages.js": { t: (value) => value },
     "../../model/drawing-model.js": load("model/drawing-model.ts"),
+    "../../model/drawing-annotation-measure.js": load("model/drawing-annotation-measure.ts"),
+    "../../model/drawing-annotation.js": load("model/drawing-annotation.ts"),
     "../../model/backup-format.js": load("model/backup-format.ts"),
     "../../model/drawing-toolbar.js": load("model/drawing-toolbar.ts"),
     "../../model/drawing-magnet.js": { snapDrawingPoint: (point) => point },
@@ -294,12 +298,18 @@ test("ChartSurface preserves the editing owner when a second finger moves, relea
     "../../model/drawing-tool-policy.js": load("model/drawing-tool-policy.ts"),
     "../../model/theme.js": {},
     "../../charts/price-format.js": {
+      chartPriceFormat: () => ({ precision: 2 }),
       nativePriceStep: () => 1,
       roundPriceToStep: (value) => value
     },
     "../../model/selected-instrument.js": { selectedMarketRow: () => null },
     "../../charts/navigation.js": load("charts/navigation.ts"),
     "./chart-lifecycle.js": {},
+    "./chart-drawing-drag.js": load("screens/terminal/chart-drawing-drag.ts"),
+    "./drawings/AnnotationInlineEditor.js": {},
+    "./drawings/annotation-edit-policy.js": load(
+      "screens/terminal/drawings/annotation-edit-policy.ts"
+    ),
     "./context.js": { useTerminal: () => ({ controller, state }) },
     "../../model/intervals/drawing-visibility.js": { drawingVisibleOnInterval: () => true },
     "../../model/technical-indicator-layout.js": { technicalIndicatorGroups: () => [] },

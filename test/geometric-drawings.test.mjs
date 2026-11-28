@@ -224,6 +224,7 @@ test("arrow kinds have distinct geometry and all tools paint configured captions
         "circle",
         "ellipse",
         "triangle",
+        "arc",
         "rotatedRectangle",
         "arrowPointer",
         "arrowUp",

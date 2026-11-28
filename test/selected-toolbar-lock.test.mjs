@@ -15,6 +15,15 @@ function fixture() {
   const controller = {
     getSnapshot: () => state,
     notify: (error) => assert.fail(error),
+    setChartSettings: async (patch) => {
+      state = {
+        ...state,
+        preferences: {
+          ...state.preferences,
+          chartSettings: { ...state.preferences.chartSettings, ...patch }
+        }
+      };
+    },
     editing: {
       cancelGesture() {},
       change: async (patch) => {
@@ -77,7 +86,7 @@ function fixture() {
       status: lockStatus(),
       mobile,
       expanded: false,
-      onChoose: () => controller.tools.toggleSelectedLock(),
+      onChoose: () => lockUi.toggleToolbarLock(controller),
       onMenu
     }).props;
   return {
@@ -104,7 +113,7 @@ test("object tree and left lock share individual drawing/image flags in both dir
     f.treeButton(kind).props.onClick();
     assert.equal(f.props().active, true);
     assert.equal(f.props().icon, "lock");
-    assert.equal(f.props().label, "Открепить объект");
+    assert.equal(f.props().label, "Разблокировать объект");
     await f.props().onChoose();
     assert.equal(f.treeButton(kind).props["aria-pressed"], false);
     assert.equal(f.props().active, false);
@@ -142,20 +151,31 @@ test("deselect or change of selection/scope cancels stale individual commands", 
   assert.equal(f.writes.length, 1);
 });
 
-test("global drawing lock explains disabled individual action without changing its flag", async () => {
-  const f = fixture();
-  f.update({
-    preferences: {
-      ...f.state().preferences,
-      chartSettings: { drawingTools: { drawingsLocked: true } }
-    }
-  });
-  assert.equal(f.props().active, true);
-  assert.equal(f.props().disabled, true);
-  assert.match(f.props().label, /глобально/);
-  await f.props().onChoose();
-  assert.equal(f.writes.length, 0);
-  assert.equal(f.state().drawings[0].lock, false);
+test("explicit global unlock preserves individual flags and indicator locks with or without selection", async () => {
+  for (const selectedObject of ["drawing", null]) {
+    const f = fixture();
+    f.state().drawings[0].lock = true;
+    f.update({
+      selectedObject,
+      preferences: {
+        ...f.state().preferences,
+        chartSettings: { drawingTools: { drawingsLocked: true, indicatorsLocked: true } }
+      }
+    });
+    assert.equal(f.props().active, true);
+    assert.equal(f.props().disabled, false);
+    assert.equal(f.props().label, "Разблокировать объекты рисования");
+    await f.props().onChoose();
+    assert.equal(f.writes.length, 0);
+    assert.equal(f.state().preferences.chartSettings.drawingTools.drawingsLocked, false);
+    assert.equal(f.state().preferences.chartSettings.drawingTools.indicatorsLocked, true);
+    assert.equal(f.state().drawings[0].lock, true);
+    assert.equal(
+      f.props().label,
+      selectedObject ? "Разблокировать объект" : "Выберите объект для блокировки"
+    );
+    assert.equal(f.props().disabled, selectedObject === null);
+  }
 });
 
 test("mobile lock always opens global menu; selected action alone can be unavailable", () => {
@@ -177,13 +197,13 @@ test("mobile lock always opens global menu; selected action alone can be unavail
     assert.equal(f.writes.length, 0);
     const globals = [{ id: "lock-all", label: "Разблокировать всё", checked: true }];
     const sections = f.lockUi.toolbarLockSections(f.lockStatus(), globals, () => {});
-    assert.equal(sections[0].items[0].disabled, true);
+    assert.equal(sections[0].items[0].disabled, !global);
     assert.equal(sections[1].items, globals);
     assert.equal(sections[1].items[0].checked, true);
     const desktop = f.DrawingToolbarSplit(f.props());
     assert.equal(
       find(desktop, (node) => node.props?.className === "tool drawing-tool-main").props.disabled,
-      true
+      !global
     );
     assert.ok(find(desktop, (node) => node.props?.className === "drawing-tool-arrow"));
   }
@@ -197,21 +217,52 @@ test("lock menu unpins the selected tree object and keeps global locking separat
     const globals = [{ id: "lock-drawings", label: "Закрепить объекты рисования", checked: false }];
     const sections = () =>
       f.lockUi.toolbarLockSections(f.lockStatus(), globals, () =>
-        f.controller.tools.toggleSelectedLock()
+        f.lockUi.toggleToolbarLock(f.controller)
       );
     const selected = sections()[0];
     assert.equal(selected.title, "Выделенный объект");
-    assert.equal(selected.items[0].label, "Открепить объект");
+    assert.equal(selected.items[0].label, "Разблокировать объект");
     assert.equal(selected.items[0].checked, true);
     assert.equal(selected.items[0].disabled, false);
     assert.equal(sections()[1].items, globals);
     await selected.items[0].action();
     assert.equal(f.treeButton(kind).props["aria-pressed"], false);
-    assert.equal(sections()[0].items[0].label, "Закрепить объект");
+    assert.equal(sections()[0].items[0].label, "Заблокировать объект");
     assert.equal(sections()[0].items[0].checked, false);
     assert.equal(globals[0].checked, false);
     f.update({ selectedObject: null });
     assert.equal(sections()[0].items[0].disabled, true);
     assert.equal(sections()[0].items[0].checked, false);
   }
+});
+
+test("selected drawing exposes visible unlock text and a checked global action", async () => {
+  const f = fixture();
+  const { SelectedDrawingLock } = f.load("screens/terminal/SelectedDrawingLock.js");
+  f.update({
+    preferences: {
+      ...f.state().preferences,
+      chartSettings: { drawingTools: { drawingsLocked: true, indicatorsLocked: true } }
+    }
+  });
+  const button = SelectedDrawingLock();
+  assert.equal(button.props.disabled, false);
+  assert.equal(button.props["aria-pressed"], true);
+  assert.equal(
+    find(button, (node) => node.type === "span").props.children,
+    "Разблокировать объекты рисования"
+  );
+  assert.ok(find(button, (node) => node.props?.name === "check"));
+  button.props.onClick();
+  await Promise.resolve();
+  await Promise.resolve();
+  assert.equal(f.state().preferences.chartSettings.drawingTools.drawingsLocked, false);
+  assert.equal(f.state().preferences.chartSettings.drawingTools.indicatorsLocked, true);
+  assert.equal(f.state().drawings[0].lock, false);
+  const unlocked = SelectedDrawingLock();
+  assert.equal(
+    find(unlocked, (node) => node.type === "span").props.children,
+    "Заблокировать объект"
+  );
+  assert.equal(unlocked.props["aria-pressed"], false);
 });

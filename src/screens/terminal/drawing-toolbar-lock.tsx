@@ -1,6 +1,7 @@
 import { t } from "../../i18n/messages.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import type { selectDrawingToolbarState } from "./terminal-state-selection.js";
+import type { TerminalController } from "./controller.js";
 import {
   DrawingToolbarSplit,
   type ToolbarMenuItem,
@@ -15,14 +16,22 @@ export function selectedToolbarLock(
 ) {
   const global = drawingToolbarSettings(state.preferences.chartSettings).drawingsLocked;
   return {
-    locked: state.selectedObjectExists && (state.selectedObjectLocked || global),
-    disabled: !state.selectedObjectExists || global,
-    label: !state.selectedObjectExists
-      ? t("Выберите объект для блокировки")
-      : global
-        ? t("Объекты заблокированы глобально. Разблокируйте их в меню.")
-        : t(state.selectedObjectLocked ? "Открепить объект" : "Закрепить объект")
+    locked: global || (state.selectedObjectExists && state.selectedObjectLocked),
+    disabled: !state.selectedObjectExists && !global,
+    label: global
+      ? t("Разблокировать объекты рисования")
+      : !state.selectedObjectExists
+        ? t("Выберите объект для блокировки")
+        : t(state.selectedObjectLocked ? "Разблокировать объект" : "Заблокировать объект")
   };
+}
+
+export function toggleToolbarLock(controller: TerminalController): Promise<void> {
+  const settings = controller.getSnapshot().preferences.chartSettings;
+  if (!drawingToolbarSettings(settings).drawingsLocked)
+    return controller.tools.toggleSelectedLock();
+  controller.editing.cancelGesture();
+  return controller.tools.setOptions({ drawingsLocked: false });
 }
 
 type LockStatus = ReturnType<typeof selectedToolbarLock>;

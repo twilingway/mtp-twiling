@@ -13,16 +13,15 @@ import { hasYandexConfig, validateYandexConfig, YandexError } from "./types.js";
 import { yandexCoordinatorProbe } from "./coordinator-probe.js";
 import { yandexSubscribe, yandexUpdatedStatus } from "./coordinator-state.js";
 import { yandexSnapshotAcceptor } from "./coordinator-accept.js";
-import * as yandexStatus from "./coordinator-status.js";
-import type { YandexStatusClear } from "./coordinator-status.js";
-import { yandexTransfer } from "./coordinator-transfer.js";
+import { yandexFailureStatus, type YandexStatusClear } from "./coordinator-status.js";
+import { yandexOperationTransfer } from "./coordinator-operation.js";
 import { YandexPreview } from "./coordinator-preview.js";
 import { YandexScheduler } from "./coordinator-scheduler.js";
 import { YandexContextBaseline } from "./context-baseline.js";
-import { yandexTransferActions } from "./coordinator-actions.js";
 import type { YandexReceiptState } from "./coordinator-actions.js";
 import { yandexManualDeletion } from "./coordinator-delete.js";
 import { yandexMaintenanceTarget } from "./maintenance-journal.js";
+import { yandexOperationDeadline } from "./operation-deadline.js";
 import type { YandexAuthorization, YandexPublicConfig } from "./types.js";
 import type { YandexAuthClient, YandexCoordinatorOptions } from "./coordinator-options.js";
 import {
@@ -41,6 +40,7 @@ export class YandexCoordinator implements CloudSyncProvider {
   private readonly journal: YandexJournal;
   private readonly transportFactory: NonNullable<YandexCoordinatorOptions["transport"]>;
   private readonly lock: typeof yandexWriterLock;
+  private readonly manualDeleteTimeoutMs: number;
   private authorization: YandexAuthorization | undefined;
   private operation: AbortController | undefined;
   private preparation: Promise<void> | undefined;
@@ -68,6 +68,7 @@ export class YandexCoordinator implements CloudSyncProvider {
     this.transportFactory =
       options.transport ?? ((authorization) => new YandexTransport(authorization));
     this.lock = options.lock ?? yandexWriterLock;
+    this.manualDeleteTimeoutMs = options.manualDeleteTimeoutMs ?? 90000;
     this.status = initialYandexClientStatus(hasYandexConfig(config));
     this.baseline.open(this.journal, config?.clientId, this.host.scope(this.id).revision);
   }
@@ -91,7 +92,9 @@ export class YandexCoordinator implements CloudSyncProvider {
     const epoch = this.epoch;
     try {
       const settings = await this.journal.settings();
+      const clientId = await this.journal.existingDeviceId();
       if (this.disposed || epoch !== this.epoch) return;
+      if (clientId) this.update({ clientId });
       if (this.settingsIntent > 0) {
         const mode = this.identity.desiredMode ?? settings.clientMode ?? this.status.clientMode;
         this.update(yandexPreparedClientStatus(settings, this.desiredAutomatic, mode));
@@ -237,6 +240,8 @@ export class YandexCoordinator implements CloudSyncProvider {
     else await yandexClientSettingsLock(save);
     if (this.disposed || intent !== this.settingsIntent) return;
     this.desiredEnabled = this.desiredAutomatic = undefined;
+    const clientId = await this.journal.existingDeviceId();
+    if (this.disposed || intent !== this.settingsIntent) return;
     const { changedMode, patch, clear } = yandexClientPreferences(this.status, settings);
     if (changedMode) {
       this.epoch++;
@@ -244,7 +249,10 @@ export class YandexCoordinator implements CloudSyncProvider {
       this.preview.clear();
       this.remoteCache.clear();
     }
-    this.update(patch, clear);
+    this.update({ ...patch, ...(clientId ? { clientId } : {}) }, [
+      ...clear,
+      ...(!clientId ? ["clientId" as const] : [])
+    ]);
     if (settings.enabled && !this.authorization && !changedMode) {
       try {
         await this.restoreAuthorization();
@@ -300,8 +308,8 @@ export class YandexCoordinator implements CloudSyncProvider {
     this.resume();
   };
   resume = (): void => {
-    this.scheduler.clear();
     if (!this.status.prepared) {
+      this.scheduler.clear();
       void this.prepare();
       return;
     }
@@ -313,11 +321,14 @@ export class YandexCoordinator implements CloudSyncProvider {
       this.host.scope(this.id).blocked ||
       this.status.conflict ||
       this.status.error === "indeterminate"
-    )
+    ) {
+      this.scheduler.clear();
       return;
+    }
     this.scheduler.schedule(
-      () => this.run(undefined, false, true),
-      () => !!this.operation
+      () => this.run(undefined, !this.status.pendingChanges, true),
+      () => !!this.operation,
+      this.status.pendingChanges
     );
   };
   sync = (): Promise<void> => this.run();
@@ -337,6 +348,8 @@ export class YandexCoordinator implements CloudSyncProvider {
       status: () => this.status,
       epoch: () => this.epoch,
       current: () => !this.disposed,
+      timeoutMs: this.manualDeleteTimeoutMs,
+      owns: (operation) => this.operation === operation,
       busy: () => !!this.operation || this.identity.changing,
       begin: (operation) => {
         this.scheduler.clear();
@@ -347,7 +360,7 @@ export class YandexCoordinator implements CloudSyncProvider {
         this.scheduler.complete(() => {});
       },
       update: (patch, clear) => this.update(patch, clear),
-      inspect: this.inspect
+      inspect: (timeoutMs) => this.run(undefined, true, false, timeoutMs, true)
     })(id);
   runSyntheticProbe = yandexCoordinatorProbe({
     authorization: () => this.authorization,
@@ -361,7 +374,9 @@ export class YandexCoordinator implements CloudSyncProvider {
   private async run(
     selection?: CloudSelection,
     inspectionOnly = false,
-    automatic = false
+    automatic = false,
+    timeoutMs = 90000,
+    keepComparison = false
   ): Promise<void> {
     if (!this.status.enabled || this.disposed || this.operation || this.identity.changing) return;
     const auth = this.authorization;
@@ -370,11 +385,12 @@ export class YandexCoordinator implements CloudSyncProvider {
       return;
     }
     const operation = new AbortController();
+    const deadline = yandexOperationDeadline([auth.signal, operation.signal], timeoutMs);
     this.operation = operation;
     const epoch = this.epoch;
     const { guard, session, scopedAuth, revisions, checkClientMode } = yandexIdentityOperation({
       host: this.host,
-      auth,
+      auth: { ...auth, signal: deadline.signal },
       operation,
       current: () =>
         !this.disposed &&
@@ -400,36 +416,22 @@ export class YandexCoordinator implements CloudSyncProvider {
         progress: { stage: "inspect" },
         ...(selection ? { choiceAction: { selection, state: "running" as const } } : {})
       },
-      inspectionOnly ? ["comparison"] : ["error", "pauseReason"]
+      inspectionOnly ? (keepComparison ? [] : ["comparison"]) : ["error", "pauseReason"]
     );
     try {
       auth.getAccessToken();
-      await this.lock(scopedAuth, async () => {
-        if (!(await checkClientMode())) {
-          this.update({ phase: previousPhase }, ["progress"]);
-          return;
-        }
-        if (
-          !inspectionOnly &&
-          (await this.journal.maintenance(this.config!.clientId, auth.accountId))
-        )
-          throw new YandexError("indeterminate");
-        const contextAssociation = await this.baseline.operation(
-          this.host,
-          guard,
-          this.journal,
-          this.config!.clientId,
-          auth.accountId,
-          inspectionOnly || !!selection
-        );
-        return yandexTransfer(
-          this.host,
-          revisions,
-          this.journal,
-          this.config!.clientId,
-          auth.accountId,
-          guard,
-          yandexTransferActions({
+      await deadline.wait(
+        this.lock(scopedAuth, async () => {
+          if (!(await checkClientMode())) {
+            this.update({ phase: previousPhase }, ["progress"]);
+            return;
+          }
+          if (
+            !inspectionOnly &&
+            (await this.journal.maintenance(this.config!.clientId, auth.accountId))
+          )
+            throw new YandexError("indeterminate");
+          return yandexOperationTransfer({
             host: this.host,
             revisions,
             journal: this.journal,
@@ -442,13 +444,14 @@ export class YandexCoordinator implements CloudSyncProvider {
             selection,
             accept: this.accept,
             observed: (association, revision) => this.baseline.accepted(association, revision),
-            update: this.update.bind(this)
-          }),
-          selection,
-          inspectionOnly,
-          contextAssociation
-        );
-      });
+            update: this.update.bind(this),
+            baseline: this.baseline,
+            inspectionOnly
+          });
+        })
+      );
+      const clientId = await deadline.wait(this.journal.existingDeviceId());
+      if (guard.isCurrent() && this.operation === operation && clientId) this.update({ clientId });
     } catch (error) {
       if (
         !this.disposed &&
@@ -457,8 +460,9 @@ export class YandexCoordinator implements CloudSyncProvider {
         !operation.signal.aborted &&
         this.host.scope(this.id).session === session
       )
-        this.failure(error, selection);
+        this.failure(auth.signal.aborted ? new YandexError("auth-required") : error, selection);
     } finally {
+      deadline.dispose();
       if (this.operation === operation) this.operation = undefined;
       this.scheduler.complete(this.resume);
     }
@@ -475,7 +479,7 @@ export class YandexCoordinator implements CloudSyncProvider {
   });
   private failure(error: unknown, selection?: CloudSelection): void {
     if (!this.status.enabled || this.disposed) return;
-    this.update(yandexStatus.yandexFailureStatus(error, selection), ["progress"]);
+    this.update(yandexFailureStatus(error, selection), ["progress"]);
   }
   private cancel(cancelAttempt = false): void {
     this.epoch++;
