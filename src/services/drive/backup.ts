@@ -34,6 +34,12 @@ const visibility: Shape = Object.fromEntries(
   ["minutes", "hours", "days", "weeks"].map((key) => [key, scalars("enabled from to")])
 );
 const drawingSettings: Shape = {
+  annotation: {
+    ...scalars(
+      "bold italic backgroundColor backgroundOpacity borderColor borderOpacity borderWidth borderStyle wrap width height offsetX offsetY screenAnchored screenX screenY"
+    ),
+    table: { cells: [[true]], columnWidths: [true], rowHeights: [true] }
+  },
   ...scalars(
     "color width lineStyle lineOpacity trendLine trendColor trendWidth trendStyle trendOpacity fill opacity extendLeft extendRight reverse labels prices labelSide labelVertical labelFormat fontSize textEnabled text textAlign textVertical oneColor extend textColor"
   ),

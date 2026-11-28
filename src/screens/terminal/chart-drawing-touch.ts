@@ -12,6 +12,8 @@ import { DrawingStrokeSampler } from "../../model/drawing-stroke-sampler.js";
 import { editDrawingAnchors } from "../../model/drawing-anchor-edit.js";
 import type { DrawingTool, DrawingPoint, PixelPoint } from "../../model/types.js";
 import type { TerminalController } from "./controller.js";
+import { annotationDefaults, isAnnotationTool } from "../../model/drawing-annotation.js";
+import { validCreationDraft } from "./drawing-creation-draft.js";
 
 type PlotPointer = PointerEvent<HTMLDivElement>;
 
@@ -27,6 +29,7 @@ export function createDrawingInput(
   pointAt: (point: PixelPoint, temporary: boolean) => DrawingPoint | null
 ) {
   let points: DrawingPoint[] = [];
+  let placements: PixelPoint[] = [];
   let vertices: PixelPoint[] = [];
   let stroke: DrawingStrokeSampler | null = null;
   let scope: string | null = null;
@@ -49,12 +52,45 @@ export function createDrawingInput(
   };
   const cancel = () => {
     points = [];
+    placements = [];
     vertices = [];
     stroke = null;
     scope = null;
     pointerId = null;
     release();
-    controller.setPreview(null);
+    const current = controller.getSnapshot(),
+      draft = current.drawingCreationDraft;
+    // Placement cancellation also runs on window blur; an open editor owns its preview.
+    if (!draft || !validCreationDraft(current, draft)) controller.setPreview(null);
+  };
+  const settingsFor = (tool: DrawingTool, pixel?: PixelPoint) => {
+    const current = controller.getSnapshot();
+    const defaults = annotationDefaults(tool);
+    const template = current.preferences.chartSettings.drawingTemplates?.[`default:${tool}`];
+    const first = placements[0],
+      end = pixel ?? placements.at(-1),
+      size = isAnnotationTool(tool) ? controller.chart?.plotSize() : undefined;
+    return {
+      ...drawingStyle({ name: tool }),
+      ...defaults,
+      levelStyles: structuredClone(DEFAULT_FIB_LEVELS),
+      ...template?.settings,
+      ...(isAnnotationTool(tool) && {
+        annotation: {
+          ...defaults.annotation,
+          ...template?.settings?.annotation,
+          ...(first &&
+            size && {
+              screenX: Math.max(0, Math.min(1, first.x / size.width)),
+              screenY: Math.max(0, Math.min(1, first.y / size.height))
+            }),
+          ...(tool === "signpost" &&
+            placements.length > 1 &&
+            first &&
+            end && { offsetX: end.x - first.x, offsetY: end.y - first.y })
+        }
+      })
+    };
   };
   const complete = () => {
     const current = controller.getSnapshot(),
@@ -63,23 +99,31 @@ export function createDrawingInput(
     const candidate: unknown = {
       id: crypto.randomUUID(),
       name: tool,
-      points: editDrawingAnchors(tool, points, [...points], 2, controller.chart),
-      settings: {
-        ...drawingStyle({ name: tool }),
-        levelStyles: structuredClone(DEFAULT_FIB_LEVELS)
-      },
-      ...current.preferences.chartSettings.drawingTemplates?.[`default:${tool}`]
+      ...current.preferences.chartSettings.drawingTemplates?.[`default:${tool}`],
+      points: editDrawingAnchors(
+        tool,
+        points,
+        tool === "signpost" ? points.slice(0, 1) : [...points],
+        2,
+        controller.chart
+      ),
+      settings: settingsFor(tool)
     };
     cancel();
-    if (isDrawing(candidate)) void controller.addDrawing(candidate);
-    else controller.notify(t("Не удалось создать рисунок."));
+    if (isDrawing(candidate)) {
+      if (isAnnotationTool(tool) && tool !== "flag" && tool !== "priceNote")
+        controller.drawingCreation.begin(candidate);
+      else void controller.addDrawing(candidate);
+    } else controller.notify(t("Не удалось создать рисунок."));
   };
-  const preview = (tool: DrawingTool, point?: DrawingPoint) => {
-    const anchors = point ? [...points, point] : [...points];
+  const preview = (tool: DrawingTool, point?: DrawingPoint, pixel?: PixelPoint) => {
+    const anchors =
+      tool === "signpost" ? points.slice(0, 1) : point ? [...points, point] : [...points];
     controller.setPreview({
       id: "preview",
       name: tool,
-      points: editDrawingAnchors(tool, anchors, anchors, 2, controller.chart)
+      points: editDrawingAnchors(tool, anchors, anchors, 2, controller.chart),
+      settings: settingsFor(tool, pixel)
     });
   };
   const finish = () => {
@@ -111,6 +155,7 @@ export function createDrawingInput(
       if (!points.length) scope = scopeKey();
       pointerId = event.pointerId;
       const required = drawingPointCount(tool);
+      placements.push(pixel);
       if (isFreehandTool(tool)) {
         stroke = new DrawingStrokeSampler();
         stroke.add(point, pixel);
@@ -159,7 +204,7 @@ export function createDrawingInput(
           points = stroke.points();
           preview(tool);
         }
-      } else if (point) preview(tool, point);
+      } else if (point) preview(tool, point, pixel);
       return true;
     },
     up(event: PlotPointer, pixel: PixelPoint) {
@@ -170,7 +215,10 @@ export function createDrawingInput(
         if (stroke) {
           stroke.add(point, pixel, true);
           points = stroke.points();
-        } else points.push(point);
+        } else {
+          points.push(point);
+          placements.push(pixel);
+        }
         if (points.length >= 2) complete();
         else cancel();
       } else if (stroke && points.length >= 3) {

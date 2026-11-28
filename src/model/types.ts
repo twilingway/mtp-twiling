@@ -115,6 +115,7 @@ export interface PixelPoint {
   y: number;
 }
 export type DrawingTool =
+  | AnnotationTool
   | "segment"
   | "rayLine"
   | "straightLine"
@@ -139,7 +140,42 @@ export type DrawingTool =
   | "cubicCurve"
   | "fibonacciLine"
   | "fibonacciExtension";
+export type AnnotationTool =
+  | "text"
+  | "note"
+  | "priceNote"
+  | "pin"
+  | "table"
+  | "callout"
+  | "comment"
+  | "priceLabel"
+  | "signpost"
+  | "flag";
 export type LineStyle = "solid" | "dashed" | "dotted";
+export interface DrawingAnnotationTable {
+  cells: string[][];
+  columnWidths?: number[];
+  rowHeights?: number[];
+}
+export interface DrawingAnnotationSettings {
+  bold?: boolean;
+  italic?: boolean;
+  backgroundColor?: string;
+  backgroundOpacity?: number;
+  borderColor?: string;
+  borderOpacity?: number;
+  borderWidth?: number;
+  borderStyle?: LineStyle;
+  wrap?: boolean;
+  width?: number;
+  height?: number;
+  offsetX?: number;
+  offsetY?: number;
+  screenAnchored?: boolean;
+  screenX?: number;
+  screenY?: number;
+  table?: DrawingAnnotationTable;
+}
 export interface FibLevelStyle {
   value: number;
   enabled: boolean;
@@ -147,6 +183,7 @@ export interface FibLevelStyle {
   text?: string;
 }
 export interface DrawingSettings {
+  annotation?: DrawingAnnotationSettings;
   color?: string;
   width?: number;
   lineStyle?: LineStyle;
@@ -201,7 +238,14 @@ export type DrawingShape =
         | "horizontalRayLine"
         | "verticalStraightLine"
         | "arrowUp"
-        | "arrowDown";
+        | "arrowDown"
+        | "text"
+        | "pin"
+        | "table"
+        | "comment"
+        | "priceLabel"
+        | "signpost"
+        | "flag";
       points: [DrawingPoint];
     }
   | {
@@ -214,7 +258,10 @@ export type DrawingShape =
         | "circle"
         | "ellipse"
         | "arrow"
-        | "arrowPointer";
+        | "arrowPointer"
+        | "note"
+        | "priceNote"
+        | "callout";
       points: [DrawingPoint, DrawingPoint];
     }
   | {

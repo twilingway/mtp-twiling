@@ -1,0 +1,92 @@
+# Design
+
+## Context
+
+См. proposal.md. Оба SDK используют общие Drawing, canvas и hit-test. Подписи прежних фигур
+однострочные; каталог уже содержит идентификаторы новых инструментов. Форматы имеют три отдельные
+границы: backup validator, clipboard allowlist и cloud projection. Нынешний modal preview требует
+уже committed original, поэтому создание нельзя реализовать записью пустого объекта до редактора.
+
+## Goals / Non-Goals
+
+**Goals:** общий контракт сохранения и экранной раскладки; одинаковый выбор и рисование;
+транзакционное создание и редактирование; перенос без потери ячеек и оформления.
+
+**Non-Goals:** хранение HTML/rich text, сетевые комментарии и ответы, серверные операции, изменение
+ImageAsset, новые зависимости, использование исходников TradingView.
+
+## Decisions
+
+- Контракт `contracts.md` фиксирует расширение DrawingSettings. Переиспользуем text/font поля, новые
+  настройки помещаем в annotation: это сохраняет прежние подписи и не смешивает матрицу с текстом.
+  Отвергнут TSV в text: он теряет пустые ячейки и размеры полос.
+- Политика задаёт один point обычным аннотациям, два — note/priceNote/callout. Signpost создаётся
+  одним нажатием с inline editor, хранит один point и pixel offsets; отдельный layout handle меняет
+  offsets после создания. Обязательного второго placement нет. Flag сохраняет data anchor и
+  фиксированный CSS px размер символа; default не фиксирует его во viewport. Таблица умеет временную
+  и нормализованную экранную привязку; преобразование сохраняет видимое положение. Размер текста и
+  рамки измеряется CSS px, проекция меняет только якорь.
+- Чистый annotation layout получает проецированные points, размеры plot, selected и измеритель
+  шрифта/formatter цены. Он выдаёт строки, ячейки, рамки, outline, отдельный price block и handles;
+  paint и hit потребляют одно представление. Canvas измерение остаётся снаружи pure core.
+  Независимый layout в React отвергнут из-за расхождения выбора и рисования в двух SDK.
+- Автоматическая цена форматируется из первого якоря с точностью текущего инструмента. Последняя
+  котировка и placeholder цены не используются. PriceNote сохраняет отдельные auto-price block и
+  пользовательскую caption вдоль соединителя; PriceLabel показывает только автоцену. Pin раскрывает
+  содержание при наведении или выборе, скрывает только при отсутствии обоих состояний. Flag рисует
+  символ без text editor; различия оформления остальных средств задаются общими defaults.
+- Creation draft существует отдельно от committed drawings до Save. Modal edit сохраняет
+  существующий preview lifecycle. Любой Cancel/context change убирает draft, Save коммитит одно
+  действие. Portable selectors продолжают читать только committed state. Stale callbacks отвергаются
+  после owner/instrument/engine/timeframe/revision/object change.
+- Табличный редактор хранит прямоугольный cells и размеры полос; поддерживает ввод, добавление
+  строк/столбцов справа/ниже выбранной ячейки, удаление, изменение общей рамки и границ полос. Все
+  операции до Save относятся к draft. Textarea/cell owns keyboard; глобальные команды графика не
+  перехватывают ввод. Limits одинаковы в UI и валидаторе, импорт не обрезает данные.
+- Все пути переноса расширяются одной версией контракта. Новые имена доступны capability reader до
+  cloud projection. Не добавляем annotation старым типам в этой итерации: старый reader иначе
+  способен молча отбросить новое оформление известной фигуры.
+
+## Risks / Trade-offs
+
+- Разные font metrics между hit/paint → один injected provider и одинаковый formatter в обоих
+  проходах; интеграционная проверка длинных, жирных и многострочных подписей.
+- Table resize при минимальных полосах → validator проверяет размеры и суммы, UI ограничивает жест
+  до допустимого результата; Cancel восстанавливает исходные размеры.
+- Пустой новый text object невидим → создание завершается только содержательным Save; pin может
+  иметь пустое содержание, priceLabel и flag видны без пользовательского текста.
+- Reference отличается между актуальными docs и старым видео → используем актуальные official docs и
+  публичное demo; не заявляем непроверенные точные defaults или приватные возможности.
+- Signpost в demo использует vertical position% относительно OHLC бара/доступного пространства,
+  optional emoji и plate settings; текущий контракт pixel offsets не выражает эту семантику точно.
+  Это явная граница соответствия reference; не заявлять полное совпадение свойств без отдельного
+  расширения модели и проверки. Однокликовое создание выбрано по наблюдённому demo, несмотря на
+  двухкликовое описание в статье поддержки.
+
+## Ownership
+
+- Core единолично меняет types, drawing-model, drawing-tool-policy, annotation layout, validator,
+  drawing-editing allowlist и services/drive/backup projection. Передаёт layout API до интеграции.
+- Renderer меняет drawing-paint, каталог и иконки; не правит drawing-model и сохранение. Передаёт UI
+  общий measurement provider и hit options.
+- UI меняет editor, settings fields, mobile widget и input/controller draft lifecycle; не меняет
+  core geometry. Если нужен общий файл, сначала передаёт запрос его владельцу.
+- Интегратор единолично управляет версией, общей сборкой, проверяемым сервером и Git. Каждый
+  исполнитель сохраняет чужие правки; общий smoke начинается после передачи всех трёх частей.
+
+## Migration Plan
+
+Миграция прежних рисунков не нужна: annotation optional, прежние settings/defaults сохраняются. До
+приёмки проверить round-trip local/clipboard/JSON/cloud и unsupported-tool guard. Откат бинарной
+версии не должен пересохранять неподдерживаемые новые рисунки; сохранить backup перед откатом.
+
+## References
+
+- Публичное официальное demo: https://charting-library.tradingview-widget.com/.
+- Выноска: https://www.tradingview.com/support/solutions/43000516978-callout-drawing-tool/.
+- Финальная наблюдённая матрица: `artifacts/tradingview-text-reference/reference-matrix.md` в
+  основном workspace. Все десять средств созданы и их настройки просмотрены в official public demo;
+  authenticated Supercharts не проверен из-за registration gate. Pin hover и selection проверены
+  отдельно. Row/column resize и anchored scroll поддержаны документацией, но не все жесты выполнены;
+  изменение viewport не является проверкой touch. Интегратор прикладывает пути к артефактам в
+  verification перед утверждением визуального соответствия.

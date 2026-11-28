@@ -5,6 +5,7 @@ import { sourceLoader } from "./helpers/market-source-loader.mjs";
 const load = sourceLoader();
 const { paintDrawings, TOOL_NAMES } = load("model/drawing-model.ts");
 const { drawingPointCount } = load("model/drawing-tool-policy.ts");
+const { isAnnotationTool } = load("model/drawing-annotation.ts");
 const { validateBackup } = load("model/backup-format.ts");
 const { assertReadableDrivePayload } = load("services/drive/reader-guard.ts");
 const { prepareDriveBackup, restoreDriveBackup } = load("services/drive/backup.ts");
@@ -90,8 +91,8 @@ test("rectangle text uses its center and selected edges with independent size an
     }
 });
 
-test("all drawing tools paint a caption; legacy drawings follow the outline and can hide captions", () => {
-  for (const name of Object.keys(TOOL_NAMES)) {
+test("line and shape tools paint a caption; legacy drawings follow the outline and can hide captions", () => {
+  for (const name of Object.keys(TOOL_NAMES).filter((tool) => !isAnnotationTool(tool))) {
     const item = drawing(name);
     assert.deepEqual(paint(item).text[0].slice(0, 2), [note, lineColor], name);
     assert.equal(paint(drawing(name, { textColor })).text[0][1], textColor, name);
