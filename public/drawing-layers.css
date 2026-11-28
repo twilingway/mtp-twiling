@@ -196,18 +196,27 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 5px;
   min-width: 29px;
   min-height: 24px;
+  max-width: min(330px, 60vw);
+  padding: 4px 7px;
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: left;
   color: var(--chart-text, var(--text));
   pointer-events: auto;
 }
 .selected-drawing-lock[aria-pressed="true"] {
+  color: var(--accent, #2962ff);
+  background: color-mix(in srgb, var(--accent, #2962ff) 14%, transparent);
   outline: 1px solid var(--accent, #2962ff);
   outline-offset: -1px;
 }
 .selected-drawing-lock svg {
   width: 15px;
   height: 15px;
+  flex-shrink: 0;
 }
 .candle-countdown {
   position: absolute;
