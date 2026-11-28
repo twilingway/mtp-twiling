@@ -381,9 +381,8 @@ export class MtpWorkerRasterCache {
       (job) => job?.geometry.contentKey === contentKey
     )?.geometry.previewHardKey;
     if (this.ready && this.ready.geometry.contentKey !== contentKey) {
-      if (this.interacting) previewHardKey ??= mtpWorkerContentKey(source, true) ?? undefined;
-      if (!this.interacting || this.ready.geometry.previewHardKey !== previewHardKey)
-        this.releaseReady();
+      previewHardKey ??= mtpWorkerContentKey(source, true) ?? undefined;
+      if (this.ready.geometry.previewHardKey !== previewHardKey) this.releaseReady();
     }
     if (this.result && this.result.geometry.contentKey !== contentKey && this.interacting)
       previewHardKey ??= mtpWorkerContentKey(source, true) ?? undefined;

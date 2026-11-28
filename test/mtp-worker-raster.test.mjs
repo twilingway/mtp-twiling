@@ -629,8 +629,8 @@ test("held unchanged-close and changed-tail revisions preserve safe preview with
     assert.ok(reads.y - oldReads.y <= 60 * 3);
     f.cache.setInteraction(false);
     f.cache.draw(frame);
-    assert.equal(image.closed, 1, "outdated data cannot be displayed as settled exact geometry");
-    assert.equal(frame.scope.context.blits.length, blits + 60);
+    assert.equal(image.closed, 0, "idle retains a soft preview until exact current data is ready");
+    assert.equal(frame.scope.context.blits.length, blits + 61);
     assert.equal(f.cache.status().snapshots, before.snapshots + 1);
     assert.equal(f.cache.status().dispatched, before.dispatched + 1);
     assert.equal(f.messages.at(-1).prefix.length, frame.model.data.length + 1);
@@ -638,6 +638,7 @@ test("held unchanged-close and changed-tail revisions preserve safe preview with
     f.result();
     assert.equal(f.cache.pending(), true);
     f.cache.draw(frame);
+    assert.equal(image.closed, 1);
     assert.equal(f.cache.pending(), false);
     f.cache.destroy();
   }
@@ -658,8 +659,12 @@ test("a non-held tail update requires new exact data and disabled/empty/destroy 
     const blits = frame.scope.context.blits.length;
     if (ending === "settled") {
       f.cache.draw(frame);
-      assert.equal(image.closed, 1);
-      assert.equal(frame.scope.context.blits.length, blits);
+      assert.equal(
+        image.closed,
+        0,
+        "same-hard soft data remains a preview while exact data is pending"
+      );
+      assert.equal(frame.scope.context.blits.length, blits + 1);
       assert.equal(f.cache.pending(), true);
       assert.equal(f.cache.status().dispatched, 2);
       f.result();
@@ -673,6 +678,78 @@ test("a non-held tail update requires new exact data and disabled/empty/destroy 
       assert.equal(f.cache.pending(), false);
     }
     assert.equal(image.closed, 1);
+    f.cache.destroy();
+  }
+});
+
+test("settled same-close and changed-close soft updates keep safe preview until the current exact actual blit", () => {
+  for (const delta of [0, 3]) {
+    const f = fixture(),
+      { frame } = lightweightFrame();
+    f.ready();
+    f.cache.draw(frame);
+    const old = f.result();
+    f.cache.draw(frame);
+    frame.model.data.at(-1).close += delta;
+    frame.model.update(frame.model.data);
+    f.cache.invalidate(true);
+    const blits = frame.scope.context.blits.length;
+    for (let i = 0; i < 20; i++) {
+      f.cache.draw(frame);
+      assert.equal(frame.scope.context.blits.at(-1)[0], old);
+      assert.equal(f.cache.pending(), true, "an old revision never completes exact readiness");
+    }
+    assert.equal(old.closed, 0);
+    assert.equal(frame.scope.context.blits.length, blits + 20);
+    assert.equal(f.cache.status().dispatched, 2);
+    assert.equal(f.cache.status().snapshots, 2);
+    const current = f.result();
+    assert.equal(old.closed, 0);
+    assert.equal(f.cache.pending(), true, "response alone does not end pending");
+    f.cache.draw(frame);
+    assert.equal(old.closed, 1);
+    assert.equal(frame.scope.context.blits.at(-1)[0], current);
+    assert.equal(f.cache.pending(), false);
+    f.cache.destroy();
+  }
+});
+
+test("settled hard changes still forbid the old bitmap before the new exact frame", () => {
+  for (const change of [
+    (frame) => {
+      frame.model.styles.mtp160.width = 8;
+    },
+    (frame) => {
+      frame.model.reset(frame.model.data, frame.model.periods);
+    },
+    (frame) => {
+      frame.model.update([...frame.model.data, { timestamp: 999999999, close: 110 }]);
+    },
+    (frame) => {
+      frame.scope.horizontalPixelRatio = 2;
+    },
+    (frame) => {
+      frame.scope.bitmapSize.width++;
+    },
+    (frame) => {
+      frame.mode = 2;
+    },
+    (frame) => {
+      frame.model = lightweightFrame().frame.model;
+    }
+  ]) {
+    const f = fixture(),
+      { frame } = lightweightFrame();
+    f.ready();
+    f.cache.draw(frame);
+    const old = f.result();
+    f.cache.draw(frame);
+    const blits = frame.scope.context.blits.length;
+    change(frame);
+    f.cache.invalidate(true);
+    f.cache.draw(frame);
+    assert.equal(old.closed, 1);
+    assert.equal(frame.scope.context.blits.length, blits);
     f.cache.destroy();
   }
 });
