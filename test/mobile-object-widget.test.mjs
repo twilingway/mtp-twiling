@@ -138,6 +138,7 @@ function menuDismissHarness({ mobile = true, kind = "drawing" } = {}) {
       "../state.js": { INDICATOR_NAMES: { ma: "MA" } },
       "../context.js": { useTerminal: () => ({ controller, state }) },
       "./controls/ChevronIcon.js": { ChevronIcon: "chevron" },
+      "../ChartFitButton.js": { ChartFitButton: "chart-fit-button" },
       "./MobileObjectWidget.js": {
         useMobileObjectWidget: () => mobile,
         MobileObjectWidget: Widget
@@ -396,6 +397,7 @@ function renderContextMenu({ width, height, mobile, kind = "drawing" }) {
       "../state.js": {},
       "../context.js": { useTerminal: () => ({ state, controller: {} }) },
       "./controls/ChevronIcon.js": { ChevronIcon: "chevron" },
+      "../ChartFitButton.js": { ChartFitButton: "chart-fit-button" },
       "./MobileObjectWidget.js": { useMobileObjectWidget: () => mobile },
       "./mobile-object-widget.js": helpers,
       "./mobile-object-menu-dismiss.js": load("mobile-object-menu-dismiss.ts")

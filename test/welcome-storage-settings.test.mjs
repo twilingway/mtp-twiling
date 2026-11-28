@@ -71,7 +71,8 @@ test("actual welcome/account components render English, official links and compa
   const preferences = modules("i18n/preferences.ts"); preferences.setDisplayPreferences({ locale: "en" });
   const { TerminalContext } = modules("screens/terminal/context.tsx"), { WelcomeGate } = modules("screens/terminal/WelcomeDialog.tsx"), { AccountDialog } = modules("screens/terminal/AccountDialog.tsx");
   let state = { owner: "guest", dialog: "welcome", ready: true, authenticated: false, name: "", status: "offline", error: null, historyHelp: "", preferences: { locale: "en" }, rows: [] };
-  const controller = { getSnapshot: () => state, subscribe: () => () => {}, sessionKey: () => null, getStorageStats: async () => ({ candles: stats, browser: {} }), clearHistory: async () => {} };
+  const cloudSession = {};
+  const controller = { getSnapshot: () => state, subscribe: () => () => {}, sessionKey: () => null, workspaceBinding: () => undefined, cloudSessionKey: () => cloudSession, getStorageStats: async () => ({ candles: stats, browser: {} }), clearHistory: async () => {} };
   const render = (component, props) => renderToStaticMarkup(React.createElement(TerminalContext, { value: controller }, React.createElement(component, props)));
   const welcome = render(WelcomeGate, { startupSettled: true });
   for (const link of ["https://developer.tbank.ru/invest/intro/intro/token", "https://www.tbank.ru/invest/settings/", "https://github.com/twilingway/mtp-twiling", "./privacy.html"]) assert.ok(welcome.includes(link));
