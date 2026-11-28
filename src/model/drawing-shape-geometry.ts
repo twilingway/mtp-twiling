@@ -4,6 +4,7 @@ import type { DrawingRectangle } from "./drawing-screen-geometry.js";
 export interface ShapePath {
   points: PixelPoint[];
   closed: boolean;
+  fillClosed?: boolean;
 }
 export interface ShapeGeometry {
   paths: ShapePath[];
@@ -66,33 +67,46 @@ function broadArrow(a: PixelPoint, b: PixelPoint, width: number): PixelPoint[] {
     point(0, -half / 2)
   ];
 }
-function circularArc(a: PixelPoint, b: PixelPoint, c: PixelPoint): PixelPoint[] {
-  // Translate before solving the circumcenter to avoid cancellation at large screen offsets.
+export function drawingArcHeight(a: PixelPoint, b: PixelPoint, c: PixelPoint): number {
   const bx = b.x - a.x,
     by = b.y - a.y,
-    cx = c.x - a.x,
-    cy = c.y - a.y;
-  const determinant = 2 * (bx * cy - by * cx);
-  if (Math.abs(determinant) < 1e-7 * Math.max(1, Math.hypot(bx, by) * Math.hypot(cx, cy)))
-    return [a, b];
-  const bs = bx * bx + by * by,
-    cs = cx * cx + cy * cy;
-  const center = {
-    x: a.x + (cy * bs - by * cs) / determinant,
-    y: a.y + (bx * cs - cx * bs) / determinant
+    distance = Math.hypot(bx, by);
+  return distance ? ((c.x - a.x) * -by + (c.y - a.y) * bx) / distance : 0;
+}
+export function drawingArcControlPoint(
+  a: PixelPoint,
+  b: PixelPoint,
+  c: PixelPoint,
+  height = drawingArcHeight(a, b, c)
+): PixelPoint {
+  const bx = b.x - a.x,
+    by = b.y - a.y,
+    distance = Math.hypot(bx, by);
+  return {
+    x: a.x + bx / 2 - (distance ? (by / distance) * height : 0),
+    y: a.y + by / 2 + (distance ? (bx / distance) * height : 0)
   };
-  const radius = length(center, a);
-  const angle = (point: PixelPoint) => Math.atan2(point.y - center.y, point.x - center.x);
-  const normalized = (value: number) => ((value % tau) + tau) % tau;
-  const start = angle(a),
-    end = normalized(angle(b) - start),
-    through = normalized(angle(c) - start);
-  const sweep = through <= end + 1e-9 ? end : end - tau;
-  const result = sample(steps(Math.abs(sweep) * radius), (t) => ({
-    x: center.x + Math.cos(start + sweep * t) * radius,
-    y: center.y + Math.sin(start + sweep * t) * radius
-  }));
+}
+function ellipticalArc(a: PixelPoint, b: PixelPoint, c: PixelPoint): PixelPoint[] {
+  const bx = b.x - a.x,
+    by = b.y - a.y,
+    distance = Math.hypot(bx, by),
+    height = drawingArcHeight(a, b, c);
+  if (!distance || Math.abs(height) < 1e-7 * Math.max(1, distance)) return [a, b];
+  const center = { x: a.x + bx / 2, y: a.y + by / 2 },
+    ux = bx / distance,
+    uy = by / distance,
+    edgeCosine = Math.sqrt(3) / 2;
+  // A 60-degree ellipse segment stretches along the chord normal; its border stays open.
+  const count = Math.ceil(steps(distance + Math.abs(height) * 2) / 4) * 4;
+  const result = sample(count, (t) => {
+    const angle = ((t - 0.5) * Math.PI) / 3,
+      along = distance * Math.sin(angle),
+      across = (height * (Math.cos(angle) - edgeCosine)) / (1 - edgeCosine);
+    return { x: center.x + ux * along - uy * across, y: center.y + uy * along + ux * across };
+  });
   result[0] = a;
+  result[count / 2] = drawingArcControlPoint(a, b, c);
   result[result.length - 1] = b;
   return result;
 }
@@ -106,7 +120,8 @@ export function drawingShapeGeometry(
   const [a, b, c, d] = anchors;
   if (!a) return null;
   const paths: ShapePath[] = [];
-  const add = (points: PixelPoint[], closed = false) => paths.push({ points, closed });
+  const add = (points: PixelPoint[], closed = false, fillClosed = false) =>
+    paths.push({ points, closed, ...(fillClosed && { fillClosed }) });
   if (tool === "arrowUp" || tool === "arrowDown") {
     const sign = tool === "arrowUp" ? 1 : -1;
     add(
@@ -167,8 +182,10 @@ export function drawingShapeGeometry(
       );
     }
   } else if (tool === "triangle") add(c ? [a, b, c] : [a, b], Boolean(c));
-  else if (tool === "arc") add(c ? circularArc(a, b, c) : [a, b]);
-  else if (tool === "quadraticCurve")
+  else if (tool === "arc") {
+    const points = c ? ellipticalArc(a, b, c) : [a, b];
+    add(points, false, points.length > 2);
+  } else if (tool === "quadraticCurve")
     add(
       c
         ? sample(steps(length(a, c) + length(c, b)), (t) => mix(mix(a, c, t), mix(c, b, t), t))
@@ -195,7 +212,7 @@ export function drawingShapeGeometry(
 
 export function pointInShape(point: PixelPoint, shape: ShapeGeometry): boolean {
   for (const path of shape.paths) {
-    if (!path.closed) continue;
+    if (!path.closed && !path.fillClosed) continue;
     let inside = false;
     for (let i = 0, j = path.points.length - 1; i < path.points.length; j = i++) {
       const a = path.points[i]!,

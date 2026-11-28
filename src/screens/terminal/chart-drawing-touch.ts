@@ -9,6 +9,7 @@ import {
   MAX_DRAWING_POINTS
 } from "../../model/drawing-tool-policy.js";
 import { DrawingStrokeSampler } from "../../model/drawing-stroke-sampler.js";
+import { editDrawingAnchors } from "../../model/drawing-anchor-edit.js";
 import type { DrawingTool, DrawingPoint, PixelPoint } from "../../model/types.js";
 import type { TerminalController } from "./controller.js";
 
@@ -62,7 +63,7 @@ export function createDrawingInput(
     const candidate: unknown = {
       id: crypto.randomUUID(),
       name: tool,
-      points: [...points],
+      points: editDrawingAnchors(tool, points, [...points], 2, controller.chart),
       settings: {
         ...drawingStyle({ name: tool }),
         levelStyles: structuredClone(DEFAULT_FIB_LEVELS)
@@ -73,12 +74,14 @@ export function createDrawingInput(
     if (isDrawing(candidate)) void controller.addDrawing(candidate);
     else controller.notify(t("Не удалось создать рисунок."));
   };
-  const preview = (tool: DrawingTool, point?: DrawingPoint) =>
+  const preview = (tool: DrawingTool, point?: DrawingPoint) => {
+    const anchors = point ? [...points, point] : [...points];
     controller.setPreview({
       id: "preview",
       name: tool,
-      points: point ? [...points, point] : [...points]
+      points: editDrawingAnchors(tool, anchors, anchors, 2, controller.chart)
     });
+  };
   const finish = () => {
     const tool = controller.getSnapshot().activeTool;
     if (!tool || !isVertexTool(tool) || points.length < 2) return false;

@@ -1,7 +1,11 @@
 export { paintDrawings } from "./drawing-paint.js";
 import { rectangleBounds, rectangleEdges } from "./drawing-screen-geometry.js";
 import type { DrawingRectangle } from "./drawing-screen-geometry.js";
-import { drawingShapeGeometry, pointInShape } from "./drawing-shape-geometry.js";
+import {
+  drawingArcControlPoint,
+  drawingShapeGeometry,
+  pointInShape
+} from "./drawing-shape-geometry.js";
 import type { ShapeGeometry } from "./drawing-shape-geometry.js";
 import { drawingHandleIndices, isGeometricTool } from "./drawing-tool-policy.js";
 import type {
@@ -227,6 +231,8 @@ export function drawingGeometry(
     if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
     points.push(p);
   }
+  if (d.name === "arc" && points[0] && points[1] && points[2])
+    points[2] = drawingArcControlPoint(points[0], points[1], points[2]);
   const style = drawingStyle(d),
     a = points[0],
     b = points[1];

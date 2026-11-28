@@ -1,10 +1,10 @@
 import { t } from "../../i18n/messages.js";
 import { useEffect, useMemo, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { hitDrawing } from "../../model/drawing-model.js";
+import { drawingGeometry, hitDrawing } from "../../model/drawing-model.js";
 import { isDrawing } from "../../model/backup-format.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
-import { preservePolylineClosure } from "../../model/drawing-anchor-edit.js";
+import { editDrawingAnchors } from "../../model/drawing-anchor-edit.js";
 import { isVertexTool } from "../../model/drawing-tool-policy.js";
 import { chartBackground } from "../../model/theme.js";
 import type { Drawing, PixelPoint } from "../../model/types.js";
@@ -226,7 +226,9 @@ export function ChartGestures({
       handle: hit.handle,
       start: p,
       original: structuredClone(drawing),
-      pixels: drawing.points.map((point) => chart.pointToPixel(point)),
+      pixels:
+        drawingGeometry(drawing, (point) => chart.pointToPixel(point), 0, 0)?.points ??
+        drawing.points.map((point) => chart.pointToPixel(point)),
       token: controller.editing.beginGesture(),
       clone: event.ctrlKey || event.metaKey,
       cloneId: null
@@ -307,11 +309,12 @@ export function ChartGestures({
     const candidate: unknown = {
       ...active.original,
       id: active.cloneId ?? active.id,
-      points: preservePolylineClosure(
+      points: editDrawingAnchors(
         active.original.name,
         active.original.points,
         points,
-        active.handle
+        active.clone ? -1 : active.handle,
+        chart
       )
     };
     if (isDrawing(candidate)) {

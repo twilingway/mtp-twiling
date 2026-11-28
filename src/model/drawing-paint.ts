@@ -161,14 +161,12 @@ export function paintDrawings(
       for (const path of g.shape.paths) {
         ctx.beginPath();
         path.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-        if (path.closed) {
-          ctx.closePath();
-          if (g.style.fill) {
-            ctx.globalAlpha = g.style.opacity;
-            ctx.fillStyle = g.style.color;
-            ctx.fill();
-            ctx.globalAlpha = g.style.lineOpacity;
-          }
+        if (path.closed) ctx.closePath();
+        if ((path.closed || path.fillClosed) && g.style.fill) {
+          ctx.globalAlpha = g.style.opacity;
+          ctx.fillStyle = g.style.color;
+          ctx.fill();
+          ctx.globalAlpha = g.style.lineOpacity;
         }
         ctx.stroke();
       }

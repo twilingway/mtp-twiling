@@ -1,7 +1,7 @@
 import { t, systemText } from "../../../i18n/messages.js";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { TOOL_NAMES } from "../../../model/drawing-model.js";
-import { preservePolylineClosure } from "../../../model/drawing-anchor-edit.js";
+import { editDrawingAnchors } from "../../../model/drawing-anchor-edit.js";
 import type {
   Drawing,
   DrawingPoint,
@@ -77,11 +77,12 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
         ? previous
         : {
             ...previous,
-            points: preservePolylineClosure(
+            points: editDrawingAnchors(
               previous.name,
               previous.points,
               previous.points.map((value, i) => (i === index ? { ...value, ...patch } : value)),
-              index
+              index,
+              controller.chart
             )
           }
     );

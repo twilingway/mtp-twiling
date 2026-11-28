@@ -57,6 +57,7 @@ export function drawingSupportsFill(tool: DrawingTool): boolean {
     "circle",
     "ellipse",
     "triangle",
+    "arc",
     "polyline",
     "arrowPointer",
     "arrowUp",
