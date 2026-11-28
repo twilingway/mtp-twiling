@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { hitDrawing } from "../../model/drawing-model.js";
 import { annotationMeasureText } from "../../model/drawing-annotation-measure.js";
-import { isAnnotationTool } from "../../model/drawing-annotation.js";
+import { annotationUsesInlineEditor } from "./drawings/annotation-edit-policy.js";
 import { isDrawing } from "../../model/backup-format.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
 import { dragChartDrawing } from "./chart-drawing-drag.js";
@@ -428,11 +428,7 @@ export function ChartGestures({
           event.stopPropagation();
           controller.selectObject(hit.id);
           const drawing = controller.getSnapshot().drawings.find((item) => item.id === hit.id);
-          if (
-            drawing &&
-            isAnnotationTool(drawing.name) &&
-            !["table", "flag", "priceNote", "priceLabel"].includes(drawing.name)
-          ) {
+          if (drawing && annotationUsesInlineEditor(drawing.name)) {
             controller.setDialog("annotation-editor");
             controller.drawingSettings.begin(hit.id);
           } else controller.setDialog("drawing-settings");

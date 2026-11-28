@@ -2,6 +2,7 @@ import { t } from "../../../i18n/messages.js";
 import type { DrawingAnnotationSettings, DrawingTool } from "../../../model/types.js";
 import { AnnotationTableEditor } from "./AnnotationTableEditor.js";
 import type { DraftSettings } from "./drawing-settings-model.js";
+import { annotationSupportsCustomText } from "./annotation-edit-policy.js";
 
 export function AnnotationEditor({
   name,
@@ -63,7 +64,7 @@ export function AnnotationEditor({
   );
   return (
     <div className="annotation-editor">
-      {name !== "flag" && name !== "table" && (
+      {annotationSupportsCustomText(name) && (
         <label className="annotation-text">
           <span>{t("Текст")}</span>
           <textarea

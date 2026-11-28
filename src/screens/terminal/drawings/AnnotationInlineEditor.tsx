@@ -3,9 +3,20 @@ import { t } from "../../../i18n/messages.js";
 import { drawingGeometry } from "../../../model/drawing-model.js";
 import { annotationMeasureText } from "../../../model/drawing-annotation-measure.js";
 import { useTerminal } from "../context.js";
+import { annotationUsesInlineEditor } from "./annotation-edit-policy.js";
+import { shallowEqual } from "../snapshot-selector.js";
+import type { TerminalState } from "../state.js";
+
+export function selectAnnotationInlineState(state: TerminalState) {
+  return {
+    dialog: state.dialog,
+    drawingCreationDraft: state.drawingCreationDraft,
+    drawingSettingsPreview: state.drawingSettingsPreview
+  };
+}
 
 export function AnnotationInlineEditor({ projection }: { projection?: EventTarget | undefined }) {
-  const { controller, state } = useTerminal(),
+  const { controller, state } = useTerminal(selectAnnotationInlineState, shallowEqual),
     creation = state.drawingCreationDraft,
     draft = creation ?? state.drawingSettingsPreview;
   const input = useRef<HTMLTextAreaElement>(null),
@@ -14,18 +25,28 @@ export function AnnotationInlineEditor({ projection }: { projection?: EventTarge
     [error, setError] = useState("");
   const [text, setText] = useState<{ token: string; value: string } | null>(null);
   const [, repaint] = useState(0);
-  const token = draft?.token;
+  const token =
+    state.dialog === "annotation-editor" && draft && annotationUsesInlineEditor(draft.drawing.name)
+      ? draft.token
+      : undefined;
   useEffect(() => {
     if (!token) return;
     input.current?.focus();
     input.current?.select();
   }, [token]);
   useEffect(() => {
+    if (!token) return;
     const update = () => repaint((value) => value + 1);
     projection?.addEventListener("change", update);
     return () => projection?.removeEventListener("change", update);
-  }, [projection]);
-  if (!draft || state.dialog !== "annotation-editor" || !controller.chart) return null;
+  }, [projection, token]);
+  if (
+    !draft ||
+    !annotationUsesInlineEditor(draft.drawing.name) ||
+    state.dialog !== "annotation-editor" ||
+    !controller.chart
+  )
+    return null;
   const drawing = draft.drawing,
     chart = controller.chart,
     size = chart.plotSize();

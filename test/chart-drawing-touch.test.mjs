@@ -307,6 +307,9 @@ test("ChartSurface preserves the editing owner when a second finger moves, relea
     "./chart-lifecycle.js": {},
     "./chart-drawing-drag.js": load("screens/terminal/chart-drawing-drag.ts"),
     "./drawings/AnnotationInlineEditor.js": {},
+    "./drawings/annotation-edit-policy.js": load(
+      "screens/terminal/drawings/annotation-edit-policy.ts"
+    ),
     "./context.js": { useTerminal: () => ({ controller, state }) },
     "../../model/intervals/drawing-visibility.js": { drawingVisibleOnInterval: () => true },
     "../../model/technical-indicator-layout.js": { technicalIndicatorGroups: () => [] },

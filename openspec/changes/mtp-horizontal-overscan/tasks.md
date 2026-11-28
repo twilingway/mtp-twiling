@@ -4,9 +4,9 @@
 
 - [x] 1.1 Разделить core/capture и адаптивный X-запас; unit проверяет реальные индексы, границы
       истории и 4 Mi-pixels/4096 px.
-- [ ] 1.2 Реализовать Worker paint без изменения core; command/pixel tests проверяют phase,
+- [x] 1.2 Реализовать Worker paint без изменения core; command/pixel tests проверяют phase,
       3000/3001, caps/joins, alpha и дробный DPR.
-- [ ] 1.3 Обновить описание frame-контракта и проверить build/version mismatch fallback.
+- [x] 1.3 Обновить описание frame-контракта и проверить build/version mismatch fallback.
 
 ## 2. Ранняя подготовка и непрерывные края
 
@@ -21,11 +21,16 @@
 
 - [ ] 3.1 Пройти typecheck/lint/format, полный check и strict OpenSpec; сохранить точный
       source/build checkpoint.
-- [ ] 3.2 Измерить actual-canvas core pixel equality и новую стоимость paint/ready latency на ПК;
+- [x] 3.2 Измерить actual-canvas core pixel equality и новую стоимость paint/ready latency на ПК;
       проверить медленный pan, быстрый jump, разворот и отсутствие полосы.
-- [ ] 3.3 По актуальному указанию пользователя выполнять проверку на компьютере, включая
-      мобильную эмуляцию и настоящий OffscreenCanvas при DPR 2.75. Физический телефон пользователь
-      забрал; не подключать его и не выдавать эмуляцию за проверку на устройстве.
+- [x] 3.3 По актуальному указанию пользователя выполнять проверку на компьютере, включая мобильную
+      эмуляцию и настоящий OffscreenCanvas при DPR 2.75. Физический телефон пользователь забрал; не
+      подключать его и не выдавать эмуляцию за проверку на устройстве.
+
+Проверенный MTP checkpoint: source `b0c9098`, build `a2356f2e259e0212`. Отчёт:
+`artifacts/mtp-horizontal-overscan-qa/runs/a2356f2e259e0212/report.json`. 24/24 pixel cases: 0 RGBA
+differences; 106 кадров жестов без пустого MTP. Новые времена измерены при параллельной валидации,
+без вывода об ускорении. Общая релизная сборка и её smoke остаются отдельным пунктом 3.1.
 
 ## Workflow follow-up
 

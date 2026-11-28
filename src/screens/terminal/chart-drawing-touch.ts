@@ -14,6 +14,7 @@ import type { DrawingTool, DrawingPoint, PixelPoint } from "../../model/types.js
 import type { TerminalController } from "./controller.js";
 import { annotationDefaults, isAnnotationTool } from "../../model/drawing-annotation.js";
 import { validCreationDraft } from "./drawing-creation-draft.js";
+import { annotationNeedsCreationEditor } from "./drawings/annotation-edit-policy.js";
 
 type PlotPointer = PointerEvent<HTMLDivElement>;
 
@@ -111,8 +112,7 @@ export function createDrawingInput(
     };
     cancel();
     if (isDrawing(candidate)) {
-      if (isAnnotationTool(tool) && tool !== "flag" && tool !== "priceNote")
-        controller.drawingCreation.begin(candidate);
+      if (annotationNeedsCreationEditor(tool)) controller.drawingCreation.begin(candidate);
       else void controller.addDrawing(candidate);
     } else controller.notify(t("Не удалось создать рисунок."));
   };

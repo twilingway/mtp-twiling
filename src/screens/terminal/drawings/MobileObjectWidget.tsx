@@ -237,7 +237,7 @@ export function MobileObjectWidget() {
             <>
               <button
                 type="button"
-                aria-label={t("Редактировать текст")}
+                aria-label={t(drawing.name === "priceLabel" ? "Настройки" : "Редактировать текст")}
                 onClick={() => controller.setDialog("drawing-settings")}
               >
                 ✎
