@@ -1,5 +1,6 @@
 import type { Locale } from "../../i18n/preferences.js";
 import type { TerminalState } from "./state.js";
+import { StepChartLoader } from "./StepChartLoader.js";
 
 const messages = {
   ru: {
@@ -40,18 +41,7 @@ export function WatchlistStartupStatus({
 }) {
   return (
     <div className="watchlist-startup-status" role="status">
-      {phase === "loading" && (
-        <div className="watchlist-loading-chart" aria-hidden="true">
-          <div className="watchlist-loading-track">
-            {Array.from({ length: 10 }, (_, index) => (
-              <span
-                key={index}
-                style={{ left: `${(index - 2) * 18}px`, bottom: `${(index - 1) * 8}px` }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      {phase === "loading" && <StepChartLoader />}
       <span>
         {phase === "error" && migrationIncomplete
           ? messages[locale].recovery

@@ -11,6 +11,7 @@ import { InstrumentIcon } from "./Watchlist.js";
 import { ChartCanvas, ChartGestures } from "./ChartSurface.js";
 import { ChartDemonstration } from "./ChartDemonstration.js";
 import { ChartRangeZoom } from "./ChartRangeZoom.js";
+import { ChartFitProgress } from "./ChartFitProgress.js";
 import { ImageLayer } from "./ImageLayer.js";
 import { DrawingAxisLabels } from "./DrawingAxisLabels.js";
 import { SelectedDrawingLock } from "./SelectedDrawingLock.js";
@@ -198,6 +199,7 @@ export function ChartPanel({
           />
           <ChartDemonstration active={active} />
           <ChartRangeZoom active={active} />
+          <ChartFitProgress height={price?.height} />
           <CalendarAnalysisTables
             tables={extra.calendar.tables}
             refresh={extra.calendar.refresh}

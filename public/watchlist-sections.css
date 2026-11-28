@@ -2,6 +2,31 @@
   overflow-x: hidden;
 }
 
+.chart-fit-progress {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  z-index: 14;
+  pointer-events: none;
+}
+
+.chart-fit-status {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  max-width: calc(100% - 24px);
+  padding: 16px 20px;
+  border: 1px solid var(--control-line);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface-raised);
+  box-shadow: 0 3px 16px var(--shadow);
+  font-size: 13px;
+  text-align: center;
+}
+
 .watchlist-startup-status {
   display: grid;
   justify-items: center;
