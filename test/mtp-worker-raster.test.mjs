@@ -36,6 +36,7 @@ const { mtpWorkerIntent } = load("model/mtp-worker-snapshot.js");
 const { paintMtpWorkerFrame, MTP_WORKER_PROTOCOL } = load("model/mtp-worker-protocol.js");
 const { MtpWorkerRefill } = load("model/mtp-worker-refill.js");
 const { MTP_EMERGENCY_VERTEX_LIMIT } = load("model/mtp-worker-emergency.js");
+const { mtpWorkerBuffer } = load("model/mtp-worker-buffer.js");
 const { mtpWorkerGeometry, mtpWorkerContentKey, mtpWorkerPreview } = load(
   "model/mtp-worker-geometry.js"
 );
@@ -463,6 +464,169 @@ function lightweightFrame(length = 5425) {
   };
 }
 
+test("real horizontal capture preserves core and exact dense native X within adaptive surface caps", () => {
+  const { frame } = partialFrame();
+  const intent = mtpWorkerIntent(frame),
+    captured = intent.frame;
+  assert.equal(captured.start, 4999);
+  assert.equal(captured.end, 5424);
+  assert.ok(captured.captureStart < captured.start);
+  assert.equal(captured.captureEnd, 5424, "no invented future bars");
+  assert.equal(captured.sampleStep, 1);
+  assert.equal(captured.padX, 96);
+  assert.equal(captured.x.length, captured.captureEnd - captured.captureStart + 1);
+  for (let index = captured.captureStart; index <= captured.captureEnd; index++)
+    assert.equal(captured.x[index - captured.captureStart], frame.xFor(index));
+  assert.equal(frame.model.prefix.byteLength > 0, true, "model prefix remains attached");
+  const exact = context(),
+    native = context();
+  paintMtpWorkerFrame(exact, captured, frame.model.prefix);
+  frame.model.draw(native, frame.from, frame.to, frame.xFor, baselineProjection(frame));
+  sameCommands(exact.commands, native.commands);
+  const generic = mtpWorkerIntent({ ...frame, uniformX: undefined }).frame;
+  assert.equal(
+    generic.captureStart,
+    generic.start,
+    "arbitrary callbacks never imply extra X geometry"
+  );
+  assert.equal(generic.captureEnd, generic.end);
+  for (const [width, height, ratio] of [
+    [1000, 400, 1],
+    [2700, 1400, 2.75],
+    [4096, 1024, 3],
+    [1024, 4096, 1]
+  ]) {
+    const allocation = mtpWorkerBuffer(width, height, ratio);
+    assert.ok(allocation.width <= 4096 && allocation.height <= 4096);
+    assert.ok(allocation.width * allocation.height <= 4 * 1024 * 1024);
+    assert.equal(allocation.width - allocation.padX * 2, width);
+    assert.equal(allocation.height - allocation.padY * 2, height);
+    assert.ok(allocation.padX <= Math.ceil(96 * ratio));
+  }
+  assert.equal(mtpWorkerBuffer(4096, 1024, 3).padX, 0);
+});
+
+test("half-reserve prefetch runs before any missing edge and stays cheap, bounded and idle-exact", () => {
+  let clock = 0;
+  const f = fixture({ now: () => clock }),
+    { frame, camera, reads } = partialFrame();
+  f.ready();
+  f.cache.draw(frame);
+  f.result();
+  f.cache.draw(frame);
+  const origin = mtpWorkerIntent(frame);
+  const geometry = mtpWorkerGeometry(
+    frame,
+    origin,
+    mtpWorkerContentKey(frame),
+    mtpWorkerContentKey(frame, true)
+  );
+  const paints = f.cache.status().emergency.paints;
+  camera(17); // 40px, with 56px of useful real reserve remaining.
+  f.cache.draw(frame, true);
+  assert.equal(f.cache.status().dispatched, 1);
+  camera(21); // 49px: refill while the complete pane is still captured.
+  const plan = mtpWorkerPreview(frame, geometry);
+  assert.equal(plan.covered, true);
+  assert.equal(plan.refill, true);
+  assert.equal(plan.uncovered, false);
+  f.cache.draw(frame, true);
+  assert.equal(f.cache.status().dispatched, 2);
+  assert.equal(f.cache.status().emergency.paints, paints);
+  const scan = { ...reads },
+    snapshot = f.cache.status().snapshots;
+  for (let i = 0; i < 60; i++) {
+    clock++;
+    camera(21 + i / 100);
+    f.cache.draw(frame, true);
+  }
+  assert.equal(reads.extrema, scan.extrema);
+  assert.equal(reads.prefix, scan.prefix);
+  assert.equal(f.cache.status().snapshots, snapshot);
+  assert.equal(f.cache.status().dispatched, 2);
+  const beforeReceive = { ...reads };
+  f.result();
+  assert.deepEqual(reads, beforeReceive, "response never projects or captures a new frame");
+  f.cache.draw(frame, true);
+  assert.equal(f.cache.status().dispatched, 2, "new reserve prevents an identical refill loop");
+  assert.equal(f.cache.pending(), true);
+  f.cache.setInteraction(false);
+  f.cache.draw(frame);
+  f.result();
+  f.cache.draw(frame);
+  assert.equal(f.cache.pending(), false);
+  assert.equal(f.timers.size, 0);
+  f.cache.destroy();
+});
+
+test("even a one-pixel uncovered edge uses full coarse instead of a nearly complete bitmap", () => {
+  const f = fixture({ now: () => 0 }),
+    { frame, camera } = partialFrame();
+  f.ready();
+  f.cache.draw(frame);
+  f.result();
+  f.cache.draw(frame);
+  const origin = mtpWorkerIntent(frame);
+  const geometry = mtpWorkerGeometry(
+    frame,
+    origin,
+    mtpWorkerContentKey(frame),
+    mtpWorkerContentKey(frame, true)
+  );
+  camera((97 * 424) / 1000); // 96px captured reserve plus precisely one uncovered CSS pixel.
+  const plan = mtpWorkerPreview(frame, geometry);
+  assert.equal(plan.uncovered, true);
+  assert.ok(plan.clip.x >= 0.999 && plan.clip.x <= 1.001);
+  assert.ok(plan.clip.width > 998);
+  const blits = frame.scope.context.blits.length,
+    paints = f.cache.status().emergency.paints;
+  f.cache.draw(frame, true);
+  assert.equal(frame.scope.context.blits.length, blits, "no partial/coarse double alpha");
+  assert.equal(f.cache.status().emergency.paints, paints + 1);
+  f.cache.destroy();
+});
+
+test("history boundaries and zero reserve never prefetch a covered stationary view", () => {
+  for (const zero of [false, true]) {
+    const { frame } = partialFrame();
+    if (zero) frame.scope.bitmapSize = { width: 4096, height: 1024 };
+    const intent = mtpWorkerIntent(frame);
+    const geometry = mtpWorkerGeometry(
+      frame,
+      intent,
+      mtpWorkerContentKey(frame),
+      mtpWorkerContentKey(frame, true)
+    );
+    const plan = mtpWorkerPreview(frame, geometry);
+    assert.equal(plan.covered, true);
+    assert.equal(plan.refill, false);
+    if (zero) assert.equal(intent.frame.padX, 0);
+  }
+});
+
+test("both loaded-history sides prefetch at half their available reserve, before coverage loss", () => {
+  const { frame, camera } = partialFrame();
+  camera(2700); // Both sides have real, not-yet-captured history.
+  const intent = mtpWorkerIntent(frame);
+  const geometry = mtpWorkerGeometry(
+    frame,
+    intent,
+    mtpWorkerContentKey(frame),
+    mtpWorkerContentKey(frame, true)
+  );
+  assert.equal(geometry.historyLeft, false);
+  assert.equal(geometry.historyRight, false);
+  for (const direction of [-1, 1]) {
+    camera(2700 + direction * 17);
+    assert.equal(mtpWorkerPreview(frame, geometry).refill, false);
+    camera(2700 + direction * 21);
+    const plan = mtpWorkerPreview(frame, geometry);
+    assert.equal(plan.covered, true);
+    assert.equal(plan.refill, true);
+    assert.equal(plan.uncovered, false);
+  }
+});
+
 test("unchanged ready and in-flight draws serialize metadata once; held tail guard alone may serialize twice", () => {
   const countSerializations = (action) => {
     const stringify = JSON.stringify;
@@ -638,7 +802,7 @@ test("a jump beyond one captured viewport paints bounded current-data MA until e
   f.cache.destroy();
 });
 
-test("covered bitmap stays native while a below-85-percent clip uses full real coarse without double alpha", () => {
+test("covered bitmap stays native while an uncovered clip uses full real coarse without double alpha", () => {
   const f = fixture({ now: () => 0 }),
     { frame, camera } = partialFrame();
   f.ready();
@@ -656,7 +820,7 @@ test("covered bitmap stays native while a below-85-percent clip uses full real c
   camera(0);
   f.cache.draw(frame, true);
   assert.equal(f.cache.status().emergency.paints, emergency);
-  camera(423);
+  camera(461);
   const plan = mtpWorkerPreview(frame, geometry);
   assert.ok(
     plan.clip.width > 0 && plan.clip.width < 10,
@@ -961,7 +1125,7 @@ test("generic, gapped and non-affine held views stay blank without preparing hea
   }
 });
 
-test("one newly revealed bar keeps a clipped safe fan visible and reversal reuses the ready bitmap", () => {
+test("one newly revealed bar stays fully covered by real overscan and reversal reuses the ready bitmap", () => {
   let clock = 0;
   const f = fixture({ now: () => clock }),
     { frame, camera, reads } = partialFrame();
@@ -976,9 +1140,8 @@ test("one newly revealed bar keeps a clipped safe fan visible and reversal reuse
   f.cache.draw(frame, true);
   assert.equal(frame.scope.context.blits.length, blits + 1);
   assert.equal(frame.scope.context.blits.at(-1)[0], image);
-  const [x, y, width, height] = frame.scope.context.clips.at(-1);
-  assert.ok(x > 0 && x < 10 && y >= 0 && x + width <= 1000 && y + height <= 400);
-  assert.ok(width > 990, "only unsafe endpoint pixels are excluded from the one-bar preview");
+  assert.equal(frame.scope.context.clips.length, 0, "real reserved bars cover the whole pane");
+  assert.equal(f.cache.status().emergency.paints, before.emergency.paints);
   assert.equal(f.cache.status().snapshots, before.snapshots);
   assert.equal(f.cache.status().dispatched, before.dispatched);
   assert.equal(reads.prefix, oldReads.prefix);
@@ -993,7 +1156,7 @@ test("one newly revealed bar keeps a clipped safe fan visible and reversal reuse
   assert.equal(image.closed, 1);
 });
 
-test("long held pan refills below 85 percent at most once per 150ms, then idle draws latest exact", () => {
+test("long held pan prefetches at most once per 150ms, then idle draws latest exact", () => {
   let clock = 0;
   const f = fixture({ now: () => clock }),
     { frame, camera, reads } = partialFrame();
@@ -1024,7 +1187,11 @@ test("long held pan refills below 85 percent at most once per 150ms, then idle d
   assert.ok(sent.every((time, index) => !index || time - sent[index - 1] >= 150));
   assert.equal(f.cache.status().snapshots - before.snapshots, sent.length);
   assert.equal(reads.prefix - oldReads.prefix, sent.length);
-  assert.equal(reads.extrema - oldReads.extrema, sent.length);
+  assert.equal(
+    reads.extrema - oldReads.extrema,
+    sent.length * 2,
+    "core and captured bounds scan only on dispatch"
+  );
   assert.equal(
     frame.scope.context.blits.length -
       blits +
@@ -1816,7 +1983,7 @@ test("worker entry verifies build, reuses bounded backing, paints/transfers and 
     (specifier) =>
       specifier.includes("generated/")
         ? { BUILD_ID: "unit" }
-        : load("model/mtp-worker-protocol.js"),
+        : load(`model/${specifier.split("/").at(-1)}`),
     { exports: {} },
     {},
     workerScope,

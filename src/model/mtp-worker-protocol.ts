@@ -1,5 +1,5 @@
 /** Same-origin, build-pinned protocol for the opt-in LW raster experiment. */
-export const MTP_WORKER_PROTOCOL = 1;
+export const MTP_WORKER_PROTOCOL = 2;
 export interface MtpPaintStyle {
   period: number;
   color: string;
@@ -11,6 +11,9 @@ export interface MtpWorkerFrame {
   length: number;
   start: number;
   end: number;
+  captureStart: number;
+  captureEnd: number;
+  sampleStep: number;
   x: Float64Array;
   priceOrigin: number;
   yOrigin: number;
@@ -61,8 +64,26 @@ export function paintMtpWorkerFrame(
   frame: MtpWorkerFrame,
   prefix: Float64Array
 ): void {
+  paintRange(context, frame, prefix, false);
+}
+
+/** Continue the core's per-period sampling grid into the captured real history. */
+export function paintMtpWorkerCapture(
+  context: PaintContext,
+  frame: MtpWorkerFrame,
+  prefix: Float64Array
+): void {
+  paintRange(context, frame, prefix, true);
+}
+
+function paintRange(
+  context: PaintContext,
+  frame: MtpWorkerFrame,
+  prefix: Float64Array,
+  expanded: boolean
+): void {
   const { start, end } = frame;
-  const step = Math.max(1, Math.ceil((end - start) / 3000));
+  const step = frame.sampleStep;
   context.save();
   context.setLineDash([]);
   context.strokeStyle = "#1e90ff";
@@ -74,12 +95,17 @@ export function paintMtpWorkerFrame(
     context.globalAlpha = style.opacity;
     context.beginPath();
     let begun = false;
-    for (let index = Math.max(start, period - 1); index <= end; index += step) {
+    const anchor = Math.max(start, period - 1);
+    const first = expanded
+      ? anchor + Math.ceil((Math.max(frame.captureStart, period - 1) - anchor) / step) * step
+      : anchor;
+    const last = expanded ? frame.captureEnd : end;
+    for (let index = first; index <= last; index += step) {
       const value =
         index >= frame.length
           ? null
           : ((prefix[index + 1] ?? 0) - (prefix[index + 1 - period] ?? 0)) / period;
-      const x = frame.x[index - start];
+      const x = frame.x[index - frame.captureStart];
       const y = value === null ? null : frame.yOrigin + (value - frame.priceOrigin) * frame.ySlope;
       if (x === undefined || y === null || !Number.isFinite(x) || !Number.isFinite(y)) {
         begun = false;

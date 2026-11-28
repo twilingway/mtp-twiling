@@ -339,7 +339,7 @@ export class MtpWorkerRasterCache {
     else if (ready && plan?.clip) {
       const context = source.scope.context,
         clip = plan.clip;
-      if (clip.width * clip.height < 0.85 * ready.geometry.width * ready.geometry.height) {
+      if (plan.uncovered) {
         if (this.coarse(source)) return plan;
         if (
           this.ready !== ready ||
