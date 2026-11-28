@@ -8,6 +8,7 @@ import {
 } from "react";
 import { t } from "../../../i18n/messages.js";
 import { drawingStyle, TOOL_NAMES } from "../../../model/drawing-model.js";
+import { isAnnotationTool } from "../../../model/drawing-annotation.js";
 import type { DrawingSettings, PixelPoint } from "../../../model/types.js";
 import { useTerminal } from "../context.js";
 import {
@@ -84,7 +85,9 @@ export function MobileObjectWidget() {
         !root.current?.contains(event.target) &&
         !(
           event.target instanceof Element &&
-          event.target.closest(".drawing-toolbar, #drawing-toolbar-menu, #objects-view")
+          event.target.closest(
+            ".drawing-toolbar, #drawing-toolbar-menu, #objects-view, #drawing-settings, .annotation-inline-editor"
+          )
         )
       )
         controller.selectObject(null);
@@ -112,6 +115,7 @@ export function MobileObjectWidget() {
       ? object.image.name
       : "";
   const style = drawing ? drawingStyle(drawing) : null;
+  const annotation = drawing && isAnnotationTool(drawing.name);
   const run = (action: Promise<void>) =>
     void action.catch((error: unknown) =>
       controller.notify(
@@ -185,15 +189,17 @@ export function MobileObjectWidget() {
       </button>
       {drawing && style && (
         <>
-          <label className="mobile-object-color" title={t("Цвет линий")}>
-            <span aria-hidden="true">╱</span>
-            <input
-              type="color"
-              aria-label={t("Цвет линий")}
-              value={style.color}
-              onChange={(event) => change(widgetLineColor(drawing, event.currentTarget.value))}
-            />
-          </label>
+          {!annotation && (
+            <label className="mobile-object-color" title={t("Цвет линий")}>
+              <span aria-hidden="true">╱</span>
+              <input
+                type="color"
+                aria-label={t("Цвет линий")}
+                value={style.color}
+                onChange={(event) => change(widgetLineColor(drawing, event.currentTarget.value))}
+              />
+            </label>
+          )}
           <label className="mobile-object-color" title={t("Цвет текста")}>
             <span aria-hidden="true">T</span>
             <input
@@ -203,36 +209,63 @@ export function MobileObjectWidget() {
               onChange={(event) => change({ textColor: event.currentTarget.value })}
             />
           </label>
-          <select
-            aria-label={t("Толщина линии")}
-            value={style.width}
-            onChange={(event) => change({ width: Number(event.currentTarget.value) })}
-          >
-            {[1, 2, 3, 4, 5].map((width) => (
-              <option key={width} value={width}>
-                {width}px
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label={t("Стиль линии")}
-            value={style.lineStyle}
-            onChange={(event) => {
-              const lineStyle = event.currentTarget.value;
-              if (lineStyle === "solid" || lineStyle === "dashed" || lineStyle === "dotted")
-                change({ lineStyle });
-            }}
-          >
-            <option value="solid" aria-label={t("Линия")}>
-              ━━
-            </option>
-            <option value="dashed" aria-label={t("Штриховой пунктир")}>
-              ┄┄
-            </option>
-            <option value="dotted" aria-label={t("Точечный пунктир")}>
-              ···
-            </option>
-          </select>
+          {annotation ? (
+            <>
+              <button
+                type="button"
+                aria-label={t("Редактировать текст")}
+                onClick={() => controller.setDialog("drawing-settings")}
+              >
+                ✎
+              </button>
+              <select
+                aria-label={t("Размер шрифта")}
+                value={style.fontSize}
+                onChange={(event) => change({ fontSize: Number(event.currentTarget.value) })}
+              >
+                {[...new Set([10, 12, 14, 16, 18, 20, 24, 28, 32, 48, 72, style.fontSize])]
+                  .sort((a, b) => a - b)
+                  .map((size) => (
+                    <option key={size} value={size}>
+                      {size}px
+                    </option>
+                  ))}
+              </select>
+            </>
+          ) : (
+            <>
+              <select
+                aria-label={t("Толщина линии")}
+                value={style.width}
+                onChange={(event) => change({ width: Number(event.currentTarget.value) })}
+              >
+                {[1, 2, 3, 4, 5].map((width) => (
+                  <option key={width} value={width}>
+                    {width}px
+                  </option>
+                ))}
+              </select>
+              <select
+                aria-label={t("Стиль линии")}
+                value={style.lineStyle}
+                onChange={(event) => {
+                  const lineStyle = event.currentTarget.value;
+                  if (lineStyle === "solid" || lineStyle === "dashed" || lineStyle === "dotted")
+                    change({ lineStyle });
+                }}
+              >
+                <option value="solid" aria-label={t("Линия")}>
+                  ━━
+                </option>
+                <option value="dashed" aria-label={t("Штриховой пунктир")}>
+                  ┄┄
+                </option>
+                <option value="dotted" aria-label={t("Точечный пунктир")}>
+                  ···
+                </option>
+              </select>
+            </>
+          )}
         </>
       )}
       <button

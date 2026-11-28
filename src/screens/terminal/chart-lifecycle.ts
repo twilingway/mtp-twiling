@@ -26,6 +26,8 @@ import { persistTechnicalPaneLayout } from "./technical-indicator-actions.js";
 import type { TerminalPreferences } from "./state.js";
 import { drawingHandleRadius } from "./chart-drawing-touch.js";
 import { observeChartAdapterReady } from "./chart-adapter-ready.js";
+import { chartPriceFormat } from "../../charts/price-format.js";
+import { annotationMeasureText } from "../../model/drawing-annotation-measure.js";
 
 function technicalInputs(preferences: TerminalPreferences) {
   const instances = preferences.technicalIndicators ?? [];
@@ -197,11 +199,24 @@ export function useChartCanvas(
             project,
             width,
             height,
-            current.selectedObject,
+            current.selectedObject ?? current.drawingCreationDraft?.drawing.id ?? null,
             drawingHandleRadius(
               container,
               window.matchMedia?.("(pointer: coarse)").matches ?? false
-            )
+            ),
+            {
+              measureText: annotationMeasureText,
+              hoveredId: current.hoveredDrawingId ?? null,
+              formatPrice: (value) =>
+                value.toFixed(
+                  chartPriceFormat(
+                    selectedMarketRow(current.rows, current.preferences) ?? {
+                      symbol: "",
+                      step: null
+                    }
+                  ).precision
+                )
+            }
           );
           if (layer === "front") drawingProjection?.dispatchEvent(new Event("change"));
         }
@@ -420,6 +435,7 @@ export function useChartCanvas(
     state.drawingSettingsPreview,
     state.preview,
     state.selectedObject,
+    state.hoveredDrawingId,
     drawingsHidden
   ]);
 }

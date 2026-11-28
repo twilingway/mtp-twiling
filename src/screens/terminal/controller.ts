@@ -36,10 +36,11 @@ import { TerminalHistory } from "./controller-history.js";
 import { TerminalSession } from "./controller-session.js";
 import { TerminalEditing } from "./controller-editing.js";
 import { createDrawingPreview, drawingPreviewState } from "./drawing-settings-preview.js";
+import { TerminalDrawingCreation, drawingCreationState } from "./drawing-creation-draft.js";
 import { TerminalDrawingTools } from "./controller-drawing-tools.js";
 import { TerminalPanel } from "./controller-panel.js";
 import { TerminalBackups } from "./controller-backups.js";
-import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
+import { addControllerDrawing } from "./controller-drawing-create.js";
 import { defaultPreferences, terminalHistoryLabel } from "./controller-bridge.js";
 import { nativeTimeframe } from "../../model/intervals/native-timeframes.js";
 import { importWritable } from "./controller-transfer-guard.js";
@@ -88,6 +89,7 @@ export class TerminalController {
   private readonly preferenceRouting = new PreferenceRouting();
   readonly editing: TerminalEditing;
   readonly drawingSettings: ReturnType<typeof createDrawingPreview>;
+  readonly drawingCreation: TerminalDrawingCreation;
   readonly tools: TerminalDrawingTools;
   readonly panel: TerminalPanel;
   private readonly backups: TerminalBackups;
@@ -105,6 +107,11 @@ export class TerminalController {
     };
     this.editing = new TerminalEditing(bridge);
     this.drawingSettings = createDrawingPreview(bridge, this.editing, () => !this.session.disposed);
+    this.drawingCreation = new TerminalDrawingCreation({
+      ...bridge,
+      addDrawing: (drawing) => this.addDrawing(drawing),
+      isAlive: () => !this.session.disposed
+    });
     this.tools = new TerminalDrawingTools(this);
     this.panel = shellPanel ?? new TerminalPanel(this);
     this.history = new TerminalHistory({
@@ -179,7 +186,7 @@ export class TerminalController {
         activeTool: null,
         ...patch
       };
-    this.state = drawingPreviewState({ ...this.state, ...patch });
+    this.state = drawingCreationState(drawingPreviewState({ ...this.state, ...patch }));
     if (patch.preferences && this.workspaceSlot === undefined)
       setDisplayPreferences(patch.preferences);
     this.listeners.forEach((listener) => listener());
@@ -207,6 +214,7 @@ export class TerminalController {
   private resetHistory = (): void => this.history.reset();
   start = (): Promise<void> => this.session.start();
   dispose = (): void => {
+    this.drawingCreation.cancel();
     this.drawingSettings.cancel();
     this.editing.reset();
     this.session.dispose();
@@ -247,6 +255,10 @@ export class TerminalController {
   };
   setPreview = (preview: TerminalState["preview"]): void => this.update({ preview });
   undoDrawings = (): Promise<void> => {
+    if (this.state.drawingCreationDraft) {
+      this.drawingCreation.cancel();
+      return Promise.resolve();
+    }
     this.drawingSettings.cancel();
     if (this.state.activeTool && this.state.preview) {
       this.setTool(null);
@@ -408,26 +420,7 @@ export class TerminalController {
   };
   updateDrawing = async (drawing: Drawing): Promise<void> =>
     this.setDrawings(this.state.drawings.map((item) => (item.id === drawing.id ? drawing : item)));
-  addDrawing = async (drawing: Drawing): Promise<void> => {
-    const owner = this.state.owner,
-      activeTool = this.state.activeTool,
-      symbol = this.state.preferences.symbol,
-      uid = selectedMarketRow(this.state.rows, this.state.preferences)?.uid;
-    await this.setDrawings([...this.state.drawings, drawing]);
-    if (
-      owner === this.state.owner &&
-      activeTool === this.state.activeTool &&
-      symbol === this.state.preferences.symbol &&
-      uid === selectedMarketRow(this.state.rows, this.state.preferences)?.uid
-    )
-      this.update({
-        selectedObject: drawing.id,
-        activeTool: drawingToolbarSettings(this.state.preferences.chartSettings).stayInDrawingMode
-          ? this.state.activeTool
-          : null,
-        preview: null
-      });
-  };
+  addDrawing = (drawing: Drawing): Promise<void> => addControllerDrawing(this, drawing);
   loadHistory = (refresh = false): Promise<void> => this.history.load(refresh);
   loadCandleCalendar = async (
     uid: string,

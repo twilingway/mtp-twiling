@@ -22,6 +22,7 @@ import type { WatchlistSections } from "../../model/watchlist-sections.js";
 import type { MarketProviderRef } from "../../model/market-provider.js";
 import { formatClock, formatNumber } from "../../i18n/format.js";
 import type { DrawingSettingsPreview } from "./drawing-settings-preview.js";
+import type { DrawingCreationDraft } from "./drawing-creation-draft.js";
 export const DEFAULT_INDICATORS: IndicatorFlags = {
   ma: false,
   ema: false,
@@ -87,6 +88,7 @@ export type TerminalDialog =
   | "instruments"
   | "chart-settings"
   | "drawing-settings"
+  | "annotation-editor"
   | "indicator-library"
   | "technical-settings"
   | "indicator-settings";
@@ -101,6 +103,8 @@ export interface ContextMenu {
   target: ContextTarget;
 }
 export interface TerminalState {
+  drawingCreationDraft?: DrawingCreationDraft | null;
+  hoveredDrawingId?: string | null;
   editingTechnicalIndicator?: string;
   drawingSettingsPreview?: DrawingSettingsPreview | null;
   marketReady?: boolean;

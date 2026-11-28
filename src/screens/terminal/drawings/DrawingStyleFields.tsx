@@ -1,6 +1,13 @@
 import { t } from "../../../i18n/messages.js";
 import { drawingSupportsFill } from "../../../model/drawing-tool-policy.js";
-import type { DrawingSettings, DrawingTool, FibLevelStyle } from "../../../model/types.js";
+import { isAnnotationTool } from "../../../model/drawing-annotation.js";
+import { AnnotationEditor } from "./AnnotationEditor.js";
+import type {
+  DrawingSettings,
+  DrawingTool,
+  FibLevelStyle,
+  DrawingAnnotationSettings
+} from "../../../model/types.js";
 import { Swatch } from "./DrawingStylePopover.js";
 import type { ColorTarget } from "./DrawingStylePopover.js";
 import { DrawingLineControls } from "./controls/DrawingLineControls.js";
@@ -16,7 +23,8 @@ export function DrawingStyleFields({
   change,
   level,
   setColorTarget,
-  onPatch
+  onPatch,
+  screenAnchor
 }: {
   name: DrawingTool;
   settings: DraftSettings;
@@ -24,6 +32,7 @@ export function DrawingStyleFields({
   level: (index: number, patch: Partial<FibLevelStyle>) => void;
   setColorTarget: (target: ColorTarget) => void;
   onPatch: (patch: Partial<DrawingSettings>) => void;
+  screenAnchor?: (() => Partial<DrawingAnnotationSettings>) | undefined;
 }) {
   const fib = name.startsWith("fibonacci");
   const rectangle = drawingSupportsFill(name);
@@ -85,6 +94,16 @@ export function DrawingStyleFields({
       />
     </div>
   );
+
+  if (isAnnotationTool(name))
+    return (
+      <AnnotationEditor
+        name={name}
+        settings={settings}
+        change={change}
+        screenAnchor={screenAnchor}
+      />
+    );
 
   return (
     <>

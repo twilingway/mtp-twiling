@@ -4,6 +4,9 @@ import { drawingGeometry } from "./drawing-model.js";
 import type { DrawingProjector, FibGeometry } from "./drawing-model.js";
 import type { DrawingDraft, LineStyle } from "./types.js";
 import { drawingHandleIndices } from "./drawing-tool-policy.js";
+import { annotationMeasureText } from "./drawing-annotation-measure.js";
+import { paintAnnotation } from "./drawing-annotation-paint.js";
+import type { AnnotationLayoutOptions } from "./drawing-annotation-layout.js";
 function fibLabelPosition(
   g: FibGeometry,
   side: "left" | "center" | "right",
@@ -22,7 +25,10 @@ export function paintDrawings(
   width: number,
   height: number,
   selected: string | null,
-  handleRadius = 5
+  handleRadius = 5,
+  options: Omit<AnnotationLayoutOptions, "selected" | "hovered"> & {
+    hoveredId?: string | null;
+  } = {}
 ) {
   ctx.save();
   ctx.beginPath();
@@ -33,7 +39,12 @@ export function paintDrawings(
   const dash = (style: LineStyle) =>
     style === "dashed" ? [6, 4] : style === "dotted" ? [2, 3] : [];
   for (const d of items) {
-    const g = drawingGeometry(d, project, width, height);
+    const g = drawingGeometry(d, project, width, height, {
+      ...options,
+      measureText: options.measureText ?? annotationMeasureText,
+      selected: d.id === selected,
+      hovered: d.id === options.hoveredId
+    });
     if (!g) continue;
     ctx.globalCompositeOperation = "source-over";
     ctx.globalAlpha = g.style.lineOpacity;
@@ -41,7 +52,9 @@ export function paintDrawings(
     ctx.strokeStyle = g.style.color;
     ctx.setLineDash(dash(g.style.lineStyle));
     ctx.font = `${g.style.fontSize}px -apple-system, BlinkMacSystemFont, "Trebuchet MS", Roboto, Ubuntu, sans-serif`;
-    if (g.levels) {
+    if (g.annotation) {
+      paintAnnotation(ctx, g.annotation, d);
+    } else if (g.levels) {
       if (g.style.fill)
         for (let i = 1; i < g.levels.length; i++) {
           ctx.globalAlpha = g.style.opacity;
@@ -198,8 +211,9 @@ export function paintDrawings(
     ctx.globalAlpha = 1;
     ctx.setLineDash([]);
     if (d.id === selected)
-      for (const index of drawingHandleIndices(d.name, g.points.length)) {
-        const p = g.points[index]!;
+      for (const p of g.annotation
+        ? g.annotation.handles.map((handle) => handle.point)
+        : drawingHandleIndices(d.name, g.points.length).map((index) => g.points[index]!)) {
         ctx.fillStyle = "#131722";
         ctx.strokeStyle = "#2962ff";
         ctx.lineWidth = 2;

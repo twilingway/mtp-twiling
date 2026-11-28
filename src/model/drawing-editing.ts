@@ -1,4 +1,5 @@
 import { isDrawing, isRecord } from "./backup-format.js";
+import { annotationTableDimensions } from "./drawing-annotation.js";
 import { isInstrumentSymbol } from "./instrument-symbol.js";
 import type { Drawing, DrawingPoint, ImageAsset, PixelPoint } from "./types.js";
 
@@ -80,6 +81,7 @@ export class DrawingUndoHistory {
 export interface ObjectProjection {
   pointToPixel(point: DrawingPoint): PixelPoint | null;
   pixelToPoint(x: number, y: number): DrawingPoint | null;
+  plotSize?(): { width: number; height: number };
 }
 export function translatePoint(
   point: DrawingPoint,
@@ -94,9 +96,39 @@ export function copyDrawing(
   projection: ObjectProjection,
   offset: PixelPoint
 ): Drawing | null {
-  const points = drawing.points.map((point) => translatePoint(point, projection, offset));
+  const annotation = drawing.settings?.annotation;
+  const points = annotation?.screenAnchored
+    ? drawing.points.map((point) => ({ ...point }))
+    : drawing.points.map((point) => translatePoint(point, projection, offset));
   if (points.some((point) => point === null)) return null;
-  const copy: unknown = { ...structuredClone(drawing), id: crypto.randomUUID(), points };
+  const copy = { ...structuredClone(drawing), id: crypto.randomUUID(), points };
+  const size = projection.plotSize?.();
+  if (annotation?.screenAnchored && size && size.width > 0 && size.height > 0) {
+    const tableSize =
+      drawing.name === "table"
+        ? annotationTableDimensions(annotation, size)
+        : { width: 0, height: 0 };
+    copy.settings = {
+      ...copy.settings,
+      annotation: {
+        ...copy.settings?.annotation,
+        screenX: Math.max(
+          0,
+          Math.min(
+            1,
+            (annotation.screenX ?? 0.5) + offset.x / Math.max(1, size.width - tableSize.width)
+          )
+        ),
+        screenY: Math.max(
+          0,
+          Math.min(
+            1,
+            (annotation.screenY ?? 0.3) + offset.y / Math.max(1, size.height - tableSize.height)
+          )
+        )
+      }
+    };
+  }
   return isDrawing(copy) ? copy : null;
 }
 export function copyImage(
@@ -144,6 +176,7 @@ const drawingKeys = new Set([
   "visibility"
 ]);
 const settingKeys = new Set([
+  "annotation",
   "color",
   "width",
   "lineStyle",

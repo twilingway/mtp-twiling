@@ -20,18 +20,37 @@ import { DrawingStyleFields } from "./DrawingStyleFields.js";
 import { DrawingCoordinatesFields } from "./DrawingCoordinatesFields.js";
 import { DrawingVisibilityFields } from "./DrawingVisibilityFields.js";
 import { LockIcon } from "../VisibilityIcon.js";
+import { annotationScreenSettings } from "../chart-drawing-drag.js";
 
 export function DrawingSettingsDialog() {
   const { state } = useTerminal();
-  const drawing = state.drawings.find((item) => item.id === state.selectedObject);
+  const creation = state.drawingCreationDraft;
+  const drawing =
+    creation?.drawing ??
+    state.drawingSettingsPreview?.drawing ??
+    state.drawings.find((item) => item.id === state.selectedObject);
   return state.dialog === "drawing-settings" && drawing ? (
-    <DrawingSettingsForm key={drawing.id} drawing={drawing} />
+    <DrawingSettingsForm
+      key={drawing.id}
+      drawing={drawing}
+      creationToken={creation?.token}
+      editingToken={state.drawingSettingsPreview?.token}
+    />
   ) : null;
 }
-function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
+function DrawingSettingsForm({
+  drawing,
+  creationToken,
+  editingToken
+}: {
+  drawing: Drawing;
+  creationToken?: string | undefined;
+  editingToken?: string | undefined;
+}) {
   const { controller } = useTerminal();
   const ref = useRef<HTMLDialogElement>(null);
   const original = useRef(drawing);
+  const initialToken = useRef(editingToken);
   const token = useRef<string | null>(null);
   const mounted = useRef(false);
   const committing = useRef(false);
@@ -47,24 +66,36 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
   const settings = draft.settings;
   const drawingLockLabel = draft.lock ? t("Разблокировать объект") : t("Заблокировать объект");
   const close = () => {
-    if (token.current) controller.drawingSettings.cancel(token.current);
+    if (token.current)
+      (creationToken ? controller.drawingCreation : controller.drawingSettings).cancel(
+        token.current
+      );
     controller.setDialog(null);
   };
   useLayoutEffect(() => {
     mounted.current = true;
     const initial = original.current;
     const current = controller.getSnapshot().drawings.find((item) => item.id === initial.id);
-    if (current === initial) token.current = controller.drawingSettings.begin(initial.id);
+    if (creationToken) token.current = creationToken;
+    else if (initialToken.current) token.current = initialToken.current;
+    else if (current === initial) token.current = controller.drawingSettings.begin(initial.id);
     return () => {
       mounted.current = false;
-      if (token.current) controller.drawingSettings.cancel(token.current);
+      if (token.current)
+        (creationToken ? controller.drawingCreation : controller.drawingSettings).cancel(
+          token.current
+        );
       token.current = null;
     };
-  }, [controller]);
+  }, [controller, creationToken]);
   useLayoutEffect(() => {
     const item = settingsCandidate(draft);
-    if (token.current && item) controller.drawingSettings.preview(token.current, item);
-  }, [controller, draft]);
+    if (token.current && item)
+      (creationToken ? controller.drawingCreation : controller.drawingSettings).preview(
+        token.current,
+        item
+      );
+  }, [controller, draft, creationToken]);
   useEffect(() => {
     const dialog = ref.current;
     if (dialog && !dialog.open) dialog.showModal();
@@ -111,7 +142,9 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
     committing.current = true;
     setSaving(true);
     try {
-      const saved = await controller.drawingSettings.commit(token.current, item);
+      const saved = await (
+        creationToken ? controller.drawingCreation : controller.drawingSettings
+      ).commit(token.current, item);
       if (!mounted.current) return;
       if (saved) close();
       else setError(t("Контекст рисунка изменился. Откройте настройки снова."));
@@ -193,6 +226,7 @@ function DrawingSettingsForm({ drawing }: { drawing: Drawing }) {
           <DrawingStyleFields
             name={draft.name}
             settings={settings}
+            screenAnchor={() => annotationScreenSettings(draft, controller.chart)}
             change={change}
             level={level}
             setColorTarget={setColorTarget}

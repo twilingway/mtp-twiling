@@ -623,3 +623,89 @@ test("visible opacity controls use 0..100 percent without inversion and retain i
   assert.match(css, /repeating-conic-gradient/);
   assert.match(css, /linear-gradient\(to right, transparent, var\(--opacity-color\)\)/);
 });
+
+test("actual inline editor keeps multiline input, isolates keys, cancels without writes and saves an existing object once", async () => {
+  const f = fixture(),
+    c = f.controller;
+  const original = {
+    id: "text",
+    name: "text",
+    points: [{ timestamp: 1700000000000, value: 100 }],
+    settings: { text: "Old\nvalue" }
+  };
+  c.chart = {
+    plotSize: () => ({ width: 800, height: 600 }),
+    pointToPixel: () => ({ x: 100, y: 100 })
+  };
+  c.update({ drawings: [original], selectedObject: "text" });
+  c.setDialog("annotation-editor");
+  c.drawingSettings.begin("text");
+  let cursor = 0;
+  const cells = [],
+    hooks = {
+      useEffect() {},
+      useRef(value) {
+        const i = cursor++;
+        return (cells[i] ??= { current: value });
+      },
+      useState(initial) {
+        const i = cursor++;
+        cells[i] ??= { value: typeof initial === "function" ? initial() : initial };
+        return [
+          cells[i].value,
+          (next) => {
+            cells[i].value = typeof next === "function" ? next(cells[i].value) : next;
+          }
+        ];
+      }
+    };
+  const load = sources({
+    react: hooks,
+    "react/jsx-runtime": { jsx, jsxs: jsx },
+    "model/drawing-annotation-measure.ts": {
+      annotationMeasureText: (text, font) => text.length * font.size * 0.6
+    },
+    "screens/terminal/context.tsx": {
+      useTerminal: () => ({ state: c.getSnapshot(), controller: c })
+    }
+  });
+  const render = () => {
+    cursor = 0;
+    return load("screens/terminal/drawings/AnnotationInlineEditor.tsx").AnnotationInlineEditor({});
+  };
+  let node = render();
+  node.props.children[0].props.onChange({ currentTarget: { value: "" } });
+  node = render();
+  assert.equal(node.props.children[0].props.value, "", "temporary empty input remains editable");
+  assert.equal(f.writes.length, 0);
+  node.props.children[0].props.onChange({ currentTarget: { value: "New\nmultiline" } });
+  node = render();
+  assert.equal(c.getSnapshot().drawingSettingsPreview.drawing.settings.text, "New\nmultiline");
+  assert.equal(c.getSnapshot().drawings[0], original);
+  let stopped = 0,
+    prevented = 0;
+  node.props.onKeyDown({
+    key: "Enter",
+    stopPropagation: () => stopped++,
+    preventDefault: () => prevented++
+  });
+  assert.equal(stopped, 1);
+  assert.equal(prevented, 0, "Enter inserts a newline");
+  node.props.onKeyDown({ key: "Escape", stopPropagation() {}, preventDefault() {} });
+  assert.equal(f.writes.length, 0);
+  assert.equal(c.getSnapshot().drawingSettingsPreview, null);
+  assert.equal(c.getSnapshot().drawings[0], original);
+  c.setDialog("annotation-editor");
+  c.drawingSettings.begin("text");
+  node = render();
+  node.props.children[0].props.onChange({ currentTarget: { value: "Saved\ntext" } });
+  node = render();
+  node.props.onKeyDown({ key: "Enter", ctrlKey: true, stopPropagation() {}, preventDefault() {} });
+  await new Promise(setImmediate);
+  assert.equal(f.writes.length, 1);
+  assert.equal(c.getSnapshot().dialog, null);
+  assert.equal(c.getSnapshot().drawings[0].settings.text, "Saved\ntext");
+  await c.undoDrawings();
+  assert.deepEqual(json(c.getSnapshot().drawings), [original]);
+  c.dispose();
+});

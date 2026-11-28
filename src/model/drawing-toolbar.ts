@@ -84,6 +84,16 @@ export function isDrawingToolbarSettings(value: unknown): value is DrawingToolba
   return true;
 }
 export const TOOL_GROUP: Partial<Record<DrawingTool, string>> = {
+  text: "annotation",
+  note: "annotation",
+  priceNote: "annotation",
+  pin: "annotation",
+  table: "annotation",
+  callout: "annotation",
+  comment: "annotation",
+  priceLabel: "annotation",
+  signpost: "annotation",
+  flag: "annotation",
   segment: "lines",
   rayLine: "lines",
   straightLine: "lines",

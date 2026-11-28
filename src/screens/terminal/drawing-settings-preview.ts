@@ -30,7 +30,7 @@ export function validDrawingSettingsPreview(
   const current = scope(state);
   return (
     importWritable(state) &&
-    state.dialog === "drawing-settings" &&
+    (state.dialog === "drawing-settings" || state.dialog === "annotation-editor") &&
     Object.keys(current).every(
       (key) => current[key as keyof typeof current] === value.scope[key as keyof typeof current]
     ) &&
@@ -63,7 +63,8 @@ export class TerminalDrawingPreview {
     dialog: TerminalState["dialog"],
     initialAccountSection?: TerminalState["initialAccountSection"]
   ): void => {
-    if (dialog === "drawing-settings") this.bridge.cancelGesture();
+    if (dialog === "drawing-settings" || dialog === "annotation-editor")
+      this.bridge.cancelGesture();
     this.bridge.update({
       dialog,
       contextMenu: null,
@@ -78,7 +79,7 @@ export class TerminalDrawingPreview {
       !this.bridge.isAlive() ||
       !importWritable(state) ||
       !original ||
-      state.dialog !== "drawing-settings" ||
+      (state.dialog !== "drawing-settings" && state.dialog !== "annotation-editor") ||
       state.selectedObject !== id
     )
       return null;

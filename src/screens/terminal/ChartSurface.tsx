@@ -2,14 +2,17 @@ import { t } from "../../i18n/messages.js";
 import { useEffect, useMemo, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { hitDrawing } from "../../model/drawing-model.js";
+import { annotationMeasureText } from "../../model/drawing-annotation-measure.js";
+import { isAnnotationTool } from "../../model/drawing-annotation.js";
 import { isDrawing } from "../../model/backup-format.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
-import { preservePolylineClosure } from "../../model/drawing-anchor-edit.js";
+import { dragChartDrawing } from "./chart-drawing-drag.js";
+import type { DrawingDrag } from "./chart-drawing-drag.js";
 import { isVertexTool } from "../../model/drawing-tool-policy.js";
 import { chartBackground } from "../../model/theme.js";
 import type { Drawing, PixelPoint } from "../../model/types.js";
 import type { ChartAdapter, TechnicalSupplementalInputs } from "../../charts/adapter.js";
-import { nativePriceStep, roundPriceToStep } from "../../charts/price-format.js";
+import { nativePriceStep, chartPriceFormat } from "../../charts/price-format.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { isPanMovement } from "../../charts/navigation.js";
 import { useChartCanvas } from "./chart-lifecycle.js";
@@ -26,8 +29,9 @@ import { useOhlcInspection } from "./ohlc-inspection-input.js";
 import { OhlcCandleCard } from "./OhlcCandleCard.js";
 import { createDrawingContextSource } from "./chart-drawing-touch.js";
 import { useChartDrawingInput } from "./chart-drawing-input.js";
+import { AnnotationInlineEditor } from "./drawings/AnnotationInlineEditor.js";
 const chartControls =
-  "[data-image-id],.indicator-legend,.technical-pane-legends,.calendar-analysis-overlays,.drawing-finish";
+  "[data-image-id],.indicator-legend,.technical-pane-legends,.calendar-analysis-overlays,.drawing-finish,.annotation-inline-editor";
 
 export function visibleDrawings(state: TerminalState): Drawing[] {
   if (drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden) return [];
@@ -56,17 +60,6 @@ export function ChartCanvas({
     />
   );
 }
-interface Drag {
-  id: string;
-  pointerId: number;
-  handle: number;
-  start: PixelPoint;
-  original: Drawing;
-  pixels: (PixelPoint | null)[];
-  token: number;
-  clone: boolean;
-  cloneId: string | null;
-}
 interface NativePan {
   pointerId: number;
   chart: ChartAdapter;
@@ -94,7 +87,7 @@ export function ChartGestures({
     body = useRef<HTMLDivElement>(null),
     contextSource = useMemo(createDrawingContextSource, []),
     pointer = useRef<HTMLSpanElement>(null),
-    drag = useRef<Drag | null>(null),
+    drag = useRef<DrawingDrag | null>(null),
     pan = useRef<NativePan | null>(null);
   const lowerCount = technicalIndicatorGroups(state.preferences.technicalIndicators ?? []).filter(
     (item) => item.pane.kind === "pane"
@@ -149,7 +142,21 @@ export function ChartGestures({
           (point) => chart.pointToPixel(point),
           size.width,
           size.height,
-          touch ? 22 : 10
+          touch ? 22 : 10,
+          {
+            selectedId: controller.getSnapshot().selectedObject,
+            hoveredId: controller.getSnapshot().hoveredDrawingId ?? null,
+            measureText: annotationMeasureText,
+            formatPrice: (value) =>
+              value.toFixed(
+                chartPriceFormat(
+                  selectedMarketRow(
+                    controller.getSnapshot().rows,
+                    controller.getSnapshot().preferences
+                  ) ?? { symbol: "", step: null }
+                ).precision
+              )
+          }
         );
   };
   const stop = (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -185,6 +192,7 @@ export function ChartGestures({
       (event.target instanceof Element && event.target.closest(chartControls))
     )
       return;
+    if (controller.getSnapshot().drawingCreationDraft) return stop(event);
     const chart = controller.chart;
     if (!chart) return;
     const p = pixel(event),
@@ -271,6 +279,9 @@ export function ChartGestures({
       drag.current = null;
       const size = chart.plotSize(),
         inPlot = p.x >= 0 && p.y >= 0 && p.x <= size.width && p.y <= size.height;
+      const hoveredId = inPlot ? (find(p)?.id ?? null) : null;
+      if (current.hoveredDrawingId !== hoveredId)
+        controller.update({ hoveredDrawingId: hoveredId });
       cursor(
         event.currentTarget,
         inPlot
@@ -290,30 +301,7 @@ export function ChartGestures({
       active.cloneId = crypto.randomUUID();
     }
     const step = nativePriceStep(selectedMarketRow(current.rows, current.preferences));
-    const points = active.original.points.map((point, i) => {
-      if (!active.clone && active.handle >= 0 && active.handle !== i) return point;
-      const start = active.pixels[i];
-      const moved = start
-        ? ((!active.clone && active.handle >= 0
-            ? drawingPoint(
-                { x: start.x + p.x - active.start.x, y: start.y + p.y - active.start.y },
-                false
-              )
-            : chart.pixelToPoint(start.x + p.x - active.start.x, start.y + p.y - active.start.y)) ??
-          point)
-        : point;
-      return moved === point ? point : { ...moved, value: roundPriceToStep(moved.value, step) };
-    });
-    const candidate: unknown = {
-      ...active.original,
-      id: active.cloneId ?? active.id,
-      points: preservePolylineClosure(
-        active.original.name,
-        active.original.points,
-        points,
-        active.handle
-      )
-    };
+    const candidate = dragChartDrawing(active, p, chart, drawingPoint, step);
     if (isDrawing(candidate)) {
       const exists = current.drawings.some((item) => item.id === candidate.id);
       controller.editing.previewGesture(active.token, {
@@ -416,6 +404,8 @@ export function ChartGestures({
           cancel(event);
       }}
       onPointerLeave={(event) => {
+        if (controller.getSnapshot().hoveredDrawingId)
+          controller.update({ hoveredDrawingId: null });
         ohlc.leave();
         measurement.cancel(event);
         if (pointer.current) pointer.current.style.display = "none";
@@ -437,7 +427,15 @@ export function ChartGestures({
           event.preventDefault();
           event.stopPropagation();
           controller.selectObject(hit.id);
-          controller.setDialog("drawing-settings");
+          const drawing = controller.getSnapshot().drawings.find((item) => item.id === hit.id);
+          if (
+            drawing &&
+            isAnnotationTool(drawing.name) &&
+            !["table", "flag", "priceNote", "priceLabel"].includes(drawing.name)
+          ) {
+            controller.setDialog("annotation-editor");
+            controller.drawingSettings.begin(hit.id);
+          } else controller.setDialog("drawing-settings");
         }
       }}
       onContextMenuCapture={(event) => {
@@ -455,6 +453,7 @@ export function ChartGestures({
       }}
     >
       {children}
+      <AnnotationInlineEditor projection={drawingProjection} />
       {state.activeTool &&
         isVertexTool(state.activeTool) &&
         (state.preview?.points.length ?? 0) >= 2 && (
