@@ -349,6 +349,7 @@ export function lightweightMtp(
                     from: range.from,
                     to: range.to,
                     mode: series.priceScale?.().options().mode,
+                    uniformX: "lightweight",
                     xFor,
                     yFor: (price) => series.priceToCoordinate(price),
                     paint
@@ -371,6 +372,7 @@ export function lightweightMtp(
   };
   series.attachPrimitive(primitive);
   return {
+    forceRender: () => raster.forceRender(),
     pending: () => {
       if (!model.periods.length || !model.data.length) {
         raster.invalidate();

@@ -38,11 +38,13 @@ const { paintMtpWorkerFrame, MTP_WORKER_PROTOCOL } = load("model/mtp-worker-prot
 function context() {
   const commands = [],
     blits = [],
-    blitStates = [];
+    blitStates = [],
+    transforms = [];
   return {
     commands,
     blits,
     blitStates,
+    transforms,
     globalCompositeOperation: "source-over",
     filter: "none",
     shadowBlur: 0,
@@ -76,6 +78,12 @@ function context() {
     drawImage(...args) {
       blits.push(args);
       blitStates.push({ shadowColor: this.shadowColor, alpha: this.globalAlpha });
+    },
+    translate(...values) {
+      transforms.push(["translate", ...values]);
+    },
+    scale(...values) {
+      transforms.push(["scale", ...values]);
     }
   };
 }
@@ -183,6 +191,321 @@ function fixture() {
   };
 }
 
+function lightweightFrame(length = 5425) {
+  const frame = frameWith(length, MTP_COMBINED_PERIODS);
+  frame.uniformX = "lightweight";
+  const reads = { x: 0, y: 0, extrema: 0, prefix: 0 };
+  const spacing = 180 / (length - 1);
+  let dx = 0,
+    dy = 0;
+  frame.xFor = (index) => {
+    reads.x++;
+    return 10 + index * spacing + dx;
+  };
+  frame.yFor = (price) => {
+    reads.y++;
+    return (140 - price) * 0.6 + dy;
+  };
+  const extrema = frame.model.extrema.bind(frame.model);
+  frame.model.extrema = (...args) => {
+    reads.extrema++;
+    return extrema(...args);
+  };
+  frame.model.prefix.subarray = function (...args) {
+    reads.prefix++;
+    return Float64Array.prototype.subarray.apply(this, args);
+  };
+  return {
+    frame,
+    reads,
+    camera(x, y = 0) {
+      dx = x;
+      dy = y;
+      frame.from = -x / spacing;
+      frame.to = length - 1 - x / spacing;
+    }
+  };
+}
+
+test("60 held LW draws follow a covered full-history bitmap with no snapshots or dispatch until idle", () => {
+  const f = fixture(),
+    { frame, reads, camera } = lightweightFrame();
+  f.ready();
+  f.cache.draw(frame);
+  const image = f.result();
+  f.cache.draw(frame);
+  const before = { ...f.cache.status() },
+    oldReads = { ...reads },
+    oldBlits = frame.scope.context.blits.length;
+  f.cache.setInteraction(true);
+  for (let i = 1; i <= 60; i++) {
+    camera(i / 10, i / 20);
+    f.cache.draw(frame, true);
+  }
+  assert.equal(f.cache.status().snapshots, before.snapshots);
+  assert.equal(f.cache.status().dispatched, before.dispatched);
+  assert.equal(reads.extrema, oldReads.extrema);
+  assert.equal(reads.prefix, oldReads.prefix);
+  assert.ok(reads.x - oldReads.x <= 60 * 3);
+  assert.ok(reads.y - oldReads.y <= 60 * 3);
+  assert.equal(
+    frame.scope.context.blits.length - oldBlits,
+    60,
+    "the complete fan stays visible during a covered gesture"
+  );
+  assert.equal(image.closed, 0);
+  assert.equal(f.cache.pending(), true, "preview does not complete exact readiness");
+  f.cache.setInteraction(false);
+  f.cache.draw(frame);
+  assert.equal(f.cache.status().snapshots, before.snapshots + 1);
+  assert.equal(f.cache.status().dispatched, before.dispatched + 1);
+  const request = f.messages.at(-1);
+  assert.equal(
+    request.key,
+    mtpWorkerIntent(frame).key,
+    "settled work uses the final exact range/X array"
+  );
+  f.result(request);
+  assert.equal(f.cache.pending(), true);
+  f.cache.draw(frame);
+  assert.equal(f.cache.pending(), false);
+  assert.equal(image.closed, 1);
+  f.cache.destroy();
+});
+
+test("unchanged LW redraws reuse exact ready and in-flight keys without history scans", () => {
+  const f = fixture(),
+    { frame, reads } = lightweightFrame();
+  f.ready();
+  f.cache.draw(frame);
+  const before = { ...reads };
+  for (let i = 0; i < 60; i++) f.cache.draw(frame);
+  assert.equal(f.cache.status().snapshots, 1);
+  assert.equal(f.cache.status().dispatched, 1);
+  assert.equal(reads.extrema, before.extrema);
+  assert.equal(reads.prefix, before.prefix);
+  assert.ok(reads.x - before.x <= 60 * 3);
+  f.result();
+  f.cache.draw(frame);
+  const readyReads = { ...reads };
+  for (let i = 0; i < 60; i++) f.cache.draw(frame);
+  assert.equal(f.cache.status().snapshots, 1);
+  assert.equal(f.cache.status().dispatched, 1);
+  assert.equal(reads.extrema, readyReads.extrema);
+  assert.equal(reads.prefix, readyReads.prefix);
+  assert.ok(reads.x - readyReads.x <= 60 * 3);
+  assert.equal(f.cache.pending(), false);
+  f.cache.destroy();
+});
+
+test("held old response is preview only and never dispatches the previously queued camera", () => {
+  const f = fixture(),
+    { frame, camera } = lightweightFrame();
+  f.ready();
+  f.cache.draw(frame);
+  const a = f.messages.at(-1);
+  camera(2);
+  f.cache.draw(frame); // Programmatic B is queued behind A.
+  const before = f.cache.status().snapshots;
+  f.cache.setInteraction(true);
+  camera(5);
+  f.cache.draw(frame, true);
+  const old = f.result(a);
+  assert.equal(f.cache.status().dispatched, 1, "receive cannot dispatch B during held input");
+  assert.equal(f.cache.pending(), true);
+  f.cache.draw(frame, true);
+  assert.equal(frame.scope.context.blits.at(-1)[0], old);
+  assert.equal(f.cache.status().snapshots, before);
+  f.cache.setInteraction(false);
+  f.cache.draw(frame);
+  assert.equal(f.cache.status().dispatched, 2);
+  assert.equal(f.messages.at(-1).key, mtpWorkerIntent(frame).key);
+  f.cache.destroy();
+});
+
+test("held data revision invalidates preview immediately and settles only the latest active prefix", () => {
+  const f = fixture(),
+    { frame, camera } = lightweightFrame();
+  f.ready();
+  f.cache.draw(frame);
+  const image = f.result();
+  f.cache.draw(frame);
+  f.cache.setInteraction(true);
+  const before = f.cache.status().snapshots,
+    blits = frame.scope.context.blits.length;
+  frame.model.data.at(-1).close += 3;
+  frame.model.update(frame.model.data);
+  f.cache.invalidate(true);
+  camera(3);
+  f.cache.draw(frame, true);
+  assert.equal(image.closed, 1);
+  assert.equal(frame.scope.context.blits.length, blits);
+  assert.equal(f.cache.status().snapshots, before);
+  f.cache.setInteraction(false);
+  f.cache.draw(frame);
+  assert.equal(f.messages.at(-1).prefix.length, frame.model.data.length + 1);
+  assert.equal(f.messages.at(-1).key, mtpWorkerIntent(frame).key);
+  f.result();
+  f.cache.draw(frame);
+  assert.equal(f.cache.pending(), false);
+  f.cache.destroy();
+});
+
+test("uncovered, generic, gapped and non-affine held views stay blank without preparing heavy work", () => {
+  for (const kind of ["uncovered", "generic", "gapped", "non-affine"]) {
+    const f = fixture(),
+      { frame, camera } = lightweightFrame();
+    if (kind === "generic" || kind === "non-affine") delete frame.uniformX;
+    if (kind === "gapped") {
+      const native = frame.xFor;
+      frame.xFor = (i) => (i % 101 === 0 ? null : native(i));
+    }
+    if (kind === "non-affine") {
+      const native = frame.xFor;
+      frame.xFor = (i) => native(i) + Math.sin(i / 5);
+    }
+    if (kind === "uncovered") frame.yFor = (price) => 300 - price * 2;
+    f.ready();
+    f.cache.draw(frame);
+    f.result();
+    f.cache.draw(frame);
+    const before = f.cache.status().snapshots,
+      blits = frame.scope.context.blits.length;
+    camera(kind === "uncovered" ? 0 : 4, kind === "uncovered" ? 200 : 0);
+    if (kind === "uncovered") frame.yFor = (price) => 275 - price * 2;
+    f.cache.draw(frame, true);
+    assert.equal(f.cache.status().snapshots, before, kind);
+    assert.equal(frame.scope.context.blits.length, blits, kind);
+    assert.equal(f.cache.pending(), true);
+    f.cache.destroy();
+  }
+});
+
+test("held hard changes close preview immediately and a different model owner falls back", () => {
+  for (const change of [
+    (frame) => {
+      frame.model.styles.mtp160.width = 8;
+    },
+    (frame) => {
+      frame.model.periods = [4, 6, 640];
+    },
+    (frame) => {
+      frame.scope.horizontalPixelRatio = 2;
+    },
+    (frame) => {
+      frame.scope.bitmapSize.width++;
+    },
+    (frame) => {
+      frame.mode = 2;
+    },
+    (frame) => {
+      frame.model.reset(frame.model.data, frame.model.periods);
+    },
+    (frame) => {
+      frame.model.reset(
+        [...frame.model.data, { timestamp: 999999999, close: 120 }],
+        frame.model.periods
+      );
+    }
+  ]) {
+    const f = fixture(),
+      { frame } = lightweightFrame();
+    f.ready();
+    f.cache.draw(frame);
+    const image = f.result();
+    f.cache.draw(frame);
+    const before = f.cache.status().snapshots,
+      blits = frame.scope.context.blits.length;
+    change(frame);
+    f.cache.draw(frame, true);
+    assert.equal(image.closed, 1);
+    assert.equal(frame.scope.context.blits.length, blits);
+    assert.equal(f.cache.status().snapshots, before);
+    f.cache.destroy();
+  }
+  const f = fixture(),
+    { frame } = lightweightFrame();
+  f.ready();
+  f.cache.draw(frame);
+  const image = f.result();
+  f.cache.draw(frame);
+  const replacement = lightweightFrame().frame;
+  assert.equal(f.cache.draw(replacement, true), false);
+  assert.equal(f.cache.status().reason, "source-owner-changed");
+  assert.equal(image.closed, 1);
+  assert.equal(f.worker.terminated, 1);
+  f.cache.destroy();
+});
+
+test("explicit Fit force bypasses held debounce once and ends pending only on exact current blit", () => {
+  const f = fixture(),
+    { frame, camera } = lightweightFrame();
+  f.ready();
+  f.cache.draw(frame);
+  f.result();
+  f.cache.draw(frame);
+  f.cache.setInteraction(true);
+  camera(5);
+  f.cache.draw(frame, true);
+  const before = f.cache.status().snapshots;
+  f.cache.forceRender();
+  f.cache.draw(frame, true);
+  assert.equal(f.cache.status().snapshots, before + 1);
+  assert.equal(f.cache.status().dispatched, 2);
+  for (let i = 0; i < 20; i++) f.cache.draw(frame, true);
+  assert.equal(f.cache.status().snapshots, before + 1);
+  f.result();
+  assert.equal(f.cache.pending(), true);
+  f.cache.draw(frame, true);
+  assert.equal(f.cache.pending(), false);
+  camera(6);
+  f.cache.draw(frame, true);
+  assert.equal(
+    f.cache.status().snapshots,
+    before + 1,
+    "ordinary held deferral resumes after exact Fit"
+  );
+  f.cache.destroy();
+});
+
+test("one forced dispatch cannot authorize another held job when the camera changes before its response", () => {
+  const f = fixture(),
+    { frame, camera } = lightweightFrame();
+  f.ready();
+  f.cache.draw(frame);
+  f.result();
+  f.cache.draw(frame);
+  f.cache.setInteraction(true);
+  camera(5);
+  f.cache.forceRender();
+  f.cache.draw(frame, true);
+  const forced = f.messages.at(-1);
+  assert.equal(f.cache.status().dispatched, 2);
+  camera(6);
+  f.cache.draw(frame, true);
+  f.result(forced);
+  f.cache.draw(frame, true);
+  assert.equal(f.cache.status().snapshots, 2);
+  assert.equal(
+    f.cache.status().dispatched,
+    2,
+    "one explicit force grants at most one dispatched job"
+  );
+  assert.equal(f.cache.pending(), true);
+  f.cache.setInteraction(false);
+  f.cache.draw(frame);
+  assert.equal(f.cache.status().dispatched, 3);
+  assert.equal(f.messages.at(-1).key, mtpWorkerIntent(frame).key);
+  f.result();
+  f.cache.draw(frame);
+  assert.equal(
+    f.cache.pending(),
+    false,
+    "latest settled camera completes readiness, without requiring the obsolete forced view"
+  );
+  f.cache.destroy();
+});
+
 test("worker paint exactly matches baseline commands, sampling phase, warmup and styles", () => {
   for (const length of [1000, 5425, 15083]) {
     const frame = frameWith(length, MTP_COMBINED_PERIODS);
@@ -264,7 +587,10 @@ test("startup handshake dispatches immediately and only actual current draw comp
   assert.equal(f.cache.pending(), true);
   assert.equal(f.cache.draw(frame), true);
   assert.equal(f.messages.length, 1);
+  assert.equal(f.cache.status().snapshots, 0, "startup retains only a cheap intent");
   f.ready();
+  assert.equal(f.messages.length, 1, "receive only requests a fresh SDK draw");
+  f.cache.draw(frame);
   assert.equal(f.messages.length, 2);
   assert.equal(f.messages[1].prefix.length, frame.model.data.length + 1);
   assert.ok(frame.model.prefix.byteLength > 0, "original prefix buffer remains attached");
@@ -276,7 +602,18 @@ test("startup handshake dispatches immediately and only actual current draw comp
   f.cache.draw(frame);
   assert.equal(f.cache.pending(), false);
   assert.equal(frame.scope.context.blits[0][0], image);
-  assert.deepEqual(frame.scope.context.blits[0].slice(1), [0, 0, 200, 100]);
+  const capture = f.messages[1].frame;
+  assert.deepEqual(frame.scope.context.blits[0].slice(1), [
+    0,
+    0,
+    capture.width / capture.horizontalRatio,
+    capture.height / capture.verticalRatio
+  ]);
+  assert.deepEqual(frame.scope.context.transforms.at(-1), [
+    "translate",
+    -capture.padX / capture.horizontalRatio,
+    -capture.padY / capture.verticalRatio
+  ]);
   f.cache.destroy();
   assert.equal(image.closed, 1);
   assert.equal(f.worker.terminated, 1);
@@ -295,6 +632,8 @@ test("A/B/C coalesces on main before postMessage and closes stale A", () => {
   assert.equal(f.messages.filter((m) => m.type === "render").length, 1);
   const stale = f.result(a);
   assert.equal(stale.closed, 1);
+  assert.equal(f.cache.status().snapshots, 1, "queued B/C and receive perform no full snapshot");
+  f.cache.draw(c);
   assert.equal(f.messages.filter((m) => m.type === "render").length, 2);
   const final = f.messages.at(-1);
   assert.equal(final.key, mtpWorkerIntent(c).key);
@@ -380,6 +719,7 @@ test("revision updates copy only new active prefix, history reset never reuses o
   f.cache.draw(frame);
   const old = f.result(a);
   assert.equal(old.closed, 1);
+  f.cache.draw(frame);
   const b = f.messages.at(-1);
   assert.equal(b.prefix.length, frame.model.data.length + 1);
   assert.equal(frame.model.prefix, originalPrefix);
@@ -395,7 +735,7 @@ test("revision updates copy only new active prefix, history reset never reuses o
 
 test("camera changed back to dispatched A cancels obsolete queued B", () => {
   const f = fixture(),
-    frame = frameWith();
+    frame = lightweightFrame().frame;
   f.ready();
   f.cache.draw(frame);
   f.cache.draw({ ...frame, from: 100 });
@@ -597,7 +937,7 @@ test("worker entry verifies build, reuses bounded backing, paints/transfers and 
   send(render);
   assert.equal(outbound.at(-1).message.type, "result");
   assert.equal(outbound.at(-1).transfer[0], bitmaps[0]);
-  assert.deepEqual(surfaces[0].transform, [1.25, 0, 0, 1.7, 0, 0]);
+  assert.deepEqual(surfaces[0].transform, [1.25, 0, 0, 1.7, intent.frame.padX, intent.frame.padY]);
   assert.equal(surfaces[0].context.lineCap, source.scope.context.lineCap);
   assert.equal(surfaces[0].context.lineJoin, source.scope.context.lineJoin);
   assert.equal(surfaces[0].context.miterLimit, source.scope.context.miterLimit);
@@ -717,4 +1057,127 @@ test("worker module deadline, rejection and destroy prevent late worker creation
     cache.destroy();
     assert.equal(stopped, outcome === "success" ? 1 : 0);
   }
+});
+
+test("LW wrapper reuses its 180ms pointer/wheel tracker and explicit Fit preserves physical pointers", async () => {
+  const code = ts.transpileModule(
+    readFileSync(new URL("../src/model/mtp-raster-cache.ts", import.meta.url), "utf8"),
+    {
+      compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.CommonJS }
+    }
+  ).outputText;
+  const module = { exports: {} };
+  new vm.Script(
+    `(function(module,exports,__MTP_RASTER_DEV__,location){${code}\n})`
+  ).runInThisContext()(module, module.exports, true, { search: "?mtpRaster=worker" });
+  const timers = new Map(),
+    held = [],
+    interactions = [];
+  let serial = 0,
+    forced = 0,
+    destroyed = 0;
+  class Client {
+    draw(_frame, active) {
+      held.push(active);
+      return true;
+    }
+    setInteraction(active) {
+      interactions.push(active);
+    }
+    forceRender() {
+      forced++;
+    }
+    destroy() {
+      destroyed++;
+    }
+  }
+  const view = new EventTarget(),
+    container = new EventTarget();
+  container.ownerDocument = { defaultView: view };
+  const environment = {
+    canvas: () => null,
+    loadWorker: async () => ({ MtpWorkerRasterCache: Client }),
+    delay(action, milliseconds) {
+      const id = serial++;
+      timers.set(id, { action, milliseconds });
+      return id;
+    },
+    cancel(id) {
+      timers.delete(id);
+    }
+  };
+  const cache = new module.exports.MtpRasterCache(() => {}, container, environment);
+  await new Promise((done) => setImmediate(done));
+  const frame = frameWith();
+  const event = (name, values) => Object.assign(new Event(name), values);
+  const idle = () => {
+    const [id, timer] = [...timers.entries()].find(([, value]) => value.milliseconds === 180);
+    timers.delete(id);
+    timer.action();
+  };
+  cache.draw(frame);
+  assert.equal(held.at(-1), false, "cold/programmatic draw has no idle wait");
+  container.dispatchEvent(event("pointerdown", { pointerId: 1, button: 0 }));
+  cache.draw(frame);
+  assert.equal(held.at(-1), true);
+  view.dispatchEvent(event("pointerup", { pointerId: 1 }));
+  cache.draw(frame);
+  assert.equal(held.at(-1), true, "release waits for the existing idle timer");
+  const firstIdle = [...timers.keys()][0];
+  frame.from += 1;
+  cache.draw(frame);
+  assert.equal(held.at(-1), true);
+  assert.equal(
+    timers.has(firstIdle),
+    false,
+    "kinetic camera movement rearms the existing 180ms wait"
+  );
+  idle();
+  frame.from += 1; // Motion can land after timeout but before the SDK's confirming redraw.
+  cache.draw(frame);
+  assert.equal(
+    held.at(-1),
+    true,
+    "idle callback alone cannot classify continued inertia as programmatic"
+  );
+  assert.equal([...timers.values()].filter((timer) => timer.milliseconds === 180).length, 1);
+  const kineticIdle = [...timers.keys()][0];
+  frame.model.data.at(-1).close += 1;
+  cache.draw(frame);
+  cache.draw(frame);
+  assert.equal(
+    [...timers.keys()][0],
+    kineticIdle,
+    "quotes and response redraws with unchanged camera do not extend idle"
+  );
+  idle();
+  cache.draw(frame);
+  assert.equal(held.at(-1), false);
+  assert.equal(interactions.at(-1), false);
+  frame.from += 1;
+  cache.draw(frame);
+  assert.equal(
+    held.at(-1),
+    false,
+    "camera changes outside an interaction epoch are immediate programmatic work"
+  );
+  container.dispatchEvent(event("wheel", { deltaX: 0, deltaY: 100 }));
+  cache.draw(frame);
+  assert.equal(held.at(-1), true);
+  cache.forceRender();
+  cache.draw(frame);
+  assert.equal(held.at(-1), false, "explicit Fit overrides stale wheel debounce");
+  assert.equal(forced, 1);
+  assert.equal(timers.size, 0);
+  container.dispatchEvent(event("pointerdown", { pointerId: 2, button: 0 }));
+  cache.forceRender();
+  cache.draw(frame);
+  assert.equal(held.at(-1), true, "Fit must not clear the physical pointer set");
+  assert.equal(forced, 2);
+  view.dispatchEvent(event("pointercancel", { pointerId: 2 }));
+  idle();
+  cache.destroy();
+  container.dispatchEvent(event("wheel", { deltaX: 0, deltaY: 100 }));
+  assert.equal(timers.size, 0);
+  assert.equal(destroyed, 1);
 });

@@ -50,7 +50,7 @@ scope.onmessage = ({ data }) => {
     surface.height = frame.height;
     const context = surface.getContext("2d");
     if (!context) throw new Error("Worker 2D context unavailable");
-    context.setTransform(frame.horizontalRatio, 0, 0, frame.verticalRatio, 0, 0);
+    context.setTransform(frame.horizontalRatio, 0, 0, frame.verticalRatio, frame.padX, frame.padY);
     context.lineCap = frame.lineCap;
     context.lineJoin = frame.lineJoin;
     context.miterLimit = frame.miterLimit;

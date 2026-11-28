@@ -7,6 +7,7 @@ export interface MtpWorkerIntent {
   revision: number;
   resetRevision: number;
   model: MtpRasterFrame["model"];
+  priceHigh: number;
   frame: MtpWorkerFrame;
 }
 
@@ -79,6 +80,14 @@ export function mtpWorkerIntent(source: MtpRasterFrame): MtpWorkerIntent | null 
     model.data.at(-1)?.timestamp,
     model.data.at(-1)?.close
   ]);
+  const factor = Math.min(
+    1.4,
+    Math.sqrt((4 * 1024 * 1024) / (size.width * size.height)),
+    4096 / size.width,
+    4096 / size.height
+  );
+  const padX = Math.floor((size.width * (factor - 1)) / 2);
+  const padY = Math.floor((size.height * (factor - 1)) / 2);
   const frame: MtpWorkerFrame = {
     dataKey,
     length: model.data.length,
@@ -89,8 +98,10 @@ export function mtpWorkerIntent(source: MtpRasterFrame): MtpWorkerIntent | null 
     yOrigin: lowY,
     ySlope: slope,
     styles,
-    width: size.width,
-    height: size.height,
+    width: size.width + padX * 2,
+    height: size.height + padY * 2,
+    padX,
+    padY,
     horizontalRatio,
     verticalRatio,
     lineCap: context.lineCap,
@@ -113,6 +124,7 @@ export function mtpWorkerIntent(source: MtpRasterFrame): MtpWorkerIntent | null 
     key,
     dataKey,
     model,
+    priceHigh: high,
     revision: model.revision,
     resetRevision: model.resetRevision,
     frame

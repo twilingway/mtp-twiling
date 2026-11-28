@@ -1,21 +1,14 @@
-import type { MtpBitmapScope, MtpModel } from "./mtp.js";
 import type { MtpWorkerRasterCache, MtpWorkerStatus } from "./mtp-worker-raster-cache.js";
+import type {
+  MtpRasterCached as Cached,
+  MtpRasterEnvironment,
+  MtpRasterFrame,
+  MtpRasterMatrix as Matrix
+} from "./mtp-raster-types.js";
+export type { MtpRasterEnvironment, MtpRasterFrame } from "./mtp-raster-types.js";
 
 declare const __MTP_RASTER_DEV__: boolean;
 
-type Surface = HTMLCanvasElement | OffscreenCanvas;
-interface Matrix {
-  xScale: number;
-  xOffset: number;
-  yScale: number;
-  yOffset: number;
-}
-export interface MtpRasterEnvironment {
-  canvas(width: number, height: number): Surface | null;
-  delay(action: () => void, milliseconds: number): unknown;
-  cancel(timer: unknown): void;
-  loadWorker?(): Promise<{ MtpWorkerRasterCache: typeof MtpWorkerRasterCache }>;
-}
 const browser: MtpRasterEnvironment = {
   canvas(width, height) {
     if (typeof OffscreenCanvas !== "undefined") return new OffscreenCanvas(width, height);
@@ -28,43 +21,6 @@ const browser: MtpRasterEnvironment = {
   delay: (action, milliseconds) => setTimeout(action, milliseconds),
   cancel: (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>)
 };
-export interface MtpRasterFrame {
-  scope: MtpBitmapScope;
-  model: MtpModel;
-  from: number;
-  to: number;
-  mode: number | undefined;
-  xFor(index: number): number | null;
-  yFor(price: number): number | null;
-  paint(context: CanvasRenderingContext2D, from?: number, to?: number): void;
-}
-interface Cached {
-  surface: Surface;
-  signature: string;
-  revision: number;
-  resetRevision: number;
-  length: number;
-  firstTime: number | undefined;
-  lastTime: number | undefined;
-  lastClose: number | undefined;
-  mode: number;
-  width: number;
-  height: number;
-  horizontalRatio: number;
-  verticalRatio: number;
-  padX: number;
-  padY: number;
-  indices: number[];
-  prices: number[];
-  x: number[];
-  y: number[];
-  logicalFrom: number;
-  logicalTo: number;
-  priceLowY: number;
-  priceHighY: number;
-  fullHistory: boolean;
-  previewOnly: boolean;
-}
 const finite = (values: readonly (number | null)[]): values is number[] =>
   values.every((value) => value !== null && Number.isFinite(value));
 const sameMatrix = (a: Matrix, b: Matrix) =>
@@ -80,6 +36,9 @@ export class MtpRasterCache {
   private workerLoading = false;
   private workerLoadError: string | undefined;
   private workerLoadTimer: unknown;
+  private forceRequested = false;
+  private interactionEpoch = false;
+  private workerCamera: { signature: string; prices: number[] } | undefined;
   private cached: Cached | undefined;
   private observed = identity;
   private timer: unknown;
@@ -123,8 +82,10 @@ export class MtpRasterCache {
     if (!view) return;
     const down = (event: PointerEvent) => {
       if (event.button !== 0) return;
+      this.interactionEpoch = true;
       this.pointers.add(event.pointerId);
       this.cancelTimer();
+      this.worker?.setInteraction(true);
     };
     const up = (event: PointerEvent) => {
       if (this.pointers.delete(event.pointerId) && !this.pointers.size) this.schedule();
@@ -135,6 +96,7 @@ export class MtpRasterCache {
     };
     const wheel = (event: WheelEvent) => {
       if (!event.deltaX && !event.deltaY) return;
+      this.interactionEpoch = true;
       this.wheel = true;
       this.schedule();
     };
@@ -165,11 +127,13 @@ export class MtpRasterCache {
   }
   private schedule(): void {
     this.cancelTimer();
+    this.worker?.setInteraction(true);
     if (this.pointers.size || this.disposed) return;
     this.timer = this.environment.delay(() => {
       this.timer = undefined;
       this.wheel = false;
       this.ready = true;
+      this.worker?.setInteraction(false);
       if (!this.disposed) this.requestUpdate();
     }, 180);
   }
@@ -178,6 +142,32 @@ export class MtpRasterCache {
     this.cached.surface.width = 0;
     this.cached.surface.height = 0;
     this.cached = undefined;
+  }
+  private trackWorkerMotion(frame: MtpRasterFrame): void {
+    if (!this.interactionEpoch) return;
+    const price = frame.model.data[0]?.close ?? 0;
+    const prices = this.workerCamera?.prices ?? [
+      price,
+      price + Math.max(1, Math.abs(price)) * 0.01
+    ];
+    const signature = JSON.stringify([
+      frame.from,
+      frame.to,
+      frame.scope.bitmapSize,
+      frame.scope.horizontalPixelRatio,
+      frame.scope.verticalPixelRatio,
+      frame.mode,
+      frame.xFor(0),
+      frame.xFor(1),
+      prices.map((value) => frame.yFor(value))
+    ]);
+    if (this.workerCamera && signature !== this.workerCamera.signature) this.schedule();
+    else if (this.ready && !this.pointers.size && !this.wheel && this.timer === undefined) {
+      this.interactionEpoch = false;
+      this.workerCamera = undefined;
+      return;
+    }
+    this.workerCamera = { signature, prices };
   }
   private matrix(frame: MtpRasterFrame, cached: Cached): Matrix | null {
     const x = cached.indices.map((index) => frame.xFor(index)),
@@ -221,8 +211,18 @@ export class MtpRasterCache {
   }
   draw(frame: MtpRasterFrame): boolean {
     if (this.disposed) return false;
+    if (this.worker || this.workerLoading) this.trackWorkerMotion(frame);
     if (this.workerLoading) return true;
-    if (this.worker?.draw(frame)) {
+    if (this.forceRequested && this.worker) {
+      this.worker.forceRender();
+      this.forceRequested = false;
+    }
+    if (
+      this.worker?.draw(
+        frame,
+        this.interactionEpoch || this.pointers.size > 0 || this.wheel || this.timer !== undefined
+      )
+    ) {
       this.release();
       return true;
     }
@@ -372,7 +372,7 @@ export class MtpRasterCache {
       y = prices.map((price) => frame.yFor(price));
     if (!finite(x) || !finite(y) || x[0] === x[1] || y[0] === y[1]) return false;
     this.release(); // Never retain two full-size raster allocations.
-    let surface: Surface | null;
+    let surface: HTMLCanvasElement | OffscreenCanvas | null;
     try {
       surface = this.environment.canvas(size.width + padPixelsX * 2, size.height + padPixelsY * 2);
     } catch {
@@ -470,6 +470,13 @@ export class MtpRasterCache {
   }
   invalidate(active = false): void {
     this.worker?.invalidate(active);
+  }
+  forceRender(): void {
+    this.forceRequested = true;
+    this.wheel = false;
+    this.cancelTimer();
+    this.interactionEpoch = this.pointers.size > 0;
+    this.workerCamera = undefined;
   }
   workerStatus(): MtpWorkerStatus {
     return (

@@ -18,6 +18,8 @@ export interface MtpWorkerFrame {
   styles: MtpPaintStyle[];
   width: number;
   height: number;
+  padX: number;
+  padY: number;
   horizontalRatio: number;
   verticalRatio: number;
   lineCap: CanvasLineCap;

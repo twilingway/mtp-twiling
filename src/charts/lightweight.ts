@@ -423,6 +423,7 @@ export function makeLightweight(options: ChartOptions): ChartAdapter {
       height: technical.metrics()[0]?.height ?? container.clientHeight - 28
     }),
     fit() {
+      mtp.forceRender();
       series.priceScale().applyOptions({ autoScale: true });
       loadedFit.fit();
     },
