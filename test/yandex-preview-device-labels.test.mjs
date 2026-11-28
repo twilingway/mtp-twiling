@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import * as react from "react";
 import * as jsx from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 import { sourceModules } from "./helpers/watchlist-sections.mjs";
 
-const load = sourceModules({ "react/jsx-runtime": jsx });
+const load = sourceModules({ react, "react/jsx-runtime": jsx });
 const { CLOUD_TEST_CLIENT_ID } = load("model/cloud-client-identity.ts");
 const { YandexPreview } = load("services/yandex/coordinator-preview.ts");
 const { CloudVersionComparison } = load("screens/terminal/CloudVersionComparison.tsx");

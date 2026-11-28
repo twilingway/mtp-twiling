@@ -20,12 +20,33 @@ import { legacyYandexHeads } from "./slot-legacy.js";
 import type { CloudRetentionStatus } from "../../model/cloud-sync.js";
 import { retainYandexSlots } from "./slot-retention.js";
 import { yandexErrorCode } from "./types.js";
+import type { CloudRemoteDeletion } from "../../model/cloud-sync.js";
+import { slotDeleteCapabilities } from "./slot-maintenance-selection.js";
+import { createSlotMaintenancePlan } from "./slot-maintenance-plan.js";
+import type { YandexManualDeletePlan } from "./slot-maintenance-plan.js";
+import { executeSlotMaintenance } from "./slot-maintenance-execute.js";
+export { validateYandexManualDeletePlan } from "./slot-maintenance-plan.js";
+export type { YandexManualDeletePlan } from "./slot-maintenance-plan.js";
 
 export interface YandexRemote {
   readonly file: YandexFile;
   readonly revision: YandexRevision;
   readonly slot?: SlotRemoteMetadata;
 }
+export const yandexRemotesFingerprint = (remotes: readonly YandexRemote[]): string =>
+  JSON.stringify(
+    remotes
+      .map(({ file, revision, slot }) => [
+        file.name,
+        file.md5,
+        file.size,
+        file.modified,
+        revision.revisionId,
+        revision.deviceId,
+        slot?.seq ?? null
+      ])
+      .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))
+  );
 const fingerprint = (files: readonly YandexFile[]) =>
   JSON.stringify(files.map(({ name, md5, size, modified }) => [name, md5, size, modified]).sort());
 export class YandexRevisions {
@@ -114,6 +135,91 @@ export class YandexRevisions {
       throw new YandexError("conflict");
     this.bodies.set(fingerprint([remote.file]), decoded.prepared);
     return decoded.prepared;
+  }
+  async manualDeleteCapabilities(
+    remotes: readonly YandexRemote[],
+    heads: readonly string[]
+  ): Promise<Record<string, CloudRemoteDeletion>> {
+    const snapshot = this.slots.snapshot;
+    if (!snapshot) throw new YandexError("not-ready");
+    const result = await slotDeleteCapabilities(snapshot);
+    for (const id of heads)
+      if (result[id]?.kind === "retired-peer")
+        result[id] = { kind: "current", allowed: false, reason: "last-head" };
+    for (const { envelope } of snapshot.latest)
+      if (await this.journal.matchesCurrentDevice(envelope.current.revision.deviceId))
+        result[envelope.current.revision.revisionId] = {
+          kind: "current",
+          allowed: false,
+          reason: "current"
+        };
+    for (const remote of remotes)
+      if (!remote.slot)
+        result[remote.revision.revisionId] = { kind: "legacy", allowed: false, reason: "legacy" };
+    return result;
+  }
+  async manualDeletePlan(
+    remoteId: string,
+    expectedRemotesFingerprint: string,
+    valid: () => boolean
+  ): Promise<YandexManualDeletePlan> {
+    const current = await this.inspect(valid);
+    if (yandexRemotesFingerprint(current.remotes) !== expectedRemotesFingerprint)
+      throw new YandexError("local-changed");
+    if (!current.remotes.some((remote) => remote.revision.revisionId === remoteId && remote.slot))
+      throw new YandexError("permission");
+    const files = (await this.transport.list()).filter((file) => !file.name.startsWith("probe_"));
+    const snapshot = this.slots.snapshot!;
+    const selectedCurrent = snapshot.latest.find(
+      ({ envelope }) => envelope.current.revision.revisionId === remoteId
+    );
+    if (
+      selectedCurrent &&
+      (await this.journal.matchesCurrentDevice(selectedCurrent.envelope.current.revision.deviceId))
+    )
+      throw new YandexError("permission");
+    if (
+      slotFingerprint(files.filter((file) => isSlotName(file.name))) !==
+      slotFingerprint(snapshot.files.map((item) => item.file))
+    )
+      throw new YandexError("conflict");
+    const plan = await createSlotMaintenancePlan(
+      this.slots,
+      files,
+      remoteId,
+      current.heads,
+      this.auth,
+      valid
+    );
+    assertCurrent(this.auth.signal, valid);
+    if (
+      slotFingerprint(files) !==
+      slotFingerprint(
+        (await this.transport.list()).filter((file) => !file.name.startsWith("probe_"))
+      )
+    )
+      throw new YandexError("conflict");
+    return plan;
+  }
+  async executeManualDelete(
+    plan: YandexManualDeletePlan,
+    valid: () => boolean,
+    beforeEffect?: () => Promise<void>
+  ): Promise<{ remotes: YandexRemote[]; heads: string[] }> {
+    await executeSlotMaintenance(
+      this.slots,
+      plan,
+      this.auth,
+      valid,
+      () => this.inspect(valid),
+      async () => {
+        await beforeEffect?.();
+        assertCurrent(this.auth.signal, valid);
+        await ensureYandexRetentionProof(this.transport, this.auth, valid);
+        assertCurrent(this.auth.signal, valid);
+      }
+    );
+    return this.inspect(valid);
   }
   async retryPrune(valid: () => boolean): Promise<void> {
     try {

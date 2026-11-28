@@ -1,6 +1,6 @@
 import type { CloudSyncStatus } from "../../model/cloud-sync.js";
 import type { CloudOperationGuard } from "../../screens/terminal/controller-cloud-host.js";
-import type { YandexJournal } from "./journal.js";
+import type { YandexAssociation, YandexJournal } from "./journal.js";
 import { yandexAcceptedStatus } from "./coordinator-status.js";
 import type { YandexStatusClear } from "./coordinator-status.js";
 import { YandexError } from "./types.js";
@@ -12,6 +12,7 @@ export function yandexSnapshotAcceptor(options: {
   revision(): number;
   status(): CloudSyncStatus;
   clearPreview(): void;
+  accepted?(association: YandexAssociation, revision: number): void;
   update(patch: Partial<CloudSyncStatus>, clear: readonly YandexStatusClear[]): void;
 }) {
   return async (
@@ -28,18 +29,16 @@ export function yandexSnapshotAcceptor(options: {
     };
     check();
     const syncedAt = new Date().toISOString();
-    await options.journal().accept(
-      options.clientId(),
-      {
-        version: 1,
-        accountId: options.accountId(),
-        heads,
-        digest,
-        syncedAt
-      },
-      guard.signal
-    );
+    const association: YandexAssociation = {
+      version: 1,
+      accountId: options.accountId(),
+      heads,
+      digest,
+      syncedAt
+    };
+    await options.journal().accept(options.clientId(), association, guard.signal);
     check();
+    options.accepted?.(association, expectedRevision);
     options.clearPreview();
     if (baselineOnly)
       options.update({ phase: "syncing", pendingChanges: true, lastSyncedAt: syncedAt }, [

@@ -6,6 +6,9 @@ import { decodeBundle, MAX_BUNDLE_BYTES, revisionName } from "./bundle.js";
 import type { YandexRevision } from "./bundle.js";
 import type { CloudClientMode } from "../../model/cloud-sync.js";
 import { CLOUD_TEST_CLIENT_ID, defaultCloudClientMode } from "../../model/cloud-client-identity.js";
+import { readYandexMaintenance } from "./maintenance-journal.js";
+import type { YandexMaintenance } from "./maintenance-journal.js";
+import { readYandexAssociation } from "./association-codec.js";
 
 export interface YandexAssociation {
   readonly version: 1;
@@ -97,25 +100,22 @@ export class YandexJournal {
   }
   async association(clientId: string, accountId: string): Promise<YandexAssociation | undefined> {
     const value = await (
-        await this.backend()
-      ).read(this.prefix(clientId, accountId) + "association"),
-      v = object(value);
-    if (value === undefined) return undefined;
-    if (
-      !v ||
-      v.version !== 1 ||
-      v.accountId !== accountId ||
-      !Array.isArray(v.heads) ||
-      v.heads.length > 1000 ||
-      !v.heads.every((head: unknown) => typeof head === "string" && uuidPattern.test(head)) ||
-      new Set(v.heads).size !== v.heads.length ||
-      typeof v.digest !== "string" ||
-      !hashPattern.test(v.digest) ||
-      typeof v.syncedAt !== "string" ||
-      !Number.isFinite(Date.parse(v.syncedAt))
-    )
-      throw new YandexError("local-save");
-    return v as unknown as YandexAssociation;
+      await this.backend()
+    ).read(this.prefix(clientId, accountId) + "association");
+    return readYandexAssociation(value, accountId);
+  }
+  async snapshotAssociations(
+    clientId: string
+  ): Promise<ReadonlyMap<string, YandexAssociation> | undefined> {
+    if (!/^[a-f\d]{32}$/i.test(clientId)) return undefined;
+    const backend = await this.backend();
+    if (!backend.readAssociations) return undefined;
+    const result = new Map<string, YandexAssociation>();
+    for (const { accountId, value } of await backend.readAssociations(clientId)) {
+      const association = readYandexAssociation(value, accountId);
+      if (association) result.set(accountId, association);
+    }
+    return result;
   }
   async accept(
     clientId: string,
@@ -191,6 +191,111 @@ export class YandexJournal {
             size: expected.reference.size
           }
         : undefined
+    );
+  }
+  async maintenance(clientId: string, accountId: string): Promise<YandexMaintenance | undefined> {
+    return readYandexMaintenance(
+      await (await this.backend()).read(this.prefix(clientId, accountId) + "maintenance"),
+      accountId
+    );
+  }
+  async saveMaintenance(
+    clientId: string,
+    value: YandexMaintenance,
+    signal: AbortSignal
+  ): Promise<void> {
+    const checked = await readYandexMaintenance(value, value.accountId);
+    signal.throwIfAborted();
+    try {
+      await (
+        await this.backend()
+      ).write(this.prefix(clientId, value.accountId) + "maintenance", checked, signal);
+    } catch {
+      signal.throwIfAborted();
+      throw new YandexError("local-save");
+    }
+  }
+  async clearMaintenance(
+    clientId: string,
+    accountId: string,
+    generation: string,
+    signal: AbortSignal
+  ): Promise<void> {
+    try {
+      await (
+        await this.backend()
+      ).remove(this.prefix(clientId, accountId) + "maintenance", signal, generation);
+    } catch {
+      signal.throwIfAborted();
+      throw new YandexError("local-save");
+    }
+  }
+  async rebindMaintenance(
+    clientId: string,
+    prior: YandexMaintenance,
+    credentialGeneration: string,
+    signal: AbortSignal
+  ): Promise<YandexMaintenance> {
+    const current = await this.maintenance(clientId, prior.accountId);
+    if (
+      !current ||
+      current.generation !== prior.generation ||
+      current.credentialGeneration !== prior.credentialGeneration ||
+      current.writerDeviceId !== prior.writerDeviceId
+    )
+      throw new YandexError("local-changed");
+    const rebound: YandexMaintenance = {
+      ...current,
+      credentialGeneration,
+      plan: { ...current.plan, credentialGeneration }
+    };
+    const checked = await readYandexMaintenance(rebound, current.accountId);
+    if (!checked) throw new YandexError("local-save");
+    signal.throwIfAborted();
+    try {
+      const backend = await this.backend(),
+        auditKey = this.prefix(clientId, prior.accountId) + "maintenance-rebind";
+      const previousAudit = object(await backend.read(auditKey));
+      await backend.write(
+        auditKey,
+        {
+          version: 1,
+          operationId: current.generation,
+          accountId: current.accountId,
+          writerDeviceId: current.writerDeviceId,
+          originalCredentialGeneration:
+            previousAudit?.operationId === current.generation
+              ? previousAudit.originalCredentialGeneration
+              : current.credentialGeneration,
+          previousCredentialGeneration: current.credentialGeneration,
+          credentialGeneration,
+          reboundAt: new Date().toISOString()
+        },
+        signal
+      );
+      await backend.write(this.prefix(clientId, prior.accountId) + "maintenance", checked, signal);
+    } catch {
+      signal.throwIfAborted();
+      throw new YandexError("local-save");
+    }
+    return checked;
+  }
+  async matchesMaintenance(
+    clientId: string,
+    accountId: string,
+    generation: string,
+    credentialGeneration: string,
+    writerDeviceId: string
+  ): Promise<boolean> {
+    const value = object(
+      await (await this.backend()).read(this.prefix(clientId, accountId) + "maintenance")
+    );
+    return (
+      value?.accountId === accountId &&
+      value.generation === generation &&
+      value.credentialGeneration === credentialGeneration &&
+      value.writerDeviceId === writerDeviceId &&
+      object(value.plan)?.operationId === generation
     );
   }
   async applyIntent(clientId: string, accountId: string): Promise<YandexApplyIntent | undefined> {

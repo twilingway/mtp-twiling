@@ -10,6 +10,12 @@ import type { TerminalSession } from "./controller-session.js";
 import { flushWorkspaceAnnotations } from "./workspace-annotations.js";
 import { summarizeBackupFile } from "../../model/backup-transfer-progress.js";
 import type { FileImportObserver } from "../../model/backup-transfer-progress.js";
+import { selectedMarketRow } from "../../model/selected-instrument.js";
+import {
+  beginRestoreRecovery,
+  completeRestoreRecovery,
+  createNativeImportRecovery
+} from "../../services/restore-recovery-journal.js";
 
 interface ImportBridge {
   getState: () => TerminalState;
@@ -43,7 +49,8 @@ function invalidateImportedView(
 /** Retry only the committed profile's restoration, without repeating any backup writes. */
 export async function restoreImportedProfile(
   bridge: ImportBridge,
-  guard?: () => boolean
+  guard?: () => boolean,
+  preserveStoredCamera?: boolean
 ): Promise<void> {
   const { owner, name } = bridge.getState(),
     client = bridge.getClient(),
@@ -58,8 +65,18 @@ export async function restoreImportedProfile(
     };
   const previousCachePaused = client?.cachePaused ?? false;
   if (client) client.cachePaused = true;
+  let recovery: Awaited<ReturnType<typeof beginRestoreRecovery>> | undefined;
   try {
-    await resetSharedChartCamera(owner);
+    recovery = await beginRestoreRecovery(owner, preserveStoredCamera);
+    if (!valid()) return;
+    if (recovery.mode === "shared-runtime") {
+      const outgoing = bridge.getChart();
+      if (outgoing) {
+        outgoing.retired = true;
+        outgoing.persistView = false;
+      }
+    }
+    await resetSharedChartCamera(owner, recovery.mode === "shared-runtime");
     if (!valid()) return;
     await bridge.session.prepareProfile(owner, name, true, valid);
     if (!valid()) return;
@@ -74,8 +91,16 @@ export async function restoreImportedProfile(
     // An adapter born under the transfer barrier may have read the old shared camera.
     invalidateImportedView(bridge, false);
     await bridge.loadHistory();
+    const restored = bridge.getState();
+    if (
+      restored.rows?.length &&
+      selectedMarketRow(restored.rows, restored.preferences)?.uid &&
+      restored.historyViewReady === false
+    )
+      throw new Error("Не удалось восстановить сохранённый вид после импорта.");
+    if (valid()) await completeRestoreRecovery(recovery);
   } catch (error) {
-    if (sessionValid()) {
+    if (sessionValid() && (recovery || preserveStoredCamera !== true)) {
       const chart = bridge.getChart();
       if (chart) {
         chart.retired = true;
@@ -131,6 +156,7 @@ export async function importTerminalBackup(
       if (summary) onProgress?.({ stage: "write", summary });
       result = await storage.importBackup(owner, data, {
         ...options,
+        restoreRecovery: createNativeImportRecovery(owner),
         valid: () => valid() && (options.valid?.() ?? true)
       });
     } catch (error) {

@@ -1,4 +1,38 @@
 export const cloudMessages = {
+  Клиент: "Client",
+  "Копий к удалению": "Copies to delete",
+  "Будут удалены все сохранения выбранного старого клиента.":
+    "All saves from the selected old client will be deleted.",
+  "Предыдущая версия": "Previous version",
+  "Принятая версия старого клиента": "Accepted version from an old client",
+  "Текущая версия": "Current version",
+  "Текущая версия защищена. Можно удалить предыдущую копию.":
+    "The current version is protected. You can delete the previous copy.",
+  "Это последняя независимая версия клиента. Сначала выберите и сохраните нужную версию.":
+    "This is the client's last independent version. Choose and save the version you need first.",
+  "Старая версия формата защищена от ручного удаления.":
+    "Legacy format versions are protected from manual deletion.",
+  "Сначала разрешите конфликт версий и повторите проверку.":
+    "Resolve the version conflict first, then check again.",
+  "Для удаления этой версии требуется обновление приложения.":
+    "Update the application before deleting this version.",
+  "Проверить и продолжить удаление…": "Verify and continue deleting…",
+  "Удалить эту копию…": "Delete this copy…",
+  "Подтверждение удаления": "Confirm deletion",
+  "Безвозвратно удалить выбранное сохранение из Яндекс Диска?":
+    "Permanently delete the selected save from Yandex Disk?",
+  "Оставшиеся текущие версии и данные этого устройства сохранятся. Отменить удаление нельзя.":
+    "Other current versions and this device's data will be kept. Deletion cannot be undone.",
+  "Удалить безвозвратно": "Delete permanently",
+  "Вход в облако выполнен. Подтверждения обмена данными сейчас нет. Для завершения выберите «Получить эту версию» или «Отправить версию устройства».":
+    "Cloud sign-in is complete. Data exchange is not currently confirmed. Choose “Receive this version” or “Send device version” to finish.",
+  "Выбранная копия удалена из облака. Данные устройства сохранены.":
+    "The selected cloud copy was deleted. Device data was kept.",
+  "Проверяем и удаляем выбранную копию…": "Verifying and deleting the selected copy…",
+  "Версии изменились. Проверьте список перед удалением.":
+    "Versions changed. Check the list before deletion.",
+  "Удаление не подтверждено. Повтор использует сохранённый план.":
+    "Deletion is unconfirmed. Retrying uses the saved plan.",
   Браузер: "Browser",
   "В облаке пока нет доступных снимков.": "No snapshots are available in this cloud yet.",
   "Версия устройства отправлена в облако.": "The device version was sent to cloud storage.",

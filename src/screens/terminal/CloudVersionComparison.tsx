@@ -7,6 +7,7 @@ import type {
 import { t } from "../../i18n/messages.js";
 import { intlLocale } from "../../i18n/preferences.js";
 import { CLOUD_TEST_CLIENT_ID } from "../../model/cloud-client-identity.js";
+import { CloudDeleteVersion } from "./CloudDeleteVersion.js";
 
 interface Props {
   id: CloudProviderId;
@@ -18,6 +19,7 @@ interface Props {
   receiveAvailable: boolean;
   onSend: () => void;
   onReceive: (id: string) => void;
+  onDelete?: ((id: string) => void) | undefined;
 }
 function VersionDate({ value, local = false }: { value?: string | undefined; local?: boolean }) {
   const known = value && Number.isFinite(Date.parse(value));
@@ -59,7 +61,8 @@ export function CloudVersionComparison({
   migration,
   receiveAvailable,
   onSend,
-  onReceive
+  onReceive,
+  onDelete
 }: Props) {
   const cloudTitle = id === "yandex-disk" ? "В Яндекс Диске" : "В Google Диске";
   const receiveEffect = migration
@@ -114,6 +117,17 @@ export function CloudVersionComparison({
                 {t("Сохранение")} · {remote.id.slice(0, 8)}
               </p>
               <VersionDate value={remote.date} />
+              {remote.deletion && (
+                <p>
+                  {t(
+                    remote.deletion.kind === "previous"
+                      ? "Предыдущая версия"
+                      : remote.deletion.kind === "retired-peer"
+                        ? "Принятая версия старого клиента"
+                        : "Текущая версия"
+                  )}
+                </p>
+              )}
               <Summary value={remote} />
               <p id={description}>{t(receiveEffect)}</p>
               {!migration && <p>{t("Облачные версии не изменятся.")}</p>}
@@ -134,6 +148,26 @@ export function CloudVersionComparison({
                       : "Получить эту версию"
                 )}
               </button>
+              {onDelete && remote.deletion && (
+                <CloudDeleteVersion
+                  key={`${remote.id}:${comparison.checkedAt ?? ""}`}
+                  id={remote.id}
+                  deletion={remote.deletion}
+                  target={
+                    remote.deviceId && remote.date
+                      ? {
+                          deviceId: remote.deviceId,
+                          date: remote.date,
+                          versions: remote.deletion.versions ?? 1,
+                          kind: remote.deletion.kind
+                        }
+                      : undefined
+                  }
+                  busy={busy}
+                  blocked={blocked}
+                  onDelete={onDelete}
+                />
+              )}
             </article>
           );
         })}

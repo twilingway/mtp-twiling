@@ -181,7 +181,8 @@ export class YandexClientIdentity {
         if (options.clientId && accountId) {
           const pending = await options.journal.pending(options.clientId, accountId),
             intent = await options.journal.applyIntent(options.clientId, accountId);
-          if (pending || intent) throw new YandexError("indeterminate");
+          if (pending || intent || (await options.journal.maintenance(options.clientId, accountId)))
+            throw new YandexError("indeterminate");
         }
         if (!options.current()) return;
         const previous = this.desiredMode;

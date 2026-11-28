@@ -1,0 +1,254 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="16"
+  height="16"
+  viewBox="0 0 512 512"
+  role="img"
+  aria-label="MTP Planometry chart mark"
+>
+  <title>MTP / Planometry</title>
+  <rect width="512" height="512" fill="#fff" />
+  <path
+    d="M 40.000,209.000 C 158.000,214.000 251.000,306.000 344.000,305.000 C 391.000,307.000 421.000,302.000 448.000,298.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,212.308 C 153.769,228.538 242.769,317.769 334.154,312.154 C 386.000,310.846 420.000,306.462 448.000,282.615"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,215.615 C 149.538,243.077 234.538,329.538 324.308,319.308 C 381.000,314.692 419.000,310.923 448.000,267.231"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,218.923 C 145.308,257.615 226.308,341.308 314.462,326.462 C 376.000,318.538 418.000,315.385 448.000,251.846"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,222.231 C 141.077,272.154 218.077,353.077 304.615,333.615 C 371.000,322.385 417.000,319.846 448.000,236.462"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,225.538 C 136.846,286.692 209.846,364.846 294.769,340.769 C 366.000,326.231 416.000,324.308 448.000,221.077"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,228.846 C 132.615,301.231 201.615,376.615 284.923,347.923 C 361.000,330.077 415.000,328.769 448.000,205.692"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,232.154 C 128.385,315.769 193.385,388.385 275.077,355.077 C 356.000,333.923 414.000,333.231 448.000,190.308"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,235.462 C 124.154,330.308 185.154,400.154 265.231,362.231 C 351.000,337.769 413.000,337.692 448.000,174.923"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,238.769 C 119.923,344.846 176.923,411.923 255.385,369.385 C 346.000,341.615 412.000,342.154 448.000,159.538"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,242.077 C 115.692,359.385 168.692,423.692 245.538,376.538 C 341.000,345.462 411.000,346.615 448.000,144.154"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,245.385 C 111.462,373.923 160.462,435.462 235.692,383.692 C 336.000,349.308 410.000,351.077 448.000,128.769"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,248.692 C 107.231,388.462 152.231,447.231 225.846,390.846 C 331.000,353.154 409.000,355.538 448.000,113.385"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,252.000 C 103.000,403.000 144.000,459.000 216.000,398.000 C 326.000,357.000 408.000,360.000 448.000,98.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="5.5"
+    opacity="0.95"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 128.000,100.000 L 448.000,100.000"
+    fill="none"
+    stroke="#246e30"
+    stroke-width="9"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 128.000,264.000 L 448.000,264.000"
+    fill="none"
+    stroke="#246e30"
+    stroke-width="9"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 128.000,420.000 L 448.000,420.000"
+    fill="none"
+    stroke="#246e30"
+    stroke-width="9"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 128.000,420.000 L 448.000,100.000"
+    fill="none"
+    stroke="#246e30"
+    stroke-width="8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,252.000 C 151.000,225.000 223.000,303.000 334.000,304.000 C 381.000,306.000 418.000,307.000 448.000,302.000"
+    fill="none"
+    stroke="#e51bcf"
+    stroke-width="9"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,268.000 L 82.000,350.000 L 128.000,414.000 L 164.000,381.000 L 201.000,389.000 L 247.000,347.000 L 286.000,283.000 L 318.000,300.000 L 360.000,278.000 L 386.000,280.000 L 403.000,191.000 L 425.000,145.000 L 448.000,84.000"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="14"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 82.000,332.000 L 82.000,373.000"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 128.000,396.000 L 128.000,438.000"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 201.000,374.000 L 201.000,408.000"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 286.000,270.000 L 286.000,320.000"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 386.000,261.000 L 386.000,302.000"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 425.000,121.000 L 425.000,181.000"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 448.000,67.000 L 448.000,112.000"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+</svg>

@@ -8,6 +8,7 @@ export const browserEntryPoints = {
   "history-codec": "src/model/history-codec.ts",
   "market-model": "src/model/market-model.ts",
   mtp: "src/model/mtp.ts",
+  "mtp-raster-worker": "src/model/mtp-raster-worker.ts",
   "drawing-model": "src/model/drawing-model.ts",
   "backup-format": "src/model/backup-format.ts"
 };

@@ -8,7 +8,14 @@ import { yandexErrorCode } from "./types.js";
 import type { YandexAssociation } from "./journal.js";
 
 export type YandexStatusClear =
-  "error" | "pauseReason" | "conflict" | "choiceAction" | "progress" | "comparison";
+  | "error"
+  | "pauseReason"
+  | "conflict"
+  | "choiceAction"
+  | "deleteAction"
+  | "progress"
+  | "comparison"
+  | "lastSyncedAt";
 
 export function yandexUnchangedStatus(association: YandexAssociation): Partial<CloudSyncStatus> {
   return {
@@ -25,6 +32,9 @@ export function yandexInspectionStatus(
 ): Partial<CloudSyncStatus> {
   return {
     comparison,
+    ...(phase === "conflict"
+      ? { conflict: { local: comparison.local, remotes: comparison.remotes } }
+      : {}),
     phase: review ? "error" : phase,
     ...(review
       ? {

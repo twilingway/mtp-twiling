@@ -1,11 +1,13 @@
-import type { CloudComparison, CloudSummary } from "../../model/cloud-sync.js";
+import type { CloudComparison, CloudRemoteDeletion, CloudSummary } from "../../model/cloud-sync.js";
 import type { CloudPreparedSnapshot } from "../../screens/terminal/controller-cloud-host.js";
 import type { YandexRemote } from "./revisions.js";
+import { yandexRemotesFingerprint } from "./revisions.js";
 import { visibleDeviceVersions } from "./bundle.js";
 
 export interface YandexPreviewRemote {
   remote: YandexRemote;
   summary: CloudSummary;
+  deletion?: CloudRemoteDeletion | undefined;
 }
 export function yandexVisibleChoices(inspected: {
   remotes: readonly YandexRemote[];
@@ -50,10 +52,12 @@ export const yandexRemoteFingerprint = (remotes: readonly YandexPreviewRemote[])
 export class YandexPreview {
   revision: number | undefined;
   remoteFingerprint: string | undefined;
+  manualFingerprint: string | undefined;
   heads: readonly string[] = [];
   clear(): void {
     this.revision = undefined;
     this.remoteFingerprint = undefined;
+    this.manualFingerprint = undefined;
     this.heads = [];
   }
   capture(
@@ -64,12 +68,14 @@ export class YandexPreview {
   ): CloudComparison {
     this.revision = captured.revision;
     this.remoteFingerprint = yandexRemoteFingerprint(remotes);
+    this.manualFingerprint = yandexRemotesFingerprint(remotes.map(({ remote }) => remote));
     this.heads = [...heads];
     return {
       local: backupSummary(captured.backup),
-      remotes: remotes.map(({ remote, summary }) => ({
+      remotes: remotes.map(({ remote, summary, deletion }) => ({
         id: remote.revision.revisionId,
         deviceId: remote.revision.deviceId,
+        ...(deletion ? { deletion } : {}),
         ...summary
       })),
       checkedAt

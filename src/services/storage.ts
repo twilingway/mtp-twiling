@@ -1,6 +1,7 @@
 import { decodeCandles } from "../model/history-codec.js";
 import { assertImportCurrent, type BackupImportOptions } from "../model/backup-import.js";
 import { replacePortableRecords } from "./storage-portable.js";
+import * as receipts from "./restore-recovery-journal.js";
 import { db, get, all, put, transaction, flush } from "./storage-db.js";
 export { flush } from "./storage-db.js";
 export {
@@ -336,6 +337,7 @@ export async function importBackup(
   if (options.replacePortable && (!data.layout || !data.watchlist || !data.views))
     throw new Error("Для синхронизации нужен полный снимок настроек.");
   assertImportCurrent(options.valid, signal);
+  const recovery = options.restoreRecovery ?? receipts.createNativeImportRecovery(owner);
   const existingImages = (await all("images"))
     .map(imageAsset)
     .filter((image) => image?.owner === owner);
@@ -399,6 +401,7 @@ export async function importBackup(
     (tx) => {
       assertImportCurrent(options.valid, signal);
       const write = () => {
+        tx.objectStore("preferences").put(receipts.nativeImportRecoveryRecord(owner, recovery));
         tx.objectStore("preferences").put({
           id: `layout:${owner}`,
           owner,

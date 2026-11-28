@@ -9,10 +9,10 @@ const load = sourceLoader(),
   { encodeBundle, revisionName } = load("services/yandex/bundle.ts"),
   { prepareDriveBackup, restoreDriveBackup, driveBackupDigest } = load("services/drive/backup.ts");
 const payloadDigest = async (payload) => driveBackupDigest(JSON.parse(await payload.text()));
-async function fixture(enabled = true) {
-  const backend = await localBackend(),
+async function fixture(enabled = true, shared) {
+  const backend = shared?.backend ?? await localBackend(),
     journal = new YandexJournal(async () => backend),
-    disk = diskFixture();
+    disk = shared?.disk ?? diskFixture();
   await journal.saveSettings({ enabled, automatic: false }, new AbortController().signal);
   let revision = 0,
     applies = 0,
@@ -127,6 +127,101 @@ async function seedRemote(f) {
   f.disk.files.set(revisionName(encoded.revision), encoded.body);
   return encoded.revision;
 }
+test("an unchanged browser/PWA context receives a peer context save instead of publishing its stale runtime", async () => {
+  const first = await fixture();
+  let second;
+  try {
+    await first.coordinator.prepare();
+    await first.coordinator.inspect();
+    await first.coordinator.choose({ kind: "local" });
+    second = await fixture(true, first);
+    await second.coordinator.prepare();
+    await second.coordinator.sync();
+    assert.equal((await second.host.capture()).backup.layout.timeframe, "1d");
+    first.edit("1h");
+    first.coordinator.localIntent();
+    await first.coordinator.sync();
+    const puts = first.disk.puts();
+    await second.coordinator.sync();
+    assert.equal(first.disk.puts(), puts, "a stale runtime must not create a rollback snapshot");
+    assert.equal((await second.host.capture()).backup.layout.timeframe, "1h");
+    assert.equal(second.coordinator.getSnapshot().phase, "idle");
+  } finally {
+    first.coordinator.dispose();
+    second?.coordinator.dispose();
+  }
+});
+for (const dirty of [false,true]) {
+  test(`a window whose authorization prepares after a shared save retains its opening baseline (${dirty ? "edited" : "unchanged"})`,async()=>{
+    const first=await fixture();let second;
+    try{
+      await first.coordinator.prepare();await first.coordinator.inspect();await first.coordinator.choose({kind:"local"});
+      second=await fixture(true,first);
+      first.edit("1h");first.coordinator.localIntent();await first.coordinator.sync();
+      if(dirty){second.edit("4h");second.coordinator.localIntent();}
+      const puts=first.disk.puts();
+      await second.coordinator.prepare();await second.coordinator.sync();
+      assert.equal(first.disk.puts(),puts);
+      assert.equal(second.coordinator.getSnapshot().phase,dirty?"conflict":"idle");
+      assert.equal((await second.host.capture()).backup.layout.timeframe,dirty?"4h":"1h");
+    }finally{first.coordinator.dispose();second?.coordinator.dispose();}
+  });
+}
+for (const scenario of ["refresh", "failure", "parallel-edit", "inspect"]) {
+  test(`shared browser/PWA journal change is guarded before stale capture (${scenario})`, async () => {
+    const first = await fixture();
+    let second;
+    try {
+      await first.coordinator.prepare();
+      await first.coordinator.inspect();
+      await first.coordinator.choose({ kind: "local" });
+      second = await fixture(true, first);
+      await second.coordinator.prepare();
+      let refreshed = 0, captured = 0;
+      const capture = second.host.capture;
+      second.host.refresh = async () => {
+        refreshed++;
+        if (scenario === "failure") throw new Error("local-save");
+        second.edit((await first.host.capture()).backup.layout.timeframe);
+      };
+      second.host.capture = async (...args) => { captured++; return capture(...args); };
+      first.edit("1h"); first.coordinator.localIntent(); await first.coordinator.sync();
+      if (scenario === "parallel-edit") { second.edit("4h"); second.coordinator.localIntent(); }
+      const puts = first.disk.puts();
+      if (scenario === "inspect") await second.coordinator.inspect();
+      else await second.coordinator.sync();
+      assert.equal(first.disk.puts(), puts);
+      if (scenario === "refresh") {
+        assert.equal(refreshed, 1);
+        assert.equal((await capture()).backup.layout.timeframe, "1h");
+        assert.equal(second.coordinator.getSnapshot().phase, "idle");
+        await second.coordinator.sync();
+        assert.equal(first.disk.puts(), puts);
+        assert.equal(refreshed, 1);
+      } else if (scenario === "parallel-edit") {
+        assert.equal(refreshed, 0);
+        assert.equal((await capture()).backup.layout.timeframe, "4h");
+        assert.equal(second.coordinator.getSnapshot().phase, "conflict");
+      } else {
+        assert.equal(captured, 0, "failed/stale inspection must stop before export flush");
+        assert.equal(second.coordinator.getSnapshot().phase, "error");
+      }
+    } finally { first.coordinator.dispose(); second?.coordinator.dispose(); }
+  });
+}
+test("a context opened before the first shared acceptance keeps unknown history explicit", async () => {
+  const first = await fixture(), second = await fixture(true, first);
+  try {
+    await first.coordinator.prepare(); await second.coordinator.prepare();
+    await first.coordinator.inspect(); await first.coordinator.choose({ kind: "local" });
+    second.edit("4h"); second.coordinator.localIntent();
+    const puts = first.disk.puts();
+    await second.coordinator.sync();
+    assert.equal(first.disk.puts(), puts);
+    assert.equal(second.coordinator.getSnapshot().phase, "conflict");
+    assert.equal((await second.host.capture()).backup.layout.timeframe, "4h");
+  } finally { first.coordinator.dispose(); second.coordinator.dispose(); }
+});
 async function advancePeerSlots(f, intervals) {
   const backend = await localBackend(),
     journal = new YandexJournal(async () => backend),
@@ -181,6 +276,189 @@ async function committedPendingDraft(f) {
   assert.deepEqual((await f.journal.association(config.clientId, f.disk.auth.accountId)).heads, base.heads);
   assert.notEqual((await f.host.capture()).digest, pending.revision.digest);
   return { base, pending, fetcher };
+}
+async function reviewedPrevious(f) {
+  await f.coordinator.prepare(); await f.coordinator.inspect();
+  await f.coordinator.choose({ kind: "local" });
+  f.edit("1h"); f.coordinator.localIntent(); await f.coordinator.sync();
+  await f.coordinator.inspect();
+  const comparison = f.coordinator.getSnapshot().comparison;
+  return { current: comparison.remotes.find(x => x.deletion?.kind === "current"),
+    previous: comparison.remotes.find(x => x.deletion?.kind === "previous") };
+}
+
+test("manual deletion reduces previous history while keeping exact current ID, local data and accepted association", async () => {
+  const f = await fixture();
+  try {
+    const { current, previous } = await reviewedPrevious(f);
+    const before = await f.journal.association(config.clientId, f.disk.auth.accountId), local = await f.host.capture();
+    assert.equal(previous.deletion.allowed, true);
+    await f.coordinator.remove(previous.id);
+    const status = f.coordinator.getSnapshot();
+    assert.equal(status.deleteAction.state, "confirmed");
+    assert.deepEqual(status.comparison.remotes.map(x => x.id), [current.id]);
+    assert.deepEqual(await f.journal.association(config.clientId, f.disk.auth.accountId), before);
+    assert.equal((await f.host.capture()).digest, local.digest);
+    assert.equal(f.applies(), 0);
+    assert.equal(await f.journal.maintenance(config.clientId, f.disk.auth.accountId), undefined);
+    assert.equal(await f.journal.pending(config.clientId, f.disk.auth.accountId), undefined);
+  } finally { f.coordinator.dispose(); }
+});
+
+for (const scenario of ["protected-current", "local-edit", "save-failure", "pending-upload", "pending-apply"]) {
+  test(`manual deletion stops before destructive cloud I/O (${scenario})`, async () => {
+    const f = await fixture();
+    try {
+      const { current, previous } = await reviewedPrevious(f);
+      if (scenario === "local-edit") { f.edit("4h"); f.coordinator.localIntent(); }
+      if (scenario === "save-failure") f.journal.saveMaintenance = async () => { throw { code: "local-save" }; };
+      if (scenario === "pending-upload") f.journal.pending = async () => ({ revision: { revisionId: crypto.randomUUID() } });
+      if (scenario === "pending-apply") f.journal.applyIntent = async () => ({ operationId: crypto.randomUUID() });
+      const calls = f.disk.calls.length;
+      await f.coordinator.remove(scenario === "protected-current" ? current.id : previous.id);
+      assert.equal(f.disk.calls.slice(calls).some(({init}) => ["PUT", "POST", "DELETE"].includes(init.method)), false);
+      assert.notEqual(f.coordinator.getSnapshot().deleteAction.state, "confirmed");
+      assert.equal(await f.journal.maintenance(config.clientId, f.disk.auth.accountId), undefined);
+      assert.equal(f.applies(), 0);
+    } finally { f.coordinator.dispose(); }
+  });
+}
+
+test("unconfirmed manual deletion keeps an exact plan across reload and generic sync never resumes DELETE", async () => {
+  const f = await fixture();
+  let reloaded;
+  try {
+    const { current, previous } = await reviewedPrevious(f), fetcher = f.disk.fetcher;
+    f.disk.fetcher = async (target, init) => init.method === "DELETE" && new URL(target).searchParams.get("path")?.includes("/slot_")
+      ? new Response(null, {status:503}) : fetcher(target, init);
+    await f.coordinator.remove(previous.id);
+    const pending = await f.journal.maintenance(config.clientId, f.disk.auth.accountId);
+    assert.ok(pending);
+    assert.equal(f.coordinator.getSnapshot().deleteAction.state, "unconfirmed");
+    const calls = f.disk.calls.length;
+    await f.coordinator.sync();
+    assert.equal(f.disk.calls.slice(calls).some(({init}) => ["PUT", "POST", "DELETE"].includes(init.method)), false);
+    f.disk.fetcher = fetcher;
+    reloaded = f.make(); await reloaded.prepare();
+    assert.equal(reloaded.getSnapshot().deleteAction.id, previous.id);
+    await reloaded.remove(previous.id);
+    assert.equal(reloaded.getSnapshot().deleteAction.state, "confirmed");
+    assert.deepEqual(reloaded.getSnapshot().comparison.remotes.map(x=>x.id), [current.id]);
+    assert.equal(await f.journal.maintenance(config.clientId, f.disk.auth.accountId), undefined);
+    assert.equal(f.applies(), 0);
+  } finally { f.coordinator.dispose(); reloaded?.dispose(); }
+});
+for (const scenario of ["same-account-reauth", "different-account", "new-local-intent"]) {
+  test(`manual deletion retry checks fresh authorization and preserves the exact plan (${scenario})`, async () => {
+    const f = await fixture(); let reloaded;
+    try {
+      const {previous}=await reviewedPrevious(f), fetcher=f.disk.fetcher;
+      f.disk.fetcher=async(target,init)=>init.method==="DELETE"&&new URL(target).searchParams.get("path")?.includes("/slot_")
+        ?new Response(null,{status:503}):fetcher(target,init);
+      await f.coordinator.remove(previous.id);
+      const accountId=f.disk.auth.accountId, pending=await f.journal.maintenance(config.clientId,accountId);
+      const operationId=pending.plan.operationId;
+      f.disk.fetcher=fetcher; f.disk.auth.credentialGeneration="credential-after-explicit-sign-in";
+      if(scenario==="different-account") f.disk.auth.accountId="456";
+      reloaded=f.make();await reloaded.prepare();
+      await reloaded.sync();
+      assert.equal((await f.journal.maintenance(config.clientId,accountId)).credentialGeneration,pending.credentialGeneration);
+      if(scenario==="new-local-intent"){
+        const rebind=f.journal.rebindMaintenance.bind(f.journal);
+        f.journal.rebindMaintenance=async(...args)=>{const value=await rebind(...args);f.edit("4h");reloaded.localIntent();return value;};
+      }
+      const calls=f.disk.calls.length;
+      await reloaded.remove(previous.id);
+      if(scenario==="same-account-reauth"){
+        assert.equal(reloaded.getSnapshot().deleteAction.state,"confirmed");
+        assert.equal(await f.journal.maintenance(config.clientId,accountId),undefined);
+        const audit=[...f.backend.records].find(([key])=>key.endsWith(":maintenance-rebind"))?.[1];
+        assert.equal(audit.operationId,operationId);
+        assert.equal(audit.originalCredentialGeneration,pending.credentialGeneration);
+        assert.equal(audit.credentialGeneration,f.disk.auth.credentialGeneration);
+      }else{
+        assert.equal(f.disk.calls.slice(calls).some(({init})=>["PUT","POST","DELETE"].includes(init.method)),false);
+        assert.equal((await f.journal.maintenance(config.clientId,accountId)).plan.operationId,operationId);
+        assert.notEqual(reloaded.getSnapshot().deleteAction.state,"confirmed");
+      }
+      assert.equal(f.applies(),0);
+    } finally {f.coordinator.dispose();reloaded?.dispose();}
+  });
+}
+test("failed local deletion finalization is not acknowledged and exact retry confirms the already committed removal", async()=>{
+  const f=await fixture();
+  try{
+    const {current,previous}=await reviewedPrevious(f), clear=f.journal.clearMaintenance.bind(f.journal);
+    f.journal.clearMaintenance=async()=>{throw {code:"local-save"};};
+    await f.coordinator.remove(previous.id);
+    assert.equal(f.coordinator.getSnapshot().deleteAction.state,"unconfirmed");
+    const pending=await f.journal.maintenance(config.clientId,f.disk.auth.accountId);
+    assert.ok(pending);
+    f.journal.clearMaintenance=clear;
+    await f.coordinator.remove(previous.id);
+    assert.equal(f.coordinator.getSnapshot().deleteAction.state,"confirmed");
+    assert.deepEqual(f.coordinator.getSnapshot().comparison.remotes.map(x=>x.id),[current.id]);
+    assert.equal(f.applies(),0);
+  }finally{f.coordinator.dispose();}
+});
+test("retrying previous deletion never acknowledges an unresolved first-exchange direction",async()=>{
+  const publisher=await fixture();let reader;
+  try{
+    await reviewedPrevious(publisher);
+    reader=await fixture(true,{disk:publisher.disk});await reader.coordinator.prepare();await reader.coordinator.sync();
+    assert.equal(reader.coordinator.getSnapshot().phase,"conflict");
+    const previous=reader.coordinator.getSnapshot().comparison.remotes.find(x=>x.deletion.kind==="previous");
+    const fetcher=publisher.disk.fetcher;
+    publisher.disk.fetcher=async(target,init)=>init.method==="DELETE"&&new URL(target).searchParams.get("path")?.includes("/slot_")?new Response(null,{status:503}):fetcher(target,init);
+    await reader.coordinator.remove(previous.id);
+    publisher.disk.fetcher=fetcher;await reader.coordinator.remove(previous.id);
+    assert.equal(reader.coordinator.getSnapshot().deleteAction.state,"confirmed");
+    assert.equal(reader.coordinator.getSnapshot().phase,"conflict");
+    assert.equal(await reader.journal.association(config.clientId,publisher.disk.auth.accountId),undefined);
+    assert.equal(reader.applies(),0);
+  }finally{publisher.coordinator.dispose();reader?.coordinator.dispose();}
+});
+test("disconnect fences a late manual-delete continuation before any cloud mutation",async()=>{
+  const f=await fixture(), entered=deferred(), release=deferred();
+  try{
+    const {previous}=await reviewedPrevious(f), save=f.journal.saveMaintenance.bind(f.journal);
+    f.journal.saveMaintenance=async(...args)=>{await save(...args);entered.resolve();await release.promise;};
+    const calls=f.disk.calls.length, deleting=f.coordinator.remove(previous.id);
+    await entered.promise;await f.coordinator.setEnabled(false);release.resolve();await deleting;
+    assert.equal(f.disk.calls.slice(calls).some(({init})=>["PUT","POST","DELETE"].includes(init.method)),false);
+    assert.equal(f.coordinator.getSnapshot().phase,"disabled");
+    assert.equal(f.coordinator.getSnapshot().deleteAction,undefined);
+    assert.ok(await f.journal.maintenance(config.clientId,f.disk.auth.accountId));
+  }finally{release.resolve();f.coordinator.dispose();}
+});
+for(const failure of ["expired","401"]){
+  test(`manual deletion exposes reconnect after ${failure} without losing maintenance or confirming first exchange`,async()=>{
+    const publisher=await fixture();let reader;
+    try{
+      await reviewedPrevious(publisher);
+      reader=await fixture(true,{disk:publisher.disk});await reader.coordinator.prepare();await reader.coordinator.sync();
+      const previous=reader.coordinator.getSnapshot().comparison.remotes.find(x=>x.deletion.kind==="previous");
+      let maintenanceSaved=false;
+      const save=reader.journal.saveMaintenance.bind(reader.journal),getAccessToken=publisher.disk.auth.getAccessToken;
+      reader.journal.saveMaintenance=async(...args)=>{await save(...args);maintenanceSaved=true;};
+      if(failure==="expired")publisher.disk.auth.getAccessToken=()=>{if(maintenanceSaved)throw {code:"auth-required"};return getAccessToken.call(publisher.disk.auth);};
+      else{
+        const fetcher=publisher.disk.fetcher;
+        publisher.disk.fetcher=async(target,init)=>maintenanceSaved&&new URL(target).pathname.endsWith("/upload")
+          ?new Response(null,{status:401}):fetcher(target,init);
+      }
+      await reader.coordinator.remove(previous.id);
+      const status=reader.coordinator.getSnapshot();
+      assert.equal(maintenanceSaved,true);
+      assert.equal(status.phase,"auth-required");assert.equal(status.error,"auth-required");
+      assert.equal(status.connected,false);assert.equal(status.pauseReason,"auth-required");
+      assert.equal(status.enabled,true);assert.equal(status.prepared,true);
+      assert.equal(status.deleteAction.state,"unconfirmed");
+      assert.ok(await reader.journal.maintenance(config.clientId,publisher.disk.auth.accountId));
+      assert.equal(await reader.journal.association(config.clientId,publisher.disk.auth.accountId),undefined);
+      assert.equal(status.lastSyncedAt,undefined);assert.equal(reader.applies(),0);
+    }finally{publisher.coordinator.dispose();reader?.coordinator.dispose();}
+  });
 }
 
 test("a committed pending fifth snapshot becomes only a baseline while the sixth local draft publishes once", async () => {
@@ -472,9 +750,9 @@ test("unrelated preference writes preserve another tab's disabled and automatic 
 });
 
 test("a stale automatic job adopts the other tab's opt-out while explicit manual sync remains available", async () => {
-  const f = await fixture(), other = f.make(),
+  const f = await fixture(),
     jobs = new Map(), timeout = globalThis.setTimeout, clear = globalThis.clearTimeout;
-  let sequence = 0;
+  let sequence = 0, other;
   globalThis.setTimeout = (run, delay, ...args) => {
     if (delay !== 750) return timeout(run, delay, ...args);
     const id = { job: ++sequence };
@@ -484,9 +762,10 @@ test("a stale automatic job adopts the other tab's opt-out while explicit manual
   globalThis.clearTimeout = (id) => { if (!jobs.delete(id)) clear(id); };
   try {
     await f.coordinator.prepare();
-    await other.prepare();
     await f.coordinator.sync();
     await f.coordinator.choose({ kind: "local" });
+    other = f.make();
+    await other.prepare();
     await other.setAutomatic(true);
     await f.coordinator.setAutomatic(false);
     f.edit("5m");
@@ -504,7 +783,7 @@ test("a stale automatic job adopts the other tab's opt-out while explicit manual
     assert.equal(other.getSnapshot().phase, "idle");
     assert.equal(f.disk.puts(), puts + 1);
   } finally {
-    f.coordinator.dispose(); other.dispose();
+    f.coordinator.dispose(); other?.dispose();
     globalThis.setTimeout = timeout; globalThis.clearTimeout = clear;
   }
 });

@@ -18,6 +18,7 @@ import type {
   Candle
 } from "../model/types.js";
 import type { BackupImportOptions } from "../model/backup-import.js";
+import { createNativeImportRecovery } from "./restore-recovery-journal.js";
 import type { MarketCache } from "./types.js";
 export {
   restoreSession,
@@ -204,7 +205,11 @@ export async function importBackup(
   input: unknown,
   options: BackupImportOptions = {}
 ) {
-  return legacy.importBackup(await prepared(owner), input, options);
+  const receipt = options.restoreRecovery ?? createNativeImportRecovery(owner);
+  return legacy.importBackup(await prepared(owner), input, {
+    ...options,
+    restoreRecovery: { ...receipt, owner }
+  });
 }
 /** Test/inspection helper: physical records are never exposed as a different logical owner. */
 export function logicalImage(value: unknown, owner: string): ImageAsset | undefined {

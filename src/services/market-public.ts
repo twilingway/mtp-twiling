@@ -8,6 +8,7 @@ import {
 } from "./providers/bybit/index.js";
 import type { BybitCatalog, BybitCategory } from "./providers/bybit/types.js";
 import type { BybitStreamOptions } from "./providers/bybit/websocket.js";
+import { bybitStreamNotices } from "./providers/bybit/stream-status.js";
 import type { BybitInterval } from "./providers/bybit/market.js";
 import {
   loadBybitOpenInterest,
@@ -315,19 +316,23 @@ export class PublicMarket {
       }
       let stream = this.streams.get(category);
       if (!stream) {
+        const notices = bybitStreamNotices(category, (message) => this.events.notice(message));
         const opts: BybitStreamOptions = {
           onEvent: (event) => {
+            if (this.lifetime.signal.aborted) return;
+            notices.event(event);
             if (event.kind === "quote") this.emitQuote(event.quote);
             if (event.kind === "candles")
               this.receiveCandles(event.ref, event.interval, event.candles);
           },
           onState: (state) => {
+            if (this.lifetime.signal.aborted) return;
+            notices.state(state);
             if (state === "open" && !this.lifetime.signal.aborted) {
               if (this.opened.has(category)) this.events.reconnect({ provider: "bybit", category });
               this.opened.add(category);
             }
-          },
-          onError: () => this.events.notice("Поток Bybit временно недоступен; источник сохранён.")
+          }
         };
         stream = this.options.stream?.(category, opts) ?? new BybitStream(category, opts);
         this.streams.set(category, stream);

@@ -3,6 +3,7 @@ export const drawingMessages = {
   "Закрепить объект": "Pin object",
   "Выделенный объект": "Selected object",
   "Разблокировать объект": "Unlock object",
+  "Открепить объект": "Unpin object",
   "Выберите объект для блокировки": "Select an object to lock",
   "Объекты заблокированы глобально. Разблокируйте их в меню.":
     "Objects are locked globally. Unlock them in the menu.",
@@ -162,5 +163,6 @@ export const drawingMessages = {
   "Изображения на графике": "Chart images",
   "объекты рисования": "drawing objects",
   индикаторы: "indicators",
-  всё: "everything"
+  всё: "everything",
+  "Завершить рисунок": "Finish drawing"
 } as const;

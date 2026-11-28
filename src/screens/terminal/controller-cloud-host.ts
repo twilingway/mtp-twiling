@@ -52,6 +52,12 @@ export interface CloudPreparedSnapshot {
 }
 export interface CloudSyncHost {
   scope(provider: CloudProviderId): CloudHostScope;
+  /** Restore an unchanged window from shared canonical storage before any export flush. */
+  refresh?(
+    provider: CloudProviderId,
+    expectedRevision: number,
+    guard: CloudOperationGuard
+  ): Promise<void>;
   capture(provider: CloudProviderId, guard: CloudOperationGuard): Promise<CloudPreparedSnapshot>;
   decode(prepared: PreparedCloudBackup, guard: CloudOperationGuard): Promise<Backup>;
   apply(
@@ -64,7 +70,7 @@ export interface CloudSyncHost {
 }
 export class CloudHostError extends Error {
   constructor(
-    readonly code: "local-changed" | "remote-invalid" | "limit",
+    readonly code: "local-changed" | "remote-invalid" | "limit" | "local-save",
     message: string
   ) {
     super(message);
@@ -129,6 +135,29 @@ class TerminalCloudSyncHost implements CloudSyncHost {
   private check(guard: CloudOperationGuard): void {
     guard.signal.throwIfAborted();
     if (!guard.isCurrent()) throw changed();
+  }
+  async refresh(
+    provider: CloudProviderId,
+    expectedRevision: number,
+    guard: CloudOperationGuard
+  ): Promise<void> {
+    this.check(guard);
+    const before = this.scope(provider);
+    if (before.blocked || before.revision !== expectedRevision) throw changed();
+    this.applying = provider;
+    try {
+      await this.controller.recoverBackup(true);
+      this.check(guard);
+      if (this.scope(provider).revision !== expectedRevision) throw changed();
+      const revision = ++this.revision;
+      this.commits.forEach((listener) => listener(provider, revision));
+    } catch (error) {
+      this.check(guard);
+      if (error instanceof CloudHostError) throw error;
+      throw new CloudHostError("local-save", "Не удалось восстановить состояние другого окна.");
+    } finally {
+      this.applying = undefined;
+    }
   }
   async capture(
     provider: CloudProviderId,

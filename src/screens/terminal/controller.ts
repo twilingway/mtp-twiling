@@ -477,7 +477,7 @@ export class TerminalController {
   importBackup = (input: unknown, options?: BackupImportOptions): Promise<void> =>
     this.backups.import(input, options);
   importBackupFile: TerminalBackups["importFile"] = (...args) => this.backups.importFile(...args);
-  recoverBackup = (): Promise<void> => this.backups.recover();
+  recoverBackup = (keepCamera?: boolean): Promise<void> => this.backups.recover(keepCamera);
   saveImage = async (asset: ImageAsset): Promise<void> => {
     if (asset.owner !== this.state.owner || asset.symbol !== this.state.preferences.symbol) return;
     const previous = this.state.images.some((image) => image.id === asset.id);

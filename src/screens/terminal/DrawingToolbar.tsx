@@ -6,6 +6,7 @@ import { drawingToolbarSettings, type DrawingTarget } from "../../model/drawing-
 import { useTerminal } from "./context.js";
 import { DrawingToolIcon, type DrawingIconName } from "./DrawingToolIcon.js";
 import { ChartMeasurementButton } from "./ChartMeasurement.js";
+import { ChartFitButton } from "./ChartFitButton.js";
 import { ChartRangeZoomButton, ChartZoomOutButton } from "./ChartRangeZoom.js";
 import { useMobileLayout } from "./use-mobile-layout.js";
 import { magnetMenuSections } from "./drawing-toolbar-magnet-menu.js";
@@ -217,8 +218,8 @@ export function DrawingToolbar() {
       () => run(() => controller.tools.toggleOption("snapIndicators"), false)
     );
   } else if (menu?.key === "lock") {
-    title = t("Для всех объектов: блокировка");
-    sections = toolbarLockSections(selectedLock, scopeRows("lock"), mobile, () =>
+    title = t("Блокировка объектов");
+    sections = toolbarLockSections(selectedLock, scopeRows("lock"), () =>
       run(() => controller.tools.toggleSelectedLock())
     );
   } else if (menu?.key === "hide") {
@@ -445,7 +446,7 @@ export function DrawingToolbar() {
         <DrawingToolIcon name="trash" />
       </button>
       <div className="rail-spacer" />
-      {button("fit-chart", t("Показать весь график"), "fit", () => controller.chart?.fit())}
+      <ChartFitButton />
       {button(
         "favorite-drawings",
         t("Избранные инструменты"),

@@ -8,6 +8,21 @@ export function klineMainStyle(settings: ChartSettings): DeepPartial<CandleStyle
   const type = resolveNativeChartType(settings),
     color = NATIVE_CHART_LINE;
   if (type === "candles") return { type: CandleType.CandleSolid };
+  if (type === "hollowCandles")
+    return {
+      type: CandleType.CandleSolid,
+      bar: {
+        upColor: "transparent",
+        downColor: "transparent",
+        noChangeColor: "transparent",
+        upBorderColor: "transparent",
+        downBorderColor: "transparent",
+        noChangeBorderColor: "transparent",
+        upWickColor: "transparent",
+        downWickColor: "transparent",
+        noChangeWickColor: "transparent"
+      }
+    };
   if (type === "bars") {
     const colors = barColors(settings);
     return {

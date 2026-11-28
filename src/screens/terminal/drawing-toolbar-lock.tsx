@@ -21,7 +21,7 @@ export function selectedToolbarLock(
       ? t("Выберите объект для блокировки")
       : global
         ? t("Объекты заблокированы глобально. Разблокируйте их в меню.")
-        : t(state.selectedObjectLocked ? "Разблокировать объект" : "Закрепить объект")
+        : t(state.selectedObjectLocked ? "Открепить объект" : "Закрепить объект")
   };
 }
 
@@ -30,14 +30,10 @@ type LockStatus = ReturnType<typeof selectedToolbarLock>;
 export function toolbarLockSections(
   status: LockStatus,
   globalRows: ToolbarMenuItem[],
-  mobile: boolean,
   action: () => void
 ): ToolbarMenuSection[] {
-  const sections: ToolbarMenuSection[] = [
-    { title: t("Для всех объектов: блокировка"), items: globalRows }
-  ];
-  if (mobile)
-    sections.unshift({
+  return [
+    {
       title: t("Выделенный объект"),
       items: [
         {
@@ -51,8 +47,9 @@ export function toolbarLockSections(
           action
         }
       ]
-    });
-  return sections;
+    },
+    { title: t("Для всех объектов: блокировка"), items: globalRows }
+  ];
 }
 
 export function DrawingToolbarLock({
@@ -74,7 +71,7 @@ export function DrawingToolbarLock({
       toolId="lock"
       label={status.label}
       disabledLabel={status.label}
-      menuLabel={t("Для всех объектов: блокировка")}
+      menuLabel={t("Блокировка объектов")}
       icon={status.locked ? "lock" : "unlock"}
       active={status.locked}
       disabled={status.disabled}

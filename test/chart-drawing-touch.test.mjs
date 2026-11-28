@@ -163,6 +163,7 @@ test("image native hold does not open a menu; real mouse right-click still does"
     "react/jsx-runtime": jsxRuntime,
     "../../i18n/messages.js": { t: (value) => value },
     "../../model/drawing-toolbar.js": load("model/drawing-toolbar.ts"),
+    "../../model/drawing-tool-policy.js": load("model/drawing-tool-policy.ts"),
     "./context.js": { useTerminal: () => ({ controller, state }) },
     "./drawing-projection.js": {},
     "./chart-drawing-touch.js": { createDrawingContextSource }
@@ -242,6 +243,11 @@ test("ChartSurface preserves the editing owner when a second finger moves, relea
     previews = 0,
     cancellations = 0;
   const finished = [];
+  const created = [];
+  let drawingInput;
+  const { registerDrawingCompletion, finishEditorDrawing } = load(
+    "screens/terminal/drawing-input-completion.ts"
+  );
   const controller = {
     chart: {
       plotSize: () => ({ width: 400, height: 400 }),
@@ -250,7 +256,12 @@ test("ChartSurface preserves the editing owner when a second finger moves, relea
     },
     getSnapshot: () => state,
     setContext() {},
-    setPreview() {},
+    setPreview(value) {
+      state.preview = value;
+    },
+    addDrawing(value) {
+      created.push(value);
+    },
     selectObject: (id) => {
       state.selectedObject = id;
     },
@@ -279,6 +290,8 @@ test("ChartSurface preserves the editing owner when a second finger moves, relea
     "../../model/backup-format.js": load("model/backup-format.ts"),
     "../../model/drawing-toolbar.js": load("model/drawing-toolbar.ts"),
     "../../model/drawing-magnet.js": { snapDrawingPoint: (point) => point },
+    "../../model/drawing-anchor-edit.js": load("model/drawing-anchor-edit.ts"),
+    "../../model/drawing-tool-policy.js": load("model/drawing-tool-policy.ts"),
     "../../model/theme.js": {},
     "../../charts/price-format.js": {
       nativePriceStep: () => 1,
@@ -307,7 +320,14 @@ test("ChartSurface preserves the editing owner when a second finger moves, relea
       useOhlcInspection: () => ({ down: noop, move: noop, up: noop, cancel: noop, clear: noop })
     },
     "./OhlcCandleCard.js": {},
-    "./chart-drawing-touch.js": load("screens/terminal/chart-drawing-touch.ts")
+    "./chart-drawing-touch.js": load("screens/terminal/chart-drawing-touch.ts"),
+    "./chart-drawing-input.js": {
+      useChartDrawingInput: () => {
+        drawingInput = createDrawingInput(controller, ({ x, y }) => ({ timestamp: x, value: y }));
+        registerDrawingCompletion(controller, drawingInput.finish);
+        return { drawingInput, drawingPoint: ({ x, y }) => ({ timestamp: x, value: y }) };
+      }
+    }
   };
   const module = { exports: {} };
   const source = ts.transpileModule(
@@ -373,4 +393,67 @@ test("ChartSurface preserves the editing owner when a second finger moves, relea
   delete target.dataset.drawingTouch;
   assert.equal(drawingHandleRadius(canvas, true), 13);
   assert.equal(drawingHandleRadius(canvas, false), 5);
+  for (const tool of ["path", "polyline", "triangle", "cubicCurve"]) {
+    state.activeTool = tool;
+    surface.props.onPointerDownCapture({ ...event(1, 100), pointerType: "mouse" });
+    surface.props.onPointerDownCapture({ ...event(1, 200), pointerType: "mouse" });
+    assert.equal(drawingInput.pending(), true, tool);
+    assert.equal(drawingInput.active(), false, tool);
+    surface.props.onPointerCancelCapture(event(2));
+    assert.equal(drawingInput.pending(), true, "another pointer cannot cancel the draft");
+    surface.props.onPointerCancelCapture(event(1));
+    assert.equal(drawingInput.pending(), false, tool);
+    assert.equal(state.preview, null, tool);
+    assert.equal(finishEditorDrawing(controller), false, "Enter after cancel cannot commit");
+    assert.equal(created.length, 0);
+  }
+  const tap = (id, x) => {
+    const touch = { ...event(id, x), isPrimary: true, target: { tagName: "CANVAS" } };
+    surface.props.onPointerDownCapture(touch);
+    surface.props.onPointerUpCapture(touch);
+    surface.props.onLostPointerCapture(touch);
+  };
+  for (const tool of ["path", "polyline", "arc", "triangle", "quadraticCurve", "cubicCurve"]) {
+    state.activeTool = tool;
+    tap(11, 100);
+    assert.equal(drawingInput.pending(), true, `${tool}: first touch survives implicit release`);
+    assert.equal(drawingInput.active(), false, "tap tools never request explicit capture");
+    tap(12, 200);
+    assert.equal(drawingInput.pending(), true, `${tool}: second touch survives implicit release`);
+    assert.equal(state.preview.points.length, 2);
+    if (tool === "path" || tool === "polyline") {
+      assert.equal(finishEditorDrawing(controller), true);
+    } else {
+      tap(13, 300);
+      if (tool === "cubicCurve") {
+        assert.equal(drawingInput.pending(), true);
+        tap(14, 350);
+      }
+    }
+    assert.equal(created.at(-1).name, tool);
+    assert.equal(drawingInput.pending(), false);
+    const committed = created.length;
+    tap(21, 100);
+    surface.props.onPointerCancelCapture({ ...event(21), isPrimary: true });
+    assert.equal(
+      drawingInput.pending(),
+      false,
+      `${tool}: actual pointercancel clears pending taps`
+    );
+    assert.equal(finishEditorDrawing(controller), false);
+    assert.equal(created.length, committed, "cancel never writes a drawing");
+  }
+  state.activeTool = "brush";
+  const committed = created.length;
+  surface.props.onPointerDownCapture(event(1));
+  surface.props.onPointerMoveCapture(event(1, 200));
+  assert.equal(drawingInput.active(), true);
+  assert.equal(capture.has(1), true);
+  capture.delete(1); // The browser reports unexpected loss before pointerup.
+  surface.props.onLostPointerCapture(event(1));
+  assert.equal(drawingInput.pending(), false);
+  assert.equal(state.preview, null);
+  surface.props.onPointerUpCapture(event(1, 200));
+  assert.equal(created.length, committed, "lost explicit brush capture never commits");
+  assert.deepEqual(finished, [1], "cancelled drafts do not add editing history");
 });

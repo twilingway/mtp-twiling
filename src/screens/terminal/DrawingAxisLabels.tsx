@@ -5,6 +5,7 @@ import { drawingVisibleOnInterval } from "../../model/intervals/drawing-visibili
 import { chartDateFormat } from "../../i18n/format.js";
 import { drawingRenderList } from "./drawing-settings-preview.js";
 import { drawingPriceTargets } from "../../model/drawing-price-labels.js";
+import { drawingHandleIndices } from "../../model/drawing-tool-policy.js";
 import { selectedMarketRow } from "../../model/selected-instrument.js";
 import { precision } from "../../charts/adapter.js";
 import type { DrawingAxisLabels as AxisLabels } from "../../charts/adapter.js";
@@ -46,7 +47,12 @@ export function DrawingAxisLabels({ drawingProjection }: { drawingProjection: Ev
           textColor: style.text
         };
       }),
-      times: (selected?.points ?? []).flatMap(({ timestamp }) =>
+      times: (selected
+        ? drawingHandleIndices(selected.name, selected.points.length).map(
+            (index) => selected.points[index]!
+          )
+        : []
+      ).flatMap(({ timestamp }) =>
         Number.isFinite(new Date(timestamp).getTime())
           ? [{ timestamp, text: date.format(timestamp) }]
           : []

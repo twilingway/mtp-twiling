@@ -2,7 +2,7 @@ import { assertCurrent, sha256, YandexError } from "./types.js";
 import type { YandexFile, YandexReference } from "./types.js";
 import type { YandexTransport } from "./transport.js";
 import { decodeSlot, decodeSlotHeader, MAX_SLOT_BYTES, yandexHeaderSize } from "./slot-codec.js";
-import { inspectSlots, isSlotName, slotName } from "./slot-model.js";
+import { inspectSlots, isSlotName, slotName, slotGeneration } from "./slot-model.js";
 import type { SlotInspection, SlotPhysical, SlotVersion } from "./slot-model.js";
 
 export const slotFingerprint = (files: readonly YandexFile[]): string =>
@@ -41,7 +41,7 @@ export class YandexSlotStore {
           await this.transport.readPrefix(file, size),
           file.size
         );
-        if (slotName(envelope.current.revision.deviceId, envelope.current.seq) !== file.name)
+        if (slotName(envelope.current.revision.deviceId, slotGeneration(envelope)) !== file.name)
           throw new YandexError("remote-invalid");
         item = { file, envelope };
         this.headers.set(key, item);

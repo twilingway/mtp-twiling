@@ -6,6 +6,7 @@ import { barColors } from "../model/bar-palette.js";
 import { lightweightPriceFormat } from "./price-format.js";
 import type { ChartPriceFormat } from "./price-format.js";
 import { createLightweightNativeRectCull } from "./lightweight-native-rect-cull.js";
+import { lightweightHollowCandles } from "./lightweight-hollow-candles.js";
 
 export type LightweightMainSeries = ISeriesApi<"Candlestick" | "Bar" | "Line" | "Area">;
 
@@ -19,7 +20,8 @@ export function lightweightMainSeries(
 ) {
   const type = resolveNativeChartType(settings),
     color = NATIVE_CHART_LINE,
-    rectCull = type === "candles" ? createLightweightNativeRectCull() : null;
+    rectCull = type === "candles" ? createLightweightNativeRectCull() : null,
+    hollow = type === "hollowCandles" ? lightweightHollowCandles(settings) : null;
   const common = {
     priceLineVisible: false,
     lastValueVisible: false,
@@ -72,7 +74,9 @@ export function lightweightMainSeries(
   return {
     series,
     dispose: () => rectCull?.dispose(),
-    setData: (bars: readonly Candle[]) => series.setData(bars.map(row)),
-    update: (bar: Candle, historical: boolean) => series.update(row(bar), historical)
+    setData: (bars: readonly Candle[]) =>
+      series.setData(hollow ? hollow.setData(bars) : bars.map(row)),
+    update: (bar: Candle, historical: boolean) =>
+      hollow ? hollow.update(series, bar, historical) : series.update(row(bar), historical)
   };
 }

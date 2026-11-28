@@ -1,4 +1,6 @@
 import { TOOL_NAMES } from "./drawing-model.js";
+import { validDrawingPointCount } from "./drawing-tool-policy.js";
+import type { DrawingTool } from "./types.js";
 import { validNativeChartTypeField } from "./native-chart-type.js";
 import { isInstrumentSymbol, isInstrumentViewKey } from "./instrument-symbol.js";
 import { validBackupProviders, validLayoutProvider, validRowProvider } from "./backup-provider.js";
@@ -156,15 +158,8 @@ export function isBackupDrawing(value: unknown): value is BackupDrawing {
     !Array.isArray(value.points)
   )
     return false;
-  const count = ["horizontalStraightLine", "horizontalRayLine", "verticalStraightLine"].includes(
-    value.name
-  )
-    ? 1
-    : value.name === "fibonacciExtension"
-      ? 3
-      : 2;
   return (
-    value.points.length === count &&
+    validDrawingPointCount(value.name as DrawingTool, value.points.length) &&
     value.points.every(isDrawingPoint) &&
     fields(value, {
       id: string,

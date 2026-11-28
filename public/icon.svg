@@ -4,18 +4,1625 @@
   height="512"
   viewBox="0 0 512 512"
   role="img"
-  aria-labelledby="brand-title"
+  aria-label="MTP Planometry chart mark"
 >
-  <title id="brand-title">МТП</title>
-  <rect width="512" height="512" rx="80" fill="#fff" />
-  <g
-    font-family="Arial, Helvetica, sans-serif"
-    font-size="184"
-    font-weight="700"
-    text-anchor="middle"
-  >
-    <text x="126" y="256" dy=".35em" fill="#2962ff">М</text>
-    <text x="263" y="256" dy=".35em" fill="#008f83">Т</text>
-    <text x="388" y="256" dy=".35em" fill="#7151cb">П</text>
-  </g>
+  <title>MTP / Planometry</title>
+  <rect width="512" height="512" fill="#fff" />
+  <path
+    d="M 40.000,64.000 L 472.000,64.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 64.000,48.000 L 64.000,464.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,104.000 L 472.000,104.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 104.000,48.000 L 104.000,464.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,144.000 L 472.000,144.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 144.000,48.000 L 144.000,464.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,184.000 L 472.000,184.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 184.000,48.000 L 184.000,464.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,224.000 L 472.000,224.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 224.000,48.000 L 224.000,464.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,264.000 L 472.000,264.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 264.000,48.000 L 264.000,464.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,304.000 L 472.000,304.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 304.000,48.000 L 304.000,464.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,344.000 L 472.000,344.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 344.000,48.000 L 344.000,464.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,384.000 L 472.000,384.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 384.000,48.000 L 384.000,464.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,424.000 L 472.000,424.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 424.000,48.000 L 424.000,464.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 40.000,464.000 L 472.000,464.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 464.000,48.000 L 464.000,464.000"
+    fill="none"
+    stroke="#e4e8e9"
+    stroke-width="0.8"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,218.000 C 145.000,218.000 210.000,314.000 335.000,318.000 C 390.000,320.000 417.000,321.000 435.000,315.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,218.413 C 144.444,220.968 208.762,316.238 332.857,319.302 C 388.571,320.556 416.492,322.333 435.000,311.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,218.825 C 143.889,223.937 207.524,318.476 330.714,320.603 C 387.143,321.111 415.984,323.667 435.000,308.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,219.238 C 143.333,226.905 206.286,320.714 328.571,321.905 C 385.714,321.667 415.476,325.000 435.000,305.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,219.651 C 142.778,229.873 205.048,322.952 326.429,323.206 C 384.286,322.222 414.968,326.333 435.000,301.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,220.063 C 142.222,232.841 203.810,325.190 324.286,324.508 C 382.857,322.778 414.460,327.667 435.000,298.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,220.476 C 141.667,235.810 202.571,327.429 322.143,325.810 C 381.429,323.333 413.952,329.000 435.000,295.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,220.889 C 141.111,238.778 201.333,329.667 320.000,327.111 C 380.000,323.889 413.444,330.333 435.000,291.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,221.302 C 140.556,241.746 200.095,331.905 317.857,328.413 C 378.571,324.444 412.937,331.667 435.000,288.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,221.714 C 140.000,244.714 198.857,334.143 315.714,329.714 C 377.143,325.000 412.429,333.000 435.000,285.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,222.127 C 139.444,247.683 197.619,336.381 313.571,331.016 C 375.714,325.556 411.921,334.333 435.000,281.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,222.540 C 138.889,250.651 196.381,338.619 311.429,332.317 C 374.286,326.111 411.413,335.667 435.000,278.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,222.952 C 138.333,253.619 195.143,340.857 309.286,333.619 C 372.857,326.667 410.905,337.000 435.000,275.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,223.365 C 137.778,256.587 193.905,343.095 307.143,334.921 C 371.429,327.222 410.397,338.333 435.000,271.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,223.778 C 137.222,259.556 192.667,345.333 305.000,336.222 C 370.000,327.778 409.889,339.667 435.000,268.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,224.190 C 136.667,262.524 191.429,347.571 302.857,337.524 C 368.571,328.333 409.381,341.000 435.000,265.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,224.603 C 136.111,265.492 190.190,349.810 300.714,338.825 C 367.143,328.889 408.873,342.333 435.000,261.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,225.016 C 135.556,268.460 188.952,352.048 298.571,340.127 C 365.714,329.444 408.365,343.667 435.000,258.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,225.429 C 135.000,271.429 187.714,354.286 296.429,341.429 C 364.286,330.000 407.857,345.000 435.000,255.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,225.841 C 134.444,274.397 186.476,356.524 294.286,342.730 C 362.857,330.556 407.349,346.333 435.000,251.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,226.254 C 133.889,277.365 185.238,358.762 292.143,344.032 C 361.429,331.111 406.841,347.667 435.000,248.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,226.667 C 133.333,280.333 184.000,361.000 290.000,345.333 C 360.000,331.667 406.333,349.000 435.000,245.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,227.079 C 132.778,283.302 182.762,363.238 287.857,346.635 C 358.571,332.222 405.825,350.333 435.000,241.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,227.492 C 132.222,286.270 181.524,365.476 285.714,347.937 C 357.143,332.778 405.317,351.667 435.000,238.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,227.905 C 131.667,289.238 180.286,367.714 283.571,349.238 C 355.714,333.333 404.810,353.000 435.000,235.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,228.317 C 131.111,292.206 179.048,369.952 281.429,350.540 C 354.286,333.889 404.302,354.333 435.000,231.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,228.730 C 130.556,295.175 177.810,372.190 279.286,351.841 C 352.857,334.444 403.794,355.667 435.000,228.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,229.143 C 130.000,298.143 176.571,374.429 277.143,353.143 C 351.429,335.000 403.286,357.000 435.000,225.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,229.556 C 129.444,301.111 175.333,376.667 275.000,354.444 C 350.000,335.556 402.778,358.333 435.000,221.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,229.968 C 128.889,304.079 174.095,378.905 272.857,355.746 C 348.571,336.111 402.270,359.667 435.000,218.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,230.381 C 128.333,307.048 172.857,381.143 270.714,357.048 C 347.143,336.667 401.762,361.000 435.000,215.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,230.794 C 127.778,310.016 171.619,383.381 268.571,358.349 C 345.714,337.222 401.254,362.333 435.000,211.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,231.206 C 127.222,312.984 170.381,385.619 266.429,359.651 C 344.286,337.778 400.746,363.667 435.000,208.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,231.619 C 126.667,315.952 169.143,387.857 264.286,360.952 C 342.857,338.333 400.238,365.000 435.000,205.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,232.032 C 126.111,318.921 167.905,390.095 262.143,362.254 C 341.429,338.889 399.730,366.333 435.000,201.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,232.444 C 125.556,321.889 166.667,392.333 260.000,363.556 C 340.000,339.444 399.222,367.667 435.000,198.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,232.857 C 125.000,324.857 165.429,394.571 257.857,364.857 C 338.571,340.000 398.714,369.000 435.000,195.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,233.270 C 124.444,327.825 164.190,396.810 255.714,366.159 C 337.143,340.556 398.206,370.333 435.000,191.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,233.683 C 123.889,330.794 162.952,399.048 253.571,367.460 C 335.714,341.111 397.698,371.667 435.000,188.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,234.095 C 123.333,333.762 161.714,401.286 251.429,368.762 C 334.286,341.667 397.190,373.000 435.000,185.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,234.508 C 122.778,336.730 160.476,403.524 249.286,370.063 C 332.857,342.222 396.683,374.333 435.000,181.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,234.921 C 122.222,339.698 159.238,405.762 247.143,371.365 C 331.429,342.778 396.175,375.667 435.000,178.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,235.333 C 121.667,342.667 158.000,408.000 245.000,372.667 C 330.000,343.333 395.667,377.000 435.000,175.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,235.746 C 121.111,345.635 156.762,410.238 242.857,373.968 C 328.571,343.889 395.159,378.333 435.000,171.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,236.159 C 120.556,348.603 155.524,412.476 240.714,375.270 C 327.143,344.444 394.651,379.667 435.000,168.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,236.571 C 120.000,351.571 154.286,414.714 238.571,376.571 C 325.714,345.000 394.143,381.000 435.000,165.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,236.984 C 119.444,354.540 153.048,416.952 236.429,377.873 C 324.286,345.556 393.635,382.333 435.000,161.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,237.397 C 118.889,357.508 151.810,419.190 234.286,379.175 C 322.857,346.111 393.127,383.667 435.000,158.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,237.810 C 118.333,360.476 150.571,421.429 232.143,380.476 C 321.429,346.667 392.619,385.000 435.000,155.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,238.222 C 117.778,363.444 149.333,423.667 230.000,381.778 C 320.000,347.222 392.111,386.333 435.000,151.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,238.635 C 117.222,366.413 148.095,425.905 227.857,383.079 C 318.571,347.778 391.603,387.667 435.000,148.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,239.048 C 116.667,369.381 146.857,428.143 225.714,384.381 C 317.143,348.333 391.095,389.000 435.000,145.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,239.460 C 116.111,372.349 145.619,430.381 223.571,385.683 C 315.714,348.889 390.587,390.333 435.000,141.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,239.873 C 115.556,375.317 144.381,432.619 221.429,386.984 C 314.286,349.444 390.079,391.667 435.000,138.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,240.286 C 115.000,378.286 143.143,434.857 219.286,388.286 C 312.857,350.000 389.571,393.000 435.000,135.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,240.698 C 114.444,381.254 141.905,437.095 217.143,389.587 C 311.429,350.556 389.063,394.333 435.000,131.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,241.111 C 113.889,384.222 140.667,439.333 215.000,390.889 C 310.000,351.111 388.556,395.667 435.000,128.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,241.524 C 113.333,387.190 139.429,441.571 212.857,392.190 C 308.571,351.667 388.048,397.000 435.000,125.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,241.937 C 112.778,390.159 138.190,443.810 210.714,393.492 C 307.143,352.222 387.540,398.333 435.000,121.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,242.349 C 112.222,393.127 136.952,446.048 208.571,394.794 C 305.714,352.778 387.032,399.667 435.000,118.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,242.762 C 111.667,396.095 135.714,448.286 206.429,396.095 C 304.286,353.333 386.524,401.000 435.000,115.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,243.175 C 111.111,399.063 134.476,450.524 204.286,397.397 C 302.857,353.889 386.016,402.333 435.000,111.667"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,243.587 C 110.556,402.032 133.238,452.762 202.143,398.698 C 301.429,354.444 385.508,403.667 435.000,108.333"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,244.000 C 110.000,405.000 132.000,455.000 200.000,400.000 C 300.000,355.000 385.000,405.000 435.000,105.000"
+    fill="none"
+    stroke="#0798d8"
+    stroke-width="1.05"
+    opacity="0.88"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,270.000 C 116.000,238.000 140.000,246.000 190.000,265.000 C 275.000,306.000 350.000,324.000 435.000,320.000"
+    fill="none"
+    stroke="#e51bcf"
+    stroke-width="3.2"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 133.000,80.000 L 433.000,80.000"
+    fill="none"
+    stroke="#246e30"
+    stroke-width="2.5"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 133.000,178.000 L 450.000,178.000"
+    fill="none"
+    stroke="#246e30"
+    stroke-width="2.5"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 133.000,279.000 L 450.000,279.000"
+    fill="none"
+    stroke="#246e30"
+    stroke-width="2.5"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 133.000,374.000 L 450.000,374.000"
+    fill="none"
+    stroke="#246e30"
+    stroke-width="2.5"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 133.000,438.000 L 433.000,438.000"
+    fill="none"
+    stroke="#246e30"
+    stroke-width="2.5"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 133.000,438.000 L 433.000,80.000"
+    fill="none"
+    stroke="#246e30"
+    stroke-width="2"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M 48.000,241.000 L 48.000,258.000"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="46.400" y="245.000" width="3.200" height="9.000" fill="#dc3747" />
+  <path
+    d="M 53.026,251.922 L 53.026,279.338"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="51.426" y="256.922" width="3.200" height="17.416" fill="#dc3747" />
+  <path
+    d="M 58.052,267.010 L 58.052,283.374"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="56.452" y="273.010" width="3.200" height="6.364" fill="#dc3747" />
+  <path
+    d="M 63.078,273.055 L 63.078,304.133"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="61.478" y="277.055" width="3.200" height="22.078" fill="#dc3747" />
+  <path
+    d="M 68.104,296.514 L 68.104,310.796"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="66.504" y="301.514" width="3.200" height="5.282" fill="#dc3747" />
+  <path
+    d="M 73.130,302.033 L 73.130,324.100"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="71.530" y="308.033" width="3.200" height="11.067" fill="#dc3747" />
+  <path
+    d="M 78.156,312.157 L 78.156,344.462"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="76.556" y="316.157" width="3.200" height="24.305" fill="#dc3747" />
+  <path
+    d="M 83.182,335.563 L 83.182,347.011"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="81.582" y="340.563" width="3.200" height="2.500" fill="#dc3747" />
+  <path
+    d="M 88.208,338.908 L 88.208,359.710"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="86.608" y="344.908" width="3.200" height="10.803" fill="#dc3747" />
+  <path
+    d="M 93.234,350.293 L 93.234,369.112"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="91.634" y="354.293" width="3.200" height="9.819" fill="#dc3747" />
+  <path
+    d="M 98.260,356.859 L 98.260,370.533"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="96.660" y="361.859" width="3.200" height="4.674" fill="#dc3747" />
+  <path
+    d="M 103.286,362.974 L 103.286,387.933"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="101.686" y="368.974" width="3.200" height="13.959" fill="#dc3747" />
+  <path
+    d="M 108.312,376.488 L 108.312,388.076"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="106.712" y="380.488" width="3.200" height="3.589" fill="#0828cc" />
+  <path
+    d="M 113.338,372.527 L 113.338,388.067"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="111.738" y="377.527" width="3.200" height="5.540" fill="#dc3747" />
+  <path
+    d="M 118.364,377.268 L 118.364,392.956"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="116.764" y="383.268" width="3.200" height="5.687" fill="#dc3747" />
+  <path
+    d="M 123.390,384.250 L 123.390,396.825"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="121.790" y="388.250" width="3.200" height="3.574" fill="#0828cc" />
+  <path
+    d="M 128.416,381.745 L 128.416,412.261"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="126.816" y="386.745" width="3.200" height="21.516" fill="#dc3747" />
+  <path
+    d="M 133.442,400.076 L 133.442,420.753"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="131.842" y="406.076" width="3.200" height="9.678" fill="#dc3747" />
+  <path
+    d="M 138.468,414.252 L 138.468,422.714"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="136.868" y="418.252" width="3.200" height="2.500" fill="#dc3747" />
+  <path
+    d="M 143.494,411.693 L 143.494,424.764"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="141.894" y="416.693" width="3.200" height="3.071" fill="#0828cc" />
+  <path
+    d="M 148.519,392.216 L 148.519,417.718"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="146.919" y="398.216" width="3.200" height="15.501" fill="#0828cc" />
+  <path
+    d="M 153.545,392.552 L 153.545,403.518"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="151.945" y="396.552" width="3.200" height="2.500" fill="#0828cc" />
+  <path
+    d="M 158.571,387.300 L 158.571,403.390"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="156.971" y="392.300" width="3.200" height="7.090" fill="#0828cc" />
+  <path
+    d="M 163.597,375.934 L 163.597,395.708"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="161.997" y="381.934" width="3.200" height="8.774" fill="#0828cc" />
+  <path
+    d="M 168.623,375.820 L 168.623,393.085"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="167.023" y="379.820" width="3.200" height="9.265" fill="#dc3747" />
+  <path
+    d="M 173.649,378.073 L 173.649,396.637"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="172.049" y="383.073" width="3.200" height="8.565" fill="#0828cc" />
+  <path
+    d="M 178.675,378.027 L 178.675,390.136"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="177.075" y="384.027" width="3.200" height="2.500" fill="#dc3747" />
+  <path
+    d="M 183.701,379.150 L 183.701,401.492"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="182.101" y="383.150" width="3.200" height="13.342" fill="#dc3747" />
+  <path
+    d="M 188.727,377.707 L 188.727,400.894"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="187.127" y="382.707" width="3.200" height="14.187" fill="#0828cc" />
+  <path
+    d="M 193.753,376.148 L 193.753,390.510"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="192.153" y="382.148" width="3.200" height="3.363" fill="#0828cc" />
+  <path
+    d="M 198.779,370.408 L 198.779,384.471"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="197.179" y="374.408" width="3.200" height="6.063" fill="#0828cc" />
+  <path
+    d="M 203.805,361.053 L 203.805,377.366"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="202.205" y="366.053" width="3.200" height="6.313" fill="#0828cc" />
+  <path
+    d="M 208.831,362.657 L 208.831,378.502"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="207.231" y="368.657" width="3.200" height="5.845" fill="#dc3747" />
+  <path
+    d="M 213.857,361.225 L 213.857,380.361"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="212.257" y="365.225" width="3.200" height="10.136" fill="#0828cc" />
+  <path
+    d="M 218.883,357.231 L 218.883,366.984"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="217.283" y="362.231" width="3.200" height="2.500" fill="#dc3747" />
+  <path
+    d="M 223.909,355.999 L 223.909,368.486"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="222.309" y="361.999" width="3.200" height="2.500" fill="#0828cc" />
+  <path
+    d="M 228.935,347.783 L 228.935,368.766"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="227.335" y="351.783" width="3.200" height="12.982" fill="#0828cc" />
+  <path
+    d="M 233.961,345.024 L 233.961,358.857"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="232.361" y="350.024" width="3.200" height="3.833" fill="#dc3747" />
+  <path
+    d="M 238.987,330.068 L 238.987,355.890"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="237.387" y="336.068" width="3.200" height="15.822" fill="#0828cc" />
+  <path
+    d="M 244.013,312.085 L 244.013,343.721"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="242.413" y="316.085" width="3.200" height="22.636" fill="#0828cc" />
+  <path
+    d="M 249.039,311.847 L 249.039,321.876"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="247.439" y="316.847" width="3.200" height="2.500" fill="#dc3747" />
+  <path
+    d="M 254.065,308.877 L 254.065,328.839"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="252.465" y="314.877" width="3.200" height="8.962" fill="#dc3747" />
+  <path
+    d="M 259.091,320.440 L 259.091,351.868"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="257.491" y="324.440" width="3.200" height="23.428" fill="#dc3747" />
+  <path
+    d="M 264.117,345.593 L 264.117,368.218"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="262.517" y="350.593" width="3.200" height="12.625" fill="#dc3747" />
+  <path
+    d="M 269.143,355.379 L 269.143,368.769"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="267.543" y="361.379" width="3.200" height="3.390" fill="#dc3747" />
+  <path
+    d="M 274.169,358.879 L 274.169,385.417"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="272.569" y="362.879" width="3.200" height="17.538" fill="#dc3747" />
+  <path
+    d="M 279.195,356.830 L 279.195,387.116"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="277.595" y="361.830" width="3.200" height="21.286" fill="#0828cc" />
+  <path
+    d="M 284.221,336.823 L 284.221,367.494"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="282.621" y="342.823" width="3.200" height="19.671" fill="#0828cc" />
+  <path
+    d="M 289.247,325.472 L 289.247,343.823"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="287.647" y="329.472" width="3.200" height="10.351" fill="#0828cc" />
+  <path
+    d="M 294.273,298.499 L 294.273,335.172"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="292.673" y="303.499" width="3.200" height="26.673" fill="#0828cc" />
+  <path
+    d="M 299.299,300.181 L 299.299,312.275"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="297.699" y="306.181" width="3.200" height="2.500" fill="#dc3747" />
+  <path
+    d="M 304.325,300.129 L 304.325,311.357"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="302.725" y="304.129" width="3.200" height="2.500" fill="#0828cc" />
+  <path
+    d="M 309.351,296.686 L 309.351,306.319"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="307.751" y="301.686" width="3.200" height="2.500" fill="#0828cc" />
+  <path
+    d="M 314.377,298.427 L 314.377,319.053"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="312.777" y="304.427" width="3.200" height="9.626" fill="#dc3747" />
+  <path
+    d="M 319.403,294.769 L 319.403,318.618"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="317.803" y="298.769" width="3.200" height="15.849" fill="#0828cc" />
+  <path
+    d="M 324.429,286.275 L 324.429,300.771"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="322.829" y="291.275" width="3.200" height="4.496" fill="#0828cc" />
+  <path
+    d="M 329.455,276.961 L 329.455,296.072"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="327.855" y="282.961" width="3.200" height="9.112" fill="#0828cc" />
+  <path
+    d="M 334.481,268.834 L 334.481,290.596"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="332.881" y="272.834" width="3.200" height="12.762" fill="#0828cc" />
+  <path
+    d="M 339.506,265.839 L 339.506,288.915"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="337.906" y="270.839" width="3.200" height="14.076" fill="#dc3747" />
+  <path
+    d="M 344.532,274.882 L 344.532,288.186"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="342.932" y="280.882" width="3.200" height="2.500" fill="#0828cc" />
+  <path
+    d="M 349.558,276.813 L 349.558,287.663"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="347.958" y="280.813" width="3.200" height="2.850" fill="#0828cc" />
+  <path
+    d="M 354.584,276.278 L 354.584,293.697"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="352.984" y="281.278" width="3.200" height="7.418" fill="#dc3747" />
+  <path
+    d="M 359.610,275.262 L 359.610,289.705"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="358.010" y="281.262" width="3.200" height="4.443" fill="#0828cc" />
+  <path
+    d="M 364.636,278.156 L 364.636,293.832"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="363.036" y="282.156" width="3.200" height="6.676" fill="#dc3747" />
+  <path
+    d="M 369.662,283.813 L 369.662,295.418"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="368.062" y="288.813" width="3.200" height="2.604" fill="#0828cc" />
+  <path
+    d="M 374.688,273.261 L 374.688,291.744"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="373.088" y="279.261" width="3.200" height="7.483" fill="#0828cc" />
+  <path
+    d="M 379.714,273.616 L 379.714,288.120"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="378.114" y="277.616" width="3.200" height="6.504" fill="#dc3747" />
+  <path
+    d="M 384.740,269.563 L 384.740,291.937"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="383.140" y="274.563" width="3.200" height="12.374" fill="#0828cc" />
+  <path
+    d="M 389.766,268.929 L 389.766,282.177"
+    fill="none"
+    stroke="#dc3747"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="388.166" y="274.929" width="3.200" height="3.248" fill="#dc3747" />
+  <path
+    d="M 394.792,234.700 L 394.792,280.194"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="393.192" y="238.700" width="3.200" height="36.494" fill="#0828cc" />
+  <path
+    d="M 399.818,174.218 L 399.818,243.690"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="398.218" y="179.218" width="3.200" height="60.472" fill="#0828cc" />
+  <path
+    d="M 404.844,157.730 L 404.844,186.751"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="403.244" y="163.730" width="3.200" height="18.021" fill="#0828cc" />
+  <path
+    d="M 409.870,150.110 L 409.870,165.589"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="408.270" y="154.110" width="3.200" height="7.479" fill="#0828cc" />
+  <path
+    d="M 414.896,136.951 L 414.896,157.550"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="413.296" y="141.951" width="3.200" height="10.599" fill="#0828cc" />
+  <path
+    d="M 419.922,121.595 L 419.922,148.801"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="418.322" y="127.595" width="3.200" height="17.206" fill="#0828cc" />
+  <path
+    d="M 424.948,117.464 L 424.948,132.860"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="423.348" y="121.464" width="3.200" height="6.396" fill="#0828cc" />
+  <path
+    d="M 429.974,103.498 L 429.974,122.494"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="428.374" y="108.498" width="3.200" height="9.995" fill="#0828cc" />
+  <path
+    d="M 435.000,83.008 L 435.000,114.583"
+    fill="none"
+    stroke="#0828cc"
+    stroke-width="1.15"
+    opacity="1"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <rect x="433.400" y="89.008" width="3.200" height="20.575" fill="#0828cc" />
 </svg>

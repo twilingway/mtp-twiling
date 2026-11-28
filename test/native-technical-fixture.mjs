@@ -499,7 +499,7 @@ export function nativeFixture(engine, initial = [], configuration = {}) {
   }
   const mtp = {
     activeMtpPeriods: (indicators) => (indicators.mtp160 ? [160] : []),
-    lightweightMtp: () => ({ update() {}, destroy() {} }),
+    lightweightMtp: () => ({ update() {}, destroy() {}, forceRender() {} }),
     MtpModel: class {
       bounds = [];
       reset(data) {

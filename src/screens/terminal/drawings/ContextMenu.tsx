@@ -6,6 +6,7 @@ import type { Drawing, ImageAsset } from "../../../model/types.js";
 import { INDICATOR_NAMES } from "../state.js";
 import { useTerminal } from "../context.js";
 import { ChevronIcon } from "./controls/ChevronIcon.js";
+import { ChartFitButton } from "../ChartFitButton.js";
 import { MobileObjectWidget, useMobileObjectWidget } from "./MobileObjectWidget.js";
 import { selectedWidgetObject } from "./mobile-object-widget.js";
 import { bindMobileObjectMenuDismiss } from "./mobile-object-menu-dismiss.js";
@@ -326,9 +327,7 @@ export function ContextMenu() {
       )}
       {target.kind === "chart" && (
         <>
-          <button role="menuitem" onClick={() => act(() => controller.chart?.fit())}>
-            {t("Показать весь график")}
-          </button>
+          <ChartFitButton menu onClose={close} />
           <button role="menuitem" onClick={() => act(() => controller.setDialog("chart-settings"))}>
             {t("Настройки графика…")}
           </button>

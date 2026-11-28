@@ -22,6 +22,7 @@ function sources(overrides) {
       Date,
       Math,
       Promise,
+      crypto,
       DOMException,
       setTimeout,
       TextEncoder,
@@ -95,6 +96,7 @@ async function fixture() {
         if (hooks.importGate) await hooks.importGate.promise;
         if (options.valid && !options.valid()) throw new DOMException("changed", "AbortError");
         if (hooks.importFailure) throw new Error("commit failed");
+        if(options.restoreRecovery){const record=load("services/restore-recovery-journal.ts").nativeImportRecoveryRecord(owner,options.restoreRecovery);db.set(record.id,record);}
         for (const item of data.views ?? []) {
           const id = `view:${owner}:${item.key}`;
           db.set(id, { id, owner, value: item.value });
@@ -125,8 +127,12 @@ async function fixture() {
       put: async (_store, record) => {
         db.set(record.id, record);
       },
-      transaction: async (_stores, action) =>
-        action({ objectStore: () => ({ delete: (id) => db.delete(id) }) })
+      transaction: async (_stores, action) => {
+        action({ objectStore: () => ({ delete: (id) => db.delete(id), get: (id) => {
+          const request={};queueMicrotask(()=>{request.result=db.get(id);request.onsuccess?.();});return request;
+        } }) });
+        await Promise.resolve();
+      }
     }
   });
   camera = load("services/chart-camera.ts");

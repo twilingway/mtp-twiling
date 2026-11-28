@@ -10,6 +10,7 @@ import type {
 type Bridge = Parameters<typeof importTerminalBackup>[1] & {
   flush: (options?: BackupExportOptions) => Promise<void>;
   isAlive: () => boolean;
+  session: Parameters<typeof importTerminalBackup>[1]["session"] & { start?: () => Promise<void> };
 };
 
 /** Public transfers are serial per profile; internal flush never waits on this queue. */
@@ -123,9 +124,17 @@ export class TerminalBackups {
       const input: unknown = JSON.parse(text);
       await this.importNow(input, undefined, onProgress);
     });
-  recover = (): Promise<void> =>
-    this.enqueue(async () => {
+  recover = (preserveStoredCamera?: boolean): Promise<void> => {
+    const state = this.bridge.getState();
+    if (state.importRecoveryRequired && state.workspaceMigrationIncomplete) {
+      return (
+        this.bridge.session.start?.() ??
+        Promise.reject(new Error("Повторите запуск приложения для восстановления."))
+      );
+    }
+    return this.enqueue(async () => {
       this.bridge.update({ importingBackup: true, importRecoveryRequired: false });
-      await restoreImportedProfile(this.bridge);
+      await restoreImportedProfile(this.bridge, undefined, preserveStoredCamera);
     });
+  };
 }

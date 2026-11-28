@@ -1,17 +1,16 @@
-import type { MtpBitmapScope, MtpModel } from "./mtp.js";
+import type { MtpWorkerRasterCache, MtpWorkerStatus } from "./mtp-worker-raster-cache.js";
+import { loadMtpWorker, mtpWorkerEligible, mtpWorkerMode } from "./mtp-worker-activation.js";
+import type { MtpWorkerMode } from "./mtp-worker-activation.js";
+import type {
+  MtpRasterCached as Cached,
+  MtpRasterEnvironment,
+  MtpRasterFrame,
+  MtpRasterMatrix as Matrix
+} from "./mtp-raster-types.js";
+export type { MtpRasterEnvironment, MtpRasterFrame } from "./mtp-raster-types.js";
 
-type Surface = HTMLCanvasElement | OffscreenCanvas;
-interface Matrix {
-  xScale: number;
-  xOffset: number;
-  yScale: number;
-  yOffset: number;
-}
-export interface MtpRasterEnvironment {
-  canvas(width: number, height: number): Surface | null;
-  delay(action: () => void, milliseconds: number): unknown;
-  cancel(timer: unknown): void;
-}
+declare const __MTP_RASTER_DEV__: boolean;
+
 const browser: MtpRasterEnvironment = {
   canvas(width, height) {
     if (typeof OffscreenCanvas !== "undefined") return new OffscreenCanvas(width, height);
@@ -24,43 +23,6 @@ const browser: MtpRasterEnvironment = {
   delay: (action, milliseconds) => setTimeout(action, milliseconds),
   cancel: (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>)
 };
-export interface MtpRasterFrame {
-  scope: MtpBitmapScope;
-  model: MtpModel;
-  from: number;
-  to: number;
-  mode: number | undefined;
-  xFor(index: number): number | null;
-  yFor(price: number): number | null;
-  paint(context: CanvasRenderingContext2D, from?: number, to?: number): void;
-}
-interface Cached {
-  surface: Surface;
-  signature: string;
-  revision: number;
-  resetRevision: number;
-  length: number;
-  firstTime: number | undefined;
-  lastTime: number | undefined;
-  lastClose: number | undefined;
-  mode: number;
-  width: number;
-  height: number;
-  horizontalRatio: number;
-  verticalRatio: number;
-  padX: number;
-  padY: number;
-  indices: number[];
-  prices: number[];
-  x: number[];
-  y: number[];
-  logicalFrom: number;
-  logicalTo: number;
-  priceLowY: number;
-  priceHighY: number;
-  fullHistory: boolean;
-  previewOnly: boolean;
-}
 const finite = (values: readonly (number | null)[]): values is number[] =>
   values.every((value) => value !== null && Number.isFinite(value));
 const sameMatrix = (a: Matrix, b: Matrix) =>
@@ -72,6 +34,14 @@ const identity: Matrix = { xScale: 1, xOffset: 0, yScale: 1, yOffset: 0 };
 
 /** A single bounded, transparent MTP layer; settled frames always use native raster geometry. */
 export class MtpRasterCache {
+  private worker: MtpWorkerRasterCache | undefined;
+  private workerLoading = false;
+  private workerLoadError: string | undefined;
+  private cancelWorkerLoad = () => {};
+  private readonly workerMode: MtpWorkerMode;
+  private forceRequested = false;
+  private interactionEpoch = false;
+  private workerCamera: { signature: string; prices: number[] } | undefined;
   private cached: Cached | undefined;
   private observed = identity;
   private timer: unknown;
@@ -85,13 +55,22 @@ export class MtpRasterCache {
     container?: HTMLElement,
     private readonly environment = browser
   ) {
+    this.workerMode = mtpWorkerMode(
+      typeof __MTP_RASTER_DEV__ !== "undefined" &&
+        __MTP_RASTER_DEV__ &&
+        typeof location !== "undefined",
+      typeof location === "undefined" ? "" : location.search
+    );
+    if (this.workerMode === "worker") this.startWorker();
     if (!container) return;
     const view = container.ownerDocument.defaultView;
     if (!view) return;
     const down = (event: PointerEvent) => {
       if (event.button !== 0) return;
+      this.interactionEpoch = true;
       this.pointers.add(event.pointerId);
       this.cancelTimer();
+      this.worker?.setInteraction(true);
     };
     const up = (event: PointerEvent) => {
       if (this.pointers.delete(event.pointerId) && !this.pointers.size) this.schedule();
@@ -102,6 +81,7 @@ export class MtpRasterCache {
     };
     const wheel = (event: WheelEvent) => {
       if (!event.deltaX && !event.deltaY) return;
+      this.interactionEpoch = true;
       this.wheel = true;
       this.schedule();
     };
@@ -119,6 +99,18 @@ export class MtpRasterCache {
       view.removeEventListener("blur", blur, true);
     };
   }
+  private startWorker(): void {
+    if (this.disposed || this.worker || this.workerLoading || this.workerLoadError !== undefined)
+      return;
+    this.workerLoading = true;
+    this.cancelWorkerLoad = loadMtpWorker(this.environment, (module, reason) => {
+      if (this.disposed) return;
+      this.workerLoading = false;
+      this.workerLoadError = reason;
+      if (module) this.worker = new module.MtpWorkerRasterCache(this.requestUpdate);
+      this.requestUpdate();
+    });
+  }
   private cancelTimer(): void {
     if (this.timer !== undefined) this.environment.cancel(this.timer);
     this.timer = undefined;
@@ -126,11 +118,13 @@ export class MtpRasterCache {
   }
   private schedule(): void {
     this.cancelTimer();
+    this.worker?.setInteraction(true);
     if (this.pointers.size || this.disposed) return;
     this.timer = this.environment.delay(() => {
       this.timer = undefined;
       this.wheel = false;
       this.ready = true;
+      this.worker?.setInteraction(false);
       if (!this.disposed) this.requestUpdate();
     }, 180);
   }
@@ -139,6 +133,32 @@ export class MtpRasterCache {
     this.cached.surface.width = 0;
     this.cached.surface.height = 0;
     this.cached = undefined;
+  }
+  private trackWorkerMotion(frame: MtpRasterFrame): void {
+    if (!this.interactionEpoch) return;
+    const price = frame.model.data[0]?.close ?? 0;
+    const prices = this.workerCamera?.prices ?? [
+      price,
+      price + Math.max(1, Math.abs(price)) * 0.01
+    ];
+    const signature = JSON.stringify([
+      frame.from,
+      frame.to,
+      frame.scope.bitmapSize,
+      frame.scope.horizontalPixelRatio,
+      frame.scope.verticalPixelRatio,
+      frame.mode,
+      frame.xFor(0),
+      frame.xFor(1),
+      prices.map((value) => frame.yFor(value))
+    ]);
+    if (this.workerCamera && signature !== this.workerCamera.signature) this.schedule();
+    else if (this.ready && !this.pointers.size && !this.wheel && this.timer === undefined) {
+      this.interactionEpoch = false;
+      this.workerCamera = undefined;
+      return;
+    }
+    this.workerCamera = { signature, prices };
   }
   private matrix(frame: MtpRasterFrame, cached: Cached): Matrix | null {
     const x = cached.indices.map((index) => frame.xFor(index)),
@@ -182,6 +202,22 @@ export class MtpRasterCache {
   }
   draw(frame: MtpRasterFrame): boolean {
     if (this.disposed) return false;
+    if (this.workerMode === "auto" && !this.worker && mtpWorkerEligible(frame)) this.startWorker();
+    if (this.worker || this.workerLoading) this.trackWorkerMotion(frame);
+    if (this.workerLoading) return true;
+    if (this.forceRequested && this.worker) {
+      this.worker.forceRender();
+      this.forceRequested = false;
+    }
+    if (
+      this.worker?.draw(
+        frame,
+        this.interactionEpoch || this.pointers.size > 0 || this.wheel || this.timer !== undefined
+      )
+    ) {
+      this.release();
+      return true;
+    }
     const { scope, model, mode } = frame;
     if (!model.periods.length) {
       this.release();
@@ -328,7 +364,7 @@ export class MtpRasterCache {
       y = prices.map((price) => frame.yFor(price));
     if (!finite(x) || !finite(y) || x[0] === x[1] || y[0] === y[1]) return false;
     this.release(); // Never retain two full-size raster allocations.
-    let surface: Surface | null;
+    let surface: HTMLCanvasElement | OffscreenCanvas | null;
     try {
       surface = this.environment.canvas(size.width + padPixelsX * 2, size.height + padPixelsY * 2);
     } catch {
@@ -414,9 +450,43 @@ export class MtpRasterCache {
   }
   destroy(): void {
     this.disposed = true;
+    this.cancelWorkerLoad();
+    this.workerLoading = false;
+    this.worker?.destroy();
     this.stopInput();
     this.cancelTimer();
     this.pointers.clear();
     this.release();
+  }
+  pending(): boolean {
+    return !this.disposed && (this.workerLoading || (this.worker?.pending() ?? false));
+  }
+  invalidate(active = false): void {
+    this.worker?.invalidate(active);
+  }
+  forceRender(): void {
+    this.forceRequested = true;
+    this.wheel = false;
+    this.cancelTimer();
+    this.interactionEpoch = this.pointers.size > 0;
+    this.workerCamera = undefined;
+  }
+  workerStatus(): MtpWorkerStatus {
+    return (
+      this.worker?.status() ?? {
+        state: this.disposed
+          ? "destroyed"
+          : this.workerLoading
+            ? "loading"
+            : this.workerLoadError !== undefined
+              ? "fallback"
+              : "off",
+        pending: this.pending(),
+        dispatched: 0,
+        completed: 0,
+        stale: 0,
+        ...(this.workerLoadError === undefined ? {} : { reason: this.workerLoadError })
+      }
+    );
   }
 }

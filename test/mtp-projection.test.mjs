@@ -1,31 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import ts from "typescript";
-
-const source = readFileSync(new URL("../src/model/mtp.ts", import.meta.url), "utf8");
-const { outputText } = ts.transpileModule(source, {
-  compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ES2022 }
-});
-const helperSource = readFileSync(
-  new URL("../src/model/screen-line-simplifier.ts", import.meta.url),
-  "utf8"
-);
-const helperOutput = ts.transpileModule(helperSource, {
-  compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ES2022 }
-}).outputText;
-const helperUrl = `data:text/javascript;base64,${Buffer.from(helperOutput).toString("base64")}`;
-const rasterSource = readFileSync(
-  new URL("../src/model/mtp-raster-cache.ts", import.meta.url),
-  "utf8"
-);
-const rasterOutput = ts.transpileModule(rasterSource, {
-  compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ES2022 }
-}).outputText;
-const rasterUrl = `data:text/javascript;base64,${Buffer.from(rasterOutput).toString("base64")}`;
-const { MtpModel, MTP_COMBINED_PERIODS, lightweightMtp } = await import(
-  `data:text/javascript;base64,${Buffer.from(outputText.replace('"./screen-line-simplifier.js"', JSON.stringify(helperUrl)).replace('"./mtp-raster-cache.js"', JSON.stringify(rasterUrl))).toString("base64")}`
-);
+import { createSourceLoader } from "./technical-volume-registration-fixture.mjs";
+const { MtpModel, MTP_COMBINED_PERIODS, lightweightMtp } = createSourceLoader()("model/mtp.js");
 
 function modelWith(length = 1100) {
   const model = new MtpModel();

@@ -135,6 +135,18 @@ export class MtpModel {
     }
     return Number.isFinite(min) ? { minValue: min, maxValue: max } : null;
   }
+  paintStyles() {
+    return this.periods.map((period) => {
+      const group = this.styleKey ?? periodGroup.get(period);
+      const style = group ? this.styles?.[group] : undefined;
+      return {
+        period,
+        color: style?.color || "#1e90ff",
+        width: style?.width || 1,
+        opacity: style?.opacity ?? 0.65
+      };
+    });
+  }
   draw(
     ctx: CanvasRenderingContext2D,
     from: number,
@@ -306,7 +318,10 @@ export function lightweightMtp(
           renderer: () => ({
             draw() {},
             drawBackground(target) {
-              if (!model.periods.length) return;
+              if (!model.periods.length || !model.data.length) {
+                raster.invalidate();
+                return;
+              }
               const timeScale = chart.timeScale();
               const range = timeScale.getVisibleLogicalRange();
               if (!range) return;
@@ -334,6 +349,7 @@ export function lightweightMtp(
                     from: range.from,
                     to: range.to,
                     mode: series.priceScale?.().options().mode,
+                    uniformX: "lightweight",
                     xFor,
                     yFor: (price) => series.priceToCoordinate(price),
                     paint
@@ -356,7 +372,17 @@ export function lightweightMtp(
   };
   series.attachPrimitive(primitive);
   return {
+    forceRender: () => raster.forceRender(),
+    pending: () => {
+      if (!model.periods.length || !model.data.length) {
+        raster.invalidate();
+        return false;
+      }
+      return raster.pending();
+    },
+    workerStatus: () => raster.workerStatus(),
     update() {
+      raster.invalidate(model.periods.length > 0 && model.data.length > 0);
       requestUpdate();
     },
     destroy() {

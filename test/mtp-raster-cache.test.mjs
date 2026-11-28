@@ -1,17 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import ts from "typescript";
-
-const code = ts.transpileModule(
-  readFileSync(new URL("../src/model/mtp-raster-cache.ts", import.meta.url), "utf8"),
-  {
-    compilerOptions: { target: ts.ScriptTarget.ES2023, module: ts.ModuleKind.ES2022 }
-  }
-).outputText;
-const { MtpRasterCache } = await import(
-  `data:text/javascript;base64,${Buffer.from(code).toString("base64")}`
-);
+import { createSourceLoader } from "./technical-volume-registration-fixture.mjs";
+const { MtpRasterCache } = createSourceLoader()("model/mtp-raster-cache.js");
 
 function fixture() {
   const timers = new Map(),

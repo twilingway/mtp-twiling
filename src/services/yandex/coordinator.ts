@@ -11,14 +11,18 @@ import type { YandexRemote } from "./revisions.js";
 import { YandexTransport } from "./transport.js";
 import { hasYandexConfig, validateYandexConfig, YandexError } from "./types.js";
 import { yandexCoordinatorProbe } from "./coordinator-probe.js";
-import { yandexUpdatedStatus } from "./coordinator-state.js";
+import { yandexSubscribe, yandexUpdatedStatus } from "./coordinator-state.js";
 import { yandexSnapshotAcceptor } from "./coordinator-accept.js";
 import * as yandexStatus from "./coordinator-status.js";
 import type { YandexStatusClear } from "./coordinator-status.js";
 import { yandexTransfer } from "./coordinator-transfer.js";
 import { YandexPreview } from "./coordinator-preview.js";
 import { YandexScheduler } from "./coordinator-scheduler.js";
-import * as yandexPublishing from "./coordinator-publish.js";
+import { YandexContextBaseline } from "./context-baseline.js";
+import { yandexTransferActions } from "./coordinator-actions.js";
+import type { YandexReceiptState } from "./coordinator-actions.js";
+import { yandexManualDeletion } from "./coordinator-delete.js";
+import { yandexMaintenanceTarget } from "./maintenance-journal.js";
 import type { YandexAuthorization, YandexPublicConfig } from "./types.js";
 import type { YandexAuthClient, YandexCoordinatorOptions } from "./coordinator-options.js";
 import {
@@ -51,7 +55,8 @@ export class YandexCoordinator implements CloudSyncProvider {
   private readonly scheduler = new YandexScheduler();
   private scopeSession: unknown;
   private readonly preview = new YandexPreview();
-  private appliedReceipt: { operationId: string; targetId: string; revision: number } | undefined;
+  private readonly baseline = new YandexContextBaseline();
+  private readonly receipts: YandexReceiptState = {};
   private status: CloudSyncStatus;
   constructor(
     private readonly host: CloudSyncHost,
@@ -64,12 +69,10 @@ export class YandexCoordinator implements CloudSyncProvider {
       options.transport ?? ((authorization) => new YandexTransport(authorization));
     this.lock = options.lock ?? yandexWriterLock;
     this.status = initialYandexClientStatus(hasYandexConfig(config));
+    this.baseline.open(this.journal, config?.clientId, this.host.scope(this.id).revision);
   }
   getSnapshot = (): CloudSyncStatus => this.status;
-  subscribe = (listener: () => void): (() => void) => {
-    this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
-  };
+  subscribe = (listener: () => void): (() => void) => yandexSubscribe(this.listeners, listener);
   private update(patch: Partial<CloudSyncStatus>, clear: readonly YandexStatusClear[] = []): void {
     if (this.disposed) return;
     this.status = yandexUpdatedStatus(this.status, patch, clear);
@@ -145,6 +148,18 @@ export class YandexCoordinator implements CloudSyncProvider {
       this.update({ phase: "disconnected", connected: false });
       return;
     }
+    const durable = await this.journal.association(this.config!.clientId, authorization.accountId);
+    if (this.disposed || !this.status.enabled || epoch !== this.epoch) return;
+    const association = await this.baseline.restore(
+      authorization.accountId,
+      durable,
+      this.host.scope(this.id).revision
+    );
+    const maintenance = await this.journal.maintenance(
+      this.config!.clientId,
+      authorization.accountId
+    );
+    if (this.disposed || !this.status.enabled || epoch !== this.epoch) return;
     this.remoteCache.clear();
     this.authorization = authorization;
     this.update(
@@ -152,9 +167,25 @@ export class YandexCoordinator implements CloudSyncProvider {
         connected: true,
         phase: "idle",
         authorizationStored: authorization.stored,
-        credentialSaveError: authorization.persistenceError
+        credentialSaveError: authorization.persistenceError,
+        ...(association ? { lastSyncedAt: association.syncedAt } : {}),
+        ...(maintenance
+          ? {
+              deleteAction: {
+                id: maintenance.plan.remoteId,
+                state: "unconfirmed" as const,
+                target: yandexMaintenanceTarget(maintenance.plan)
+              }
+            }
+          : {})
       },
-      ["error", "pauseReason", "comparison"]
+      [
+        "error",
+        "pauseReason",
+        "comparison",
+        ...(!association ? ["lastSyncedAt" as const] : []),
+        ...(!maintenance ? ["deleteAction" as const] : [])
+      ]
     );
     this.resume();
   }
@@ -292,6 +323,32 @@ export class YandexCoordinator implements CloudSyncProvider {
   sync = (): Promise<void> => this.run();
   inspect = (): Promise<void> => this.run(undefined, true);
   receive = (id: string): Promise<void> => this.choose({ kind: "remote", id });
+  remove = (id: string): Promise<void> =>
+    yandexManualDeletion({
+      host: this.host,
+      journal: this.journal,
+      cache: this.remoteCache,
+      preview: this.preview,
+      lock: (...args) => this.lock(...args),
+      transport: (auth) => this.transportFactory(auth),
+      prepare: this.prepare,
+      authorization: () => this.authorization,
+      clientId: () => this.config?.clientId,
+      status: () => this.status,
+      epoch: () => this.epoch,
+      current: () => !this.disposed,
+      busy: () => !!this.operation || this.identity.changing,
+      begin: (operation) => {
+        this.scheduler.clear();
+        this.operation = operation;
+      },
+      finish: (operation) => {
+        if (this.operation === operation) this.operation = undefined;
+        this.scheduler.complete(() => {});
+      },
+      update: (patch, clear) => this.update(patch, clear),
+      inspect: this.inspect
+    })(id);
   runSyntheticProbe = yandexCoordinatorProbe({
     authorization: () => this.authorization,
     enabled: () => this.status.enabled && !this.disposed,
@@ -352,6 +409,19 @@ export class YandexCoordinator implements CloudSyncProvider {
           this.update({ phase: previousPhase }, ["progress"]);
           return;
         }
+        if (
+          !inspectionOnly &&
+          (await this.journal.maintenance(this.config!.clientId, auth.accountId))
+        )
+          throw new YandexError("indeterminate");
+        const contextAssociation = await this.baseline.operation(
+          this.host,
+          guard,
+          this.journal,
+          this.config!.clientId,
+          auth.accountId,
+          inspectionOnly || !!selection
+        );
         return yandexTransfer(
           this.host,
           revisions,
@@ -359,86 +429,24 @@ export class YandexCoordinator implements CloudSyncProvider {
           this.config!.clientId,
           auth.accountId,
           guard,
-          {
-            preview: () => ({
-              revision:
-                selection?.kind === "remote" && this.appliedReceipt?.targetId === selection.id
-                  ? this.appliedReceipt.revision
-                  : this.preview.revision,
-              heads: this.preview.heads,
-              remoteFingerprint: this.preview.remoteFingerprint
-            }),
-            publish: (captured, heads, explicit, beforeEffect) =>
-              yandexPublishing.publishYandexSnapshot(
-                revisions,
-                captured,
-                heads,
-                guard,
-                explicit,
-                this.journal,
-                this.config!.clientId,
-                auth.accountId,
-                (accepted, digest, expected) => this.accept(accepted, digest, guard, expected),
-                (stage) => this.update({ progress: { stage } }),
-                () => this.host.scope(this.id).revision,
-                beforeEffect,
-                (retention) => this.update({ retention })
-              ),
-            accept: (heads, digest, expected) => this.accept(heads, digest, guard, expected),
-            confirmedBaseline: (heads, digest, expected) =>
-              this.accept(heads, digest, guard, expected, true),
-            committed: (intent, revision) => {
-              this.appliedReceipt = {
-                operationId: intent.operationId,
-                targetId: intent.targetId,
-                revision
-              };
-            },
-            committedRevision: (id) =>
-              this.appliedReceipt?.operationId === id ? this.appliedReceipt.revision : undefined,
-            clearCommitted: (id) => {
-              if (this.appliedReceipt?.operationId === id) this.appliedReceipt = undefined;
-            },
-            applying: () => this.update({ progress: { stage: "apply" } }),
-            unchanged: (association, revision) =>
-              yandexPublishing.unchangedYandexSnapshot(
-                revisions,
-                association,
-                guard,
-                revision,
-                () => this.host.scope(this.id).revision,
-                this.update.bind(this)
-              ),
-            inspected: (captured, remotes, heads, review) => {
-              const comparison = this.preview.capture(
-                captured,
-                remotes,
-                heads,
-                new Date().toISOString()
-              );
-              this.update(yandexStatus.yandexInspectionStatus(comparison, previousPhase, review), [
-                "progress"
-              ]);
-            },
-            conflict: (captured, remotes, heads) => {
-              const comparison = this.preview.capture(
-                captured,
-                remotes,
-                heads,
-                new Date().toISOString()
-              );
-              this.update(
-                {
-                  phase: "conflict",
-                  comparison,
-                  conflict: { local: comparison.local, remotes: comparison.remotes }
-                },
-                ["progress", "choiceAction"]
-              );
-            }
-          },
+          yandexTransferActions({
+            host: this.host,
+            revisions,
+            journal: this.journal,
+            clientId: this.config!.clientId,
+            accountId: auth.accountId,
+            guard,
+            preview: this.preview,
+            receipts: this.receipts,
+            previousPhase,
+            selection,
+            accept: this.accept,
+            observed: (association, revision) => this.baseline.accepted(association, revision),
+            update: this.update.bind(this)
+          }),
           selection,
-          inspectionOnly
+          inspectionOnly,
+          contextAssociation
         );
       });
     } catch (error) {
@@ -462,6 +470,7 @@ export class YandexCoordinator implements CloudSyncProvider {
     revision: () => this.host.scope(this.id).revision,
     status: () => this.status,
     clearPreview: () => this.preview.clear(),
+    accepted: (association, revision) => this.baseline.accepted(association, revision),
     update: (patch, clear) => this.update(patch, clear)
   });
   private failure(error: unknown, selection?: CloudSelection): void {
@@ -475,7 +484,7 @@ export class YandexCoordinator implements CloudSyncProvider {
     this.auth.suspend(cancelAttempt);
     this.authorization = undefined;
     this.preview.clear();
-    this.appliedReceipt = undefined;
+    this.receipts.applied = undefined;
     this.remoteCache.clear();
     this.update({}, ["comparison"]);
   }

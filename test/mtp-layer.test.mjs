@@ -24,6 +24,7 @@ test("MTP renders after the grid, before candles, and only once per frame", () =
     detachPrimitive(value) { assert.equal(value, primitive); }
   };
   const model = {
+    data: [{ timestamp: 0, open: 30, high: 30, low: 30, close: 30, volume: 1 }],
     periods: [20],
     draw(ctx, from, to, xFor, yFor) {
       assert.equal(ctx, context);

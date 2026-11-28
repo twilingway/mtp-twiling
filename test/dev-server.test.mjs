@@ -159,7 +159,8 @@ test("shared browser config keeps standalone model entries and copies existing l
     "drawing-model",
     "history-codec",
     "market-model",
-    "mtp"
+    "mtp",
+    "mtp-raster-worker"
   ]);
   assert.equal(installEntryPoints["pwa-install-entry"], "src/pwa-install-entry.ts");
   assert.equal(browserBuildOptions("project", "public").outdir, "public");

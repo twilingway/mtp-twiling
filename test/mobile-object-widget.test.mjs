@@ -138,6 +138,7 @@ function menuDismissHarness({ mobile = true, kind = "drawing" } = {}) {
       "../state.js": { INDICATOR_NAMES: { ma: "MA" } },
       "../context.js": { useTerminal: () => ({ controller, state }) },
       "./controls/ChevronIcon.js": { ChevronIcon: "chevron" },
+      "../ChartFitButton.js": { ChartFitButton: "chart-fit-button" },
       "./MobileObjectWidget.js": {
         useMobileObjectWidget: () => mobile,
         MobileObjectWidget: Widget
@@ -396,6 +397,7 @@ function renderContextMenu({ width, height, mobile, kind = "drawing" }) {
       "../state.js": {},
       "../context.js": { useTerminal: () => ({ state, controller: {} }) },
       "./controls/ChevronIcon.js": { ChevronIcon: "chevron" },
+      "../ChartFitButton.js": { ChartFitButton: "chart-fit-button" },
       "./MobileObjectWidget.js": { useMobileObjectWidget: () => mobile },
       "./mobile-object-widget.js": helpers,
       "./mobile-object-menu-dismiss.js": load("mobile-object-menu-dismiss.ts")
@@ -634,7 +636,7 @@ test("outside dismissal runs in capture phase and never consumes the canvas poin
   assert.equal(harness.handlers.size, 0);
 });
 
-test("native toolbar/menu pointer and focus transitions retain the selected object", () => {
+test("native toolbar, menu and object-tree transitions retain the selected object", () => {
   for (const object of [
     { id: "line", name: "segment", points: [] },
     { id: "image", name: "Photo" }
@@ -652,7 +654,9 @@ test("native toolbar/menu pointer and focus transitions retain the selected obje
       ["pointerdown", ".drawing-toolbar"],
       ["focusin", "#drawing-toolbar-menu"],
       ["pointerdown", "#drawing-toolbar-menu"],
-      ["focusin", ".drawing-toolbar"]
+      ["focusin", ".drawing-toolbar"],
+      ["pointerdown", "#objects-view"],
+      ["focusin", "#objects-view"]
     ]) {
       dispatch(type, new harness.Element(ancestor));
       assert.equal(harness.state.selectedObject, object.id, `${type}: ${ancestor}`);

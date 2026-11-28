@@ -1,10 +1,11 @@
 import { t } from "../../i18n/messages.js";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import type { PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { hitDrawing } from "../../model/drawing-model.js";
 import { isDrawing } from "../../model/backup-format.js";
 import { drawingToolbarSettings } from "../../model/drawing-toolbar.js";
-import { snapDrawingPoint } from "../../model/drawing-magnet.js";
+import { preservePolylineClosure } from "../../model/drawing-anchor-edit.js";
+import { isVertexTool } from "../../model/drawing-tool-policy.js";
 import { chartBackground } from "../../model/theme.js";
 import type { Drawing, PixelPoint } from "../../model/types.js";
 import type { ChartAdapter, TechnicalSupplementalInputs } from "../../charts/adapter.js";
@@ -23,13 +24,10 @@ import { useChartMeasurementInput } from "./chart-measurement-input.js";
 import { publishWorkspaceCrosshair } from "./workspace-sync-controller.js";
 import { useOhlcInspection } from "./ohlc-inspection-input.js";
 import { OhlcCandleCard } from "./OhlcCandleCard.js";
-import {
-  createDrawingContextSource,
-  createDrawingInput,
-  observeOwnedDrawingTouch
-} from "./chart-drawing-touch.js";
+import { createDrawingContextSource } from "./chart-drawing-touch.js";
+import { useChartDrawingInput } from "./chart-drawing-input.js";
 const chartControls =
-  "[data-image-id],.indicator-legend,.technical-pane-legends,.calendar-analysis-overlays";
+  "[data-image-id],.indicator-legend,.technical-pane-legends,.calendar-analysis-overlays,.drawing-finish";
 
 export function visibleDrawings(state: TerminalState): Drawing[] {
   if (drawingToolbarSettings(state.preferences.chartSettings).drawingsHidden) return [];
@@ -179,52 +177,7 @@ export function ChartGestures({
             : "default"
           : "crosshair";
   };
-  const drawingPoint = useCallback(
-    (p: PixelPoint, temporary: boolean) => {
-      const chart = controller.chart;
-      const raw = chart?.pixelToPoint(p.x, p.y);
-      if (!chart || !raw) return null;
-      const current = controller.getSnapshot(),
-        options = drawingToolbarSettings(current.preferences.chartSettings);
-      const mode = temporary ? (options.magnet === "off" ? "weak" : "off") : options.magnet;
-      const flags = current.preferences.indicators;
-      const indicators =
-        flags.mtpAll && current.preferences.chartSettings.mtpAllHidden
-          ? { ...flags, mtpAll: false, mtp160: false, mtp440: false, mtp640: false }
-          : flags;
-      const point = snapDrawingPoint(
-        raw,
-        p,
-        current.candles,
-        (point) => chart.pointToPixel(point),
-        mode,
-        options.snapIndicators && !options.indicatorsHidden ? indicators : undefined
-      );
-      const step = nativePriceStep(selectedMarketRow(current.rows, current.preferences));
-      return { ...point, value: roundPriceToStep(point.value, step) };
-    },
-    [controller]
-  );
-  const drawingInput = useMemo(
-    () => createDrawingInput(controller, drawingPoint),
-    [controller, drawingPoint]
-  );
-  useEffect(() => {
-    drawingInput.cancel();
-    return drawingInput.cancel;
-  }, [
-    drawingInput,
-    state.owner,
-    state.preferences.symbol,
-    state.preferences.instrumentUid,
-    state.preferences.timeframe,
-    state.activeTool
-  ]);
-  useEffect(() => {
-    const element = body.current;
-    if (!element) return;
-    return observeOwnedDrawingTouch(element, () => Boolean(drag.current) || drawingInput.active());
-  }, [drawingInput]);
+  const { drawingInput, drawingPoint } = useChartDrawingInput(controller, state, body, drag);
   function down(event: ReactPointerEvent<HTMLDivElement>) {
     if (drag.current) return stop(event);
     if (
@@ -351,7 +304,16 @@ export function ChartGestures({
         : point;
       return moved === point ? point : { ...moved, value: roundPriceToStep(moved.value, step) };
     });
-    const candidate: unknown = { ...active.original, id: active.cloneId ?? active.id, points };
+    const candidate: unknown = {
+      ...active.original,
+      id: active.cloneId ?? active.id,
+      points: preservePolylineClosure(
+        active.original.name,
+        active.original.points,
+        points,
+        active.handle
+      )
+    };
     if (isDrawing(candidate)) {
       const exists = current.drawings.some((item) => item.id === candidate.id);
       controller.editing.previewGesture(active.token, {
@@ -385,10 +347,10 @@ export function ChartGestures({
       );
   }
   function cancel(event: ReactPointerEvent<HTMLDivElement>) {
-    if (drawingInput.active() && !drawingInput.owns(event.pointerId)) return;
+    if (drawingInput.pending() && !drawingInput.owns(event.pointerId)) return;
     if (drag.current && drag.current.pointerId !== event.pointerId) return;
     contextSource.up(event);
-    if (drawingInput.active()) drawingInput.cancel();
+    if (drawingInput.pending()) drawingInput.cancel();
     finishNativePan(pan);
     if (!drag.current) return;
     drag.current = null;
@@ -444,7 +406,14 @@ export function ChartGestures({
         ohlc.cancel(event);
         measurement.cancel(event);
         cameraInput.up(event);
-        cancel(event);
+        // Touch taps release the browser's implicit capture after pointerup. Only loss of
+        // capture explicitly owned by an active drawing gesture can cancel its draft.
+        if (
+          (drawingInput.active() && drawingInput.owns(event.pointerId)) ||
+          drag.current?.pointerId === event.pointerId ||
+          pan.current?.pointerId === event.pointerId
+        )
+          cancel(event);
       }}
       onPointerLeave={(event) => {
         ohlc.leave();
@@ -456,6 +425,11 @@ export function ChartGestures({
       }}
       onDoubleClickCapture={(event) => {
         if (measurement.active()) return;
+        if (drawingInput.finish()) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
         if (cameraInput.action(event) === false) return;
         if (event.target instanceof Element && event.target.closest(chartControls)) return;
         const hit = find(pixel(event));
@@ -481,6 +455,30 @@ export function ChartGestures({
       }}
     >
       {children}
+      {state.activeTool &&
+        isVertexTool(state.activeTool) &&
+        (state.preview?.points.length ?? 0) >= 2 && (
+          <button
+            type="button"
+            className="drawing-finish"
+            disabled={!drawingInput.canFinish()}
+            style={{
+              position: "absolute",
+              left: 12,
+              top: 48,
+              zIndex: 12,
+              minHeight: 44,
+              padding: "8px 16px"
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              drawingInput.finish();
+            }}
+          >
+            {t("Завершить рисунок")}
+          </button>
+        )}
       {ohlc.timestamp != null && (
         <OhlcCandleCard timestamp={ohlc.timestamp} drawingProjection={drawingProjection} />
       )}

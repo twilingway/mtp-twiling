@@ -72,7 +72,12 @@ const result = await build({
   splitting: true,
   format: "esm",
   chunkNames: "assets/[name]-[hash]",
-  define: { ...cloudPublicDefines(root), "process.env.NODE_ENV": '"production"' }
+  define: {
+    ...cloudPublicDefines(root),
+    "process.env.NODE_ENV": '"production"',
+    // Eligible MTP panes activate lazily; ?mtpRaster=native keeps the native fallback.
+    __MTP_RASTER_DEV__: "true"
+  }
 });
 const outputs = [
   ...Object.keys(installCapture.metafile.outputs),

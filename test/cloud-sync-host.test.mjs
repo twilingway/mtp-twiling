@@ -46,13 +46,44 @@ function fixture() {
       options.onCommitted();
       await hooks.after?.();
       assert.equal(options.valid(), true);
-    }
+    },
+    recoverBackup: async (preserveStoredCamera) => hooks.recover?.(preserveStoredCamera)
   };
   const host = api.createCloudSyncHost(controller),
     abort = new AbortController();
   const guard = { signal: abort.signal, isCurrent: () => !abort.signal.aborted };
   return { ...api, host, state, hooks, imports, guard, abort, modules };
 }
+
+test("shared-context refresh restores runtime without exporting or importing a backup", async () => {
+  const f = fixture();
+  let restored = 0, commits = 0;
+  f.hooks.export = () => { throw new Error("stale export forbidden"); };
+  f.hooks.recover = async (preserveStoredCamera) => { assert.equal(preserveStoredCamera, true); restored++; };
+  const stop = f.subscribeCloudHostCommit(f.host, (provider) => {
+    assert.equal(provider, "yandex-disk"); commits++;
+  });
+  await f.host.refresh("yandex-disk", 0, f.guard);
+  stop();
+  assert.equal(restored, 1);
+  assert.equal(commits, 1);
+  assert.equal(f.host.scope("yandex-disk").revision, 1);
+  assert.equal(f.imports.length, 0);
+});
+
+test("shared-context refresh fences local intent, aborted guard and failed runtime recovery", async () => {
+  for (const scenario of ["intent", "abort", "failure"]) {
+    const f = fixture();
+    let restored = 0;
+    f.hooks.recover = async () => { restored++; throw new Error("restore failed"); };
+    if (scenario === "intent") f.cloudHostIntent(f.host);
+    if (scenario === "abort") f.abort.abort();
+    await assert.rejects(f.host.refresh("yandex-disk", 0, f.guard));
+    assert.equal(restored, scenario === "failure" ? 1 : 0);
+    assert.equal(f.host.scope("yandex-disk").blocked, false);
+    assert.equal(f.imports.length, 0);
+  }
+});
 
 test("cloud host binds independent namespaces and rejects capture after synchronous user intent", async () => {
   const f = fixture(),

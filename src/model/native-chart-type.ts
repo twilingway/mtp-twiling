@@ -1,6 +1,6 @@
 import type { ChartSettings } from "./types.js";
 
-export const NATIVE_CHART_TYPES = ["candles", "bars", "line", "area"] as const;
+export const NATIVE_CHART_TYPES = ["candles", "hollowCandles", "bars", "line", "area"] as const;
 export type NativeChartType = (typeof NATIVE_CHART_TYPES)[number];
 
 export function isNativeChartType(value: unknown): value is NativeChartType {

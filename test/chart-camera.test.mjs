@@ -135,7 +135,7 @@ function harness(engine, row = { symbol: "GAZP", step: 0.01 }) {
       update() {}
     },
     activeMtpPeriods: () => [],
-    lightweightMtp: () => ({ update() {}, destroy() {} })
+    lightweightMtp: () => ({ update() {}, destroy() {}, forceRender() {} })
   };
   const options = {
     container: { clientWidth: 870, clientHeight: 528, parentElement: { append() {} } },

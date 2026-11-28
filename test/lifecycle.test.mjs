@@ -412,6 +412,7 @@ function terminalFixture({ restore = async () => null, candles, importBackup, on
         saveChartView: storage.saveView,
         resetSharedChartCamera: async () => {}
       },
+      "services/restore-recovery-journal.ts": { readRestoreRecovery: async () => undefined, completeRestoreRecovery: async () => {} },
       "services/tbank-client.ts": { TBankClient: BankBoundary },
       "services/market-client.ts": { MarketClient: BankBoundary }
     }
