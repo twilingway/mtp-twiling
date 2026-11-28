@@ -470,6 +470,31 @@ test("widget reclamps for rotation and an offset visual viewport", () => {
   );
 });
 
+test("default widget clears the chart heading at 390 and 500px and fits short viewports", () => {
+  const size = { width: 302, height: 48 };
+  for (const width of [390, 500]) {
+    const point = helpers.defaultObjectWidgetPosition(
+      size,
+      { left: 0, top: 0, width, height: 844 },
+      { top: 90, bottom: 175 }
+    );
+    assert.deepEqual(plain(point), { x: 12, y: 183 });
+  }
+  const above = helpers.defaultObjectWidgetPosition(
+    size,
+    { left: 0, top: 0, width: 390, height: 200 },
+    { top: 90, bottom: 175 }
+  );
+  assert.deepEqual(plain(above), { x: 12, y: 34 });
+  const tiny = helpers.defaultObjectWidgetPosition(
+    size,
+    { left: 0, top: 0, width: 320, height: 100 },
+    { top: 20, bottom: 80 }
+  );
+  assert.ok(tiny.x >= 6 && tiny.x + size.width <= 314);
+  assert.ok(tiny.y >= 6 && tiny.y + size.height <= 94);
+});
+
 test("only the selected visible object in the active snapshot is exposed", () => {
   const drawing = { id: "line", name: "segment" };
   const image = { id: "image", name: "photo" };
@@ -501,7 +526,10 @@ function componentHarness(object) {
       state.selectedObject = id;
       calls.push(["select", id]);
     },
-    tools: { deleteObject: async (id) => calls.push(["delete", id]) },
+    tools: {
+      scopeKey: () => state.chartScope ?? "chart-one",
+      deleteObject: async (id) => calls.push(["delete", id])
+    },
     notify: (value) => calls.push(["notify", value])
   };
   class Node {}
@@ -656,7 +684,9 @@ test("native toolbar, menu and object-tree transitions retain the selected objec
       ["pointerdown", "#drawing-toolbar-menu"],
       ["focusin", ".drawing-toolbar"],
       ["pointerdown", "#objects-view"],
-      ["focusin", "#objects-view"]
+      ["focusin", "#objects-view"],
+      ["pointerdown", ".selected-drawing-lock"],
+      ["focusin", ".selected-drawing-lock"]
     ]) {
       dispatch(type, new harness.Element(ancestor));
       assert.equal(harness.state.selectedObject, object.id, `${type}: ${ancestor}`);
@@ -707,7 +737,7 @@ test("Escape dismisses the selection and handle uses pointer capture without ope
   );
 });
 
-test("dragged position survives widget remounts for the same controller", () => {
+test("dragged position survives widget remounts and stays independent for each chart scope", () => {
   const harness = componentHarness({ id: "line", name: "segment", points: [] });
   harness.tree.props.ref.current = { getBoundingClientRect: () => ({ width: 306, height: 48 }) };
   const handle = harness.find("Переместить панель");
@@ -720,5 +750,9 @@ test("dragged position survives widget remounts for the same controller", () => 
     currentTarget: { setPointerCapture() {} }
   });
   handle.props.onPointerMove({ pointerId: 1, clientX: 60, clientY: 300 });
+  assert.deepEqual(plain(harness.render().props.style), { left: 60, top: 300 });
+  harness.state.chartScope = "chart-two";
+  assert.deepEqual(plain(harness.render().props.style), { left: 12, top: 108 });
+  harness.state.chartScope = "chart-one";
   assert.deepEqual(plain(harness.render().props.style), { left: 60, top: 300 });
 });
