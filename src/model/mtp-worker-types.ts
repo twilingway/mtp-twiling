@@ -1,5 +1,13 @@
 import type { MtpWorkerRequest, MtpWorkerResponse } from "./mtp-worker-protocol.js";
 import type { MtpEmergencyStats } from "./mtp-worker-emergency.js";
+import type { MtpWorkerIntent } from "./mtp-worker-snapshot.js";
+import type { MtpWorkerGeometry } from "./mtp-worker-geometry.js";
+
+export interface MtpWorkerDispatched {
+  id: number;
+  intent: MtpWorkerIntent;
+  geometry: MtpWorkerGeometry;
+}
 
 export interface MtpRasterWorker {
   onmessage: ((event: MessageEvent<MtpWorkerResponse>) => void) | null;

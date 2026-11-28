@@ -181,7 +181,7 @@ function prepare(source: MtpRasterFrame, allowed: () => boolean): Prepared | nul
   return { lines, x, low, lowY, slope, current };
 }
 
-/** Temporary current-data strokes, used only when no safe bitmap pixels can be shown. */
+/** Temporary current-data strokes while safe bitmap coverage is missing or too small. */
 export class MtpEmergencyPreview {
   private generation = 0;
   private readonly stats: MtpEmergencyStats = {

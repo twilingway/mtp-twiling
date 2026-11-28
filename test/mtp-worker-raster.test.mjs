@@ -36,6 +36,9 @@ const { mtpWorkerIntent } = load("model/mtp-worker-snapshot.js");
 const { paintMtpWorkerFrame, MTP_WORKER_PROTOCOL } = load("model/mtp-worker-protocol.js");
 const { MtpWorkerRefill } = load("model/mtp-worker-refill.js");
 const { MTP_EMERGENCY_VERTEX_LIMIT } = load("model/mtp-worker-emergency.js");
+const { mtpWorkerGeometry, mtpWorkerContentKey, mtpWorkerPreview } = load(
+  "model/mtp-worker-geometry.js"
+);
 
 function rasterCacheFor(search = "?mtpRaster=worker", enabled = true) {
   const code = ts.transpileModule(
@@ -635,7 +638,7 @@ test("a jump beyond one captured viewport paints bounded current-data MA until e
   f.cache.destroy();
 });
 
-test("covered and tiny-but-nonzero bitmap clips never double-paint a coarse main fan", () => {
+test("covered bitmap stays native while a below-85-percent clip uses full real coarse without double alpha", () => {
   const f = fixture({ now: () => 0 }),
     { frame, camera } = partialFrame();
   f.ready();
@@ -643,21 +646,65 @@ test("covered and tiny-but-nonzero bitmap clips never double-paint a coarse main
   f.result();
   f.cache.draw(frame);
   const emergency = f.cache.status().emergency.paints;
+  const origin = mtpWorkerIntent(frame);
+  const geometry = mtpWorkerGeometry(
+    frame,
+    origin,
+    mtpWorkerContentKey(frame),
+    mtpWorkerContentKey(frame, true)
+  );
   camera(0);
   f.cache.draw(frame, true);
   assert.equal(f.cache.status().emergency.paints, emergency);
   camera(423);
+  const plan = mtpWorkerPreview(frame, geometry);
+  assert.ok(
+    plan.clip.width > 0 && plan.clip.width < 10,
+    "the boundary has a real but tiny safe clip"
+  );
   const blits = frame.scope.context.blits.length;
   f.cache.draw(frame, true);
-  const clip = frame.scope.context.clips.at(-1);
-  assert.ok(clip[2] > 0 && clip[2] < 10, "the boundary has a real but tiny safe clip");
-  assert.equal(frame.scope.context.blits.length, blits + 1);
+  assert.equal(frame.scope.context.blits.length, blits);
   assert.equal(
     f.cache.status().emergency.paints,
-    emergency,
-    "ZERO-overlap policy is deliberate; no full coarse layer under a partial bitmap"
+    emergency + 1,
+    "coarse replaces a mostly-missing bitmap; it is never painted underneath that partial bitmap"
   );
   f.cache.destroy();
+});
+
+test("rejected coarse keeps a valid partial clip, but cancellation cannot paint or rearm anything", () => {
+  for (const cancelled of [false, true]) {
+    let clock = 0;
+    const f = fixture({ now: () => clock }),
+      { frame, camera } = partialFrame();
+    f.ready();
+    f.cache.draw(frame);
+    const old = f.result();
+    f.cache.draw(frame);
+    camera(100);
+    f.cache.draw(frame, true); // One refill is already in flight.
+    clock = 10;
+    camera(423);
+    const paints = f.cache.status().emergency.paints,
+      blits = frame.scope.context.blits.length;
+    frame.model.sma = () => {
+      if (cancelled) f.cache.destroy();
+      return null;
+    };
+    f.cache.draw(frame, true);
+    assert.equal(f.cache.status().emergency.paints, paints);
+    assert.equal(frame.scope.context.blits.length, blits + (cancelled ? 0 : 1));
+    if (!cancelled) {
+      assert.equal(frame.scope.context.blits.at(-1)[0], old);
+      assert.ok(frame.scope.context.clips.at(-1)[2] > 0);
+      assert.equal(f.cache.pending(), true);
+    } else {
+      assert.equal(f.timers.size, 0);
+      assert.equal(old.closed, 1);
+    }
+    f.cache.destroy();
+  }
 });
 
 test("emergency paint uses new reset data while old ownership, unsupported projection and destroyed caches cannot paint", () => {
@@ -979,9 +1026,12 @@ test("long held pan refills below 85 percent at most once per 150ms, then idle d
   assert.equal(reads.prefix - oldReads.prefix, sent.length);
   assert.equal(reads.extrema - oldReads.extrema, sent.length);
   assert.equal(
-    frame.scope.context.blits.length - blits,
+    frame.scope.context.blits.length -
+      blits +
+      f.cache.status().emergency.paints -
+      before.emergency.paints,
     80,
-    "the fan remains visible on every pan frame"
+    "every pan frame uses exactly one visible path: safe bitmap or full coarse, never both"
   );
   clock += 10;
   camera(401);

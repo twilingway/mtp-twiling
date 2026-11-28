@@ -19,6 +19,7 @@ import type { MtpWorkerReadyBitmap as Ready } from "./mtp-worker-geometry.js";
 import { MtpEmergencyPreview } from "./mtp-worker-emergency.js";
 import type { MtpRasterWorker, MtpWorkerEnvironment, MtpWorkerStatus } from "./mtp-worker-types.js";
 export type { MtpRasterWorker, MtpWorkerEnvironment, MtpWorkerStatus } from "./mtp-worker-types.js";
+import type { MtpWorkerDispatched as Dispatched } from "./mtp-worker-types.js";
 const browser: MtpWorkerEnvironment = {
   create() {
     if (typeof Worker === "undefined" || typeof OffscreenCanvas === "undefined")
@@ -31,11 +32,6 @@ const browser: MtpWorkerEnvironment = {
   cancel: (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>),
   build: BUILD_ID
 };
-interface Dispatched {
-  id: number;
-  intent: MtpWorkerIntent;
-  geometry: MtpWorkerGeometry;
-}
 
 /** One owned worker, one dispatched job, one latest intent and one owned ready bitmap. */
 export class MtpWorkerRasterCache {
@@ -325,6 +321,17 @@ export class MtpWorkerRasterCache {
       this.forcedKey = undefined;
     } else this.previews++;
   }
+  private coarse(source: MtpRasterFrame): boolean {
+    const key = this.lastContentKey;
+    return this.emergency.draw(
+      source,
+      () =>
+        this.state !== "fallback" &&
+        this.state !== "destroyed" &&
+        this.owner === source.model &&
+        key === this.lastContentKey
+    );
+  }
   private preview(source: MtpRasterFrame): MtpWorkerPreviewPlan | undefined {
     const ready = this.ready;
     const plan = ready ? mtpWorkerPreview(source, ready.geometry) : undefined;
@@ -332,23 +339,22 @@ export class MtpWorkerRasterCache {
     else if (ready && plan?.clip) {
       const context = source.scope.context,
         clip = plan.clip;
+      if (clip.width * clip.height < 0.85 * ready.geometry.width * ready.geometry.height) {
+        if (this.coarse(source)) return plan;
+        if (
+          this.ready !== ready ||
+          this.owner !== source.model ||
+          mtpWorkerContentKey(source, true) !== ready.geometry.previewHardKey
+        )
+          return plan;
+      }
       context.save();
       context.beginPath();
       context.rect(clip.x, clip.y, clip.width, clip.height);
       context.clip();
       this.blit(source, ready, plan.matrix, false);
       context.restore();
-    } else {
-      const key = this.lastContentKey;
-      this.emergency.draw(
-        source,
-        () =>
-          this.state !== "fallback" &&
-          this.state !== "destroyed" &&
-          this.owner === source.model &&
-          key === this.lastContentKey
-      );
-    }
+    } else this.coarse(source);
     return plan;
   }
   /** True includes a blank pending layer; the caller must not run heavy sync paint as well. */
@@ -391,8 +397,10 @@ export class MtpWorkerRasterCache {
       this.latest = undefined;
       this.desiredKey = undefined;
       this.needsDraw = true;
+      const plan = this.preview(source);
+      if (!this.worker) return true;
       this.refillPermit = this.refill.allow(
-        this.preview(source)?.refill ?? (!this.ready && source.uniformX === "lightweight")
+        plan?.refill ?? (!this.ready && source.uniformX === "lightweight")
       );
       if (!this.refillPermit) return true;
     }
