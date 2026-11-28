@@ -2,7 +2,7 @@
 
 ## 1. Контракт и точный буфер
 
-- [ ] 1.1 Разделить core/capture и адаптивный X-запас; unit проверяет реальные индексы, границы
+- [x] 1.1 Разделить core/capture и адаптивный X-запас; unit проверяет реальные индексы, границы
       истории и 4 Mi-pixels/4096 px.
 - [ ] 1.2 Реализовать Worker paint без изменения core; command/pixel tests проверяют phase,
       3000/3001, caps/joins, alpha и дробный DPR.
@@ -10,11 +10,11 @@
 
 ## 2. Ранняя подготовка и непрерывные края
 
-- [ ] 2.1 Запускать bounded refill до исчерпания запаса; unit проверяет covered-prefetch, 150 ms
+- [x] 2.1 Запускать bounded refill до исчерпания запаса; unit проверяет covered-prefetch, 150 ms
       cap, one in-flight и отсутствие N-обхода на кадр.
-- [ ] 2.2 Заменять любой реально uncovered partial текущим coarse; тесты проверяют полосу 1 px,
+- [x] 2.2 Заменять любой реально uncovered partial текущим coarse; тесты проверяют полосу 1 px,
       нулевое покрытие, отсутствие double alpha и pending до exact.
-- [ ] 2.3 Сохранить reversal/source/reset/DPR/disable/destroy guards; scoped lifecycle tests и
+- [x] 2.3 Сохранить reversal/source/reset/DPR/disable/destroy guards; scoped lifecycle tests и
       независимое ревью PASS.
 
 ## 3. Интеграция и видимая проверка
@@ -23,8 +23,9 @@
       source/build checkpoint.
 - [ ] 3.2 Измерить actual-canvas core pixel equality и новую стоимость paint/ready latency на ПК;
       проверить медленный pan, быстрый jump, разворот и отсутствие полосы.
-- [ ] 3.3 Проверить актуальную сборку на телефоне с BTC-AUD, день, MTP160+440, сохранив
-      пользовательские настройки/камеру и честно указав пределы проверки.
+- [ ] 3.3 По актуальному указанию пользователя выполнять проверку на компьютере, включая
+      мобильную эмуляцию и настоящий OffscreenCanvas при DPR 2.75. Физический телефон пользователь
+      забрал; не подключать его и не выдавать эмуляцию за проверку на устройстве.
 
 ## Workflow follow-up
 

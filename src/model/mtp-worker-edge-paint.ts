@@ -9,6 +9,10 @@ export function paintMtpWorkerEdges(
 ): void {
   if (frame.padX === 0 || (frame.captureStart === frame.start && frame.captureEnd === frame.end))
     return;
+  // Finish the original core before changing clips. Chrome's deferred Canvas renderer can
+  // otherwise change interior stroke AA when the expanded, clipped pass shares that batch.
+  // This bounded readback stays in the Worker; failures use its existing fallback boundary.
+  context.getImageData(0, 0, 1, 1);
   context.save();
   context.setTransform(1, 0, 0, 1, 0, 0);
   context.clearRect(0, 0, frame.padX, frame.height);

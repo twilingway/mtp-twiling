@@ -11,15 +11,17 @@ const { MTP_WORKER_PROTOCOL, paintMtpWorkerFrame, paintMtpWorkerCapture } = load
 );
 const { paintMtpWorkerEdges } = load("model/mtp-worker-edge-paint.js");
 
-function recorder() {
+function recorder(options = {}) {
   const commands = [];
   const context = new Proxy(
     {},
     {
       get:
         (_target, name) =>
-        (...args) =>
-          commands.push([name, ...args]),
+        (...args) => {
+          if (name === "getImageData" && options.failRead) throw new Error("readback failed");
+          commands.push([name, ...args]);
+        },
       set: (_target, name, value) => {
         commands.push([name, value]);
         return true;
@@ -118,6 +120,24 @@ for (const span of [3000, 3001]) {
     assert.deepEqual(actual.commands, expected.commands);
     assert.equal(actual.commands.filter(([op]) => op === "stroke").length, 2);
   });
+  test(`expanded and compressed captures emit bitwise-identical core commands at span ${span}`, () => {
+    const { frame, prefix } = fixture({ start: 100, end: 100 + span });
+    // Real-market magnitudes exercise cancellation without changing the shared prefix.
+    for (let index = 1; index < prefix.length; index++) prefix[index] *= 5100.123456789;
+    frame.priceOrigin *= 5100.123456789;
+    frame.ySlope /= 5100.123456789;
+    const coreOnly = {
+      ...frame,
+      captureStart: frame.start,
+      captureEnd: frame.end,
+      x: frame.x.slice(frame.start - frame.captureStart, frame.end - frame.captureStart + 1)
+    };
+    const expanded = recorder(),
+      compressed = recorder();
+    paintMtpWorkerFrame(expanded.context, frame, prefix);
+    paintMtpWorkerFrame(compressed.context, coreOnly, prefix);
+    assert.deepEqual(expanded.commands, compressed.commands);
+  });
 }
 
 test("expanded paths preserve each period's original phase, warmup and sampled gaps", () => {
@@ -157,7 +177,8 @@ test("edge clear and clip use integer physical strips, never the visible core", 
   const { frame, prefix } = fixture();
   const { context, commands } = recorder();
   paintMtpWorkerEdges(context, frame, prefix);
-  assert.deepEqual(commands.slice(0, 9), [
+  assert.deepEqual(commands.slice(0, 10), [
+    ["getImageData", 0, 0, 1, 1],
     ["save"],
     ["setTransform", 1, 0, 0, 1, 0, 0],
     ["clearRect", 0, 0, 264, 1200],
@@ -184,11 +205,11 @@ test("no additional real bars or zero padding skips all edge commands", () => {
   }
 });
 
-function workerHarness() {
+function workerHarness(options = {}) {
   const messages = [],
     canvases = [],
     allocations = [];
-  const { context, commands } = recorder();
+  const { context, commands } = recorder(options);
   class Canvas {
     constructor(width, height) {
       this.w = width;
@@ -260,9 +281,32 @@ test("protocol 2 Worker paints core first, then strips, on one bounded backing",
   assert.equal(worker.canvases.length, 1);
   assert.ok(worker.allocations.some(([w, h]) => w === 0 && h === 4096));
   const firstClear = worker.commands.findIndex(([op]) => op === "clearRect");
+  const firstFence = worker.commands.findIndex(([op]) => op === "getImageData");
+  assert.ok(firstFence > 0 && firstFence < firstClear);
+  assert.equal(worker.commands.slice(0, firstFence).filter(([op]) => op === "stroke").length, 2);
   assert.equal(worker.commands.slice(0, firstClear).filter(([op]) => op === "stroke").length, 2);
   assert.ok(worker.commands.some(([op, value]) => op === "lineCap" && value === "square"));
   assert.ok(worker.commands.some(([op, value]) => op === "miterLimit" && value === 17));
+});
+
+test("a failed core fence reaches the existing Worker failure boundary before any edge mutation", () => {
+  const worker = workerHarness({ failRead: true });
+  const { frame, prefix } = fixture();
+  worker.send({ type: "render", id: 1, key: "key", frame, prefix });
+  assert.equal(worker.messages.at(-1).type, "failure");
+  assert.match(worker.messages.at(-1).reason, /readback failed/);
+  assert.equal(
+    worker.messages.some(({ type }) => type === "result"),
+    false
+  );
+  assert.equal(
+    worker.commands.some(([op]) => op === "clearRect" || op === "clip"),
+    false
+  );
+  const coreOnly = workerHarness({ failRead: true });
+  const core = fixture({ captureStart: 100, captureEnd: 3101 });
+  coreOnly.send({ type: "render", id: 1, key: "core", frame: core.frame, prefix: core.prefix });
+  assert.equal(coreOnly.messages.at(-1).type, "result", "no extra real bars means no fence");
 });
 
 test("malformed capture geometry is rejected before canvas allocation", () => {
