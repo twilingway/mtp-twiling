@@ -407,4 +407,53 @@ test("ChartSurface preserves the editing owner when a second finger moves, relea
     assert.equal(finishEditorDrawing(controller), false, "Enter after cancel cannot commit");
     assert.equal(created.length, 0);
   }
+  const tap = (id, x) => {
+    const touch = { ...event(id, x), isPrimary: true, target: { tagName: "CANVAS" } };
+    surface.props.onPointerDownCapture(touch);
+    surface.props.onPointerUpCapture(touch);
+    surface.props.onLostPointerCapture(touch);
+  };
+  for (const tool of ["path", "polyline", "arc", "triangle", "quadraticCurve", "cubicCurve"]) {
+    state.activeTool = tool;
+    tap(11, 100);
+    assert.equal(drawingInput.pending(), true, `${tool}: first touch survives implicit release`);
+    assert.equal(drawingInput.active(), false, "tap tools never request explicit capture");
+    tap(12, 200);
+    assert.equal(drawingInput.pending(), true, `${tool}: second touch survives implicit release`);
+    assert.equal(state.preview.points.length, 2);
+    if (tool === "path" || tool === "polyline") {
+      assert.equal(finishEditorDrawing(controller), true);
+    } else {
+      tap(13, 300);
+      if (tool === "cubicCurve") {
+        assert.equal(drawingInput.pending(), true);
+        tap(14, 350);
+      }
+    }
+    assert.equal(created.at(-1).name, tool);
+    assert.equal(drawingInput.pending(), false);
+    const committed = created.length;
+    tap(21, 100);
+    surface.props.onPointerCancelCapture({ ...event(21), isPrimary: true });
+    assert.equal(
+      drawingInput.pending(),
+      false,
+      `${tool}: actual pointercancel clears pending taps`
+    );
+    assert.equal(finishEditorDrawing(controller), false);
+    assert.equal(created.length, committed, "cancel never writes a drawing");
+  }
+  state.activeTool = "brush";
+  const committed = created.length;
+  surface.props.onPointerDownCapture(event(1));
+  surface.props.onPointerMoveCapture(event(1, 200));
+  assert.equal(drawingInput.active(), true);
+  assert.equal(capture.has(1), true);
+  capture.delete(1); // The browser reports unexpected loss before pointerup.
+  surface.props.onLostPointerCapture(event(1));
+  assert.equal(drawingInput.pending(), false);
+  assert.equal(state.preview, null);
+  surface.props.onPointerUpCapture(event(1, 200));
+  assert.equal(created.length, committed, "lost explicit brush capture never commits");
+  assert.deepEqual(finished, [1], "cancelled drafts do not add editing history");
 });

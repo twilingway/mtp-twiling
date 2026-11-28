@@ -406,7 +406,14 @@ export function ChartGestures({
         ohlc.cancel(event);
         measurement.cancel(event);
         cameraInput.up(event);
-        cancel(event);
+        // Touch taps release the browser's implicit capture after pointerup. Only loss of
+        // capture explicitly owned by an active drawing gesture can cancel its draft.
+        if (
+          (drawingInput.active() && drawingInput.owns(event.pointerId)) ||
+          drag.current?.pointerId === event.pointerId ||
+          pan.current?.pointerId === event.pointerId
+        )
+          cancel(event);
       }}
       onPointerLeave={(event) => {
         ohlc.leave();
